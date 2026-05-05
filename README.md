@@ -86,7 +86,24 @@ Biến môi trường tuỳ chọn (Vite):
 - `VITE_BACKEND_URL` (mặc định `http://localhost:4000/api`)
 - `VITE_SOCKET_URL` (mặc định `http://localhost:4000`)
 
-## 6) Luồng demo nhanh
+## 6) Giao diện app mới
+
+Giao diện người dùng mới đã được thêm vào thư mục `web-app/`.
+
+```bash
+cd web-app
+npm install --legacy-peer-deps
+npm run dev
+```
+
+File `.env` trong `web-app/` chứa cấu hình Supabase, và bạn có thể thêm:
+
+```env
+VITE_BACKEND_URL=http://localhost:4000/api
+VITE_SOCKET_URL=http://localhost:4000
+```
+
+## 7) Luồng demo nhanh
 
 1. Chạy backend.
 2. Mở web-admin.
