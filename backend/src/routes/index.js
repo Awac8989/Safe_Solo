@@ -16,9 +16,32 @@ const {
   listAlertTimeline,
   listEmergencySmsLogs,
 } = require('../controllers/adminController');
+const authRoutes = require('./authRoutes');
+const chatRoutes = require('./chatRoutes');
+const radarRoutes = require('./radarRoutes');
+const feedRoutes = require('./feedRoutes');
+const emergencyRoutes = require('./emergencyRoutes');
+const guardianRoutes = require('./guardianRoutes');
+const medicalRoutes = require('./medicalRoutes');
+const communityRoutes = require('./communityRoutes');
+const kycRoutes = require('./kycRoutes');
+const locationRoutes = require('./locationRoutes');
 
 const apiRouter = express.Router();
 
+// Prisma Routes
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/chat', chatRoutes);
+apiRouter.use('/radar', radarRoutes);
+apiRouter.use('/feed', feedRoutes);
+apiRouter.use('/emergencies', emergencyRoutes);
+apiRouter.use('/guardians', guardianRoutes);
+apiRouter.use('/medical', medicalRoutes);
+apiRouter.use('/community', communityRoutes);
+apiRouter.use('/kyc', kycRoutes);
+apiRouter.use('/location', locationRoutes);
+
+// Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);
 apiRouter.get('/users', listUsers);
 apiRouter.get('/users/:id', getUserById);

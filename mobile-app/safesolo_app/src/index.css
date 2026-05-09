@@ -1,0 +1,145 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SafeSolo Design System
+   Tối giản · Trực quan · Trợ năng cao
+   Tất cả màu HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 150 25% 98%;
+    --foreground: 155 30% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 155 30% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 155 30% 12%;
+
+    /* Xanh lá an tâm */
+    --primary: 152 60% 38%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 152 70% 55%;
+    --primary-soft: 152 50% 92%;
+
+    --secondary: 150 20% 94%;
+    --secondary-foreground: 155 30% 18%;
+
+    --muted: 150 15% 95%;
+    --muted-foreground: 155 12% 42%;
+
+    --accent: 152 50% 92%;
+    --accent-foreground: 152 60% 25%;
+
+    /* Cảnh báo */
+    --warning: 38 95% 55%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 88%;
+    --input: 150 15% 90%;
+    --ring: 152 60% 38%;
+
+    --radius: 1.25rem;
+
+    /* Gradients */
+    --gradient-safe: linear-gradient(135deg, hsl(152 60% 42%), hsl(152 70% 55%));
+    --gradient-warn: linear-gradient(135deg, hsl(38 95% 55%), hsl(20 90% 55%));
+    --gradient-danger: linear-gradient(135deg, hsl(0 80% 55%), hsl(350 85% 50%));
+    --gradient-bg: linear-gradient(180deg, hsl(150 30% 99%), hsl(150 25% 95%));
+
+    /* Shadows */
+    --shadow-safe: 0 20px 60px -15px hsl(152 60% 38% / 0.45);
+    --shadow-warn: 0 20px 60px -15px hsl(38 95% 55% / 0.5);
+    --shadow-danger: 0 20px 60px -15px hsl(0 80% 55% / 0.55);
+    --shadow-card: 0 4px 24px -8px hsl(155 30% 12% / 0.08);
+
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* High Contrast (WCAG AAA) */
+  .hc {
+    --background: 0 0% 0%;
+    --foreground: 60 100% 60%;
+    --card: 0 0% 5%;
+    --card-foreground: 60 100% 60%;
+    --primary: 120 100% 55%;
+    --primary-foreground: 0 0% 0%;
+    --primary-soft: 120 60% 12%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 60 100% 60%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 60 80% 75%;
+    --accent: 60 100% 50%;
+    --accent-foreground: 0 0% 0%;
+    --warning: 48 100% 60%;
+    --destructive: 0 100% 60%;
+    --border: 60 100% 50%;
+    --input: 0 0% 15%;
+    --ring: 60 100% 60%;
+    --shadow-card: 0 0 0 2px hsl(60 100% 50%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04';
+  }
+  h1, h2, h3, h4 {
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .gradient-safe { background: var(--gradient-safe); }
+  .gradient-warn { background: var(--gradient-warn); }
+  .gradient-danger { background: var(--gradient-danger); }
+  .gradient-bg { background: var(--gradient-bg); }
+
+  .shadow-safe { box-shadow: var(--shadow-safe); }
+  .shadow-warn { box-shadow: var(--shadow-warn); }
+  .shadow-danger { box-shadow: var(--shadow-danger); }
+  .shadow-card { box-shadow: var(--shadow-card); }
+}
+
+/* Pulse cho Heartbeat button */
+@keyframes heartbeat-safe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 24px hsl(var(--primary) / 0); }
+}
+@keyframes heartbeat-warn {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 hsl(var(--warning) / 0.6); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 32px hsl(var(--warning) / 0); }
+}
+@keyframes heartbeat-danger {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 hsl(var(--destructive) / 0.7); }
+  50% { transform: scale(1.07); box-shadow: 0 0 0 36px hsl(var(--destructive) / 0); }
+}
+.animate-heartbeat-safe { animation: heartbeat-safe 3s ease-in-out infinite; }
+.animate-heartbeat-warn { animation: heartbeat-warn 1.5s ease-in-out infinite; }
+.animate-heartbeat-danger { animation: heartbeat-danger 0.9s ease-in-out infinite; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.animate-blink { animation: blink 1s ease-in-out infinite; }
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.4s ease-out both; }

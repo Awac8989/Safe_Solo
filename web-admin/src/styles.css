@@ -1,133 +1,110 @@
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #f4f7fb;
-  color: #1f2937;
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sos: var(--sos);
+  --color-duress: var(--duress);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 16px;
+:root {
+  --radius: 0.625rem;
+  /* Dark command center theme - default */
+  --background: oklch(0.16 0.02 260);
+  --foreground: oklch(0.97 0.01 250);
+  --card: oklch(0.21 0.025 260);
+  --card-foreground: oklch(0.97 0.01 250);
+  --popover: oklch(0.21 0.025 260);
+  --popover-foreground: oklch(0.97 0.01 250);
+  --primary: oklch(0.72 0.18 220);
+  --primary-foreground: oklch(0.12 0.02 260);
+  --secondary: oklch(0.27 0.03 260);
+  --secondary-foreground: oklch(0.97 0.01 250);
+  --muted: oklch(0.25 0.025 260);
+  --muted-foreground: oklch(0.7 0.03 256);
+  --accent: oklch(0.3 0.05 260);
+  --accent-foreground: oklch(0.97 0.01 250);
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(0.98 0.01 250);
+  --border: oklch(0.3 0.03 260);
+  --input: oklch(0.3 0.03 260);
+  --ring: oklch(0.72 0.18 220);
+
+  --sos: oklch(0.62 0.24 25);
+  --duress: oklch(0.6 0.22 305);
+  --warning: oklch(0.78 0.17 70);
+  --success: oklch(0.7 0.18 150);
+  --info: oklch(0.72 0.18 220);
+
+  --sidebar: oklch(0.13 0.02 260);
+  --sidebar-foreground: oklch(0.94 0.01 250);
+  --sidebar-primary: oklch(0.72 0.18 220);
+  --sidebar-primary-foreground: oklch(0.12 0.02 260);
+  --sidebar-accent: oklch(0.24 0.03 260);
+  --sidebar-accent-foreground: oklch(0.97 0.01 250);
+  --sidebar-border: oklch(0.27 0.03 260);
+  --sidebar-ring: oklch(0.72 0.18 220);
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
 }
 
-.header button,
-button {
-  border: none;
-  border-radius: 8px;
-  padding: 10px 14px;
-  background: #0d9488;
-  color: white;
-  cursor: pointer;
+@keyframes pulse-sos {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--sos) 60%, transparent); }
+  50% { box-shadow: 0 0 0 12px color-mix(in oklab, var(--sos) 0%, transparent); }
 }
-
-.sos-banner {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  background: #fee2e2;
-  border: 2px solid #dc2626;
+@keyframes pulse-duress {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--duress) 60%, transparent); }
+  50% { box-shadow: 0 0 0 12px color-mix(in oklab, var(--duress) 0%, transparent); }
 }
+.pulse-sos { animation: pulse-sos 1.4s ease-out infinite; }
+.pulse-duress { animation: pulse-duress 1.6s ease-out infinite; }
 
-.error {
-  color: #b91c1c;
-  font-weight: 600;
-}
-
-.stats-grid {
-  margin-top: 16px;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.stat-card {
-  background: white;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid #d1d5db;
-}
-
-.panel {
-  margin-top: 16px;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #d1d5db;
-  padding: 12px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th,
-td {
-  border-bottom: 1px solid #e5e7eb;
-  text-align: left;
-  padding: 10px;
-  font-size: 14px;
-}
-
-.status {
-  display: inline-block;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.status-safe {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-warning {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-sos {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.filter-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.filter-btn {
-  background: #64748b;
-}
-
-.filter-btn.active {
-  background: #0d9488;
-}
-
-.selected-emergency-row {
-  background: #ecfeff;
-}
-
-.selected-emergency-row td {
-  border-bottom-color: #99f6e4;
-}
-
-.monitoring-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 8px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: #ccfbf1;
-  color: #0f766e;
-  font-size: 12px;
-  font-weight: 700;
+.scanline-bg {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--info) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--info) 8%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
