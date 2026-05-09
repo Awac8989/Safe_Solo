@@ -1,66 +1,37 @@
 const jwt = require('jsonwebtoken');
-const prisma = require('../config/database');
 
-const auth = async (req, res, next) => {
+const { readState } = require('../data/store');
+const { sanitizeUser } = require('../lib/utils');
+
+module.exports = async function auth(req, res, next) {
   try {
-    let token;
-
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: 'Not authorized to access this resource'
+        error: 'Not authorized to access this resource',
       });
     }
 
-    try {
-      // Verify token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'safesolo-dev-secret');
+    const state = readState();
+    const user = state.users.find((item) => item.id === decoded.id);
 
-      // Get user from token
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          isActive: true,
-          isVerified: true
-        }
-      });
-
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          error: 'User not found'
-        });
-      }
-
-      if (!user.isActive) {
-        return res.status(401).json({
-          success: false,
-          error: 'Account is deactivated'
-        });
-      }
-
-      req.user = user;
-      next();
-    } catch (error) {
+    if (!user || !user.isActive) {
       return res.status(401).json({
         success: false,
-        error: 'Not authorized to access this resource'
+        error: 'User not found or inactive',
       });
     }
-  } catch (error) {
-    return res.status(500).json({
+
+    req.user = sanitizeUser(user);
+    next();
+  } catch (_error) {
+    return res.status(401).json({
       success: false,
-      error: 'Server Error'
+      error: 'Not authorized to access this resource',
     });
   }
 };
-
-module.exports = auth;

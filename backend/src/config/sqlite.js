@@ -119,6 +119,38 @@ function mapAlertEventRow(row) {
   };
 }
 
+function mapInteractionEventRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    _id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    source: row.source,
+    metadata: safeParse(row.meta_json, {}),
+    createdAt: row.created_at,
+  };
+}
+
+function mapAlertPolicyRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    _id: row.id,
+    userId: row.user_id,
+    level1Minutes: row.level1_minutes,
+    level2Minutes: row.level2_minutes,
+    level3Minutes: row.level3_minutes,
+    level4Enabled: Boolean(row.level4_enabled),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -181,6 +213,28 @@ function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS interaction_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      source TEXT NOT NULL,
+      meta_json TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS alert_policies (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      level1_minutes INTEGER NOT NULL DEFAULT 30,
+      level2_minutes INTEGER NOT NULL DEFAULT 5,
+      level3_minutes INTEGER NOT NULL DEFAULT 15,
+      level4_enabled INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS sms_dispatch_logs (
       id TEXT PRIMARY KEY,
       emergency_log_id TEXT,
@@ -204,6 +258,9 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_emergency_resolved ON emergency_logs(is_resolved);
     CREATE INDEX IF NOT EXISTS idx_alert_user_id ON alert_events(user_id);
     CREATE INDEX IF NOT EXISTS idx_alert_created_at ON alert_events(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_interaction_user_id ON interaction_events(user_id);
+    CREATE INDEX IF NOT EXISTS idx_interaction_created_at ON interaction_events(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_policy_user_id ON alert_policies(user_id);
     CREATE INDEX IF NOT EXISTS idx_sms_emergency ON sms_dispatch_logs(emergency_log_id);
     CREATE INDEX IF NOT EXISTS idx_sms_user ON sms_dispatch_logs(user_id);
   `);
@@ -344,6 +401,42 @@ function initDatabase() {
   alertEventStatements.countAll = db.prepare('SELECT COUNT(*) AS total FROM alert_events');
   alertEventStatements.countByUser = db.prepare('SELECT COUNT(*) AS total FROM alert_events WHERE user_id = ?');
 
+  interactionEventStatements.create = db.prepare(`
+    INSERT INTO interaction_events (
+      id, user_id, type, source, meta_json, created_at
+    ) VALUES (
+      @id, @user_id, @type, @source, @meta_json, @created_at
+    )
+  `);
+  interactionEventStatements.listByUser = db.prepare(`
+    SELECT * FROM interaction_events
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+
+  alertPolicyStatements.create = db.prepare(`
+    INSERT INTO alert_policies (
+      id, user_id, level1_minutes, level2_minutes, level3_minutes,
+      level4_enabled, created_at, updated_at
+    ) VALUES (
+      @id, @user_id, @level1_minutes, @level2_minutes, @level3_minutes,
+      @level4_enabled, @created_at, @updated_at
+    )
+  `);
+  alertPolicyStatements.getByUserId = db.prepare(`
+    SELECT * FROM alert_policies WHERE user_id = ?
+  `);
+  alertPolicyStatements.updateByUserId = db.prepare(`
+    UPDATE alert_policies
+    SET level1_minutes = @level1_minutes,
+        level2_minutes = @level2_minutes,
+        level3_minutes = @level3_minutes,
+        level4_enabled = @level4_enabled,
+        updated_at = @updated_at
+    WHERE user_id = @user_id
+  `);
+
   smsDispatchStatements.create = db.prepare(`
     INSERT INTO sms_dispatch_logs (
       id, emergency_log_id, user_id, to_phone, provider, attempt, success,
@@ -366,6 +459,8 @@ const userStatements = {};
 const checkinStatements = {};
 const emergencyStatements = {};
 const alertEventStatements = {};
+const interactionEventStatements = {};
+const alertPolicyStatements = {};
 const smsDispatchStatements = {};
 
 module.exports = {
@@ -375,10 +470,14 @@ module.exports = {
   mapUserRow,
   mapEmergencyRow,
   mapAlertEventRow,
+  mapInteractionEventRow,
+  mapAlertPolicyRow,
   mapSmsDispatchRow,
   userStatements,
   checkinStatements,
   emergencyStatements,
   alertEventStatements,
+  interactionEventStatements,
+  alertPolicyStatements,
   smsDispatchStatements,
 };

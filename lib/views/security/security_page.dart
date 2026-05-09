@@ -37,7 +37,7 @@ class _SecurityPageState extends State<SecurityPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Bảo mật'),
+        title: const Text('Bao mat'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -45,7 +45,7 @@ class _SecurityPageState extends State<SecurityPage> {
         actions: [
           TextButton(
             onPressed: _saveSecuritySettings,
-            child: const Text('Lưu', style: TextStyle(color: Colors.white)),
+            child: const Text('Luu', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -53,57 +53,50 @@ class _SecurityPageState extends State<SecurityPage> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Cài đặt bảo mật nâng cao',
+            'Cai dat bao mat nang cao',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Những cài đặt này giúp bảo vệ thông tin cá nhân của bạn',
+            'Luu y: duress PIN co the duoc dung de mo app trong tinh huong bi ep buoc.',
             style: TextStyle(color: Colors.grey.shade600),
           ),
           const SizedBox(height: 24),
-
-          // Real PIN
           TextFormField(
             controller: _realPinController,
             decoration: const InputDecoration(
-              labelText: 'Mật khẩu thật',
+              labelText: 'PIN chinh',
               border: OutlineInputBorder(),
-              hintText: 'Mật khẩu để mở khóa thông tin',
+              hintText: 'PIN de mo thong tin that',
             ),
             obscureText: true,
           ),
           const SizedBox(height: 16),
-
-          // Duress PIN
           TextFormField(
             controller: _duressPinController,
             decoration: const InputDecoration(
-              labelText: 'Mật khẩu duress',
+              labelText: 'Duress PIN',
               border: OutlineInputBorder(),
-              hintText: 'Mật khẩu giả khi bị ép buộc',
+              hintText: 'PIN gia khi can che do danh lac huong',
             ),
             obscureText: true,
           ),
           const SizedBox(height: 16),
-
-          // Stealth mode
           SwitchListTile(
-            title: const Text('Chế độ ẩn danh'),
-            subtitle: const Text('Ẩn ứng dụng khỏi danh sách ứng dụng'),
+            title: const Text('Stealth mode'),
+            subtitle: const Text('Rut gon giao dien khi mo app tu nhanh'),
             value: _stealthMode,
             onChanged: (value) => setState(() => _stealthMode = value),
           ),
           const Divider(),
-
-          // Auto wipe
           ListTile(
-            title: const Text('Tự động xóa dữ liệu'),
-            subtitle: Text(_autoWipeDays == 0 ? 'Không bao giờ' : 'Sau $_autoWipeDays ngày'),
+            title: const Text('Auto wipe'),
+            subtitle: Text(
+              _autoWipeDays == 0 ? 'Khong bao gio' : 'Sau $_autoWipeDays ngay',
+            ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showAutoWipeDialog(context),
           ),
-
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
@@ -120,7 +113,7 @@ class _SecurityPageState extends State<SecurityPage> {
                     Icon(Icons.info, color: Colors.blue.shade700),
                     const SizedBox(width: 8),
                     Text(
-                      'Lưu ý bảo mật',
+                      'Ghi chu',
                       style: TextStyle(
                         color: Colors.blue.shade700,
                         fontWeight: FontWeight.bold,
@@ -130,9 +123,7 @@ class _SecurityPageState extends State<SecurityPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '• Mật khẩu duress sẽ hiển thị thông tin giả\n'
-                  '• Chế độ ẩn danh giúp bảo vệ quyền riêng tư\n'
-                  '• Tự động xóa dữ liệu sau thời gian không hoạt động',
+                  'Stealth mode chi doi giao dien hien tai. Neu muon an hoan toan icon app, can can thiep them o muc native Android.',
                   style: TextStyle(color: Colors.blue.shade700),
                 ),
               ],
@@ -144,25 +135,29 @@ class _SecurityPageState extends State<SecurityPage> {
   }
 
   void _showAutoWipeDialog(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tự động xóa dữ liệu'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Auto wipe'),
         content: DropdownButtonFormField<int>(
-          value: _autoWipeDays,
-          items: [0, 7, 30, 90, 365].map((days) => DropdownMenuItem(
-            value: days,
-            child: Text(days == 0 ? 'Không bao giờ' : '$days ngày'),
-          )).toList(),
+          initialValue: _autoWipeDays,
+          items: [0, 7, 30, 90, 365]
+              .map(
+                (days) => DropdownMenuItem(
+                  value: days,
+                  child: Text(days == 0 ? 'Khong bao gio' : '$days ngay'),
+                ),
+              )
+              .toList(),
           onChanged: (value) => setState(() => _autoWipeDays = value ?? 0),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Huy'),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('OK'),
           ),
         ],
@@ -170,7 +165,7 @@ class _SecurityPageState extends State<SecurityPage> {
     );
   }
 
-  void _saveSecuritySettings() {
+  Future<void> _saveSecuritySettings() async {
     final security = Security(
       realPin: _realPinController.text.trim(),
       duressPin: _duressPinController.text.trim(),
@@ -178,10 +173,13 @@ class _SecurityPageState extends State<SecurityPage> {
       autoWipeDays: _autoWipeDays,
     );
 
-    context.read<AppProvider>().setSecurity(security);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã lưu cài đặt bảo mật')),
-    );
+    await context.read<AppProvider>().setSecurity(security);
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Da luu cai dat bao mat')));
     Navigator.pop(context);
   }
 }

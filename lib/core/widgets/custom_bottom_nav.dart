@@ -9,19 +9,42 @@ class CustomBottomNav extends StatelessWidget {
     super.key,
     required this.active,
     required this.onChanged,
-    this.onTap,
   });
 
   final BottomTab active;
   final ValueChanged<BottomTab> onChanged;
-  final VoidCallback? onTap;
 
   static const List<_NavItem> _items = [
-    _NavItem(BottomTab.home, 'Điểm danh', Icons.home_rounded),
-    _NavItem(BottomTab.circle, 'Circle', Icons.auto_awesome_rounded),
-    _NavItem(BottomTab.messages, 'Tin nhắn', Icons.chat_bubble_rounded),
-    _NavItem(BottomTab.heroes, 'Heroes', Icons.workspace_premium_rounded),
-    _NavItem(BottomTab.settings, 'Cài đặt', Icons.settings_rounded),
+    _NavItem(
+      BottomTab.home,
+      'Diem danh',
+      Icons.home_outlined,
+      Icons.home_rounded,
+    ),
+    _NavItem(
+      BottomTab.circle,
+      'Circle',
+      Icons.auto_awesome_outlined,
+      Icons.auto_awesome_rounded,
+    ),
+    _NavItem(
+      BottomTab.messages,
+      'Tin nhan',
+      Icons.chat_bubble_outline_rounded,
+      Icons.chat_bubble_rounded,
+    ),
+    _NavItem(
+      BottomTab.heroes,
+      'Heroes',
+      Icons.workspace_premium_outlined,
+      Icons.workspace_premium_rounded,
+    ),
+    _NavItem(
+      BottomTab.settings,
+      'Cai dat',
+      Icons.settings_outlined,
+      Icons.settings_rounded,
+    ),
   ];
 
   @override
@@ -30,82 +53,71 @@ class CustomBottomNav extends StatelessWidget {
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.card.withValues(alpha: 0.95),
-          border: const Border(top: BorderSide(color: AppColors.border)),
+          color: AppColors.surface.withValues(alpha: 0.95),
+          border: Border(
+            top: BorderSide(color: AppColors.border.withValues(alpha: 0.55)),
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
         child: Row(
-          children: _items
-              .map(
-                (item) => Expanded(
-                  child: _BottomNavButton(
-                    item: item,
-                    active: item.tab == active,
-                    onPressed: () {
-                      onTap?.call();
-                      onChanged(item.tab);
-                    },
+          children: _items.map((item) {
+            final isActive = item.tab == active;
+            return Expanded(
+              child: Semantics(
+                button: true,
+                selected: isActive,
+                label: item.label,
+                child: InkWell(
+                  onTap: () => onChanged(item.tab),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  child: SizedBox(
+                    height: 58,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          curve: Curves.easeOut,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.primarySoft
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            isActive ? item.activeIcon : item.icon,
+                            size: 20,
+                            color: isActive
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                            fontSize: 10,
+                            color: isActive
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                            fontWeight: isActive
+                                ? FontWeight.w700
+                                : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomNavButton extends StatelessWidget {
-  const _BottomNavButton({
-    required this.item,
-    required this.active,
-    required this.onPressed,
-  });
-
-  final _NavItem item;
-  final bool active;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final iconColor = active ? AppColors.primary : AppColors.textMuted;
-    final textColor = active ? AppColors.primary : AppColors.textMuted;
-
-    return Semantics(
-      button: true,
-      selected: active,
-      label: item.label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        onTap: onPressed,
-        child: SizedBox(
-          height: 56,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                width: 44,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: active ? AppColors.primarySoft : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(item.icon, size: 20, color: iconColor),
               ),
-              const SizedBox(height: 2),
-              Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.caption.copyWith(
-                  fontSize: 10,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -113,9 +125,10 @@ class _BottomNavButton extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.tab, this.label, this.icon);
+  const _NavItem(this.tab, this.label, this.icon, this.activeIcon);
 
   final BottomTab tab;
   final String label;
   final IconData icon;
+  final IconData activeIcon;
 }

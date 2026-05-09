@@ -15,11 +15,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Live Dispatch", url: "/", icon: Radio },
-  { title: "User & KYC", url: "/kyc", icon: Users },
-  { title: "Omnichannel", url: "/omnichannel", icon: Network },
-  { title: "Revenue & Partners", url: "/revenue", icon: DollarSign },
-  { title: "Audit Logs", url: "/audit", icon: ScrollText },
+  { title: "Trung tam dieu pho", url: "/", icon: Radio },
+  { title: "Nguoi dung va KYC", url: "/kyc", icon: Users },
+  { title: "Kenh lien lac", url: "/omnichannel", icon: Network },
+  { title: "Doanh thu va doi tac", url: "/revenue", icon: DollarSign },
+  { title: "Nhat ky he thong", url: "/audit", icon: ScrollText },
 ];
 
 export function AppSidebar() {
@@ -38,7 +38,7 @@ export function AppSidebar() {
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-bold tracking-wide">Alive?</span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Command Center
+                Dieu pho khan cap
               </span>
             </div>
           )}
@@ -46,7 +46,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Operations</SidebarGroupLabel>
+          <SidebarGroupLabel>Dieu hanh</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -68,7 +68,7 @@ export function AppSidebar() {
           <div className="px-2 py-2 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-success" />
-              All systems operational
+              Tat ca he thong dang hoat dong
             </div>
           </div>
         )}

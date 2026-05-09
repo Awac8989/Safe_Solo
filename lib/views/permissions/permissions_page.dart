@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
+import '../../core/widgets/app_shell.dart';
 
 class PermissionsPage extends StatefulWidget {
   const PermissionsPage({super.key});
@@ -14,6 +16,8 @@ class PermissionsPage extends StatefulWidget {
 class _PermissionsPageState extends State<PermissionsPage> {
   bool _locationGranted = false;
   bool _notificationGranted = false;
+  bool _microphoneGranted = false;
+  bool _contactsGranted = false;
   bool _isLoading = false;
 
   @override
@@ -23,284 +27,177 @@ class _PermissionsPageState extends State<PermissionsPage> {
   }
 
   Future<void> _checkPermissions() async {
-    final locationStatus = await Permission.location.status;
-    final notificationStatus = await Permission.notification.status;
-
+    final location = await Permission.location.status;
+    final notification = await Permission.notification.status;
+    final microphone = await Permission.microphone.status;
+    final contacts = await Permission.contacts.status;
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      _locationGranted = locationStatus.isGranted;
-      _notificationGranted = notificationStatus.isGranted;
-    });
-  }
-
-  Future<void> _requestLocationPermission() async {
-    final status = await Permission.location.request();
-    setState(() {
-      _locationGranted = status.isGranted;
-    });
-  }
-
-  Future<void> _requestNotificationPermission() async {
-    final status = await Permission.notification.request();
-    setState(() {
-      _notificationGranted = status.isGranted;
+      _locationGranted = location.isGranted;
+      _notificationGranted = notification.isGranted;
+      _microphoneGranted = microphone.isGranted;
+      _contactsGranted = contacts.isGranted;
     });
   }
 
   Future<void> _handleContinue() async {
-    if (!_locationGranted || !_notificationGranted) {
+    setState(() => _isLoading = true);
+
+    final location = await Permission.location.request();
+    final notification = await Permission.notification.request();
+    final microphone = await Permission.microphone.request();
+    final contacts = await Permission.contacts.request();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _locationGranted = location.isGranted;
+      _notificationGranted = notification.isGranted;
+      _microphoneGranted = microphone.isGranted;
+      _contactsGranted = contacts.isGranted;
+      _isLoading = false;
+    });
+
+    if (!_locationGranted || !_microphoneGranted || !_contactsGranted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng cấp quyền để tiếp tục'),
+          content: Text(
+            'SafeSolo can quyen vi tri, mic va danh ba de hoat dong day du.',
+          ),
         ),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      context.read<AppProvider>().grantPermissions();
-      // Navigation will be handled by AppRoot
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
-      );
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    context.read<AppProvider>().grantPermissions();
   }
 
   @override
   Widget build(BuildContext context) {
-    final allGranted = _locationGranted && _notificationGranted;
-
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.grey.shade50],
-          ),
+      body: AppPage(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 22),
+            Text(
+              'Cap quyen he thong',
+              style: AppTextStyles.h1.copyWith(fontSize: 34),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'De SafeSolo bao ve ban khi can, ung dung can cac quyen sau:',
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textSecondary,
+                height: 1.55,
+              ),
+            ),
+            const SizedBox(height: 28),
+            _PermissionCard(
+              icon: Icons.location_on_outlined,
+              title: 'Vi tri',
+              description: 'Gui toa do chinh xac cho guardian va SOS maps.',
+              granted: _locationGranted,
+            ),
+            const SizedBox(height: 16),
+            _PermissionCard(
+              icon: Icons.mic_none_rounded,
+              title: 'Microphone',
+              description: 'Thu am voice memo khan cap va push-to-talk.',
+              granted: _microphoneGranted,
+            ),
+            const SizedBox(height: 16),
+            _PermissionCard(
+              icon: Icons.notifications_active_outlined,
+              title: 'Thong bao',
+              description: 'Nhan nhac check-in va demo push SOS gan ban.',
+              granted: _notificationGranted,
+            ),
+            const SizedBox(height: 16),
+            _PermissionCard(
+              icon: Icons.contacts_outlined,
+              title: 'Danh ba',
+              description: 'Them nhanh guardians va lien he khan cap.',
+              granted: _contactsGranted,
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _handleContinue,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Cho phep tat ca'),
+              ),
+            ),
+            const SizedBox(height: 18),
+          ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+      ),
+    );
+  }
+}
+
+class _PermissionCard extends StatelessWidget {
+  const _PermissionCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.granted,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool granted;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
-                // Header
-                Icon(
-                  Icons.security,
-                  size: 80,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 24),
+                Text(title, style: AppTextStyles.title),
+                const SizedBox(height: 6),
                 Text(
-                  'Cấp quyền truy cập',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'SafeSolo cần các quyền sau để bảo vệ bạn tốt nhất',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey.shade600,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 60),
-                // Permissions list
-                Expanded(
-                  child: ListView(
-                    children: [
-                      // Location permission
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: _locationGranted
-                                    ? Colors.green.shade100
-                                    : Colors.grey.shade100,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.location_on,
-                                color: _locationGranted
-                                    ? Colors.green
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Vị trí',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Để gửi vị trí khi có sự cố khẩn cấp',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Colors.grey.shade600,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            if (_locationGranted)
-                              Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 24,
-                              )
-                            else
-                              ElevatedButton(
-                                onPressed: _requestLocationPermission,
-                                child: const Text('Cấp quyền'),
-                              ),
-                          ],
-                        ),
-                      ),
-                      // Notification permission
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                color: _notificationGranted
-                                    ? Colors.green.shade100
-                                    : Colors.grey.shade100,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.notifications,
-                                color: _notificationGranted
-                                    ? Colors.green
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Thông báo',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Để nhận nhắc nhở và cảnh báo kịp thời',
-                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                          color: Colors.grey.shade600,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            if (_notificationGranted)
-                              Icon(
-                                Icons.check_circle,
-                                color: Colors.green,
-                                size: 24,
-                              )
-                            else
-                              ElevatedButton(
-                                onPressed: _requestNotificationPermission,
-                                child: const Text('Cấp quyền'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Continue button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: (allGranted && !_isLoading) ? _handleContinue : null,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text(
-                            'Tiếp tục',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    // Skip permissions (not recommended)
-                    context.read<AppProvider>().grantPermissions();
-                  },
-                  child: Text(
-                    'Bỏ qua (không khuyến nghị)',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
+                  description,
+                  style: AppTextStyles.body.copyWith(height: 1.55),
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(width: 10),
+          Icon(
+            granted ? Icons.check_rounded : Icons.add_rounded,
+            color: granted ? AppColors.primary : AppColors.textMuted,
+            size: 24,
+          ),
+        ],
       ),
     );
   }

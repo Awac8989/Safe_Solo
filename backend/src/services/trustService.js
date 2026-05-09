@@ -1,28 +1,22 @@
-const prisma = require('../config/database');
+const { withState } = require('../data/store');
+const { AppError } = require('../lib/errors');
 
 class TrustService {
-  async calculateAndUpdateTrustScore(volunteerId, rating) {
-    const volunteer = await prisma.user.findUnique({
-      where: { id: volunteerId },
-      select: {
-        trust_score: true,
-        rescues_count: true
+  async calculateAndUpdateTrustScore(volunteerId, rating = 5) {
+    return withState((state) => {
+      const volunteer = state.users.find((item) => item.id === volunteerId);
+      if (!volunteer) {
+        throw new AppError('Volunteer not found', 404);
       }
-    });
 
-    if (!volunteer) {
-      throw new Error('Volunteer not found');
-    }
+      const oldCount = Number(volunteer.rescuesCount || 0);
+      const oldScore = Number(volunteer.trustScore || 5);
+      const newCount = oldCount + 1;
+      volunteer.rescuesCount = newCount;
+      volunteer.trustScore = Number((((oldScore * oldCount) + Number(rating)) / newCount).toFixed(2));
+      volunteer.updatedAt = new Date().toISOString();
 
-    const newRescuesCount = volunteer.rescues_count + 1;
-    const newTrustScore = ((volunteer.trust_score * volunteer.rescues_count) + rating) / newRescuesCount;
-
-    return prisma.user.update({
-      where: { id: volunteerId },
-      data: {
-        trust_score: newTrustScore,
-        rescues_count: newRescuesCount
-      }
+      return volunteer;
     });
   }
 }

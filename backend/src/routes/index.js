@@ -9,6 +9,10 @@ const {
   setSleepMode,
   listUsers,
   getUserById,
+  getAlertPolicy,
+  updateAlertPolicyByUser,
+  listUserInteractions,
+  createUserInteraction,
 } = require('../controllers/userController');
 const {
   listEmergencies,
@@ -50,6 +54,10 @@ apiRouter.patch('/users/:id/timer', updateTimer);
 apiRouter.patch('/users/:id/location', updateLocation);
 apiRouter.patch('/users/:id/preferences', updatePreferences);
 apiRouter.patch('/users/:id/sleep-mode', setSleepMode);
+apiRouter.get('/users/:id/alert-policy', getAlertPolicy);
+apiRouter.patch('/users/:id/alert-policy', updateAlertPolicyByUser);
+apiRouter.get('/users/:id/interactions', listUserInteractions);
+apiRouter.post('/users/:id/interactions', createUserInteraction);
 
 apiRouter.get('/admin/emergencies', listEmergencies);
 apiRouter.patch('/admin/emergencies/:id/resolve', resolveEmergencyLog);

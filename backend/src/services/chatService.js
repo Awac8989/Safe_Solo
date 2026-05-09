@@ -1,155 +1,207 @@
-const prisma = require('../config/database');
+const path = require('path');
+
+const { readState, withState, createId, nowIso } = require('../data/store');
+const { AppError } = require('../lib/errors');
+const { sanitizeUser } = require('../lib/utils');
 
 class ChatService {
-  // Check if user has access to chat room
-  async checkUserAccessToRoom(userId, roomId) {
-    const chatRoom = await prisma.chatRoom.findUnique({
-      where: { id: roomId },
-      include: {
-        incident: {
-          include: {
-            victim: true,
-            responses: {
-              where: { status: 'ARRIVED' },
-              include: { volunteer: true }
-            }
-          }
-        }
-      }
-    });
-
-    if (!chatRoom) {
-      throw new Error('Chat room not found');
+  ensureRoomAccess(state, userId, roomId) {
+    const room = state.chatRooms.find((item) => item.id === roomId);
+    if (!room) {
+      throw new AppError('Chat room not found', 404);
+    }
+    if (room.status === 'READ_ONLY') {
+      throw new AppError('Chat room is closed', 403);
     }
 
-    if (chatRoom.status === 'READ_ONLY') {
-      throw new Error('Chat room is closed');
+    const incident = state.rescueIncidents.find((item) => item.id === room.incidentId);
+    if (!incident) {
+      throw new AppError('Incident not found', 404);
     }
 
-    const incident = chatRoom.incident;
-
-    // Check if user is the victim
-    if (incident.victimId === userId) {
-      return true;
-    }
-
-    // Check if user is an accepted volunteer
-    const isAcceptedVolunteer = incident.responses.some(response =>
-      response.volunteerId === userId && response.status === 'ARRIVED'
+    const acceptedVolunteer = state.volunteerResponses.some(
+      (item) => item.incidentId === incident.id && item.volunteerId === userId,
     );
-    if (isAcceptedVolunteer) {
-      return true;
+    const guardian = state.guardianRelationships.some(
+      (item) =>
+        item.requesterId === incident.victimId &&
+        item.guardianId === userId &&
+        item.status === 'ACCEPTED',
+    );
+
+    if (incident.victimId !== userId && !acceptedVolunteer && !guardian) {
+      throw new AppError('Unauthorized access to chat room', 403);
     }
 
-    // Check if user is a guardian of the victim
-    const guardianRelation = await prisma.guardianRelationship.findFirst({
-      where: {
-        requesterId: incident.victimId,
-        guardianId: userId,
-        status: 'ACCEPTED'
+    return { room, incident };
+  }
+
+  async checkUserAccessToRoom(userId, roomId) {
+    const state = readState();
+    this.ensureRoomAccess(state, userId, roomId);
+    return true;
+  }
+
+  async createChatRoom(incidentId) {
+    return withState((state) => {
+      let room = state.chatRooms.find((item) => item.incidentId === incidentId);
+      if (!room) {
+        room = {
+          id: createId('room'),
+          incidentId,
+          status: 'ACTIVE',
+          createdAt: nowIso(),
+          closedAt: null,
+        };
+        state.chatRooms.push(room);
       }
+      return room;
     });
-
-    if (guardianRelation) {
-      return true;
-    }
-
-    throw new Error('Unauthorized access to chat room');
   }
 
-  // Create a new message
-  async createMessage(roomId, senderId, messageType, content) {
-    const message = await prisma.message.create({
-      data: {
-        roomId,
-        senderId: senderId || null, // Null for system messages
-        messageType,
-        content
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true
-          }
-        }
-      }
-    });
-
-    return message;
-  }
-
-  // Broadcast system message to room
-  async broadcastSystemMessage(roomId, text) {
-    return await this.createMessage(roomId, null, 'SYSTEM', text);
-  }
-
-  // Close chat room (set to READ_ONLY)
-  async closeChatRoom(incidentId) {
-    const chatRoom = await prisma.chatRoom.findUnique({
-      where: { incidentId }
-    });
-
-    if (!chatRoom) {
-      throw new Error('Chat room not found for this incident');
-    }
-
-    await prisma.chatRoom.update({
-      where: { id: chatRoom.id },
-      data: {
-        status: 'READ_ONLY',
-        closedAt: new Date()
-      }
-    });
-
-    // Broadcast system message about room closure
-    await this.broadcastSystemMessage(chatRoom.id, 'This chat room has been closed as the incident has been resolved.');
-
-    return chatRoom.id;
-  }
-
-  // Get chat room by incident ID
   async getChatRoomByIncident(incidentId) {
-    return await prisma.chatRoom.findUnique({
-      where: { incidentId },
-      include: {
-        messages: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                avatar: true
-              }
-            }
-          },
-          orderBy: { createdAt: 'asc' }
-        }
+    const state = readState();
+    const room = state.chatRooms.find((item) => item.incidentId === incidentId);
+    if (!room) {
+      throw new AppError('Chat room not found', 404);
+    }
+
+    return {
+      ...room,
+      messages: state.messages
+        .filter((item) => item.roomId === room.id)
+        .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))
+        .map((message) => this.enrichMessage(state, message)),
+    };
+  }
+
+  async createMessage(roomId, senderId, messageType, content, metadata = null) {
+    return withState((state) => {
+      if (senderId) {
+        this.ensureRoomAccess(state, senderId, roomId);
       }
+
+      const message = {
+        id: createId('msg'),
+        roomId,
+        senderId: senderId || null,
+        messageType,
+        content,
+        metadata: metadata || null,
+        createdAt: nowIso(),
+      };
+      state.messages.push(message);
+      return this.enrichMessage(state, message);
     });
   }
 
-  // Get messages by room ID
-  async getMessagesByRoomId(roomId) {
-    const messages = await prisma.message.findMany({
-      where: { roomId },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            avatar: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'asc' }
-    });
+  async broadcastSystemMessage(roomId, text, metadata = null) {
+    return this.createMessage(roomId, null, 'SYSTEM', text, metadata);
+  }
 
-    return messages;
+  enrichMessage(state, message) {
+    const sender = message.senderId
+      ? state.users.find((item) => item.id === message.senderId)
+      : null;
+
+    return {
+      ...message,
+      sender: sender ? sanitizeUser(sender) : null,
+    };
+  }
+
+  async getMessagesByRoomId(roomId) {
+    const state = readState();
+    return state.messages
+      .filter((item) => item.roomId === roomId)
+      .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))
+      .map((message) => this.enrichMessage(state, message));
+  }
+
+  async closeChatRoom(incidentId) {
+    return withState((state) => {
+      const room = state.chatRooms.find((item) => item.incidentId === incidentId);
+      if (!room) {
+        throw new AppError('Chat room not found for this incident', 404);
+      }
+      room.status = 'READ_ONLY';
+      room.closedAt = nowIso();
+      state.messages.push({
+        id: createId('msg'),
+        roomId: room.id,
+        senderId: null,
+        messageType: 'SYSTEM',
+        content: 'Chat khan cap da duoc dong vi su co da ket thuc.',
+        metadata: { incidentId },
+        createdAt: nowIso(),
+      });
+      return room;
+    });
+  }
+
+  async getInbox(userId) {
+    const state = readState();
+
+    const incidentRooms = state.chatRooms
+      .map((room) => {
+        const incident = state.rescueIncidents.find((item) => item.id === room.incidentId);
+        if (!incident) return null;
+
+        const canAccess =
+          incident.victimId === userId ||
+          state.guardianRelationships.some(
+            (item) =>
+              item.requesterId === incident.victimId &&
+              item.guardianId === userId &&
+              item.status === 'ACCEPTED',
+          ) ||
+          state.volunteerResponses.some(
+            (item) => item.incidentId === incident.id && item.volunteerId === userId,
+          );
+
+        if (!canAccess) return null;
+        const messages = state.messages
+          .filter((item) => item.roomId === room.id)
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        const lastMessage = messages[0] || null;
+        const victim = state.users.find((item) => item.id === incident.victimId);
+
+        return {
+          roomId: room.id,
+          type: 'INCIDENT',
+          incidentId: incident.id,
+          title: victim ? `${victim.firstName} ${victim.lastName}`.trim() : 'Emergency Room',
+          preview: lastMessage ? lastMessage.content : 'Chua co tin nhan',
+          timestamp: lastMessage ? lastMessage.createdAt : room.createdAt,
+          batteryLevel: victim?.batteryLevel ?? null,
+          status: room.status,
+        };
+      })
+      .filter(Boolean);
+
+    const familyRooms = state.guardianRelationships
+      .filter((item) => item.status === 'ACCEPTED' && (item.requesterId === userId || item.guardianId === userId))
+      .map((item) => {
+        const otherId = item.requesterId === userId ? item.guardianId : item.requesterId;
+        const otherUser = state.users.find((user) => user.id === otherId);
+        if (!otherUser) return null;
+        return {
+          roomId: `direct_${[userId, otherId].sort().join('_')}`,
+          type: 'DIRECT',
+          title: `${otherUser.firstName} ${otherUser.lastName}`.trim(),
+          preview: otherUser.approxAddress ? `Vi tri gan nhat: ${otherUser.approxAddress}` : 'Guardian da ket noi',
+          timestamp: item.updatedAt,
+          batteryLevel: otherUser.batteryLevel ?? null,
+          status: 'ACTIVE',
+        };
+      })
+      .filter(Boolean);
+
+    return [...incidentRooms, ...familyRooms].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+  }
+
+  buildVoiceUrl(filename) {
+    return `/uploads/voices/${path.basename(filename)}`;
   }
 }
 

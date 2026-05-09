@@ -2,6 +2,7 @@ const cors = require('cors');
 const express = require('express');
 
 const { apiRouter } = require('./routes');
+const adminPortalRoutes = require('./routes/adminPortalRoutes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -18,6 +19,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api', apiRouter);
+app.use('/api/admin', adminPortalRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

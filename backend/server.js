@@ -4,13 +4,16 @@ const { createServer } = require('http');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+
 const { initializeSocket } = require('./src/sockets/socketServer');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
 const prisma = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
-const emergencyRoutes = require('./src/routes/emergencyRoutes');
+const { startDeadManWorker } = require('./src/workers/deadmanWorker');
+const { initDatabase } = require('./src/config/sqlite');
+const { apiRouter } = require('./src/routes');
 
-// Import routes
+const emergencyRoutes = require('./src/routes/emergencyRoutes');
 const authRoutes = require('./src/routes/authRoutes');
 const medicalRoutes = require('./src/routes/medicalRoutes');
 const guardianRoutes = require('./src/routes/guardianRoutes');
@@ -20,41 +23,48 @@ const chatRoutes = require('./src/routes/chatRoutes');
 const feedRoutes = require('./src/routes/feedRoutes');
 const communityRoutes = require('./src/routes/communityRoutes');
 const kycRoutes = require('./src/routes/kycRoutes');
+const adminPortalRoutes = require('./src/routes/adminPortalRoutes');
 
 const app = express();
 const server = createServer(app);
 const io = initializeSocket(server);
 const port = process.env.PORT || 4000;
 
-// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: {
     success: false,
-    error: 'Too many requests from this IP, please try again later.'
-  }
+    error: 'Too many requests from this IP, please try again later.',
+  },
 });
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
-
-// Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     success: true,
     message: 'SafeSolo Backend is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   });
 });
 
-// API routes
+app.get('/api/health', (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'SafeSolo API is running',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Unified API router: includes Flutter legacy endpoints such as /api/users/register.
+app.use('/api', apiRouter);
+
+// Keep direct mounts for existing clients using these exact paths.
 app.use('/api/auth', authRoutes);
 app.use('/api/medical', medicalRoutes);
 app.use('/api/guardians', guardianRoutes);
@@ -65,14 +75,11 @@ app.use('/api/feed', feedRoutes);
 app.use('/api/community', communityRoutes);
 app.use('/api/emergency', emergencyRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/admin', adminPortalRoutes);
 
-// 404 handler
 app.use(notFoundHandler);
-
-// Error handler (must be last)
 app.use(errorHandler);
 
-// Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
   await prisma.$disconnect();
@@ -85,22 +92,25 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-// Start server
 server.listen(port, async () => {
   try {
-    // Test database connection
+    initDatabase();
     await prisma.$connect();
-    console.log('✅ Database connected successfully');
+    console.log('Database connected successfully');
   } catch (error) {
-    console.error('❌ Database connection failed:', error);
+    console.error('Database connection failed:', error);
     process.exit(1);
   }
 
-  // Start duress monitoring workers after socket is ready
-  startDuressWorkers();
+  startDeadManWorker(io);
+  try {
+    startDuressWorkers();
+  } catch (error) {
+    console.error('Duress workers disabled:', error.message);
+  }
 
-  console.log(`🚀 SafeSolo Backend running at http://localhost:${port}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`SafeSolo Backend running at http://localhost:${port}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 module.exports = app;

@@ -1,255 +1,196 @@
-const prisma = require('../config/database');
+const { readState, withState, createId, nowIso } = require('../data/store');
+const { AppError, ensure } = require('../lib/errors');
+const { sanitizeUser, normalizeEmail, fullName } = require('../lib/utils');
+const { createAlertEvent } = require('./alertEventService');
 
 class GuardianService {
-  // Send guardian request
-  async sendGuardianRequest(requesterId, guardianId, message = null) {
-    // Check if users exist
-    const [requester, guardian] = await Promise.all([
-      prisma.user.findUnique({ where: { id: requesterId } }),
-      prisma.user.findUnique({ where: { id: guardianId } })
-    ]);
+  async sendGuardianRequest(requesterId, guardianId, message = null, escalationLevel = 1) {
+    return withState((state) => {
+      const requester = state.users.find((item) => item.id === requesterId);
+      const guardian = state.users.find((item) => item.id === guardianId);
 
-    if (!requester || !guardian) {
-      throw new Error('User not found');
-    }
+      ensure(requester, 'Requester not found', 404);
+      ensure(guardian, 'Guardian not found', 404);
+      ensure(requesterId !== guardianId, 'Cannot send request to yourself');
 
-    if (requesterId === guardianId) {
-      throw new Error('Cannot send request to yourself');
-    }
+      const existing = state.guardianRelationships.find(
+        (item) =>
+          item.requesterId === requesterId &&
+          item.guardianId === guardianId &&
+          item.status !== 'REJECTED',
+      );
 
-    // Check if relationship already exists
-    const existingRelationship = await prisma.guardianRelationship.findUnique({
-      where: {
-        requesterId_guardianId: {
-          requesterId,
-          guardianId
-        }
+      if (existing) {
+        throw new AppError('Guardian request already exists', 409);
       }
-    });
 
-    if (existingRelationship) {
-      if (existingRelationship.status === 'PENDING') {
-        throw new Error('Request already sent');
-      }
-      if (existingRelationship.status === 'ACCEPTED') {
-        throw new Error('Already connected');
-      }
-      if (existingRelationship.status === 'BLOCKED') {
-        throw new Error('Cannot send request to blocked user');
-      }
-    }
-
-    // Create relationship request
-    const relationship = await prisma.guardianRelationship.create({
-      data: {
+      const relationship = {
+        id: createId('guard'),
         requesterId,
         guardianId,
-        message,
-        status: 'PENDING'
-      },
-      include: {
-        requester: {
-          select: { id: true, firstName: true, lastName: true, email: true }
-        },
-        guardian: {
-          select: { id: true, firstName: true, lastName: true, email: true }
-        }
-      }
-    });
+        status: 'PENDING',
+        escalationLevel,
+        guardianConfirmedAt: null,
+        lastNotifiedAt: null,
+        message: message || '',
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      };
 
-    return relationship;
+      state.guardianRelationships.push(relationship);
+      createAlertEvent({
+        userId: guardianId,
+        level: 'INFO',
+        status: 'GUARDIAN_REQUEST_RECEIVED',
+        source: 'USER',
+        title: 'Loi moi guardian',
+        message: `${fullName(requester)} muon ket noi voi ban`,
+        metadata: { relationshipId: relationship.id },
+      });
+
+      return {
+        ...relationship,
+        requester: sanitizeUser(requester),
+        guardian: sanitizeUser(guardian),
+      };
+    });
   }
 
-  // Respond to guardian request
   async respondToRequest(relationshipId, guardianId, action) {
-    const relationship = await prisma.guardianRelationship.findUnique({
-      where: { id: relationshipId }
+    return withState((state) => {
+      const relationship = state.guardianRelationships.find((item) => item.id === relationshipId);
+      ensure(relationship, 'Guardian request not found', 404);
+      ensure(relationship.guardianId === guardianId, 'Unauthorized', 403);
+      ensure(relationship.status === 'PENDING', 'Guardian request already handled', 409);
+
+      relationship.status = action === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
+      relationship.guardianConfirmedAt = action === 'ACCEPT' ? nowIso() : null;
+      relationship.updatedAt = nowIso();
+
+      createAlertEvent({
+        userId: relationship.requesterId,
+        level: 'INFO',
+        status: relationship.status === 'ACCEPTED' ? 'GUARDIAN_ACCEPTED' : 'GUARDIAN_REJECTED',
+        source: 'USER',
+        title: 'Cap nhat guardian',
+        message: `Guardian request ${relationship.status.toLowerCase()}`,
+        metadata: { relationshipId },
+      });
+
+      return relationship;
     });
-
-    if (!relationship) {
-      throw new Error('Relationship request not found');
-    }
-
-    if (relationship.guardianId !== guardianId) {
-      throw new Error('Unauthorized to respond to this request');
-    }
-
-    if (relationship.status !== 'PENDING') {
-      throw new Error('Request has already been responded to');
-    }
-
-    const newStatus = action === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
-
-    const updatedRelationship = await prisma.guardianRelationship.update({
-      where: { id: relationshipId },
-      data: { status: newStatus },
-      include: {
-        requester: {
-          select: { id: true, firstName: true, lastName: true, email: true }
-        },
-        guardian: {
-          select: { id: true, firstName: true, lastName: true, email: true }
-        }
-      }
-    });
-
-    return updatedRelationship;
   }
 
-  // Get user's guardians
   async getUserGuardians(userId) {
-    const relationships = await prisma.guardianRelationship.findMany({
-      where: {
-        OR: [
-          { requesterId: userId, status: 'ACCEPTED' },
-          { guardianId: userId, status: 'ACCEPTED' }
-        ]
-      },
-      include: {
-        requester: {
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatar: true }
-        },
-        guardian: {
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true, avatar: true }
-        }
-      }
-    });
+    const state = readState();
+    const accepted = state.guardianRelationships.filter(
+      (item) =>
+        item.status === 'ACCEPTED' &&
+        (item.requesterId === userId || item.guardianId === userId),
+    );
 
-    // Separate into guardians and proteges
-    const guardians = relationships
-      .filter(rel => rel.guardianId === userId)
-      .map(rel => ({
-        id: rel.id,
-        user: rel.requester,
-        relationship: 'protege',
-        connectedAt: rel.updatedAt
-      }));
+    const guardians = accepted
+      .filter((item) => item.requesterId === userId)
+      .map((item) => {
+        const user = state.users.find((entry) => entry.id === item.guardianId);
+        return {
+          relationshipId: item.id,
+          escalationLevel: item.escalationLevel,
+          guardianConfirmedAt: item.guardianConfirmedAt,
+          relationship: 'guardian',
+          user: user ? sanitizeUser(user) : null,
+        };
+      })
+      .filter((item) => item.user);
 
-    const proteges = relationships
-      .filter(rel => rel.requesterId === userId)
-      .map(rel => ({
-        id: rel.id,
-        user: rel.guardian,
-        relationship: 'guardian',
-        connectedAt: rel.updatedAt
-      }));
+    const proteges = accepted
+      .filter((item) => item.guardianId === userId)
+      .map((item) => {
+        const user = state.users.find((entry) => entry.id === item.requesterId);
+        return {
+          relationshipId: item.id,
+          escalationLevel: item.escalationLevel,
+          guardianConfirmedAt: item.guardianConfirmedAt,
+          relationship: 'protege',
+          user: user ? sanitizeUser(user) : null,
+        };
+      })
+      .filter((item) => item.user);
 
     return { guardians, proteges };
   }
 
-  // Get pending requests (sent and received)
   async getPendingRequests(userId) {
-    const [sentRequests, receivedRequests] = await Promise.all([
-      prisma.guardianRelationship.findMany({
-        where: {
-          requesterId: userId,
-          status: 'PENDING'
-        },
-        include: {
-          guardian: {
-            select: { id: true, firstName: true, lastName: true, email: true, avatar: true }
-          }
-        }
-      }),
-      prisma.guardianRelationship.findMany({
-        where: {
-          guardianId: userId,
-          status: 'PENDING'
-        },
-        include: {
-          requester: {
-            select: { id: true, firstName: true, lastName: true, email: true, avatar: true }
-          }
-        }
-      })
-    ]);
-
+    const state = readState();
     return {
-      sent: sentRequests.map(req => ({
-        id: req.id,
-        user: req.guardian,
-        message: req.message,
-        sentAt: req.createdAt
-      })),
-      received: receivedRequests.map(req => ({
-        id: req.id,
-        user: req.requester,
-        message: req.message,
-        receivedAt: req.createdAt
-      }))
+      sent: state.guardianRelationships
+        .filter((item) => item.requesterId === userId && item.status === 'PENDING')
+        .map((item) => ({
+          ...item,
+          user: sanitizeUser(state.users.find((entry) => entry.id === item.guardianId)),
+        })),
+      received: state.guardianRelationships
+        .filter((item) => item.guardianId === userId && item.status === 'PENDING')
+        .map((item) => ({
+          ...item,
+          user: sanitizeUser(state.users.find((entry) => entry.id === item.requesterId)),
+        })),
     };
   }
 
-  // Remove guardian relationship
   async removeRelationship(relationshipId, userId) {
-    const relationship = await prisma.guardianRelationship.findUnique({
-      where: { id: relationshipId }
+    return withState((state) => {
+      const index = state.guardianRelationships.findIndex((item) => item.id === relationshipId);
+      ensure(index >= 0, 'Relationship not found', 404);
+
+      const relationship = state.guardianRelationships[index];
+      ensure(
+        relationship.requesterId === userId || relationship.guardianId === userId,
+        'Unauthorized',
+        403,
+      );
+
+      state.guardianRelationships.splice(index, 1);
+      return { message: 'Relationship removed successfully' };
     });
-
-    if (!relationship) {
-      throw new Error('Relationship not found');
-    }
-
-    if (relationship.requesterId !== userId && relationship.guardianId !== userId) {
-      throw new Error('Unauthorized to remove this relationship');
-    }
-
-    await prisma.guardianRelationship.delete({
-      where: { id: relationshipId }
-    });
-
-    return { message: 'Relationship removed successfully' };
   }
 
-  // Block user
   async blockUser(relationshipId, userId) {
-    const relationship = await prisma.guardianRelationship.findUnique({
-      where: { id: relationshipId }
+    return withState((state) => {
+      const relationship = state.guardianRelationships.find((item) => item.id === relationshipId);
+      ensure(relationship, 'Relationship not found', 404);
+      ensure(
+        relationship.requesterId === userId || relationship.guardianId === userId,
+        'Unauthorized',
+        403,
+      );
+
+      relationship.status = 'BLOCKED';
+      relationship.updatedAt = nowIso();
+      return { message: 'User blocked successfully' };
     });
-
-    if (!relationship) {
-      throw new Error('Relationship not found');
-    }
-
-    if (relationship.guardianId !== userId) {
-      throw new Error('Unauthorized to block this user');
-    }
-
-    await prisma.guardianRelationship.update({
-      where: { id: relationshipId },
-      data: { status: 'BLOCKED' }
-    });
-
-    return { message: 'User blocked successfully' };
   }
 
-  // Search users for guardian requests
-  async searchUsers(query, currentUserId, limit = 20) {
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          { id: { not: currentUserId } },
-          { isActive: true },
-          {
-            OR: [
-              { email: { contains: query, mode: 'insensitive' } },
-              { firstName: { contains: query, mode: 'insensitive' } },
-              { lastName: { contains: query, mode: 'insensitive' } }
-            ]
-          }
-        ]
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        avatar: true
-      },
-      take: limit
-    });
+  async searchUsers(term, currentUserId, limit = 20) {
+    const state = readState();
+    const query = String(term || '').trim().toLowerCase();
 
-    return users;
+    return state.users
+      .filter((item) => item.id !== currentUserId && item.isActive)
+      .filter((item) => {
+        const haystack = [
+          normalizeEmail(item.email),
+          item.phone || '',
+          item.firstName || '',
+          item.lastName || '',
+          fullName(item),
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(query);
+      })
+      .slice(0, limit)
+      .map(sanitizeUser);
   }
 }
 

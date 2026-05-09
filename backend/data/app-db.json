@@ -1,0 +1,797 @@
+{
+  "users": [
+    {
+      "id": "user-demo",
+      "email": "demo@safesolo.app",
+      "phone": "+84901111222",
+      "firstName": "Demo",
+      "lastName": "User",
+      "dateOfBirth": "1998-01-01",
+      "gender": "PREFER_NOT_TO_SAY",
+      "avatar": null,
+      "isActive": true,
+      "isVerified": true,
+      "otpCode": null,
+      "otpExpiresAt": null,
+      "lastLoginAt": "2026-05-09T13:55:57.566Z",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z",
+      "trustScore": 4.8,
+      "rescuesCount": 1,
+      "isKycVerified": true,
+      "nextCheckinDeadline": "2026-05-10T13:55:57.578Z",
+      "lastCheckInAt": "2026-05-09T13:55:57.566Z",
+      "graceHours": 24,
+      "deadmanStage": 0,
+      "deadmanEscalationTriggeredAt": null,
+      "lastLat": 10.7769,
+      "lastLng": 106.7009,
+      "lastLocationTime": "2026-05-09T13:55:57.566Z",
+      "batteryLevel": 82,
+      "approxAddress": "Quan 1, TP.HCM",
+      "role": "USER",
+      "security": {
+        "stealthMode": false,
+        "highContrast": false,
+        "realPin": "",
+        "duressPin": "",
+        "autoWipeEnabled": false,
+        "autoWipeDays": 30,
+        "quietHoursStart": "23:00",
+        "quietHoursEnd": "06:00",
+        "falseAlertGraceMinutes": 7,
+        "pillReminder": false,
+        "pillTime": "08:00"
+      }
+    },
+    {
+      "id": "user-father",
+      "email": "botai@safesolo.app",
+      "phone": "+84901111001",
+      "firstName": "Bo",
+      "lastName": "Tai",
+      "dateOfBirth": "1962-04-10",
+      "gender": "MALE",
+      "avatar": null,
+      "isActive": true,
+      "isVerified": true,
+      "otpCode": null,
+      "otpExpiresAt": null,
+      "lastLoginAt": "2026-05-09T13:55:57.566Z",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z",
+      "trustScore": 4.7,
+      "rescuesCount": 0,
+      "isKycVerified": false,
+      "nextCheckinDeadline": "2026-05-10T01:55:57.578Z",
+      "lastCheckInAt": "2026-05-09T13:55:57.566Z",
+      "graceHours": 24,
+      "deadmanStage": 0,
+      "deadmanEscalationTriggeredAt": null,
+      "lastLat": 10.7752,
+      "lastLng": 106.6981,
+      "lastLocationTime": "2026-05-09T13:55:57.566Z",
+      "batteryLevel": 12,
+      "approxAddress": "Quan 1, TP.HCM",
+      "role": "USER",
+      "security": {
+        "stealthMode": false,
+        "highContrast": false,
+        "realPin": "",
+        "duressPin": "",
+        "autoWipeEnabled": false,
+        "autoWipeDays": 30,
+        "quietHoursStart": "22:30",
+        "quietHoursEnd": "06:00",
+        "falseAlertGraceMinutes": 5,
+        "pillReminder": true,
+        "pillTime": "07:30"
+      }
+    },
+    {
+      "id": "user-mother",
+      "email": "melan@safesolo.app",
+      "phone": "+84901111002",
+      "firstName": "Me",
+      "lastName": "Lan",
+      "dateOfBirth": "1965-05-12",
+      "gender": "FEMALE",
+      "avatar": null,
+      "isActive": true,
+      "isVerified": true,
+      "otpCode": null,
+      "otpExpiresAt": null,
+      "lastLoginAt": "2026-05-09T13:55:57.566Z",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z",
+      "trustScore": 4.6,
+      "rescuesCount": 0,
+      "isKycVerified": false,
+      "nextCheckinDeadline": "2026-05-10T01:55:57.578Z",
+      "lastCheckInAt": "2026-05-09T13:55:57.566Z",
+      "graceHours": 24,
+      "deadmanStage": 0,
+      "deadmanEscalationTriggeredAt": null,
+      "lastLat": 10.7721,
+      "lastLng": 106.7042,
+      "lastLocationTime": "2026-05-09T13:55:57.566Z",
+      "batteryLevel": 85,
+      "approxAddress": "Quan 3, TP.HCM",
+      "role": "USER",
+      "security": {
+        "stealthMode": false,
+        "highContrast": false,
+        "realPin": "",
+        "duressPin": "",
+        "autoWipeEnabled": false,
+        "autoWipeDays": 30,
+        "quietHoursStart": "22:00",
+        "quietHoursEnd": "06:30",
+        "falseAlertGraceMinutes": 5,
+        "pillReminder": true,
+        "pillTime": "08:30"
+      }
+    },
+    {
+      "id": "user-volunteer",
+      "email": "minhanh@safesolo.app",
+      "phone": "+84901111003",
+      "firstName": "Minh",
+      "lastName": "Anh",
+      "dateOfBirth": "1993-09-21",
+      "gender": "FEMALE",
+      "avatar": null,
+      "isActive": true,
+      "isVerified": true,
+      "otpCode": null,
+      "otpExpiresAt": null,
+      "lastLoginAt": "2026-05-09T13:55:57.566Z",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T14:34:48.018Z",
+      "trustScore": 4.9,
+      "rescuesCount": 12,
+      "isKycVerified": true,
+      "nextCheckinDeadline": "2026-05-10T13:55:57.578Z",
+      "lastCheckInAt": "2026-05-09T13:55:57.566Z",
+      "graceHours": 24,
+      "deadmanStage": 0,
+      "deadmanEscalationTriggeredAt": null,
+      "lastLat": 10.7788,
+      "lastLng": 106.7012,
+      "lastLocationTime": "2026-05-09T13:55:57.566Z",
+      "batteryLevel": 64,
+      "approxAddress": "Quan 1, TP.HCM",
+      "role": "VOLUNTEER",
+      "security": {
+        "stealthMode": false,
+        "highContrast": false,
+        "realPin": "",
+        "duressPin": "",
+        "autoWipeEnabled": false,
+        "autoWipeDays": 30,
+        "quietHoursStart": "23:00",
+        "quietHoursEnd": "06:00",
+        "falseAlertGraceMinutes": 5,
+        "pillReminder": false,
+        "pillTime": "08:00"
+      }
+    },
+    {
+      "id": "user-hero",
+      "email": "quanhero@safesolo.app",
+      "phone": "+84901111004",
+      "firstName": "Doan",
+      "lastName": "Minh Quan",
+      "dateOfBirth": "1997-07-07",
+      "gender": "MALE",
+      "avatar": null,
+      "isActive": true,
+      "isVerified": true,
+      "otpCode": null,
+      "otpExpiresAt": null,
+      "lastLoginAt": "2026-05-09T13:55:57.566Z",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z",
+      "trustScore": 4.9,
+      "rescuesCount": 15,
+      "isKycVerified": true,
+      "nextCheckinDeadline": "2026-05-10T13:55:57.578Z",
+      "lastCheckInAt": "2026-05-09T13:55:57.566Z",
+      "graceHours": 24,
+      "deadmanStage": 0,
+      "deadmanEscalationTriggeredAt": null,
+      "lastLat": 11.0089,
+      "lastLng": 106.6557,
+      "lastLocationTime": "2026-05-09T13:55:57.566Z",
+      "batteryLevel": 91,
+      "approxAddress": "Thu Dau Mot, Binh Duong",
+      "role": "HERO",
+      "security": {
+        "stealthMode": false,
+        "highContrast": false,
+        "realPin": "",
+        "duressPin": "",
+        "autoWipeEnabled": false,
+        "autoWipeDays": 30,
+        "quietHoursStart": "23:00",
+        "quietHoursEnd": "06:00",
+        "falseAlertGraceMinutes": 5,
+        "pillReminder": false,
+        "pillTime": "08:00"
+      }
+    }
+  ],
+  "medicalProfiles": [
+    {
+      "id": "med-demo",
+      "userId": "user-demo",
+      "bloodType": "O_POSITIVE",
+      "allergies": [
+        "Penicillin"
+      ],
+      "medications": [
+        "Vitamin C"
+      ],
+      "medicalConditions": [],
+      "emergencyContact": {
+        "name": "Bo Tai",
+        "phone": "+84901111001",
+        "relationship": "Father"
+      },
+      "insuranceInfo": null,
+      "doctor": "BS. Nguyen Thi Hoa",
+      "qrCodeValue": "SAFE-MED-user-demo",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "guardianRelationships": [
+    {
+      "id": "rel-demo-father",
+      "requesterId": "user-demo",
+      "guardianId": "user-father",
+      "status": "ACCEPTED",
+      "escalationLevel": 1,
+      "guardianConfirmedAt": "2026-05-09T13:55:57.566Z",
+      "lastNotifiedAt": null,
+      "message": "Bo oi, lam guardian cho con nhe.",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "rel-demo-mother",
+      "requesterId": "user-demo",
+      "guardianId": "user-mother",
+      "status": "ACCEPTED",
+      "escalationLevel": 2,
+      "guardianConfirmedAt": "2026-05-09T13:55:57.566Z",
+      "lastNotifiedAt": null,
+      "message": "Me oi, giup con theo doi check-in nhe.",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "rescueIncidents": [
+    {
+      "id": "incident-demo",
+      "victimId": "user-demo",
+      "status": "RESOLVED",
+      "incidentType": "medical_emergency",
+      "severity": 3,
+      "source": "SOS",
+      "exactLat": 10.7769,
+      "exactLng": 106.7009,
+      "fuzzedLat": 10.7771,
+      "fuzzedLng": 106.7011,
+      "approxAddress": "Quan 1, TP.HCM",
+      "batteryLevel": 64,
+      "communityRequestedAt": null,
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "resolvedAt": "2026-05-09T14:17:00.823Z"
+    }
+  ],
+  "volunteerResponses": [
+    {
+      "id": "response-demo",
+      "incidentId": "incident-demo",
+      "volunteerId": "user-volunteer",
+      "status": "ARRIVED",
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "chatRooms": [
+    {
+      "id": "room-demo",
+      "incidentId": "incident-demo",
+      "status": "ACTIVE",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "closedAt": null
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg-demo-1",
+      "roomId": "room-demo",
+      "senderId": null,
+      "messageType": "SYSTEM",
+      "content": "Tin nhan khan cap da duoc mo.",
+      "metadata": {
+        "incidentId": "incident-demo"
+      },
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "msg-demo-2",
+      "roomId": "room-demo",
+      "senderId": "user-demo",
+      "messageType": "TEXT",
+      "content": "Toi dang can giup do o Quan 1.",
+      "metadata": null,
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "dailyStatuses": [
+    {
+      "id": "status-demo-1",
+      "userId": "user-father",
+      "moodEmoji": "😊",
+      "text": "Sang nay bo di bo quanh ho 30 phut, thay khoe hon nhieu.",
+      "audioUrl": null,
+      "visibility": "FAMILY",
+      "batteryLevel": 12,
+      "isCheckIn": true,
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "status-demo-2",
+      "userId": "user-mother",
+      "moodEmoji": "🙂",
+      "text": "Me vua uong thuoc xong va dang nghi ngoi mot chut.",
+      "audioUrl": "/uploads/voices/demo-me-lan.m4a",
+      "visibility": "FAMILY",
+      "batteryLevel": 85,
+      "isCheckIn": true,
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "statusReactions": [
+    {
+      "id": "react-1",
+      "statusId": "status-demo-1",
+      "userId": "user-demo",
+      "type": "HUG",
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "react-2",
+      "statusId": "status-demo-1",
+      "userId": "user-mother",
+      "type": "HUG",
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "react-3",
+      "statusId": "status-demo-2",
+      "userId": "user-demo",
+      "type": "HUG",
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "statusComments": [
+    {
+      "id": "comment-1",
+      "statusId": "status-demo-1",
+      "userId": "user-demo",
+      "content": "Con thay bo on la vui roi.",
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "thankYouNotes": [
+    {
+      "id": "thanks-1",
+      "volunteerId": "user-volunteer",
+      "authorId": "user-demo",
+      "content": "Cam on chi da den rat nhanh khi gia dinh can.",
+      "rating": 5,
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    },
+    {
+      "id": "thanks-2",
+      "volunteerId": "user-hero",
+      "authorId": "user-mother",
+      "content": "Cam on vi su binh tinh va tan tam cua ban.",
+      "rating": 5,
+      "createdAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "kycDocuments": [
+    {
+      "id": "kyc-demo",
+      "userId": "user-volunteer",
+      "frontImageUrl": "/uploads/kyc/front-demo.png",
+      "backImageUrl": "/uploads/kyc/back-demo.png",
+      "status": "APPROVED",
+      "submittedAt": "2026-05-09T13:55:57.566Z",
+      "reviewedAt": "2026-05-09T14:34:48.018Z"
+    }
+  ],
+  "vaults": [
+    {
+      "id": "vault-demo",
+      "userId": "user-demo",
+      "content": {
+        "documents": [
+          "cccd-front.png",
+          "di-chuc.pdf"
+        ],
+        "lastEncryptedAt": "2026-05-09T13:55:57.566Z",
+        "encrypted": true
+      },
+      "shreddedAt": null,
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "updatedAt": "2026-05-09T13:55:57.566Z"
+    }
+  ],
+  "systemLogs": [
+    {
+      "id": "audit_incident-demo_1778336220823",
+      "incidentId": "incident-demo",
+      "actionType": "RESOLVE_INCIDENT",
+      "description": "Resolved from dispatch center",
+      "metadata": {
+        "source": "admin-portal"
+      },
+      "createdAt": "2026-05-09T14:17:00.824Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778336237108",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T14:17:17.108Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778337284711",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T14:34:44.711Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778337286063",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T14:34:46.063Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778337286975",
+      "incidentId": null,
+      "actionType": "REJECT_KYC",
+      "description": "REJECT KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T14:34:46.975Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778337288018",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T14:34:48.018Z"
+    }
+  ],
+  "alertEvents": [
+    {
+      "id": "alert_bf36d5ab-e3b0-4afd-bdd5-244c37e28e6d",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "INFO",
+      "status": "REGISTERED",
+      "source": "USER",
+      "title": "Dang ky tai khoan",
+      "message": "Test Register da dang ky SafeSolo",
+      "metadata": {
+        "timerIntervalMinutes": 180
+      },
+      "createdAt": "2026-05-09T13:59:18.594Z"
+    },
+    {
+      "id": "alert_887d1390-7e83-4833-8f57-93d144c8719e",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 360 phut",
+      "metadata": {
+        "timerIntervalMinutes": 360
+      },
+      "createdAt": "2026-05-09T14:10:35.177Z"
+    },
+    {
+      "id": "alert_593b5403-f2bd-4323-8923-574f4888e418",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 37.4219983,
+          "lng": -122.084
+        }
+      },
+      "createdAt": "2026-05-09T14:12:06.179Z"
+    },
+    {
+      "id": "alert_338a197f-2b28-41d8-b18b-3f7d86f0f81a",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SLEEP_MODE_ON",
+      "source": "USER",
+      "title": "Bat sleep mode",
+      "message": "Tam dung canh bao trong 1440 phut",
+      "metadata": {
+        "minutes": 1440,
+        "sleepModeUntil": "2026-05-10T14:12:24.190Z"
+      },
+      "createdAt": "2026-05-09T14:12:24.194Z"
+    },
+    {
+      "id": "alert_d9d4f96f-cf46-4a14-83f0-454d53591fbb",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SLEEP_MODE_OFF",
+      "source": "USER",
+      "title": "Tat sleep mode",
+      "message": "Da tat che do tam dung canh bao",
+      "metadata": {
+        "minutes": 0,
+        "sleepModeUntil": null
+      },
+      "createdAt": "2026-05-09T14:12:26.683Z"
+    },
+    {
+      "id": "alert_a7444f31-bab8-4210-9303-2936c96eb15a",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "4df3bfb4-0fea-4f2d-928f-21b4aa852edb",
+        "notes": "Resolved from dispatch center"
+      },
+      "createdAt": "2026-05-09T14:17:39.189Z"
+    },
+    {
+      "id": "alert_94150120-838f-46c9-b77a-d74b472e731c",
+      "userId": "d45f44c4-2b18-4c7a-bc42-3592f917c9c2",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "02b7484d-423a-4f04-a401-cfc1d4923ba0",
+        "notes": "Resolved from dispatch center"
+      },
+      "createdAt": "2026-05-09T14:17:39.716Z"
+    },
+    {
+      "id": "alert_3be11c31-700e-4ef1-ac04-b51a737205ae",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "09a92209-6816-44b6-9b9a-2cf11c844f28",
+        "notes": "Resolved from dispatch center"
+      },
+      "createdAt": "2026-05-09T14:17:41.361Z"
+    },
+    {
+      "id": "alert_ceecce37-614d-498e-8b2c-c71ec40a8194",
+      "userId": "d45f44c4-2b18-4c7a-bc42-3592f917c9c2",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "d3cdee5c-1add-4f33-89aa-72011d874c9d",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T14:18:14.292Z"
+    },
+    {
+      "id": "alert_949dcd66-eae2-44ac-98f4-e6229359da2b",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "3c93919f-7575-45e8-a700-6dcba9654e41",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T14:18:14.304Z"
+    },
+    {
+      "id": "alert_5729e2f9-70a6-4576-9c68-260afa7bbee0",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "REGISTERED",
+      "source": "USER",
+      "title": "Dang ky tai khoan",
+      "message": "Roadmap User da dang ky SafeSolo",
+      "metadata": {
+        "timerIntervalMinutes": 180
+      },
+      "createdAt": "2026-05-09T14:20:22.356Z"
+    },
+    {
+      "id": "alert_cc5d1958-1fd1-4437-baba-bdf77eed6e3e",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "3c93919f-7575-45e8-a700-6dcba9654e41",
+        "notes": "Da xu ly tu trung tam dieu pho"
+      },
+      "createdAt": "2026-05-09T14:34:57.810Z"
+    },
+    {
+      "id": "alert_1a42fa2d-0994-4923-83b3-ec2f4c01d74e",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "45e4fd8c-79e2-4434-920f-f720ef4da0e8",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T14:35:14.441Z"
+    },
+    {
+      "id": "alert_9e52cba7-23f4-4408-8677-a073fc381df5",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 37.4219983,
+          "lng": -122.084
+        }
+      },
+      "createdAt": "2026-05-09T14:42:41.603Z"
+    },
+    {
+      "id": "alert_0e5c8366-5402-4cd6-a43c-9dd7d3a84e38",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 4320 phut",
+      "metadata": {
+        "timerIntervalMinutes": 4320
+      },
+      "createdAt": "2026-05-09T14:47:18.318Z"
+    },
+    {
+      "id": "alert_49054b23-462f-41eb-a989-e669cd042027",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 1200 phut",
+      "metadata": {
+        "timerIntervalMinutes": 1200
+      },
+      "createdAt": "2026-05-09T14:47:24.105Z"
+    },
+    {
+      "id": "alert_7eef4d3c-3688-47c0-9fa4-74e25add5b14",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 37.4219983,
+          "lng": -122.084
+        }
+      },
+      "createdAt": "2026-05-09T14:47:26.429Z"
+    },
+    {
+      "id": "alert_59752b12-133d-4a1a-842a-182955550df1",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SLEEP_MODE_ON",
+      "source": "USER",
+      "title": "Bat sleep mode",
+      "message": "Tam dung canh bao trong 1440 phut",
+      "metadata": {
+        "minutes": 1440,
+        "sleepModeUntil": "2026-05-10T14:48:34.205Z"
+      },
+      "createdAt": "2026-05-09T14:48:34.251Z"
+    },
+    {
+      "id": "alert_9cb239bd-b83b-41d7-bd4d-505f2e30a416",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SLEEP_MODE_OFF",
+      "source": "USER",
+      "title": "Tat sleep mode",
+      "message": "Da tat che do tam dung canh bao",
+      "metadata": {
+        "minutes": 0,
+        "sleepModeUntil": null
+      },
+      "createdAt": "2026-05-09T14:48:41.919Z"
+    }
+  ],
+  "emergencyMemos": [
+    {
+      "id": "memo-demo-1",
+      "incidentId": "incident-demo",
+      "victimId": "user-demo",
+      "createdAt": "2026-05-09T13:55:57.566Z",
+      "duration": 15,
+      "victimName": "Demo User",
+      "lat": 10.7769,
+      "lng": 106.7009,
+      "approxAddress": "Quan 1, TP.HCM",
+      "contentUrl": "/uploads/voices/demo-memo.m4a",
+      "transcript": "Toi dang o gan cho Ben Thanh va can giup do y te.",
+      "isAnonymous": true
+    }
+  ],
+  "smsDispatchLogs": []
+}

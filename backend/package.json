@@ -15,7 +15,7 @@
     "bullmq": "^5.12.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^4.21.2",
+    "express": "^4.22.1",
     "express-rate-limit": "^8.5.0",
     "ioredis": "^5.3.2",
     "joi": "^18.2.1",
@@ -29,5 +29,10 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  }
+  },
+  "description": "A comprehensive backend API for the SafeSolo personal safety application, built with Node.js, Express, and PostgreSQL.",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
 }

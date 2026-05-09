@@ -3,12 +3,28 @@ import 'dart:async';
 
 import 'package:http/http.dart' as http;
 
+import '../models/alert_policy_model.dart';
+import '../models/interaction_event_model.dart';
 import '../core/constants.dart';
 import '../models/user_model.dart';
 
 class ApiService {
   final _client = http.Client();
   static const _timeout = Duration(seconds: 12);
+
+  Future<List<UserModel>> listUsers() async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body
+        .map(
+          (item) => UserModel.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
 
   Future<UserModel> registerUser({
     required String fullName,
@@ -81,6 +97,26 @@ class ApiService {
     return UserModel.fromJson(body['user'] as Map<String, dynamic>);
   }
 
+  Future<UserModel> updateLocation({
+    required String userId,
+    required double lat,
+    required double lng,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/location');
+    final response = await _safeRequest(
+      _client.patch(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'location': {'lat': lat, 'lng': lng}
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return UserModel.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
   Future<UserModel> updatePreferences({
     required String userId,
     required String quietHoursStart,
@@ -119,6 +155,79 @@ class ApiService {
     _throwIfFailed(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return UserModel.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
+  Future<AlertPolicyModel> getAlertPolicy(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/alert-policy');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return AlertPolicyModel.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<AlertPolicyModel> updateAlertPolicy({
+    required String userId,
+    required int level1Minutes,
+    required int level2Minutes,
+    required int level3Minutes,
+    required bool level4Enabled,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/alert-policy');
+    final response = await _safeRequest(
+      _client.patch(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'level1Minutes': level1Minutes,
+          'level2Minutes': level2Minutes,
+          'level3Minutes': level3Minutes,
+          'level4Enabled': level4Enabled,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return AlertPolicyModel.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  Future<List<InteractionEventModel>> listInteractions(
+    String userId, {
+    int limit = 20,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/interactions?limit=$limit');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body
+        .map(
+          (item) => InteractionEventModel.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<void> createInteraction({
+    required String userId,
+    required String type,
+    required String source,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/interactions');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type': type,
+          'source': source,
+          'metadata': metadata,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
   }
 
   void _throwIfFailed(http.Response response) {

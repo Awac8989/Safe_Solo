@@ -7,6 +7,14 @@ const {
   checkinStatements,
 } = require('../config/sqlite');
 const { createAlertEvent } = require('../services/alertEventService');
+const {
+  createInteractionEvent,
+  listInteractionEvents,
+} = require('../services/interactionService');
+const {
+  ensureAlertPolicy,
+  updateAlertPolicy,
+} = require('../services/alertPolicyService');
 
 function computeDeadlineIso(minutes) {
   return new Date(Date.now() + minutes * 60 * 1000).toISOString();
@@ -59,6 +67,13 @@ async function registerUser(req, res) {
   });
 
   const created = userStatements.getById.get(id);
+  ensureAlertPolicy(id);
+  createInteractionEvent({
+    userId: id,
+    type: 'ACCOUNT_REGISTERED',
+    source: 'MOBILE_APP',
+    metadata: { timerIntervalMinutes: interval },
+  });
   createAlertEvent({
     userId: id,
     level: 'INFO',
@@ -106,6 +121,12 @@ async function checkin(req, res) {
   });
 
   const updated = userStatements.getById.get(id);
+  createInteractionEvent({
+    userId: id,
+    type: 'CHECKIN_TAP_OK',
+    source: 'MOBILE_APP',
+    metadata: { location },
+  });
   createAlertEvent({
     userId: id,
     level: 'INFO',
@@ -270,6 +291,93 @@ async function getUserById(req, res) {
   return res.json(mapUserRow(user));
 }
 
+async function getAlertPolicy(req, res) {
+  const { id } = req.params;
+  const user = userStatements.getById.get(id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+  return res.json(ensureAlertPolicy(id));
+}
+
+async function updateAlertPolicyByUser(req, res) {
+  const { id } = req.params;
+  const user = userStatements.getById.get(id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const level1Minutes = Number(req.body.level1Minutes);
+  const level2Minutes = Number(req.body.level2Minutes);
+  const level3Minutes = Number(req.body.level3Minutes);
+  const level4Enabled = Boolean(req.body.level4Enabled);
+
+  if (
+    Number.isNaN(level1Minutes) ||
+    Number.isNaN(level2Minutes) ||
+    Number.isNaN(level3Minutes) ||
+    level1Minutes < 0 ||
+    level2Minutes < 0 ||
+    level3Minutes < level2Minutes
+  ) {
+    return res.status(400).json({
+      message: 'Invalid alert policy. Ensure level3Minutes >= level2Minutes.',
+    });
+  }
+
+  const policy = updateAlertPolicy(id, {
+    level1Minutes,
+    level2Minutes,
+    level3Minutes,
+    level4Enabled,
+  });
+
+  createAlertEvent({
+    userId: id,
+    level: 'INFO',
+    status: 'ALERT_POLICY_UPDATED',
+    source: 'USER',
+    title: 'Cap nhat alert policy',
+    message: `L1=${level1Minutes}, L2=${level2Minutes}, L3=${level3Minutes}`,
+    metadata: { level1Minutes, level2Minutes, level3Minutes, level4Enabled },
+  });
+
+  return res.json(policy);
+}
+
+async function listUserInteractions(req, res) {
+  const { id } = req.params;
+  const user = userStatements.getById.get(id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const events = listInteractionEvents(id, req.query.limit);
+  return res.json(events);
+}
+
+async function createUserInteraction(req, res) {
+  const { id } = req.params;
+  const user = userStatements.getById.get(id);
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const { type, source, metadata } = req.body;
+  if (!type || !source) {
+    return res.status(400).json({ message: 'type and source are required' });
+  }
+
+  createInteractionEvent({
+    userId: id,
+    type,
+    source,
+    metadata: metadata || {},
+  });
+
+  return res.status(201).json({ message: 'Interaction event recorded' });
+}
+
 module.exports = {
   registerUser,
   checkin,
@@ -279,4 +387,8 @@ module.exports = {
   setSleepMode,
   listUsers,
   getUserById,
+  getAlertPolicy,
+  updateAlertPolicyByUser,
+  listUserInteractions,
+  createUserInteraction,
 };

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants.dart';
+import '../../core/widgets/main_navigation.dart';
 import '../../services/api_service.dart';
-import '../home/home_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -36,7 +36,9 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!mounted || savedUserId == null || savedUserId.isEmpty) {
       return;
     }
-    Navigator.pushReplacementNamed(context, HomePage.routeName);
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const MainNavigation()),
+    );
   }
 
   Future<void> _register() async {
@@ -60,14 +62,16 @@ class _RegisterPageState extends State<RegisterPage> {
       if (!mounted) {
         return;
       }
-      Navigator.pushReplacementNamed(context, HomePage.routeName);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainNavigation()),
+      );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Dang ky that bai: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Dang ky that bai: $error')));
     } finally {
       if (mounted) {
         setState(() => _loading = false);
@@ -107,8 +111,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 Text(
                   'SafeSolo',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -135,7 +139,9 @@ class _RegisterPageState extends State<RegisterPage> {
                             prefixIcon: Icon(Icons.person_outline),
                           ),
                           validator: (value) =>
-                              value == null || value.trim().isEmpty ? 'Nhap ho ten' : null,
+                              value == null || value.trim().isEmpty
+                              ? 'Nhap ho ten'
+                              : null,
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -146,7 +152,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             labelText: 'So dien thoai',
                             prefixIcon: Icon(Icons.phone_outlined),
                           ),
-                          validator: (value) => value == null || value.trim().isEmpty
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
                               ? 'Nhap so dien thoai'
                               : null,
                         ),
@@ -158,7 +165,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             labelText: 'Ten nguoi than',
                             prefixIcon: Icon(Icons.family_restroom_outlined),
                           ),
-                          validator: (value) => value == null || value.trim().isEmpty
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
                               ? 'Nhap ten nguoi than'
                               : null,
                         ),
@@ -170,7 +178,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             labelText: 'SĐT nguoi than',
                             prefixIcon: Icon(Icons.contact_phone_outlined),
                           ),
-                          validator: (value) => value == null || value.trim().isEmpty
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
                               ? 'Nhap sdt nguoi than'
                               : null,
                         ),
@@ -181,7 +190,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 14),
                 Text(
                   'Chu ky check-in',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -207,10 +218,14 @@ class _RegisterPageState extends State<RegisterPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.verified_user_outlined),
-                  label: Text(_loading ? 'Dang xu ly...' : 'Dang ky va bat dau'),
+                  label: Text(
+                    _loading ? 'Dang xu ly...' : 'Dang ky va bat dau',
+                  ),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 54),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

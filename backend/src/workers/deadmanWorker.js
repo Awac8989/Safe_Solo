@@ -1,6 +1,7 @@
 const { mapUserRow, nowIso, userStatements } = require('../config/sqlite');
 const { triggerSosForUser } = require('../services/sosService');
 const { createAlertEvent } = require('../services/alertEventService');
+const { ensureAlertPolicy } = require('../services/alertPolicyService');
 
 function toMinutes(ms) {
   return Math.floor(ms / 60000);
@@ -34,9 +35,9 @@ function isSleepModeActive(now, sleepUntilIso) {
 
 function startDeadManWorker(io) {
   const workerInterval = Number(process.env.WORKER_INTERVAL_MS || 60000);
-  const reminderMinutes = Number(process.env.ESCALATION_REMINDER_MINUTES || 30);
-  const warningMinutes = Number(process.env.ESCALATION_WARNING_MINUTES || 5);
-  const sosMinutes = Number(process.env.ESCALATION_SOS_MINUTES || 15);
+  const defaultReminderMinutes = Number(process.env.ESCALATION_REMINDER_MINUTES || 30);
+  const defaultWarningMinutes = Number(process.env.ESCALATION_WARNING_MINUTES || 5);
+  const defaultSosMinutes = Number(process.env.ESCALATION_SOS_MINUTES || 15);
 
   setInterval(async () => {
     try {
@@ -44,11 +45,15 @@ function startDeadManWorker(io) {
       const now = new Date();
 
       for (const user of users) {
+        const policy = ensureAlertPolicy(user._id);
         const deadline = new Date(user.nextDeadline);
         const msUntilDeadline = deadline.getTime() - now.getTime();
         const minutesUntilDeadline = toMinutes(msUntilDeadline);
         const overdueMinutes = toMinutes(-msUntilDeadline);
         const grace = Number(user.falseAlertGraceMinutes || 0);
+        const reminderMinutes = Number(policy?.level1Minutes || defaultReminderMinutes);
+        const warningMinutes = Number(policy?.level2Minutes || defaultWarningMinutes);
+        const sosMinutes = Number(policy?.level3Minutes || defaultSosMinutes);
         const inQuietHours = isInQuietHours(now, user.quietHoursStart, user.quietHoursEnd);
         const sleepModeActive = isSleepModeActive(now, user.sleepModeUntil);
 
@@ -128,6 +133,18 @@ function startDeadManWorker(io) {
 
         if (overdueMinutes >= sosMinutes + grace && user.currentStatus !== 'SOS') {
           await triggerSosForUser(io, user);
+          if (policy?.level4Enabled && overdueMinutes >= sosMinutes + grace + 10) {
+            const event = createAlertEvent({
+              userId: user._id,
+              level: 'LEVEL_4_RESCUE_CALL',
+              status: 'RESCUE_CALL_QUEUED',
+              source: 'SYSTEM',
+              title: 'Kich hoat goi cuu ho',
+              message: 'Vuot nguong SOS, da dua vao hang doi auto-call',
+              metadata: { overdueMinutes, policy },
+            });
+            io.emit('ALERT_EVENT', event);
+          }
         }
       }
     } catch (error) {

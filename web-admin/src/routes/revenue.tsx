@@ -1,45 +1,66 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
 import { TrendingUp, Wallet, Building2 } from "lucide-react";
+import { fetchRevenueSummary } from "@/lib/api";
 
 export const Route = createFileRoute("/revenue")({
-  head: () => ({ meta: [{ title: "Revenue & Partners — Alive?" }] }),
+  head: () => ({ meta: [{ title: "Doanh thu va doi tac - SafeSolo Admin" }] }),
   component: Page,
 });
 
-const partners = [
-  { name: "Vinmec Central Park", dispatches: 142, rate: "15%", balance: "₫ 32,400,000" },
-  { name: "FV Hospital", dispatches: 98, rate: "12%", balance: "₫ 18,720,000" },
-  { name: "115 Ambulance Co.", dispatches: 211, rate: "10%", balance: "₫ 25,300,000" },
-  { name: "Hoàn Mỹ Saigon", dispatches: 76, rate: "15%", balance: "₫ 11,400,000" },
-];
-
-const sparkline = [12, 18, 14, 22, 26, 21, 30, 28, 34, 31, 38, 42, 39, 45, 50, 48, 55, 60, 58, 64, 70, 68, 75, 80, 78, 84, 90, 95, 92, 99];
-
 function Page() {
-  const max = Math.max(...sparkline);
+  const revenueQuery = useQuery({
+    queryKey: ["revenue-summary"],
+    queryFn: fetchRevenueSummary,
+  });
+
+  const data = revenueQuery.data?.data;
+  const partners = data?.partners ?? [];
+  const sparkline = data?.sparkline ?? [];
+  const max = Math.max(...sparkline, 1);
   const points = sparkline
-    .map((v, i) => `${(i / (sparkline.length - 1)) * 100},${100 - (v / max) * 100}`)
+    .map((value, index) => `${(index / Math.max(sparkline.length - 1, 1)) * 100},${100 - (value / max) * 100}`)
     .join(" ");
 
   return (
     <>
-      <Topbar title="Revenue & Partners" subtitle="AdMob earnings · medical dispatch commissions" />
+      <Topbar title="Doanh thu va doi tac" subtitle="Thu nhap AdMob · hoa hong dieu pho y te" />
       <div className="space-y-3 p-3">
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            { label: "AdMob Revenue (30d)", value: "$ 18,420", icon: TrendingUp, tone: "success" as const, sub: "+12.4% vs prev" },
-            { label: "Unpaid Commissions", value: "₫ 87,820,000", icon: Wallet, tone: "warning" as const, sub: "4 partners pending" },
-            { label: "Active Partner Hospitals", value: "37", icon: Building2, tone: "info" as const, sub: "3 onboarding" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+            {
+              label: "Doanh thu AdMob (30 ngay)",
+              value: usd(data?.cards.admobRevenue30d || 0),
+              icon: TrendingUp,
+              tone: "success" as const,
+              sub: "Chi so tong hop cho admin",
+            },
+            {
+              label: "Hoa hong chua thanh toan",
+              value: vnd(data?.cards.unpaidCommissions || 0),
+              icon: Wallet,
+              tone: "warning" as const,
+              sub: `${partners.length} doi tac dang cho`,
+            },
+            {
+              label: "Benh vien doi tac dang hoat dong",
+              value: String(data?.cards.activePartners || 0),
+              icon: Building2,
+              tone: "info" as const,
+              sub: "Danh sach dang van hanh",
+            },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
-                <s.icon className="h-4 w-4 text-muted-foreground" />
+                <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{item.label}</div>
+                <item.icon className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="mt-2 text-2xl font-bold">{s.value}</div>
-              <div className="mt-1"><Tag tone={s.tone}>{s.sub}</Tag></div>
+              <div className="mt-2 text-2xl font-bold">{item.value}</div>
+              <div className="mt-1">
+                <Tag tone={item.tone}>{item.sub}</Tag>
+              </div>
             </div>
           ))}
         </div>
@@ -47,10 +68,10 @@ function Page() {
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold">AdMob Ad Revenue · Last 30 days</h2>
-              <p className="text-[11px] text-muted-foreground">USD per day</p>
+              <h2 className="text-sm font-semibold">Doanh thu quang cao AdMob · 30 ngay gan nhat</h2>
+              <p className="text-[11px] text-muted-foreground">USD moi ngay</p>
             </div>
-            <Tag tone="success">Trending up</Tag>
+            <Tag tone="success">Dang tang</Tag>
           </div>
           <div className="mt-4">
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-48 w-full">
@@ -69,30 +90,32 @@ function Page() {
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Ambulance Dispatch Commissions</h2>
-              <p className="text-[11px] text-muted-foreground">Per partner hospital · this cycle</p>
+              <h2 className="text-sm font-semibold">Hoa hong dieu xe cuu thuong</h2>
+              <p className="text-[11px] text-muted-foreground">Theo tung benh vien doi tac · ky hien tai</p>
             </div>
             <button className="rounded-md bg-success px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              Request Payout
+              Yeu cau thanh toan
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-background/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium">Partner</th>
-                  <th className="px-4 py-2 text-left font-medium">Successful Dispatches</th>
-                  <th className="px-4 py-2 text-left font-medium">Rate</th>
-                  <th className="px-4 py-2 text-left font-medium">Unpaid Balance</th>
+                  <th className="px-4 py-2 text-left font-medium">Doi tac</th>
+                  <th className="px-4 py-2 text-left font-medium">Luot dieu pho thanh cong</th>
+                  <th className="px-4 py-2 text-left font-medium">Ty le</th>
+                  <th className="px-4 py-2 text-left font-medium">So du chua thanh toan</th>
                 </tr>
               </thead>
               <tbody>
-                {partners.map((p) => (
-                  <tr key={p.name} className="border-t border-border hover:bg-accent/30">
-                    <td className="px-4 py-3 font-medium">{p.name}</td>
-                    <td className="px-4 py-3 font-mono">{p.dispatches}</td>
-                    <td className="px-4 py-3"><Tag tone="info">{p.rate}</Tag></td>
-                    <td className="px-4 py-3 font-mono font-semibold">{p.balance}</td>
+                {partners.map((partner) => (
+                  <tr key={partner.name} className="border-t border-border hover:bg-accent/30">
+                    <td className="px-4 py-3 font-medium">{partner.name}</td>
+                    <td className="px-4 py-3 font-mono">{partner.dispatches}</td>
+                    <td className="px-4 py-3">
+                      <Tag tone="info">{partner.rate}</Tag>
+                    </td>
+                    <td className="px-4 py-3 font-mono font-semibold">{vnd(partner.balance)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -102,4 +125,20 @@ function Page() {
       </div>
     </>
   );
+}
+
+function usd(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function vnd(value: number) {
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(value);
 }

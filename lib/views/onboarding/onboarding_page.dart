@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
+import '../../core/widgets/app_shell.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -13,25 +15,25 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   int _currentIndex = 0;
 
-  final List<Map<String, dynamic>> _slides = [
-    {
-      'icon': Icons.favorite,
-      'title': "I'm Alive · Tôi vẫn ổn",
-      'description': "Mỗi ngày bạn chỉ cần chạm một nút để báo cho người thân biết bạn vẫn an toàn.",
-      'gradient': [Colors.green.shade400, Colors.green.shade600],
-    },
-    {
-      'icon': Icons.access_time,
-      'title': "Time's Up · Quá hạn",
-      'description': "Nếu bạn không phản hồi trong thời gian ân hạn, người bảo hộ sẽ nhận được tín hiệu và vị trí.",
-      'gradient': [Colors.orange.shade400, Colors.orange.shade600],
-    },
-    {
-      'icon': Icons.book,
-      'title': "User Manual · Két sắt sinh tử",
-      'description': "Mật khẩu, di chúc, chỉ dẫn — chỉ được mở khoá khi sự cố thực sự xảy ra.",
-      'gradient': [Colors.red.shade400, Colors.red.shade600],
-    },
+  final List<_OnboardingSlide> _slides = const [
+    _OnboardingSlide(
+      icon: Icons.favorite_border_rounded,
+      title: "I'm Alive · Tôi vẫn ổn",
+      description:
+          'Mỗi ngày bạn chỉ cần chạm một nút để báo cho người thân biết bạn vẫn an toàn.',
+    ),
+    _OnboardingSlide(
+      icon: Icons.notifications_active_outlined,
+      title: 'Nhắc đúng lúc',
+      description:
+          'SafeSolo giữ nhịp check-in nhẹ nhàng để bạn yên tâm mà không thấy áp lực.',
+    ),
+    _OnboardingSlide(
+      icon: Icons.shield_outlined,
+      title: 'Cảnh báo khi cần',
+      description:
+          'Khi bạn im lặng quá lâu, vòng bảo hộ sẽ nhận tín hiệu và biết lúc nào nên hỗ trợ.',
+    ),
   ];
 
   @override
@@ -40,153 +42,131 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final isLast = _currentIndex == _slides.length - 1;
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.grey.shade50],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              // Logo
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.shield,
-                    size: 32,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'SafeSolo',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 80),
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Icon
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: slide['gradient'] as List<Color>,
-                          ),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          slide['icon'] as IconData,
-                          size: 60,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      // Title
-                      Text(
-                        slide['title'] as String,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              height: 1.2,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      // Description
-                      Text(
-                        slide['description'] as String,
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              color: Colors.grey.shade600,
-                              height: 1.5,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+      body: AppPage(
+        child: Column(
+          children: [
+            const Spacer(flex: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.shield_outlined, size: 24, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'SafeSolo',
+                  style: AppTextStyles.title.copyWith(
+                    fontSize: 18,
+                    color: AppColors.primary,
                   ),
                 ),
-              ),
-              // Navigation
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+              ],
+            ),
+            const SizedBox(height: 56),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 280),
+              child: Container(
+                key: ValueKey(_currentIndex),
                 child: Column(
                   children: [
-                    // Dots indicator
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        _slides.length,
-                        (index) => Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: index == _currentIndex
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.grey.shade300,
-                          ),
-                        ),
+                    Container(
+                      width: 176,
+                      height: 176,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.safeGradient,
+                        borderRadius: BorderRadius.circular(36),
+                        boxShadow: AppShadows.safe,
+                      ),
+                      child: Icon(
+                        slide.icon,
+                        color: AppColors.primaryForeground,
+                        size: 78,
                       ),
                     ),
                     const SizedBox(height: 40),
-                    // Buttons
-                    Row(
-                      children: [
-                        if (_currentIndex > 0)
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                setState(() {
-                                  _currentIndex--;
-                                });
-                              },
-                              child: const Text('Quay lại'),
-                            ),
-                          ),
-                        if (_currentIndex > 0) const SizedBox(width: 16),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (isLast) {
-                                context.read<AppProvider>().completeOnboarding();
-                              } else {
-                                setState(() {
-                                  _currentIndex++;
-                                });
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(isLast ? 'Bắt đầu' : 'Tiếp theo'),
-                          ),
+                    Text(
+                      slide.title,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.h2.copyWith(fontSize: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        slide.description,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.55,
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_slides.length, (index) {
+                final active = index == _currentIndex;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: active ? 28 : 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.primary : AppColors.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                );
+              }),
+            ),
+            const Spacer(flex: 3),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  if (isLast) {
+                    context.read<AppProvider>().completeOnboarding();
+                  } else {
+                    setState(() => _currentIndex += 1);
+                  }
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(isLast ? 'Bắt đầu' : 'Tiếp tục'),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => context.read<AppProvider>().completeOnboarding(),
+              child: Text(
+                'Bỏ qua',
+                style: AppTextStyles.bodyStrong.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
       ),
     );
   }
+}
+
+class _OnboardingSlide {
+  const _OnboardingSlide({
+    required this.icon,
+    required this.title,
+    required this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
 }

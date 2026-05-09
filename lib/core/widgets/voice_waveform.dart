@@ -5,6 +5,7 @@ import '../app_theme.dart';
 class VoiceWaveform extends StatelessWidget {
   const VoiceWaveform({
     super.key,
+    this.seed = 'default',
     this.bars = 28,
     this.progress = 0,
     this.height = 28,
@@ -14,6 +15,7 @@ class VoiceWaveform extends StatelessWidget {
     this.activeColor,
   });
 
+  final String seed;
   final int bars;
   final double progress;
   final double height;
@@ -24,10 +26,10 @@ class VoiceWaveform extends StatelessWidget {
 
   List<double> _heights(int n) {
     final arr = <double>[];
-    var seed = 7;
+    var seedValue = seed.codeUnits.fold<int>(7, (value, item) => value + item);
     for (var i = 0; i < n; i++) {
-      seed = (seed * 9301 + 49297) % 233280;
-      final r = seed / 233280;
+      seedValue = (seedValue * 9301 + 49297) % 233280;
+      final r = seedValue / 233280;
       arr.add(0.25 + (r * 0.75));
     }
     return arr;

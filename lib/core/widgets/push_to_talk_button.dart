@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
+import 'voice_waveform.dart';
 
 class PushToTalkButton extends StatefulWidget {
   const PushToTalkButton({
@@ -33,6 +34,7 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   double _startX = 0;
   DateTime? _startTime;
   Timer? _ticker;
+  OverlayEntry? _overlayEntry;
 
   double get _buttonSize => widget.size == PushToTalkSize.large ? 80 : 56;
   double get _iconSize => widget.size == PushToTalkSize.large ? 32 : 24;
@@ -40,6 +42,7 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   @override
   void dispose() {
     _ticker?.cancel();
+    _removeOverlay();
     super.dispose();
   }
 
@@ -58,8 +61,10 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
       setState(() {
         _seconds = DateTime.now().difference(start).inMilliseconds / 1000;
       });
+      _overlayEntry?.markNeedsBuild();
     });
 
+    _showOverlay();
     setState(() {});
   }
 
@@ -68,6 +73,7 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
     setState(() {
       _cancelHover = (_startX - globalPosition.dx) > widget.cancelThreshold;
     });
+    _overlayEntry?.markNeedsBuild();
   }
 
   void _end() {
@@ -87,94 +93,113 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
       _seconds = 0;
       _startTime = null;
     });
+    _removeOverlay();
+  }
+
+  void _showOverlay() {
+    _removeOverlay();
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) {
+      return;
+    }
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            color: AppColors.background.withValues(alpha: 0.95),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    color: _cancelHover
+                        ? const Color(0xFFE7EFEB)
+                        : AppColors.destructive,
+                    shape: BoxShape.circle,
+                    boxShadow: _cancelHover ? AppShadows.card : AppShadows.danger,
+                  ),
+                  child: Icon(
+                    _cancelHover ? Icons.delete_rounded : Icons.mic_rounded,
+                    size: 54,
+                    color: _cancelHover
+                        ? AppColors.destructive
+                        : AppColors.primaryForeground,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: 180,
+                  child: VoiceWaveform(
+                    bars: 28,
+                    progress: (_seconds % 4) / 4,
+                    height: 28,
+                    color: _cancelHover ? AppColors.textMuted : AppColors.destructive,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '${_seconds.toStringAsFixed(1)}s',
+                  style: AppTextStyles.h2.copyWith(
+                    color: _cancelHover
+                        ? AppColors.textMuted
+                        : AppColors.destructive,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _cancelHover ? 'Tha de huy' : 'Tha de gui · Vuot trai de huy',
+                  style: AppTextStyles.bodyStrong.copyWith(
+                    color: AppColors.destructive,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    overlay.insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Listener(
-          onPointerDown: (event) => _begin(event.position),
-          onPointerMove: (event) => _move(event.position),
-          onPointerUp: (_) => _end(),
-          onPointerCancel: (_) => _end(),
-          child: GestureDetector(
-            onTap: widget.onTap,
-            child: AnimatedScale(
-              duration: const Duration(milliseconds: 180),
-              scale: _recording ? 1.2 : 1,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: _buttonSize,
-                height: _buttonSize,
-                decoration: BoxDecoration(
-                  color: _recording ? AppColors.destructive : AppColors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: _recording ? AppShadows.danger : AppShadows.safe,
-                ),
-                child: Icon(
-                  Icons.mic_rounded,
-                  size: _iconSize,
-                  color: AppColors.primaryForeground,
-                ),
-              ),
+    return Listener(
+      onPointerDown: (event) => _begin(event.position),
+      onPointerMove: (event) => _move(event.position),
+      onPointerUp: (_) => _end(),
+      onPointerCancel: (_) => _end(),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 180),
+          scale: _recording ? 1.2 : 1,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: _buttonSize,
+            height: _buttonSize,
+            decoration: BoxDecoration(
+              color: _recording ? AppColors.destructive : AppColors.primary,
+              shape: BoxShape.circle,
+              boxShadow: _recording ? AppShadows.danger : AppShadows.safe,
+            ),
+            child: Icon(
+              Icons.mic_rounded,
+              size: _iconSize,
+              color: AppColors.primaryForeground,
             ),
           ),
         ),
-        if (_recording)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                color: AppColors.background.withValues(alpha: 0.95),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: _cancelHover ? AppColors.mutedFallback : AppColors.destructive,
-                          shape: BoxShape.circle,
-                          boxShadow: _cancelHover ? AppShadows.card : AppShadows.danger,
-                        ),
-                        child: Icon(
-                          _cancelHover ? Icons.delete_rounded : Icons.mic_rounded,
-                          size: 54,
-                          color: _cancelHover ? AppColors.destructive : AppColors.primaryForeground,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        '${_seconds.toStringAsFixed(1)}s',
-                        style: AppTextStyles.h2.copyWith(
-                          color: _cancelHover ? AppColors.textMuted : AppColors.destructive,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _cancelHover ? 'Thả tay để HỦY' : '🔴 Đang ghi âm...',
-                        style: AppTextStyles.bodyStrong.copyWith(
-                          color: AppColors.destructive,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '← Vuốt sang trái để hủy',
-                        style: AppTextStyles.body.copyWith(color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+      ),
     );
   }
-}
-
-extension on AppColors {
-  static const Color mutedFallback = Color(0xFF2A3D36);
 }

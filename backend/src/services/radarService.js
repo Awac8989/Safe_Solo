@@ -1,327 +1,266 @@
-const prisma = require('../config/database');
+const { readState, withState, createId, nowIso } = require('../data/store');
+const { AppError, ensure } = require('../lib/errors');
+const { fuzzCoordinates, haversineKm, sanitizeUser } = require('../lib/utils');
 const chatService = require('./chatService');
 const trustService = require('./trustService');
+const { createAlertEvent } = require('./alertEventService');
+const systemLogService = require('./systemLogService');
+const { getIo } = require('../sockets/socketServer');
 
 class RadarService {
-  // Generate fuzzed coordinates (50m offset for privacy)
-  generateFuzzedCoordinates(lat, lng) {
-    // Approximate conversion: 1 degree latitude ≈ 111 km
-    // 1 degree longitude ≈ 111 km * cos(latitude)
-    // For 50m offset, we need approximately 0.00045 degrees
+  async broadcastSOS(victimId, incidentType, exactLat, exactLng, options = {}) {
+    const result = withState((state) => {
+      const victim = state.users.find((item) => item.id === victimId);
+      ensure(victim, 'Victim not found', 404);
 
-    const offsetMeters = 50;
-    const latOffset = offsetMeters / 111000; // meters to degrees latitude
-    const lngOffset = offsetMeters / (111000 * Math.cos(lat * Math.PI / 180)); // meters to degrees longitude
-
-    // Generate random offset within ±50m
-    const randomLatOffset = (Math.random() - 0.5) * 2 * latOffset;
-    const randomLngOffset = (Math.random() - 0.5) * 2 * lngOffset;
-
-    return {
-      fuzzedLat: lat + randomLatOffset,
-      fuzzedLng: lng + randomLngOffset
-    };
-  }
-
-  // Create rescue incident and broadcast SOS
-  async broadcastSOS(victimId, incidentType, exactLat, exactLng) {
-    // Generate fuzzed coordinates for privacy
-    const { fuzzedLat, fuzzedLng } = this.generateFuzzedCoordinates(exactLat, exactLng);
-
-    // Create rescue incident
-    const incident = await prisma.rescueIncident.create({
-      data: {
+      const { fuzzedLat, fuzzedLng } = fuzzCoordinates(exactLat, exactLng);
+      const incident = {
+        id: createId('incident'),
         victimId,
+        status: 'ACTIVE',
         incidentType,
+        severity: Number(options.severity || 3),
+        source: options.source || 'SOS',
         exactLat,
         exactLng,
         fuzzedLat,
         fuzzedLng,
-        status: 'ACTIVE'
-      },
-      include: {
-        victim: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true
-          }
-        }
-      }
+        approxAddress: options.approxAddress || victim.approxAddress || null,
+        batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
+        communityRequestedAt: null,
+        createdAt: nowIso(),
+        resolvedAt: null,
+      };
+
+      state.rescueIncidents.push(incident);
+      victim.lastLat = exactLat;
+      victim.lastLng = exactLng;
+      victim.lastLocationTime = nowIso();
+      victim.approxAddress = incident.approxAddress;
+      victim.batteryLevel = incident.batteryLevel;
+      victim.updatedAt = nowIso();
+
+      return {
+        incident,
+        victim: sanitizeUser(victim),
+      };
     });
 
-    // Create chat room for the incident
-    await chatService.createChatRoom(incident.id);
+    await chatService.createChatRoom(result.incident.id);
+    await systemLogService.createLog({
+      incidentId: result.incident.id,
+      actionType: 'SOS_BROADCASTED',
+      description: `SOS incident ${result.incident.id} created for victim ${victimId}`,
+      metadata: {
+        incidentType,
+        lat: exactLat,
+        lng: exactLng,
+      },
+    });
 
-    // Find nearby volunteers using PostGIS spatial query
     const nearbyVolunteers = await this.findNearbyVolunteers(exactLat, exactLng, victimId);
+    createAlertEvent({
+      userId: victimId,
+      level: 'SOS',
+      status: 'SOS_BROADCASTED',
+      source: 'USER',
+      title: 'Da phat SOS',
+      message: 'He thong dang thong bao cho guardians va tinh nguyen vien gan ban',
+      metadata: {
+        incidentId: result.incident.id,
+        nearbyVolunteersCount: nearbyVolunteers.length,
+      },
+    });
+
+    try {
+      getIo().emit('RADAR_INCIDENT_CREATED', {
+        incident: await this.getIncidentDetailsForBroadcast(result.incident.id),
+      });
+    } catch (_error) {
+      // socket optional
+    }
 
     return {
-      incident,
-      nearbyVolunteers: nearbyVolunteers.map(v => v.id) // Return only IDs for push notifications
+      incident: await this.getIncidentDetailsForBroadcast(result.incident.id),
+      nearbyVolunteers,
     };
   }
 
-  // Find nearby volunteers within 3km radius using PostGIS
-  async findNearbyVolunteers(lat, lng, excludeUserId) {
-    // Use PostGIS ST_DWithin function to find users within 3000 meters
-    // Create geometry points on-the-fly from lat/lng columns
-    // ST_DWithin uses geography for accurate distance calculations on Earth's surface
-    const nearbyUsers = await prisma.$queryRaw`
-      SELECT
-        u.id,
-        u."firstName",
-        u."lastName",
-        u."lastLat",
-        u."lastLng",
-        u."lastLocationTime"
-      FROM users u
-      WHERE u.id != ${excludeUserId}
-        AND u."isActive" = true
-        AND u."lastLat" IS NOT NULL
-        AND u."lastLng" IS NOT NULL
-        AND u."lastLocationTime" IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1
-          FROM guardian_relationships gr
-          WHERE gr."requesterId" = ${excludeUserId}
-            AND gr."guardianId" = u.id
-            AND gr.status = 'ACCEPTED'
-        )
-        AND ST_DWithin(
-          ST_SetSRID(ST_MakePoint(u."lastLng", u."lastLat"), 4326)::geography,
-          ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-          3000
-        )
-      ORDER BY ST_Distance(
-        ST_SetSRID(ST_MakePoint(u."lastLng", u."lastLat"), 4326)::geography,
-        ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
-      )
-      LIMIT 50
-    `;
-
-    return nearbyUsers;
+  async getIncidentDetailsForBroadcast(incidentId) {
+    const state = readState();
+    const incident = state.rescueIncidents.find((item) => item.id === incidentId);
+    if (!incident) {
+      throw new AppError('Incident not found', 404);
+    }
+    const victim = state.users.find((item) => item.id === incident.victimId);
+    return {
+      ...incident,
+      victim: victim ? sanitizeUser(victim) : null,
+      roomId: state.chatRooms.find((item) => item.incidentId === incident.id)?.id || null,
+    };
   }
 
-  // Get nearby active incidents for volunteers (with fuzzed coordinates)
-  async getNearbyIncidents(volunteerLat, volunteerLng, volunteerId) {
-    // Find active incidents within 3km of volunteer
-    const nearbyIncidents = await prisma.$queryRaw`
-      SELECT
-        ri.id,
-        ri."incidentType",
-        ri."fuzzedLat",
-        ri."fuzzedLng",
-        ri."createdAt",
-        u."firstName" as "victimFirstName",
-        u."lastName" as "victimLastName"
-      FROM rescue_incidents ri
-      JOIN users u ON ri."victimId" = u.id
-      WHERE ri.status = 'ACTIVE'
-        AND ST_DWithin(
-          ST_SetSRID(ST_MakePoint(ri."fuzzedLng", ri."fuzzedLat"), 4326)::geography,
-          ST_SetSRID(ST_MakePoint(${volunteerLng}, ${volunteerLat}), 4326)::geography,
-          3000
-        )
-        AND ri."victimId" != ${volunteerId}
-        AND NOT EXISTS (
-          SELECT 1 FROM volunteer_responses vr
-          WHERE vr."incidentId" = ri.id
-            AND vr."volunteerId" = ${volunteerId}
-        )
-      ORDER BY ri."createdAt" DESC
-      LIMIT 20
-    `;
-
-    return nearbyIncidents;
+  async findNearbyVolunteers(lat, lng, excludeUserId, radiusKm = 3) {
+    const state = readState();
+    return state.users
+      .filter((item) => item.id !== excludeUserId && item.isActive)
+      .filter((item) => item.role === 'VOLUNTEER' || item.role === 'HERO')
+      .filter((item) => item.isKycVerified)
+      .filter((item) => item.lastLat != null && item.lastLng != null)
+      .map((item) => ({
+        ...sanitizeUser(item),
+        distanceKm: Number(haversineKm(lat, lng, item.lastLat, item.lastLng).toFixed(2)),
+      }))
+      .filter((item) => item.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
   }
 
-  // Accept rescue incident with concurrency control
+  async getNearbyIncidents(volunteerLat, volunteerLng, volunteerId, radiusKm = 3) {
+    const state = readState();
+    return state.rescueIncidents
+      .filter((item) => item.status === 'ACTIVE' && item.victimId !== volunteerId)
+      .map((incident) => {
+        const victim = state.users.find((user) => user.id === incident.victimId);
+        const distanceKm = haversineKm(volunteerLat, volunteerLng, incident.fuzzedLat, incident.fuzzedLng);
+        return {
+          ...incident,
+          victim: victim ? sanitizeUser(victim) : null,
+          distanceKm: Number(distanceKm.toFixed(2)),
+          hasAccepted: state.volunteerResponses.some(
+            (response) => response.incidentId === incident.id && response.volunteerId === volunteerId,
+          ),
+        };
+      })
+      .filter((item) => item.distanceKm <= radiusKm)
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+  }
+
   async acceptRescueIncident(incidentId, volunteerId) {
-    // Use transaction to ensure atomicity and prevent race conditions
-    return await prisma.$transaction(async (tx) => {
-      // Check current volunteer count for this incident
-      const volunteerCount = await tx.volunteerResponse.count({
-        where: { incidentId }
-      });
+    return withState((state) => {
+      const volunteer = state.users.find((item) => item.id === volunteerId);
+      ensure(volunteer, 'Volunteer not found', 404);
+      ensure(volunteer.isKycVerified, 'KYC verification required before accepting rescue missions', 403);
 
-      if (volunteerCount >= 3) {
-        throw new Error('Đã đủ người hỗ trợ. Không thể nhận thêm tình nguyện viên.');
+      const incident = state.rescueIncidents.find((item) => item.id === incidentId);
+      ensure(incident, 'Incident not found', 404);
+      ensure(incident.status === 'ACTIVE', 'Incident is no longer active', 409);
+
+      const existing = state.volunteerResponses.find(
+        (item) => item.incidentId === incidentId && item.volunteerId === volunteerId,
+      );
+      if (existing) {
+        throw new AppError('You have already accepted this rescue mission', 409);
       }
 
-      // Check if volunteer already responded to this incident
-      const existingResponse = await tx.volunteerResponse.findUnique({
-        where: {
-          incidentId_volunteerId: {
-            incidentId,
-            volunteerId
-          }
-        }
+      const response = {
+        id: createId('resp'),
+        incidentId,
+        volunteerId,
+        status: 'EN_ROUTE',
+        createdAt: nowIso(),
+      };
+      state.volunteerResponses.push(response);
+
+      createAlertEvent({
+        userId: incident.victimId,
+        level: 'INFO',
+        status: 'VOLUNTEER_ACCEPTED',
+        source: 'COMMUNITY',
+        title: 'Tinh nguyen vien dang den',
+        message: `${volunteer.firstName} ${volunteer.lastName}`.trim() + ' da nhan ho tro',
+        metadata: { incidentId, volunteerId },
       });
-
-      if (existingResponse) {
-        throw new Error('Bạn đã nhận ca cứu hộ này rồi.');
-      }
-
-      // Create volunteer response
-      const response = await tx.volunteerResponse.create({
-        data: {
-          incidentId,
-          volunteerId,
-          status: 'EN_ROUTE'
-        }
-      });
-
-      // Get incident details with exact coordinates and victim info
-      const incident = await tx.rescueIncident.findUnique({
-        where: { id: incidentId },
-        include: {
-          victim: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true
-            }
-          }
-        }
-      });
-
-      if (!incident) {
-        throw new Error('Không tìm thấy ca cứu hộ.');
-      }
-
-      if (incident.status !== 'ACTIVE') {
-        throw new Error('Ca cứu hộ này không còn hoạt động.');
-      }
 
       return {
         response,
         incident: {
-          id: incident.id,
-          incidentType: incident.incidentType,
-          exactLat: incident.exactLat,
-          exactLng: incident.exactLng,
-          victim: incident.victim,
-          createdAt: incident.createdAt
-        }
+          ...incident,
+          victim: sanitizeUser(state.users.find((item) => item.id === incident.victimId)),
+        },
       };
     });
   }
 
-  // Resolve incident and close chat room
-  async resolveIncident(incidentId) {
-    const incident = await prisma.rescueIncident.findUnique({
-      where: { id: incidentId },
-      include: { chatRoom: true }
+  async markVolunteerArrived(incidentId, volunteerId) {
+    return withState((state) => {
+      const response = state.volunteerResponses.find(
+        (item) => item.incidentId === incidentId && item.volunteerId === volunteerId,
+      );
+      ensure(response, 'Volunteer response not found', 404);
+      response.status = 'ARRIVED';
+      return response;
     });
-
-    if (!incident) {
-      throw new Error('Incident not found');
-    }
-
-    if (incident.status === 'RESOLVED') {
-      throw new Error('Incident is already resolved');
-    }
-
-    // Update incident status
-    await prisma.rescueIncident.update({
-      where: { id: incidentId },
-      data: {
-        status: 'RESOLVED',
-        resolvedAt: new Date()
-      }
-    });
-
-    // Close chat room if it exists
-    if (incident.chatRoom) {
-      await chatService.closeChatRoom(incidentId);
-    }
-
-    return incident;
   }
 
-  // Get incident details (for volunteers who accepted)
-  async getIncidentDetails(incidentId, volunteerId) {
-    // Check if volunteer has accepted this incident
-    const response = await prisma.volunteerResponse.findUnique({
-      where: {
-        incidentId_volunteerId: {
-          incidentId,
-          volunteerId
-        }
-      }
-    });
+  async getIncidentDetails(incidentId, requesterId) {
+    const state = readState();
+    const incident = state.rescueIncidents.find((item) => item.id === incidentId);
+    ensure(incident, 'Incident not found', 404);
 
-    if (!response) {
-      throw new Error('Bạn chưa nhận ca cứu hộ này.');
-    }
+    const canAccess =
+      incident.victimId === requesterId ||
+      state.volunteerResponses.some(
+        (item) => item.incidentId === incidentId && item.volunteerId === requesterId,
+      ) ||
+      state.guardianRelationships.some(
+        (item) =>
+          item.requesterId === incident.victimId &&
+          item.guardianId === requesterId &&
+          item.status === 'ACCEPTED',
+      );
 
-    const incident = await prisma.rescueIncident.findUnique({
-      where: { id: incidentId },
-      include: {
-        victim: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true
-          }
-        },
-        responses: {
-          include: {
-            volunteer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true
-              }
-            }
-          }
-        }
-      }
-    });
+    ensure(canAccess, 'Unauthorized to access this incident', 403);
 
-    return incident;
+    return {
+      ...incident,
+      victim: sanitizeUser(state.users.find((item) => item.id === incident.victimId)),
+      responses: state.volunteerResponses
+        .filter((item) => item.incidentId === incidentId)
+        .map((response) => ({
+          ...response,
+          volunteer: sanitizeUser(state.users.find((item) => item.id === response.volunteerId)),
+        })),
+      chatRoom: state.chatRooms.find((item) => item.incidentId === incidentId) || null,
+      emergencyMemos: state.emergencyMemos.filter((item) => item.incidentId === incidentId),
+    };
   }
 
-  // Resolve incident
-  async resolveIncident(incidentId, victimId) {
-    const incident = await prisma.rescueIncident.update({
-      where: { id: incidentId },
-      data: {
-        status: 'RESOLVED',
-        resolvedAt: new Date()
-      },
-      include: {
-        responses: {
-          include: {
-            volunteer: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true
-              }
-            }
-          }
-        }
-      }
+  async resolveIncident(incidentId, requesterId) {
+    const result = withState((state) => {
+      const incident = state.rescueIncidents.find((item) => item.id === incidentId);
+      ensure(incident, 'Incident not found', 404);
+      ensure(incident.victimId === requesterId, 'Only the victim can resolve this incident', 403);
+      ensure(incident.status === 'ACTIVE', 'Incident is already resolved', 409);
+
+      incident.status = 'RESOLVED';
+      incident.resolvedAt = nowIso();
+
+      return {
+        incident,
+        arrivedVolunteerIds: state.volunteerResponses
+          .filter((item) => item.incidentId === incidentId && item.status === 'ARRIVED')
+          .map((item) => item.volunteerId),
+      };
     });
 
-    // Update trust scores for all volunteers who responded
-    for (const response of incident.responses) {
-      if (response.status === 'ARRIVED') {
-        await trustService.calculateAndUpdateTrustScore(response.volunteerId, 5.0); // Default 5-star rating for successful rescue
-      }
+    for (const volunteerId of result.arrivedVolunteerIds) {
+      await trustService.calculateAndUpdateTrustScore(volunteerId, 5);
     }
 
-    // Close chat room if it exists
-    if (incident.chatRoom) {
-      await chatService.closeChatRoom(incidentId);
+    await chatService.closeChatRoom(incidentId);
+    await systemLogService.createLog({
+      incidentId,
+      actionType: 'INCIDENT_RESOLVED',
+      description: `Incident ${incidentId} resolved by victim`,
+    });
+
+    try {
+      getIo().emit('RADAR_INCIDENT_RESOLVED', { incidentId });
+    } catch (_error) {
+      // socket optional
     }
 
-    return incident;
+    return this.getIncidentDetailsForBroadcast(incidentId);
   }
 }
 

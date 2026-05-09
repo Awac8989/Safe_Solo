@@ -1,94 +1,87 @@
-const prisma = require('../config/database');
+const { readState, withState, createId, nowIso } = require('../data/store');
+const { AppError } = require('../lib/errors');
 
 class MedicalService {
-  // Create medical profile
   async createMedicalProfile(userId, profileData) {
-    // Check if profile already exists
-    const existingProfile = await prisma.medicalProfile.findUnique({
-      where: { userId }
-    });
+    return withState((state) => {
+      const existing = state.medicalProfiles.find((item) => item.userId === userId);
+      if (existing) {
+        throw new AppError('Medical profile already exists for this user', 409);
+      }
 
-    if (existingProfile) {
-      throw new Error('Medical profile already exists for this user');
-    }
-
-    const profile = await prisma.medicalProfile.create({
-      data: {
+      const profile = {
+        id: createId('med'),
         userId,
-        ...profileData
-      }
-    });
+        bloodType: profileData.bloodType || null,
+        allergies: profileData.allergies || [],
+        medications: profileData.medications || [],
+        medicalConditions: profileData.medicalConditions || [],
+        emergencyContact: profileData.emergencyContact || null,
+        insuranceInfo: profileData.insuranceInfo || null,
+        doctor: profileData.doctor || null,
+        qrCodeValue: `SAFE-MED-${userId}`,
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      };
 
-    return profile;
+      state.medicalProfiles.push(profile);
+      return profile;
+    });
   }
 
-  // Get medical profile
   async getMedicalProfile(userId) {
-    const profile = await prisma.medicalProfile.findUnique({
-      where: { userId }
-    });
-
+    const state = readState();
+    const profile = state.medicalProfiles.find((item) => item.userId === userId);
     if (!profile) {
-      throw new Error('Medical profile not found');
+      throw new AppError('Medical profile not found', 404);
     }
-
     return profile;
   }
 
-  // Update medical profile
   async updateMedicalProfile(userId, updateData) {
-    const profile = await prisma.medicalProfile.findUnique({
-      where: { userId }
-    });
-
-    if (!profile) {
-      throw new Error('Medical profile not found');
-    }
-
-    const updatedProfile = await prisma.medicalProfile.update({
-      where: { userId },
-      data: updateData
-    });
-
-    return updatedProfile;
-  }
-
-  // Delete medical profile
-  async deleteMedicalProfile(userId) {
-    const profile = await prisma.medicalProfile.findUnique({
-      where: { userId }
-    });
-
-    if (!profile) {
-      throw new Error('Medical profile not found');
-    }
-
-    await prisma.medicalProfile.delete({
-      where: { userId }
-    });
-
-    return { message: 'Medical profile deleted successfully' };
-  }
-
-  // Get medical profile for emergency access (by guardian)
-  async getEmergencyProfile(userId) {
-    const profile = await prisma.medicalProfile.findUnique({
-      where: { userId },
-      select: {
-        bloodType: true,
-        allergies: true,
-        medications: true,
-        medicalConditions: true,
-        emergencyContact: true,
-        insuranceInfo: true
+    return withState((state) => {
+      const profile = state.medicalProfiles.find((item) => item.userId === userId);
+      if (!profile) {
+        throw new AppError('Medical profile not found', 404);
       }
+
+      Object.assign(profile, {
+        ...updateData,
+        updatedAt: nowIso(),
+      });
+
+      if (!profile.qrCodeValue) {
+        profile.qrCodeValue = `SAFE-MED-${userId}`;
+      }
+
+      return profile;
     });
+  }
 
-    if (!profile) {
-      throw new Error('Medical profile not found');
-    }
+  async deleteMedicalProfile(userId) {
+    return withState((state) => {
+      const index = state.medicalProfiles.findIndex((item) => item.userId === userId);
+      if (index < 0) {
+        throw new AppError('Medical profile not found', 404);
+      }
 
-    return profile;
+      state.medicalProfiles.splice(index, 1);
+      return { message: 'Medical profile deleted successfully' };
+    });
+  }
+
+  async getEmergencyProfile(userId) {
+    const profile = await this.getMedicalProfile(userId);
+    return {
+      bloodType: profile.bloodType,
+      allergies: profile.allergies,
+      medications: profile.medications,
+      medicalConditions: profile.medicalConditions,
+      emergencyContact: profile.emergencyContact,
+      insuranceInfo: profile.insuranceInfo,
+      doctor: profile.doctor,
+      qrCodeValue: profile.qrCodeValue,
+    };
   }
 }
 
