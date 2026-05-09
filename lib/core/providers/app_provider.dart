@@ -3,8 +3,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app_language.dart';
 import '../../models/alert_policy_model.dart';
+import '../../models/automation_settings_model.dart';
 import '../../models/interaction_event_model.dart';
+import '../../models/medical_profile_model.dart';
+import '../../models/security_settings_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
@@ -231,6 +235,7 @@ class MedicalId {
 }
 
 class Automation {
+  String dailyReminderTime;
   bool shakeSos;
   int shakeSensitivity;
   bool fallDetection;
@@ -239,6 +244,7 @@ class Automation {
   String pillTime;
 
   Automation({
+    this.dailyReminderTime = '08:00',
     this.shakeSos = true,
     this.shakeSensitivity = 3,
     this.fallDetection = false,
@@ -248,6 +254,7 @@ class Automation {
   });
 
   Map<String, dynamic> toJson() => {
+    'dailyReminderTime': dailyReminderTime,
     'shakeSos': shakeSos,
     'shakeSensitivity': shakeSensitivity,
     'fallDetection': fallDetection,
@@ -257,6 +264,7 @@ class Automation {
   };
 
   factory Automation.fromJson(Map<String, dynamic> json) => Automation(
+    dailyReminderTime: json['dailyReminderTime'] as String? ?? '08:00',
     shakeSos: json['shakeSos'] as bool? ?? true,
     shakeSensitivity: json['shakeSensitivity'] as int? ?? 3,
     fallDetection: json['fallDetection'] as bool? ?? false,
@@ -271,12 +279,14 @@ class Security {
   String duressPin;
   bool stealthMode;
   int autoWipeDays;
+  bool encryptionEnabled;
 
   Security({
     this.realPin = '',
     this.duressPin = '',
     this.stealthMode = false,
     this.autoWipeDays = 0,
+    this.encryptionEnabled = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -284,6 +294,7 @@ class Security {
     'duressPin': duressPin,
     'stealthMode': stealthMode,
     'autoWipeDays': autoWipeDays,
+    'encryptionEnabled': encryptionEnabled,
   };
 
   factory Security.fromJson(Map<String, dynamic> json) => Security(
@@ -291,7 +302,60 @@ class Security {
     duressPin: json['duressPin'] as String? ?? '',
     stealthMode: json['stealthMode'] as bool? ?? false,
     autoWipeDays: json['autoWipeDays'] as int? ?? 0,
+    encryptionEnabled: json['encryptionEnabled'] as bool? ?? true,
   );
+}
+
+class VaultEntry {
+  const VaultEntry({
+    required this.id,
+    required this.title,
+    required this.hint,
+    required this.content,
+    this.updatedAt,
+  });
+
+  final String id;
+  final String title;
+  final String hint;
+  final String content;
+  final DateTime? updatedAt;
+
+  bool get hasContent => content.trim().isNotEmpty;
+
+  VaultEntry copyWith({
+    String? id,
+    String? title,
+    String? hint,
+    String? content,
+    DateTime? updatedAt,
+  }) {
+    return VaultEntry(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      hint: hint ?? this.hint,
+      content: content ?? this.content,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'hint': hint,
+    'content': content,
+    'updatedAt': updatedAt?.toIso8601String(),
+  };
+
+  factory VaultEntry.fromJson(Map<String, dynamic> json) {
+    return VaultEntry(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      hint: json['hint'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      updatedAt: _parseDateTime(json['updatedAt']),
+    );
+  }
 }
 
 class CirclePost {
@@ -430,6 +494,7 @@ class ChatThread {
     this.messages = const [],
     this.unread = 0,
     this.battery,
+    this.contactPhone,
     this.highlight = false,
   });
 
@@ -441,6 +506,7 @@ class ChatThread {
   final List<ChatMessage> messages;
   final int unread;
   final String? battery;
+  final String? contactPhone;
   final bool highlight;
 
   ChatThread copyWith({
@@ -452,6 +518,7 @@ class ChatThread {
     List<ChatMessage>? messages,
     int? unread,
     String? battery,
+    String? contactPhone,
     bool? highlight,
   }) {
     return ChatThread(
@@ -463,6 +530,7 @@ class ChatThread {
       messages: messages ?? this.messages,
       unread: unread ?? this.unread,
       battery: battery ?? this.battery,
+      contactPhone: contactPhone ?? this.contactPhone,
       highlight: highlight ?? this.highlight,
     );
   }
@@ -476,6 +544,7 @@ class ChatThread {
     'messages': messages.map((item) => item.toJson()).toList(),
     'unread': unread,
     'battery': battery,
+    'contactPhone': contactPhone,
     'highlight': highlight,
   };
 
@@ -491,6 +560,7 @@ class ChatThread {
           .toList(),
       unread: json['unread'] as int? ?? 0,
       battery: json['battery'] as String?,
+      contactPhone: json['contactPhone'] as String?,
       highlight: json['highlight'] as bool? ?? false,
     );
   }
@@ -504,6 +574,7 @@ class ChatMessage {
     required this.createdAt,
     this.mine = false,
     this.isSystem = false,
+    this.voiceSeconds,
   });
 
   final String id;
@@ -512,6 +583,9 @@ class ChatMessage {
   final DateTime createdAt;
   final bool mine;
   final bool isSystem;
+  final int? voiceSeconds;
+
+  bool get isVoiceNote => voiceSeconds != null && voiceSeconds! > 0;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -520,6 +594,7 @@ class ChatMessage {
     'createdAt': createdAt.toIso8601String(),
     'mine': mine,
     'isSystem': isSystem,
+    'voiceSeconds': voiceSeconds,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -530,6 +605,7 @@ class ChatMessage {
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
       mine: json['mine'] as bool? ?? false,
       isSystem: json['isSystem'] as bool? ?? false,
+      voiceSeconds: json['voiceSeconds'] as int?,
     );
   }
 }
@@ -591,9 +667,13 @@ class AppProvider with ChangeNotifier {
   int _streak = 0;
   Mood? _mood = Mood.calm;
   bool _highContrast = false;
+  AppLanguage _language = AppLanguage.vi;
   MedicalId _medical = MedicalId();
   Automation _automation = Automation();
   Security _security = Security();
+  List<VaultEntry> _vaultEntries = _defaultVaultEntries();
+  DateTime? _vaultReleaseAt;
+  DateTime? _vaultAutoWipeAt;
   List<String> _badges = [];
   List<CirclePost> _circlePosts = const [];
   List<ChatThread> _chatThreads = const [];
@@ -611,9 +691,15 @@ class AppProvider with ChangeNotifier {
   int get streak => _streak;
   Mood? get mood => _mood;
   bool get highContrast => _highContrast;
+  AppLanguage get language => _language;
   MedicalId get medical => _medical;
   Automation get automation => _automation;
   Security get security => _security;
+  List<VaultEntry> get vaultEntries => List.unmodifiable(_vaultEntries);
+  DateTime? get vaultReleaseAt => _vaultReleaseAt;
+  DateTime? get vaultAutoWipeAt => _vaultAutoWipeAt;
+  bool get isVaultReleased => _vaultReleaseAt != null;
+  bool get isVaultAutoWiped => _vaultAutoWipeAt != null;
   List<String> get badges => List.unmodifiable(_badges);
   List<CirclePost> get circlePosts => List.unmodifiable(_circlePosts);
   List<ChatThread> get chatThreads => List.unmodifiable(_chatThreads);
@@ -628,6 +714,21 @@ class AppProvider with ChangeNotifier {
   bool get isVacation =>
       _user?.sleepModeUntil != null &&
       _user!.sleepModeUntil!.isAfter(DateTime.now());
+  DateTime? get silentWindowStartedAt {
+    final lastCheckin = _user?.lastCheckinTime;
+    if (lastCheckin == null) {
+      return null;
+    }
+    return lastCheckin.add(Duration(hours: graceHours));
+  }
+
+  DateTime? get vaultUnlockAt {
+    final silentWindow = silentWindowStartedAt;
+    if (silentWindow == null) {
+      return null;
+    }
+    return silentWindow.add(const Duration(hours: 72));
+  }
 
   List<CirclePost> postsFor(CircleScope scope) =>
       _circlePosts.where((post) => post.scope == scope).toList();
@@ -650,6 +751,7 @@ class AppProvider with ChangeNotifier {
         _streak = data['streak'] as int? ?? 0;
         _mood = _decodeMood(data['mood'] as String?);
         _highContrast = data['highContrast'] as bool? ?? false;
+        _language = _decodeLanguage(data['language'] as String?);
         _medical = MedicalId.fromJson(
           Map<String, dynamic>.from(data['medical'] as Map? ?? const {}),
         );
@@ -659,6 +761,14 @@ class AppProvider with ChangeNotifier {
         _security = Security.fromJson(
           Map<String, dynamic>.from(data['security'] as Map? ?? const {}),
         );
+        _vaultEntries = (data['vaultEntries'] as List<dynamic>? ?? const [])
+            .map((item) => VaultEntry.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+        if (_vaultEntries.isEmpty) {
+          _vaultEntries = _defaultVaultEntries();
+        }
+        _vaultReleaseAt = _parseDateTime(data['vaultReleaseAt']);
+        _vaultAutoWipeAt = _parseDateTime(data['vaultAutoWipeAt']);
         _badges = List<String>.from(data['badges'] as List<dynamic>? ?? const []);
         _circlePosts = (data['circlePosts'] as List<dynamic>? ?? const [])
             .map((item) => CirclePost.fromJson(Map<String, dynamic>.from(item as Map)))
@@ -681,6 +791,8 @@ class AppProvider with ChangeNotifier {
       }
     }
 
+    await _evaluateSafetyAutomation();
+
     _isInitializing = false;
     notifyListeners();
   }
@@ -694,9 +806,13 @@ class AppProvider with ChangeNotifier {
       'streak': _streak,
       'mood': _mood?.name,
       'highContrast': _highContrast,
+      'language': _language.name,
       'medical': _medical.toJson(),
       'automation': _automation.toJson(),
       'security': _security.toJson(),
+      'vaultEntries': _vaultEntries.map((item) => item.toJson()).toList(),
+      'vaultReleaseAt': _vaultReleaseAt?.toIso8601String(),
+      'vaultAutoWipeAt': _vaultAutoWipeAt?.toIso8601String(),
       'badges': _badges,
       'circlePosts': _circlePosts.map((item) => item.toJson()).toList(),
       'chatThreads': _chatThreads.map((item) => item.toJson()).toList(),
@@ -745,6 +861,16 @@ class AppProvider with ChangeNotifier {
       _medical.fullName = fullName;
       _medical.emergencyPhone = emergencyPhone;
       _streak = (_streak == 0) ? 1 : _streak;
+      _medical = _fromMedicalProfile(
+        await _api.getMedicalProfile(_user!.id),
+      );
+      _automation = _fromAutomationSettings(
+        await _api.getAutomationSettings(_user!.id),
+      );
+      _security = _mergeSecuritySettings(
+        _security,
+        await _api.getSecuritySettings(_user!.id),
+      );
       _alertPolicy = await _api.getAlertPolicy(_user!.id);
       _interactionEvents = await _api.listInteractions(_user!.id);
       _seedDemoCollections();
@@ -760,10 +886,19 @@ class AppProvider with ChangeNotifier {
     }
     final refreshed = await _api.getUserById(current.id);
     _user = User.fromUserModel(refreshed, email: current.email);
+    _medical = _fromMedicalProfile(await _api.getMedicalProfile(current.id));
+    _automation = _fromAutomationSettings(
+      await _api.getAutomationSettings(current.id),
+    );
+    _security = _mergeSecuritySettings(
+      _security,
+      await _api.getSecuritySettings(current.id),
+    );
     _alertPolicy = await _api.getAlertPolicy(current.id);
     _interactionEvents = await _api.listInteractions(current.id);
     _seedDemoCollections();
     _updateBadges();
+    await _evaluateSafetyAutomation();
     await _saveToStorage();
     notifyListeners();
   }
@@ -780,6 +915,9 @@ class AppProvider with ChangeNotifier {
     _medical = MedicalId();
     _automation = Automation();
     _security = Security();
+    _vaultEntries = _defaultVaultEntries();
+    _vaultReleaseAt = null;
+    _vaultAutoWipeAt = null;
     _badges = [];
     _circlePosts = const [];
     _chatThreads = const [];
@@ -820,7 +958,9 @@ class AppProvider with ChangeNotifier {
         'Da nhan check-in moi cua ${_user?.name ?? 'ban'}',
       );
       _interactionEvents = await _api.listInteractions(current.id);
+      _vaultReleaseAt = null;
       _updateBadges();
+      await _evaluateSafetyAutomation();
       await _saveToStorage();
     });
   }
@@ -851,6 +991,7 @@ class AppProvider with ChangeNotifier {
     await _runBusy(() async {
       final updated = await _api.updateTimer(current.id, hours * 60);
       _user = User.fromUserModel(updated, email: current.email);
+      await _evaluateSafetyAutomation();
       await _saveToStorage();
     });
   }
@@ -922,6 +1063,7 @@ class AppProvider with ChangeNotifier {
     await _runBusy(() async {
       final updated = await _api.setSleepMode(userId: current.id, minutes: 0);
       _user = User.fromUserModel(updated, email: current.email);
+      await _evaluateSafetyAutomation();
       await _saveToStorage();
     });
   }
@@ -938,6 +1080,7 @@ class AppProvider with ChangeNotifier {
         minutes: boundedHours * 60,
       );
       _user = User.fromUserModel(updated, email: current.email);
+      await _evaluateSafetyAutomation();
       await _saveToStorage();
     });
   }
@@ -948,22 +1091,90 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setMedical(MedicalId medical) async {
-    _medical = medical;
-    _updateBadges();
+  Future<void> setLanguage(AppLanguage language) async {
+    _language = language;
     await _saveToStorage();
     notifyListeners();
+  }
+
+  Future<void> setMedical(MedicalId medical) async {
+    final current = _user;
+    if (current == null) {
+      _medical = medical;
+      _updateBadges();
+      await _saveToStorage();
+      notifyListeners();
+      return;
+    }
+    await _runBusy(() async {
+      final profile = await _api.updateMedicalProfile(
+        userId: current.id,
+        profile: _toMedicalProfile(current.id, medical),
+      );
+      _medical = _fromMedicalProfile(profile);
+      _updateBadges();
+      await _saveToStorage();
+    });
   }
 
   Future<void> setAutomation(Automation automation) async {
-    _automation = automation;
+    final current = _user;
+    if (current == null) {
+      _automation = automation;
+      _updateBadges();
+      await _saveToStorage();
+      notifyListeners();
+      return;
+    }
+    await _runBusy(() async {
+      final settings = await _api.updateAutomationSettings(
+        userId: current.id,
+        settings: _toAutomationSettings(current.id, automation),
+      );
+      _automation = _fromAutomationSettings(settings);
+      _updateBadges();
+      await _saveToStorage();
+    });
+  }
+
+  Future<void> setSecurity(Security security) async {
+    final current = _user;
+    _security = security;
+    if (current != null) {
+      await _runBusy(() async {
+        final remote = await _api.updateSecuritySettings(
+          userId: current.id,
+          stealthMode: security.stealthMode,
+          autoWipeDays: security.autoWipeDays,
+          encryptionEnabled: security.encryptionEnabled,
+        );
+        _security = _mergeSecuritySettings(security, remote);
+        _updateBadges();
+        await _evaluateSafetyAutomation();
+        await _saveToStorage();
+      });
+      return;
+    }
     _updateBadges();
+    await _evaluateSafetyAutomation();
     await _saveToStorage();
     notifyListeners();
   }
 
-  Future<void> setSecurity(Security security) async {
-    _security = security;
+  Future<void> saveVaultEntry({
+    required String entryId,
+    required String content,
+  }) async {
+    _vaultEntries = _vaultEntries
+        .map(
+          (entry) => entry.id == entryId
+              ? entry.copyWith(
+                  content: content.trim(),
+                  updatedAt: DateTime.now(),
+                )
+              : entry,
+        )
+        .toList();
     _updateBadges();
     await _saveToStorage();
     notifyListeners();
@@ -974,9 +1185,65 @@ class AppProvider with ChangeNotifier {
     if (current == null) {
       return;
     }
-    _user = current.copyWith(emergencyContacts: contacts);
-    await _saveToStorage();
-    notifyListeners();
+    await _runBusy(() async {
+      final target = contacts.take(3).toList();
+      final existing = current.emergencyContacts;
+      final exactExisting = {
+        for (final item in existing) '${item.name}|${item.phone}|${item.relation}': item,
+      };
+      final exactTarget = {
+        for (final item in target) '${item.name}|${item.phone}|${item.relation}': item,
+      };
+
+      for (final item in existing) {
+        final key = '${item.name}|${item.phone}|${item.relation}';
+        if (!exactTarget.containsKey(key)) {
+          await _api.deleteGuardian(userId: current.id, phone: item.phone);
+        }
+      }
+
+      for (final item in target) {
+        final key = '${item.name}|${item.phone}|${item.relation}';
+        if (!exactExisting.containsKey(key)) {
+          await _api.createGuardian(
+            userId: current.id,
+            name: item.name,
+            phone: item.phone,
+            relation: item.relation,
+          );
+        }
+      }
+
+      final refreshedContacts = await _api.listGuardians(current.id);
+      _user = current.copyWith(
+        emergencyContacts: refreshedContacts
+            .map(
+              (item) => EmergencyContact(
+                name: item.name,
+                phone: item.phone,
+                relation: item.relation,
+              ),
+            )
+            .toList(),
+      );
+      await _saveToStorage();
+    });
+  }
+
+  Future<void> reportDeviceSignal({
+    required String signalType,
+    Map<String, dynamic> payload = const {},
+  }) async {
+    final current = _user;
+    if (current == null) {
+      return;
+    }
+    await _api.createDeviceSignal(
+      userId: current.id,
+      signalType: signalType,
+      payload: payload,
+    );
+    await refreshUser();
   }
 
   Future<void> triggerSilentSos() async {
@@ -1160,6 +1427,38 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> sendVoiceMessage(String threadId, int seconds) async {
+    if (seconds <= 0) {
+      return;
+    }
+
+    final sender = _user?.name ?? 'Ban';
+    final outgoing = ChatMessage(
+      id: 'voice-${DateTime.now().microsecondsSinceEpoch}',
+      sender: sender,
+      content: 'Tin nhắn thoại',
+      createdAt: DateTime.now(),
+      mine: true,
+      voiceSeconds: seconds,
+    );
+
+    final preview = 'Tin nhắn thoại ${seconds}s';
+    _chatThreads = _chatThreads
+        .map((thread) => thread.id == threadId
+            ? thread.copyWith(
+                preview: preview,
+                updatedAt: DateTime.now(),
+                unread: 0,
+                messages: [...thread.messages, outgoing],
+              )
+            : thread)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    await _saveToStorage();
+    notifyListeners();
+  }
+
   Future<void> markThreadRead(String threadId) async {
     _chatThreads = _chatThreads
         .map(
@@ -1204,6 +1503,9 @@ class AppProvider with ChangeNotifier {
     if (_security.duressPin.isNotEmpty) {
       newBadges.add('duress');
     }
+    if (_vaultEntries.any((entry) => entry.hasContent)) {
+      newBadges.add('vault');
+    }
     _badges = newBadges;
   }
 
@@ -1235,6 +1537,86 @@ class AppProvider with ChangeNotifier {
             ? thread.copyWith(
                 preview: preview,
                 updatedAt: DateTime.now(),
+              )
+            : thread)
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  Future<void> _evaluateSafetyAutomation() async {
+    final current = _user;
+    if (current == null || isVacation) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final unlockAt = vaultUnlockAt;
+    var changed = false;
+
+    if (unlockAt != null && _vaultReleaseAt == null && !now.isBefore(unlockAt)) {
+      _vaultReleaseAt = now;
+      _appendSystemMessage(
+        'family',
+        'Két sắt sinh tử đã được mở theo dead-man switch sau hơn 72 giờ mất liên lạc liên tiếp.',
+      );
+      _appendSystemMessage('emergency', buildVaultGuardianPayload());
+      changed = true;
+    }
+
+    if (_security.autoWipeDays > 0 &&
+        _vaultAutoWipeAt == null &&
+        current.lastCheckinTime != null &&
+        !now.isBefore(
+          current.lastCheckinTime!.add(Duration(days: _security.autoWipeDays)),
+        )) {
+      _vaultEntries = _defaultVaultEntries();
+      _medical = MedicalId();
+      _vaultAutoWipeAt = now;
+      _appendSystemMessage(
+        'emergency',
+        'Auto-wipe đã xoá dữ liệu nhạy cảm cục bộ trên thiết bị sau ${_security.autoWipeDays} ngày không có check-in.',
+      );
+      changed = true;
+    }
+
+    if (changed) {
+      _updateBadges();
+      await _saveToStorage();
+      notifyListeners();
+    }
+  }
+
+  String buildVaultGuardianPayload() {
+    final filledEntries = _vaultEntries.where((entry) => entry.hasContent).toList();
+    if (filledEntries.isEmpty) {
+      return 'Két sắt sinh tử đã mở nhưng hiện chưa có nội dung nào được lưu.';
+    }
+
+    final buffer = StringBuffer('Gói dữ liệu Vault cho Guardian:\n');
+    for (final entry in filledEntries) {
+      buffer.writeln('- ${entry.title}: ${entry.content}');
+    }
+    return buffer.toString().trimRight();
+  }
+
+  void _appendSystemMessage(String threadId, String content) {
+    final now = DateTime.now();
+    _chatThreads = _chatThreads
+        .map((thread) => thread.id == threadId
+            ? thread.copyWith(
+                preview: content,
+                updatedAt: now,
+                unread: thread.unread + 1,
+                messages: [
+                  ...thread.messages,
+                  ChatMessage(
+                    id: 'system-${now.microsecondsSinceEpoch}-${thread.id}',
+                    sender: 'Hệ thống',
+                    content: content,
+                    createdAt: now,
+                    isSystem: true,
+                  ),
+                ],
               )
             : thread)
         .toList()
@@ -1311,6 +1693,7 @@ class AppProvider with ChangeNotifier {
           name: 'Gia dinh',
           preview: 'Da dong bo check-in moi nhat',
           updatedAt: DateTime.now().subtract(const Duration(minutes: 10)),
+          contactPhone: _user?.emergencyContacts.firstOrNull?.phone ?? '0911132112',
           messages: [
             ChatMessage(
               id: 'family-msg-1',
@@ -1325,6 +1708,13 @@ class AppProvider with ChangeNotifier {
               createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
               mine: true,
             ),
+            ChatMessage(
+              id: 'family-voice-1',
+              sender: 'Me',
+              content: 'Voice note da gui',
+              createdAt: DateTime.now().subtract(const Duration(minutes: 8)),
+              voiceSeconds: 11,
+            ),
           ],
           unread: 1,
         ),
@@ -1334,6 +1724,7 @@ class AppProvider with ChangeNotifier {
           name: 'Ho tro - Hiep si Minh Anh',
           preview: 'Neu co SOS, toi se la nguoi tiep can dau tien.',
           updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+          contactPhone: '115',
           messages: [
             ChatMessage(
               id: 'emergency-msg-1',
@@ -1359,6 +1750,7 @@ class AppProvider with ChangeNotifier {
           name: 'Alive Circle',
           preview: 'Moi nguoi dang gui trang thai binh an hom nay',
           updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
+          contactPhone: null,
           messages: [
             ChatMessage(
               id: 'community-msg-1',
@@ -1460,6 +1852,13 @@ class AppProvider with ChangeNotifier {
     return Mood.values.where((item) => item.name == value).firstOrNull;
   }
 
+  static AppLanguage _decodeLanguage(String? value) {
+    return AppLanguage.values
+            .where((item) => item.name == value)
+            .firstOrNull ??
+        AppLanguage.vi;
+  }
+
   static String _labelForMood(Mood mood) {
     switch (mood) {
       case Mood.calm:
@@ -1474,6 +1873,129 @@ class AppProvider with ChangeNotifier {
         return 'Dang tap trung';
     }
   }
+}
+
+List<VaultEntry> _defaultVaultEntries() {
+  return const [
+    VaultEntry(
+      id: 'checklist',
+      title: 'Checklist công việc',
+      hint: 'Các việc cần Guardian xử lý ngay trong 24 giờ đầu.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'farewell',
+      title: 'Lời trăn trối',
+      hint: 'Điều bạn muốn nhắn lại cho gia đình và người thân.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'passwords',
+      title: 'Mật khẩu',
+      hint: 'Tài khoản số, email, mạng xã hội và hướng dẫn truy cập.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'funeral',
+      title: 'Tang lễ',
+      hint: 'Nguyện vọng tang lễ, nghi thức, người cần liên hệ.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'medical',
+      title: 'Hồ sơ y tế',
+      hint: 'Bệnh nền, thuốc, bác sĩ và lưu ý cấp cứu.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'pets',
+      title: 'Thú cưng',
+      hint: 'Người chăm, thức ăn, thuốc và lịch sinh hoạt.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'insurance',
+      title: 'Bảo hiểm',
+      hint: 'Hợp đồng, người thụ hưởng và nơi liên hệ.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'assets',
+      title: 'Tài sản',
+      hint: 'Ngân hàng, ví, giấy tờ, tài sản số và hướng dẫn xử lý.',
+      content: '',
+    ),
+    VaultEntry(
+      id: 'other',
+      title: 'Khác',
+      hint: 'Mọi điều Guardian cần biết thêm.',
+      content: '',
+    ),
+  ];
+}
+
+MedicalProfileModel _toMedicalProfile(String userId, MedicalId medical) {
+  return MedicalProfileModel(
+    userId: userId,
+    fullName: medical.fullName,
+    birthYear: medical.birthYear,
+    bloodType: medical.bloodType,
+    allergies: medical.allergies,
+    conditions: medical.conditions,
+    medications: medical.medications,
+    emergencyPhone: medical.emergencyPhone,
+    insuranceProvider: medical.insuranceProvider,
+    insuranceNumber: medical.insuranceNumber,
+  );
+}
+
+MedicalId _fromMedicalProfile(MedicalProfileModel profile) {
+  return MedicalId(
+    fullName: profile.fullName,
+    birthYear: profile.birthYear,
+    bloodType: profile.bloodType,
+    allergies: profile.allergies,
+    conditions: profile.conditions,
+    medications: profile.medications,
+    emergencyPhone: profile.emergencyPhone,
+    insuranceProvider: profile.insuranceProvider,
+    insuranceNumber: profile.insuranceNumber,
+  );
+}
+
+AutomationSettingsModel _toAutomationSettings(String userId, Automation automation) {
+  return AutomationSettingsModel(
+    userId: userId,
+    dailyReminderTime: automation.dailyReminderTime,
+    shakeSos: automation.shakeSos,
+    shakeSensitivity: automation.shakeSensitivity,
+    fallDetection: automation.fallDetection,
+    geofenceAutoCheckin: automation.geofenceAutoCheckin,
+    pillReminder: automation.pillReminder,
+    pillTime: automation.pillTime,
+  );
+}
+
+Automation _fromAutomationSettings(AutomationSettingsModel settings) {
+  return Automation(
+    dailyReminderTime: settings.dailyReminderTime,
+    shakeSos: settings.shakeSos,
+    shakeSensitivity: settings.shakeSensitivity,
+    fallDetection: settings.fallDetection,
+    geofenceAutoCheckin: settings.geofenceAutoCheckin,
+    pillReminder: settings.pillReminder,
+    pillTime: settings.pillTime,
+  );
+}
+
+Security _mergeSecuritySettings(Security local, SecuritySettingsModel remote) {
+  return Security(
+    realPin: local.realPin,
+    duressPin: local.duressPin,
+    stealthMode: remote.stealthMode,
+    autoWipeDays: remote.autoWipeDays,
+    encryptionEnabled: remote.encryptionEnabled,
+  );
 }
 
 DateTime? _parseDateTime(Object? value) {

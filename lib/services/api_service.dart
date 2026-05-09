@@ -4,8 +4,11 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 
 import '../models/alert_policy_model.dart';
+import '../models/automation_settings_model.dart';
 import '../models/interaction_event_model.dart';
 import '../core/constants.dart';
+import '../models/medical_profile_model.dart';
+import '../models/security_settings_model.dart';
 import '../models/user_model.dart';
 
 class ApiService {
@@ -224,6 +227,162 @@ class ApiService {
           'type': type,
           'source': source,
           'metadata': metadata,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+  }
+
+  Future<List<EmergencyContactModel>> listGuardians(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/guardians');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body
+        .map(
+          (item) => EmergencyContactModel.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<EmergencyContactModel>> createGuardian({
+    required String userId,
+    required String name,
+    required String phone,
+    required String relation,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/guardians');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          'relation': relation,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body
+        .map(
+          (item) => EmergencyContactModel.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<List<EmergencyContactModel>> deleteGuardian({
+    required String userId,
+    required String phone,
+  }) async {
+    final uri = Uri.parse(
+      '${AppConstants.backendBaseUrl}/users/$userId/guardians/${Uri.encodeComponent(phone)}',
+    );
+    final response = await _safeRequest(_client.delete(uri));
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as List<dynamic>;
+    return body
+        .map(
+          (item) => EmergencyContactModel.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<MedicalProfileModel> getMedicalProfile(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/medical-profile');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return MedicalProfileModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<MedicalProfileModel> updateMedicalProfile({
+    required String userId,
+    required MedicalProfileModel profile,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/medical-profile');
+    final response = await _safeRequest(
+      _client.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(profile.toJson()),
+      ),
+    );
+    _throwIfFailed(response);
+    return MedicalProfileModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<AutomationSettingsModel> getAutomationSettings(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/automation-settings');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return AutomationSettingsModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<AutomationSettingsModel> updateAutomationSettings({
+    required String userId,
+    required AutomationSettingsModel settings,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/automation-settings');
+    final response = await _safeRequest(
+      _client.patch(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(settings.toJson()),
+      ),
+    );
+    _throwIfFailed(response);
+    return AutomationSettingsModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<SecuritySettingsModel> getSecuritySettings(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/security-settings');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return SecuritySettingsModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<SecuritySettingsModel> updateSecuritySettings({
+    required String userId,
+    required bool stealthMode,
+    required int autoWipeDays,
+    required bool encryptionEnabled,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/security-settings');
+    final response = await _safeRequest(
+      _client.patch(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'stealthMode': stealthMode,
+          'autoWipeDays': autoWipeDays,
+          'encryptionEnabled': encryptionEnabled,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return SecuritySettingsModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> createDeviceSignal({
+    required String userId,
+    required String signalType,
+    Map<String, dynamic> payload = const {},
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/device-signals');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'signalType': signalType,
+          'payload': payload,
         }),
       ),
     );

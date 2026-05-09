@@ -13,11 +13,26 @@ class StealthPage extends StatefulWidget {
 }
 
 class _StealthPageState extends State<StealthPage> {
+  static const _keys = [
+    'C', '÷', '×', '⌫',
+    '7', '8', '9', '-',
+    '4', '5', '6', '+',
+    '1', '2', '3', '=',
+    '0', '.',
+  ];
+
   String _display = '0';
 
   void _press(String value) {
     if (value == 'C') {
       setState(() => _display = '0');
+      return;
+    }
+
+    if (value == '⌫') {
+      setState(() {
+        _display = _display.length > 1 ? _display.substring(0, _display.length - 1) : '0';
+      });
       return;
     }
 
@@ -39,27 +54,29 @@ class _StealthPageState extends State<StealthPage> {
     final security = context.read<AppProvider>().security;
     final realPin = security.realPin.isEmpty ? '1909' : security.realPin;
     final duressPin = security.duressPin.isEmpty ? '9111' : security.duressPin;
+    final rawInput = _display.trim();
 
-    if (_display == realPin) {
+    if (rawInput == realPin) {
       await context.read<AppProvider>().setSecurity(
         Security(
           realPin: security.realPin,
           duressPin: security.duressPin,
           stealthMode: false,
           autoWipeDays: security.autoWipeDays,
+          encryptionEnabled: security.encryptionEnabled,
         ),
       );
       return;
     }
 
-    if (_display == duressPin) {
+    if (rawInput == duressPin) {
       unawaited(context.read<AppProvider>().triggerSilentSos());
       setState(() => _display = '0');
       return;
     }
 
     try {
-      final normalized = _display.replaceAll('x', '*').replaceAll('÷', '/');
+      final normalized = rawInput.replaceAll('×', '*').replaceAll('÷', '/');
       final result = _simpleEvaluate(normalized);
       setState(() => _display = result);
     } catch (_) {
@@ -68,20 +85,24 @@ class _StealthPageState extends State<StealthPage> {
   }
 
   String _simpleEvaluate(String input) {
-    final match = RegExp(r'^(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)$').firstMatch(input);
+    final match = RegExp(
+      r'^(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)$',
+    ).firstMatch(input);
     if (match == null) {
       return input;
     }
+
     final left = double.parse(match.group(1)!);
-    final op = match.group(2)!;
+    final operator = match.group(2)!;
     final right = double.parse(match.group(3)!);
-    final value = switch (op) {
+    final value = switch (operator) {
       '+' => left + right,
       '-' => left - right,
       '*' => left * right,
       '/' => right == 0 ? double.nan : left / right,
       _ => left,
     };
+
     if (value.isNaN || value.isInfinite) {
       throw StateError('invalid');
     }
@@ -93,14 +114,6 @@ class _StealthPageState extends State<StealthPage> {
 
   @override
   Widget build(BuildContext context) {
-    const keys = [
-      'C', '÷', 'x', '⌫',
-      '7', '8', '9', '-',
-      '4', '5', '6', '+',
-      '1', '2', '3', '=',
-      '0', '.',
-    ];
-
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -108,6 +121,24 @@ class _StealthPageState extends State<StealthPage> {
         body: SafeArea(
           child: Column(
             children: [
+              const SizedBox(height: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Máy tính',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(Icons.calculate_outlined, color: Colors.white70),
+                  ],
+                ),
+              ),
               const Spacer(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -125,13 +156,28 @@ class _StealthPageState extends State<StealthPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Nhập phép tính rồi bấm =',
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Expanded(
                 flex: 2,
                 child: GridView.builder(
                   padding: const EdgeInsets.all(12),
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: keys.length,
+                  itemCount: _keys.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 4,
                     mainAxisSpacing: 8,
@@ -139,22 +185,12 @@ class _StealthPageState extends State<StealthPage> {
                     childAspectRatio: 1,
                   ),
                   itemBuilder: (context, index) {
-                    final key = keys[index];
-                    final isOperator = ['÷', 'x', '-', '+', '='].contains(key);
+                    final key = _keys[index];
+                    final isOperator = ['÷', '×', '-', '+', '='].contains(key);
                     final isUtility = ['C', '⌫'].contains(key);
 
                     return GestureDetector(
-                      onTap: () {
-                        if (key == '⌫') {
-                          setState(() {
-                            _display = _display.length > 1
-                                ? _display.substring(0, _display.length - 1)
-                                : '0';
-                          });
-                          return;
-                        }
-                        _press(key);
-                      },
+                      onTap: () => _press(key),
                       child: Container(
                         decoration: BoxDecoration(
                           color: isOperator
@@ -162,7 +198,7 @@ class _StealthPageState extends State<StealthPage> {
                               : isUtility
                               ? const Color(0xFF5E5E5E)
                               : const Color(0xFF1C1C1E),
-                          borderRadius: BorderRadius.circular(24),
+                          borderRadius: BorderRadius.circular(26),
                         ),
                         alignment: Alignment.center,
                         child: Text(

@@ -7,16 +7,16 @@ import { Search, Download } from "lucide-react";
 import { fetchAuditLogs } from "@/lib/api";
 
 export const Route = createFileRoute("/audit")({
-  head: () => ({ meta: [{ title: "Nhat ky he thong - SafeSolo Admin" }] }),
+  head: () => ({ meta: [{ title: "Nhật ký hệ thống - SafeSolo Admin" }] }),
   component: Page,
 });
 
 const categories = [
-  { label: "Tat ca", value: "All" },
-  { label: "Dieu pho", value: "Dispatch" },
+  { label: "Tất cả", value: "All" },
+  { label: "Điều phối", value: "Dispatch" },
   { label: "KYC", value: "KYC" },
-  { label: "He thong", value: "System" },
-  { label: "Tai chinh", value: "Finance" },
+  { label: "Hệ thống", value: "System" },
+  { label: "Tài chính", value: "Finance" },
 ];
 
 function Page() {
@@ -32,7 +32,7 @@ function Page() {
 
   return (
     <>
-      <Topbar title="Nhat ky he thong" subtitle="Lich su su kien khong the sua phuc vu doi soat" />
+      <Topbar title="Nhật ký hệ thống" subtitle="Lịch sử sự kiện không thể sửa phục vụ đối soát" />
       <div className="space-y-3 p-3">
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3">
           <div className="flex flex-1 items-center gap-2 rounded-md border border-border bg-background/50 px-3 py-2 text-sm">
@@ -40,7 +40,7 @@ function Page() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Tim theo nguoi thuc hien, hanh dong, ma su co..."
+              placeholder="Tìm theo người thực hiện, hành động, mã sự cố..."
               className="w-full bg-transparent outline-none placeholder:text-muted-foreground"
             />
           </div>
@@ -56,7 +56,7 @@ function Page() {
             </button>
           ))}
           <button className="ml-auto inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">
-            <Download className="h-3.5 w-3.5" /> Xuat CSV
+            <Download className="h-3.5 w-3.5" /> Xuất CSV
           </button>
         </div>
 
@@ -64,10 +64,10 @@ function Page() {
           <table className="w-full text-sm">
             <thead className="bg-background/40 text-[11px] uppercase tracking-wider text-muted-foreground">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">Thoi gian</th>
-                <th className="px-4 py-2 text-left font-medium">Nguoi thuc hien</th>
-                <th className="px-4 py-2 text-left font-medium">Hanh dong</th>
-                <th className="px-4 py-2 text-left font-medium">Doi tuong</th>
+                <th className="px-4 py-2 text-left font-medium">Thời gian</th>
+                <th className="px-4 py-2 text-left font-medium">Người thực hiện</th>
+                <th className="px-4 py-2 text-left font-medium">Hành động</th>
+                <th className="px-4 py-2 text-left font-medium">Đối tượng</th>
                 <th className="px-4 py-2 text-left font-medium">Hash</th>
               </tr>
             </thead>
@@ -75,7 +75,7 @@ function Page() {
               {logsQuery.isLoading && (
                 <tr>
                   <td className="px-4 py-4 text-muted-foreground" colSpan={5}>
-                    Dang tai nhat ky he thong...
+                    Đang tải nhật ký hệ thống...
                   </td>
                 </tr>
               )}

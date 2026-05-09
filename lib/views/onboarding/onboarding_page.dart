@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
@@ -15,31 +16,38 @@ class OnboardingPage extends StatefulWidget {
 class _OnboardingPageState extends State<OnboardingPage> {
   int _currentIndex = 0;
 
-  final List<_OnboardingSlide> _slides = const [
-    _OnboardingSlide(
-      icon: Icons.favorite_border_rounded,
-      title: "I'm Alive · Tôi vẫn ổn",
-      description:
-          'Mỗi ngày bạn chỉ cần chạm một nút để báo cho người thân biết bạn vẫn an toàn.',
-    ),
-    _OnboardingSlide(
-      icon: Icons.notifications_active_outlined,
-      title: 'Nhắc đúng lúc',
-      description:
-          'SafeSolo giữ nhịp check-in nhẹ nhàng để bạn yên tâm mà không thấy áp lực.',
-    ),
-    _OnboardingSlide(
-      icon: Icons.shield_outlined,
-      title: 'Cảnh báo khi cần',
-      description:
-          'Khi bạn im lặng quá lâu, vòng bảo hộ sẽ nhận tín hiệu và biết lúc nào nên hỗ trợ.',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final slide = _slides[_currentIndex];
-    final isLast = _currentIndex == _slides.length - 1;
+    final strings = AppStrings.of(context);
+    final slides = [
+      _OnboardingSlide(
+        icon: Icons.favorite_border_rounded,
+        title: strings.text('Bình an', 'Peace of mind'),
+        description: strings.text(
+          'Mỗi ngày bạn chỉ cần chạm một nút để báo cho người thân biết bạn vẫn an toàn.',
+          'Each day, one tap is enough to let your loved ones know you are safe.',
+        ),
+      ),
+      _OnboardingSlide(
+        icon: Icons.notifications_active_outlined,
+        title: strings.text('Kết nối', 'Connected'),
+        description: strings.text(
+          'SafeSolo giữ nhịp check-in nhẹ nhàng để bạn yên tâm mà không thấy áp lực.',
+          'SafeSolo keeps your check-in rhythm gentle so you stay reassured without pressure.',
+        ),
+      ),
+      _OnboardingSlide(
+        icon: Icons.shield_outlined,
+        title: strings.text('Cộng đồng', 'Community'),
+        description: strings.text(
+          'Khi bạn im lặng quá lâu, vòng bảo vệ sẽ nhận tín hiệu và biết lúc nào nên hỗ trợ.',
+          'If you stay silent too long, your safety circle gets the signal and knows when to help.',
+        ),
+      ),
+    ];
+
+    final slide = slides[_currentIndex];
+    final isLast = _currentIndex == slides.length - 1;
 
     return Scaffold(
       body: AppPage(
@@ -106,7 +114,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             const SizedBox(height: 32),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(_slides.length, (index) {
+              children: List.generate(slides.length, (index) {
                 final active = index == _currentIndex;
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
@@ -134,7 +142,12 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(isLast ? 'Bắt đầu' : 'Tiếp tục'),
+                    Text(
+                      strings.text(
+                        isLast ? 'Bắt đầu' : 'Tiếp tục',
+                        isLast ? 'Get started' : 'Continue',
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     const Icon(Icons.chevron_right_rounded, size: 20),
                   ],
@@ -145,7 +158,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             TextButton(
               onPressed: () => context.read<AppProvider>().completeOnboarding(),
               child: Text(
-                'Bỏ qua',
+                strings.text('Bỏ qua', 'Skip'),
                 style: AppTextStyles.bodyStrong.copyWith(
                   color: AppColors.textSecondary,
                 ),

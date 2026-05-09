@@ -27,8 +27,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('SafeSolo'), findsOneWidget);
-    expect(find.text('Dang nhap hoac tao ho so'), findsOneWidget);
-    expect(find.text('Ho va ten'), findsOneWidget);
-    expect(find.text('So dien thoai'), findsOneWidget);
+    expect(find.text('Đăng nhập hoặc tạo hồ sơ'), findsOneWidget);
+    expect(find.text('Họ và tên'), findsOneWidget);
+    expect(find.text('Số điện thoại'), findsOneWidget);
   });
 }

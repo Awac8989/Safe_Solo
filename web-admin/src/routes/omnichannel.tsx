@@ -6,7 +6,7 @@ import { MessageSquare, Send, Mail, Phone, Smartphone, ArrowRight } from "lucide
 import { fetchChannelHealth } from "@/lib/api";
 
 export const Route = createFileRoute("/omnichannel")({
-  head: () => ({ meta: [{ title: "Kenh lien lac - SafeSolo Admin" }] }),
+  head: () => ({ meta: [{ title: "Kênh liên lạc - SafeSolo Admin" }] }),
   component: Page,
 });
 
@@ -20,12 +20,12 @@ const iconMap = {
 } as const;
 
 const channelLabelMap: Record<string, string> = {
-  "SMS Provider": "Nha cung cap SMS",
-  "SMS Fallback": "SMS du phong",
+  "SMS Provider": "Nhà cung cấp SMS",
+  "SMS Fallback": "SMS dự phòng",
   "Zalo ZNS": "Zalo ZNS",
   "Telegram Bot": "Bot Telegram",
   "Gmail SMTP": "Gmail SMTP",
-  "Voice Auto-Call": "Goi tu dong bang giong noi",
+  "Voice Auto-Call": "Gọi tự động bằng giọng nói",
 };
 
 function Page() {
@@ -40,7 +40,7 @@ function Page() {
 
   return (
     <>
-      <Topbar title="Kenh lien lac" subtitle="Suc khoe he thong · dinh tuyen gui thong diep" />
+      <Topbar title="Kênh liên lạc" subtitle="Sức khỏe hệ thống · định tuyến gửi thông điệp" />
       <div className="space-y-3 p-3">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {channels.map((channel) => {
@@ -62,12 +62,12 @@ function Page() {
                 </div>
                 <div className="mt-4 space-y-2">
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Han muc</div>
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hạn mức</div>
                     <div className="font-mono text-sm">{channel.quota}</div>
                   </div>
                   <div>
                     <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <span>Ti le thanh cong</span>
+                      <span>Tỉ lệ thành công</span>
                       <span>{channel.success}%</span>
                     </div>
                     <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -75,7 +75,7 @@ function Page() {
                     </div>
                   </div>
                   <div className="pt-1">
-                    <Tag tone={channel.ok ? "success" : "sos"}>{channel.ok ? "On dinh" : "Suy giam"}</Tag>
+                    <Tag tone={channel.ok ? "success" : "sos"}>{channel.ok ? "Ổn định" : "Suy giảm"}</Tag>
                   </div>
                 </div>
               </div>
@@ -86,21 +86,21 @@ function Page() {
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Luong du phong gui thong diep</h2>
+              <h2 className="text-sm font-semibold">Luồng dự phòng gửi thông điệp</h2>
               <p className="text-[11px] text-muted-foreground">
-                Neu mot kenh loi, canh bao se tu dong chuyen xuong kenh tiep theo
+                Nếu một kênh lỗi, cảnh báo sẽ tự động chuyển xuống kênh tiếp theo
               </p>
             </div>
-            <Tag tone="info">Chinh sach dang ap dung</Tag>
+            <Tag tone="info">Chính sách đang áp dụng</Tag>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             {policy.map((step, index) => (
               <div key={step.step} className="flex items-center gap-3">
                 <div className="rounded-lg border border-border bg-background/60 px-4 py-3 text-sm font-semibold">
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Buoc {step.step}</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Bước {step.step}</div>
                   {channelLabelMap[step.name] || step.name}
                   <div className="mt-1">
-                    <Tag tone={step.tone as "info" | "warning" | "sos"}>Du phong</Tag>
+                    <Tag tone={step.tone as "info" | "warning" | "sos"}>Dự phòng</Tag>
                   </div>
                 </div>
                 {index < policy.length - 1 && <ArrowRight className="h-5 w-5 text-muted-foreground" />}

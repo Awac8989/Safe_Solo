@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../app_theme.dart';
+import '../app_strings.dart';
+import '../providers/app_provider.dart';
 
 enum BottomTab { home, circle, messages, heroes, settings }
 
@@ -17,31 +20,31 @@ class CustomBottomNav extends StatelessWidget {
   static const List<_NavItem> _items = [
     _NavItem(
       BottomTab.home,
-      'Diem danh',
+      BottomNavLabel.home,
       Icons.home_outlined,
       Icons.home_rounded,
     ),
     _NavItem(
       BottomTab.circle,
-      'Circle',
+      BottomNavLabel.circle,
       Icons.auto_awesome_outlined,
       Icons.auto_awesome_rounded,
     ),
     _NavItem(
       BottomTab.messages,
-      'Tin nhan',
+      BottomNavLabel.messages,
       Icons.chat_bubble_outline_rounded,
       Icons.chat_bubble_rounded,
     ),
     _NavItem(
       BottomTab.heroes,
-      'Heroes',
+      BottomNavLabel.heroes,
       Icons.workspace_premium_outlined,
       Icons.workspace_premium_rounded,
     ),
     _NavItem(
       BottomTab.settings,
-      'Cai dat',
+      BottomNavLabel.settings,
       Icons.settings_outlined,
       Icons.settings_rounded,
     ),
@@ -49,6 +52,9 @@ class CustomBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<AppProvider>().language;
+    final strings = AppStrings.of(context);
+
     return SafeArea(
       top: false,
       child: Container(
@@ -62,11 +68,12 @@ class CustomBottomNav extends StatelessWidget {
         child: Row(
           children: _items.map((item) {
             final isActive = item.tab == active;
+            final label = strings.bottomTab(item.labelKey);
             return Expanded(
               child: Semantics(
                 button: true,
                 selected: isActive,
-                label: item.label,
+                label: label,
                 child: InkWell(
                   onTap: () => onChanged(item.tab),
                   borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -98,7 +105,7 @@ class CustomBottomNav extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          item.label,
+                          label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.caption.copyWith(
@@ -125,10 +132,10 @@ class CustomBottomNav extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.tab, this.label, this.icon, this.activeIcon);
+  const _NavItem(this.tab, this.labelKey, this.icon, this.activeIcon);
 
   final BottomTab tab;
-  final String label;
+  final BottomNavLabel labelKey;
   final IconData icon;
   final IconData activeIcon;
 }

@@ -9,12 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as RevenueRouteImport } from './routes/revenue'
 import { Route as OmnichannelRouteImport } from './routes/omnichannel'
 import { Route as KycRouteImport } from './routes/kyc'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RevenueRoute = RevenueRouteImport.update({
   id: '/revenue',
   path: '/revenue',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/users': typeof UsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/users': typeof UsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,21 @@ export interface FileRoutesById {
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/users': typeof UsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue'
+  fullPaths: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue'
-  id: '__root__' | '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue'
+  to: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/audit'
+    | '/kyc'
+    | '/omnichannel'
+    | '/revenue'
+    | '/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,10 +93,18 @@ export interface RootRouteChildren {
   KycRoute: typeof KycRoute
   OmnichannelRoute: typeof OmnichannelRoute
   RevenueRoute: typeof RevenueRoute
+  UsersRoute: typeof UsersRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/revenue': {
       id: '/revenue'
       path: '/revenue'
@@ -125,6 +149,7 @@ const rootRouteChildren: RootRouteChildren = {
   KycRoute: KycRoute,
   OmnichannelRoute: OmnichannelRoute,
   RevenueRoute: RevenueRoute,
+  UsersRoute: UsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

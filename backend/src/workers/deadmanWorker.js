@@ -1,4 +1,10 @@
-const { mapUserRow, nowIso, userStatements } = require('../config/sqlite');
+const {
+  mapUserRow,
+  mapSecuritySettingsRow,
+  nowIso,
+  userStatements,
+  securitySettingsStatements,
+} = require('../config/sqlite');
 const { triggerSosForUser } = require('../services/sosService');
 const { createAlertEvent } = require('../services/alertEventService');
 const { ensureAlertPolicy } = require('../services/alertPolicyService');
@@ -56,9 +62,36 @@ function startDeadManWorker(io) {
         const sosMinutes = Number(policy?.level3Minutes || defaultSosMinutes);
         const inQuietHours = isInQuietHours(now, user.quietHoursStart, user.quietHoursEnd);
         const sleepModeActive = isSleepModeActive(now, user.sleepModeUntil);
+        const security = mapSecuritySettingsRow(
+          securitySettingsStatements.getByUserId.get(user._id),
+        );
 
         if (inQuietHours || sleepModeActive) {
           continue;
+        }
+
+        if (
+          security?.autoWipeDays > 0 &&
+          user.lastCheckinTime &&
+          (!security.lastAutoWipeDueAt || new Date(security.lastAutoWipeDueAt) < new Date(user.lastCheckinTime)) &&
+          now.getTime() >= new Date(user.lastCheckinTime).getTime() + security.autoWipeDays * 24 * 60 * 60 * 1000
+        ) {
+          const updatedAt = nowIso();
+          securitySettingsStatements.markAutoWipeDue.run({
+            user_id: user._id,
+            last_auto_wipe_due_at: updatedAt,
+            updated_at: updatedAt,
+          });
+          const event = createAlertEvent({
+            userId: user._id,
+            level: 'INFO',
+            status: 'AUTO_WIPE_DUE',
+            source: 'SYSTEM',
+            title: 'Auto-wipe den han',
+            message: `Da qua ${security.autoWipeDays} ngay khong co check-in. Thiet bi co the thuc thi xoa du lieu nhay cam cuc bo.`,
+            metadata: { autoWipeDays: security.autoWipeDays, lastCheckinTime: user.lastCheckinTime },
+          });
+          io.emit('ALERT_EVENT', event);
         }
 
         if (

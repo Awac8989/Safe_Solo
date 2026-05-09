@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
@@ -89,7 +90,8 @@ class _CirclePageState extends State<CirclePage> {
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
-    final userName = appProvider.user?.name ?? 'Ban';
+    final strings = AppStrings.of(context);
+    final userName = appProvider.user?.name ?? strings.text('Bạn', 'You');
     final posts = appProvider.postsFor(_filter);
 
     return AppPage(
@@ -105,14 +107,17 @@ class _CirclePageState extends State<CirclePage> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Alive Circle',
+                strings.text('Vòng tròn Bình an', 'Alive Circle'),
                 style: AppTextStyles.h2.copyWith(fontSize: 26),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            'Bang tin binh an cho gia dinh va cong dong.',
+            strings.text(
+              'Bảng tin bình an cho gia đình và cộng đồng.',
+              'Safety updates for family and community.',
+            ),
             style: AppTextStyles.bodyLarge.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -120,15 +125,15 @@ class _CirclePageState extends State<CirclePage> {
           const SizedBox(height: 18),
           AppSegmentedControl<CircleScope>(
             value: _filter,
-            items: const [
+            items: [
               AppSegmentItem(
                 value: CircleScope.family,
-                label: 'Gia dinh',
+                label: strings.text('Gia đình', 'Family'),
                 icon: Icons.groups_2_outlined,
               ),
               AppSegmentItem(
                 value: CircleScope.community,
-                label: 'Cong dong',
+                label: strings.text('Cộng đồng', 'Community'),
                 icon: Icons.workspace_premium_outlined,
               ),
             ],

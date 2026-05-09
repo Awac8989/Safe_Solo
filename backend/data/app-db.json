@@ -147,7 +147,7 @@
       "otpExpiresAt": null,
       "lastLoginAt": "2026-05-09T13:55:57.566Z",
       "createdAt": "2026-05-09T13:55:57.566Z",
-      "updatedAt": "2026-05-09T14:34:48.018Z",
+      "updatedAt": "2026-05-09T23:41:55.960Z",
       "trustScore": 4.9,
       "rescuesCount": 12,
       "isKycVerified": true,
@@ -412,7 +412,7 @@
       "backImageUrl": "/uploads/kyc/back-demo.png",
       "status": "APPROVED",
       "submittedAt": "2026-05-09T13:55:57.566Z",
-      "reviewedAt": "2026-05-09T14:34:48.018Z"
+      "reviewedAt": "2026-05-09T23:41:55.960Z"
     }
   ],
   "vaults": [
@@ -497,6 +497,17 @@
         "userId": "user-volunteer"
       },
       "createdAt": "2026-05-09T14:34:48.018Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778370115960",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-09T23:41:55.960Z"
     }
   ],
   "alertEvents": [
@@ -775,6 +786,377 @@
         "sleepModeUntil": null
       },
       "createdAt": "2026-05-09T14:48:41.919Z"
+    },
+    {
+      "id": "alert_a0cc646d-0c31-4d57-9c3f-3a2044f9241e",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "381977de-39d6-4633-b3b5-90f51270a95c",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:01:32.724Z"
+    },
+    {
+      "id": "alert_c7be1679-7138-40e1-84c2-e38912dc90bd",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "e0d15504-3156-4d4f-8d1c-257b1434035a",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:01:32.743Z"
+    },
+    {
+      "id": "alert_1dff5621-f2aa-4c49-9521-486201ac20fb",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "AUTOMATION_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat tu dong hoa",
+      "message": "Cac quy tac daily reminder, geofence va sensor da duoc cap nhat",
+      "metadata": {
+        "dailyReminderTime": "07:30",
+        "pillTime": "08:15",
+        "geofenceAutoCheckin": true,
+        "fallDetection": true,
+        "shakeSos": true
+      },
+      "createdAt": "2026-05-09T23:09:36.723Z"
+    },
+    {
+      "id": "alert_4e93ce22-238a-42cc-ba99-eeffd5e1e1fa",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "MEDICAL_PROFILE_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat ho so y te",
+      "message": "Medical profile da duoc dong bo len backend",
+      "metadata": {
+        "bloodType": "B+"
+      },
+      "createdAt": "2026-05-09T23:09:53.251Z"
+    },
+    {
+      "id": "alert_f3e0c067-b502-4a21-a436-32b58131ff51",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "SECURITY_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat bao mat",
+      "message": "Stealth mode, auto-wipe va trang thai ma hoa da duoc cap nhat",
+      "metadata": {
+        "stealthMode": true,
+        "autoWipeDays": 30,
+        "encryptionEnabled": true
+      },
+      "createdAt": "2026-05-09T23:09:53.317Z"
+    },
+    {
+      "id": "alert_ca3e7766-391c-4007-ba05-c81fb52d6229",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "GUARDIAN_ADDED",
+      "source": "USER",
+      "title": "Them Guardian",
+      "message": "Test Guardian da duoc them vao mang bao ho",
+      "metadata": {
+        "name": "Test Guardian",
+        "phone": "0900000001",
+        "relation": "Ban"
+      },
+      "createdAt": "2026-05-09T23:09:53.335Z"
+    },
+    {
+      "id": "alert_40d93a56-d070-42cc-9a92-f53444f9b6f4",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "AUTO_CHECKIN_HOME",
+      "source": "SYSTEM",
+      "title": "Auto check-in khi ve nha",
+      "message": "Da tu dong check-in khi phat hien den khu vuc nha",
+      "metadata": {
+        "lat": 10.77,
+        "lng": 106.7
+      },
+      "createdAt": "2026-05-09T23:09:53.382Z"
+    },
+    {
+      "id": "alert_08d7018d-d898-4238-a49e-58f07994f145",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "AUTOMATION_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat tu dong hoa",
+      "message": "Cac quy tac daily reminder, geofence va sensor da duoc cap nhat",
+      "metadata": {
+        "dailyReminderTime": "08:00",
+        "pillTime": "08:00",
+        "geofenceAutoCheckin": true,
+        "fallDetection": true,
+        "shakeSos": true
+      },
+      "createdAt": "2026-05-09T23:27:38.849Z"
+    },
+    {
+      "id": "alert_58cfb21b-675a-4d03-81b0-c91005c1bd43",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "AUTOMATION_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat tu dong hoa",
+      "message": "Cac quy tac daily reminder, geofence va sensor da duoc cap nhat",
+      "metadata": {
+        "dailyReminderTime": "08:00",
+        "pillTime": "08:00",
+        "geofenceAutoCheckin": true,
+        "fallDetection": true,
+        "shakeSos": true
+      },
+      "createdAt": "2026-05-09T23:27:44.229Z"
+    },
+    {
+      "id": "alert_8371efe8-e126-40d6-b8aa-32e72fe8fff3",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "AUTOMATION_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat tu dong hoa",
+      "message": "Cac quy tac daily reminder, geofence va sensor da duoc cap nhat",
+      "metadata": {
+        "dailyReminderTime": "08:00",
+        "pillTime": "08:00",
+        "geofenceAutoCheckin": true,
+        "fallDetection": false,
+        "shakeSos": true
+      },
+      "createdAt": "2026-05-09T23:27:45.240Z"
+    },
+    {
+      "id": "alert_ed04f918-b6d6-46d5-833e-c0caf34f31a1",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SECURITY_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat bao mat",
+      "message": "Stealth mode, auto-wipe va trang thai ma hoa da duoc cap nhat",
+      "metadata": {
+        "stealthMode": true,
+        "autoWipeDays": 0,
+        "encryptionEnabled": true
+      },
+      "createdAt": "2026-05-09T23:28:50.370Z"
+    },
+    {
+      "id": "alert_4b4894e9-d2d2-4eef-aac8-efec749a0be4",
+      "userId": "cdf9c64a-7754-48c0-8928-065ec31b0a8c",
+      "level": "INFO",
+      "status": "SECURITY_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat bao mat",
+      "message": "Stealth mode, auto-wipe va trang thai ma hoa da duoc cap nhat",
+      "metadata": {
+        "stealthMode": false,
+        "autoWipeDays": 0,
+        "encryptionEnabled": true
+      },
+      "createdAt": "2026-05-09T23:28:58.845Z"
+    },
+    {
+      "id": "alert_b5145ade-552a-42ff-b7e0-d9a92cf411fa",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "e0d15504-3156-4d4f-8d1c-257b1434035a",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:35:01.787Z"
+    },
+    {
+      "id": "alert_93ba5bc8-8b3c-4b5f-a05c-d17cd353cdaf",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "381977de-39d6-4633-b3b5-90f51270a95c",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:35:03.659Z"
+    },
+    {
+      "id": "alert_c3704b5e-5809-4029-a62d-5451f15a0b46",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "45e4fd8c-79e2-4434-920f-f720ef4da0e8",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:35:05.673Z"
+    },
+    {
+      "id": "alert_fc394658-8457-4a7e-833c-e8f52194d59c",
+      "userId": "d45f44c4-2b18-4c7a-bc42-3592f917c9c2",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "d3cdee5c-1add-4f33-89aa-72011d874c9d",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:35:06.514Z"
+    },
+    {
+      "id": "alert_ecd0b7af-8d15-4e0e-9bfc-96244608b6a1",
+      "userId": "d45f44c4-2b18-4c7a-bc42-3592f917c9c2",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "2f75ee02-6fe9-4716-94a0-25da51e38a27",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:35:19.118Z"
+    },
+    {
+      "id": "alert_e262644f-26af-4db2-b11f-96dadbcce511",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "b4fadaa7-abe8-4ee4-a23b-932d90716a93",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:35:19.155Z"
+    },
+    {
+      "id": "alert_831ed9b6-b9f4-40a5-89ca-a36e1fdfcd34",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "a0e27c07-5434-4868-bfb6-a571396b6ef5",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:35:19.190Z"
+    },
+    {
+      "id": "alert_7b48f1dd-1e89-48c6-8d4b-37005dd2197a",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "b4fadaa7-abe8-4ee4-a23b-932d90716a93",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:41:43.396Z"
+    },
+    {
+      "id": "alert_9e83f827-41d9-40d9-9fc2-ec6dc010aeb4",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "a0e27c07-5434-4868-bfb6-a571396b6ef5",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-09T23:41:44.892Z"
+    },
+    {
+      "id": "alert_c384ede3-64dd-417d-bee6-aae1bbb00537",
+      "userId": "b455f857-cb20-4d60-a9d6-009db5d65693",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "f93e9ac3-db67-4636-8b59-b932e7d744bd",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:42:19.198Z"
+    },
+    {
+      "id": "alert_42de1ef4-22be-42ea-9bb8-b287eccae743",
+      "userId": "6e5b99f1-6665-4b7b-9bcb-bd5daf5bb02a",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "eb1a4d6e-8c99-4f3a-996f-8fef4ba55528",
+        "smsSent": 1,
+        "smsAttempted": 1,
+        "smsFailed": 0,
+        "location": null
+      },
+      "createdAt": "2026-05-09T23:42:19.290Z"
+    },
+    {
+      "id": "alert_69bf4a83-706a-4197-b07b-eb60f8f9b589",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "REGISTERED",
+      "source": "USER",
+      "title": "Dang ky tai khoan",
+      "message": "doan minh quan da dang ky SafeSolo",
+      "metadata": {
+        "timerIntervalMinutes": 720
+      },
+      "createdAt": "2026-05-09T23:43:03.181Z"
     }
   ],
   "emergencyMemos": [

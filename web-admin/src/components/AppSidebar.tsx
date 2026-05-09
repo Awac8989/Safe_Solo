@@ -1,5 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Radio, Users, Network, DollarSign, ScrollText, ShieldAlert } from "lucide-react";
+import {
+  Radio,
+  Users,
+  Network,
+  DollarSign,
+  ScrollText,
+  ShieldAlert,
+  Smartphone,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +23,8 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Trung tam dieu pho", url: "/", icon: Radio },
+  { title: "Trung tam dieu phoi", url: "/", icon: Radio },
+  { title: "Nguoi dung ung dung", url: "/users", icon: Smartphone },
   { title: "Nguoi dung va KYC", url: "/kyc", icon: Users },
   { title: "Kenh lien lac", url: "/omnichannel", icon: Network },
   { title: "Doanh thu va doi tac", url: "/revenue", icon: DollarSign },
@@ -38,7 +47,7 @@ export function AppSidebar() {
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-bold tracking-wide">Alive?</span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Dieu pho khan cap
+                Dieu phoi khan cap
               </span>
             </div>
           )}

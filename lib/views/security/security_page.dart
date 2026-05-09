@@ -171,6 +171,7 @@ class _SecurityPageState extends State<SecurityPage> {
       duressPin: _duressPinController.text.trim(),
       stealthMode: _stealthMode,
       autoWipeDays: _autoWipeDays,
+      encryptionEnabled: context.read<AppProvider>().security.encryptionEnabled,
     );
 
     await context.read<AppProvider>().setSecurity(security);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
@@ -98,8 +99,9 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
+    final strings = AppStrings.of(context);
     final user = appProvider.user;
-    final userName = user?.name ?? 'Ban';
+    final userName = user?.name ?? strings.text('Bạn', 'You');
     final lastCheckIn = user?.lastCheckinTime ?? DateTime.now();
     final nextDeadline = user?.nextDeadline ?? lastCheckIn.add(const Duration(hours: 12));
     final remaining = nextDeadline.difference(_now);
@@ -128,7 +130,7 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         Flexible(
                           child: Text(
-                            'Xin chao, $userName!',
+                            strings.text('Xin chào, $userName!', 'Hello, $userName!'),
                             style: AppTextStyles.h2.copyWith(fontSize: 30),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -177,8 +179,11 @@ class _HomePageState extends State<HomePage> {
           if (appProvider.isVacation)
             MaterialBanner(
               backgroundColor: const Color(0xFFE8F1FF),
-              content: const Text(
-                'Che do nghi duong dang bat. Countdown tam dung cho den khi ban tat sleep mode.',
+              content: Text(
+                strings.text(
+                  'Chế độ nghỉ dưỡng đang bật. Đồng hồ đếm ngược tạm dừng cho đến khi bạn tắt chế độ ngủ.',
+                  'Vacation mode is on. The countdown is paused until you turn off sleep mode.',
+                ),
               ),
               leading: const Icon(Icons.hotel_rounded, color: Color(0xFF3A7AFE)),
               actions: const [SizedBox.shrink()],
@@ -189,9 +194,12 @@ class _HomePageState extends State<HomePage> {
               children: [
                 const Icon(Icons.wb_sunny_outlined, color: AppColors.warning),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Chao buoi sang. Xac nhan ban da xem de he thong ghi nhan tuong tac som nay.',
+                    strings.text(
+                      'Chào buổi sáng. Xác nhận bạn đã xem để hệ thống ghi nhận tương tác sáng nay.',
+                      'Good morning. Confirm that you have seen this so the system can record your morning interaction.',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -216,7 +224,7 @@ class _HomePageState extends State<HomePage> {
                             );
                           }
                         },
-                  child: const Text('Da xem'),
+                  child: Text(strings.text('Đã xem', 'Seen')),
                 ),
               ],
             ),
@@ -231,8 +239,11 @@ class _HomePageState extends State<HomePage> {
                 Expanded(
                   child: Text(
                     user == null
-                        ? 'Chua co ho so'
-                        : 'Lien he khan cap: ${user.emergencyContacts.isEmpty ? 'chua cap nhat' : user.emergencyContacts.first.name}',
+                        ? strings.text('Chưa có hồ sơ', 'No profile yet')
+                        : strings.text(
+                            'Liên hệ khẩn cấp: ${user.emergencyContacts.isEmpty ? 'chưa cập nhật' : user.emergencyContacts.first.name}',
+                            'Emergency contact: ${user.emergencyContacts.isEmpty ? 'not set' : user.emergencyContacts.first.name}',
+                          ),
                     style: AppTextStyles.bodyStrong,
                   ),
                 ),
@@ -282,14 +293,22 @@ class _HomePageState extends State<HomePage> {
                       ),
                     const SizedBox(height: 10),
                     Text(
-                      safe ? 'Da diem danh' : 'Can check-in',
+                      safe
+                          ? strings.text('Đã điểm danh', 'Checked in')
+                          : strings.text('Cần check-in', 'Check-in needed'),
                       style: AppTextStyles.h3.copyWith(color: Colors.white),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       safe
-                          ? 'Cham de gui vi tri va xac nhan an toan'
-                          : 'Deadline dang den gan, hay xac nhan ban van on',
+                          ? strings.text(
+                              'Chạm để gửi vị trí và xác nhận an toàn',
+                              'Tap to share your location and confirm you are safe',
+                            )
+                          : strings.text(
+                              'Mốc thời gian đang đến gần, hãy xác nhận bạn vẫn ổn',
+                              'The deadline is getting close, please confirm you are okay',
+                            ),
                       textAlign: TextAlign.center,
                       style: AppTextStyles.bodyLarge.copyWith(
                         color: Colors.white.withValues(alpha: 0.92),
@@ -306,7 +325,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Guardians online', style: AppTextStyles.title),
+                  Text(strings.text('Người bảo hộ đang online', 'Guardians online'), style: AppTextStyles.title),
                   const SizedBox(height: 12),
                   for (final guardian in guardians) ...[
                     Row(
@@ -354,7 +373,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 28),
           Center(
             child: Text(
-              'CON LAI',
+              strings.text('CÒN LẠI', 'REMAINING'),
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textSecondary,
                 fontSize: 18,
@@ -372,14 +391,17 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 10),
           Center(
             child: Text(
-              'Lan check-in cuoi: ${_formatTime(lastCheckIn)}',
+              strings.text(
+                'Lần check-in cuối: ${_formatTime(lastCheckIn)}',
+                'Last check-in: ${_formatTime(lastCheckIn)}',
+              ),
               style: AppTextStyles.bodyLarge.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
           ),
           const SizedBox(height: 24),
-          Text('Trang thai nhanh', style: AppTextStyles.title),
+          Text(strings.text('Trạng thái nhanh', 'Quick status'), style: AppTextStyles.title),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
@@ -400,7 +422,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: _StatCard(
                   icon: Icons.monitor_heart_outlined,
-                  label: 'STATUS',
+                  label: strings.text('TRẠNG THÁI', 'STATUS'),
                   value: user?.currentStatus ?? 'SAFE',
                 ),
               ),
@@ -408,7 +430,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: _StatCard(
                   icon: Icons.schedule_rounded,
-                  label: 'QUIET HOURS',
+                  label: strings.text('GIỜ YÊN LẶNG', 'QUIET HOURS'),
                   value: user == null
                       ? '--'
                       : '${user.quietHoursStart}-${user.quietHoursEnd}',
@@ -418,7 +440,7 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: _StatCard(
                   icon: Icons.medication_outlined,
-                  label: 'THUOC',
+                  label: strings.text('THUỐC', 'MEDS'),
                   value: appProvider.automation.pillReminder
                       ? appProvider.automation.pillTime
                       : 'Tat',
@@ -435,7 +457,10 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Vi tri cuoi: ${user!.lastKnownLocation!.lat.toStringAsFixed(5)}, ${user.lastKnownLocation!.lng.toStringAsFixed(5)}',
+                      strings.text(
+                        'Vị trí cuối: ${user!.lastKnownLocation!.lat.toStringAsFixed(5)}, ${user.lastKnownLocation!.lng.toStringAsFixed(5)}',
+                        'Last location: ${user!.lastKnownLocation!.lat.toStringAsFixed(5)}, ${user.lastKnownLocation!.lng.toStringAsFixed(5)}',
+                      ),
                       style: AppTextStyles.bodyStrong,
                     ),
                   ),
@@ -451,7 +476,10 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Policy: nhac truoc ${appProvider.alertPolicy!.level1Minutes}p, bao dong sau ${appProvider.alertPolicy!.level2Minutes}p, SOS sau ${appProvider.alertPolicy!.level3Minutes}p.',
+                      strings.text(
+                        'Chính sách: nhắc trước ${appProvider.alertPolicy!.level1Minutes}p, báo động sau ${appProvider.alertPolicy!.level2Minutes}p, SOS sau ${appProvider.alertPolicy!.level3Minutes}p.',
+                        'Policy: remind at ${appProvider.alertPolicy!.level1Minutes}m, alarm after ${appProvider.alertPolicy!.level2Minutes}m, SOS after ${appProvider.alertPolicy!.level3Minutes}m.',
+                      ),
                       style: AppTextStyles.bodyStrong,
                     ),
                   ),
@@ -460,7 +488,7 @@ class _HomePageState extends State<HomePage> {
             ),
           const SizedBox(height: 14),
           if (appProvider.interactionEvents.isNotEmpty) ...[
-            Text('Lich su tuong tac', style: AppTextStyles.title),
+            Text(strings.text('Lịch sử tương tác', 'Interaction history'), style: AppTextStyles.title),
             const SizedBox(height: 10),
             for (final item in appProvider.interactionEvents.take(4)) ...[
               AppCard(
@@ -497,6 +525,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openMoodPrompt() async {
+    final strings = AppStrings.of(context);
     final selected = await showModalBottomSheet<Mood>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -508,15 +537,15 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Ban dang the nao?', style: AppTextStyles.h3),
+              Text(strings.text('Bạn đang thế nào?', 'How are you feeling?'), style: AppTextStyles.h3),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  _MoodChoice(mood: Mood.happy, label: 'Khoe'),
-                  _MoodChoice(mood: Mood.calm, label: 'Binh thuong'),
-                  _MoodChoice(mood: Mood.sick, label: 'Met'),
+                  _MoodChoice(mood: Mood.happy, label: strings.text('Khỏe', 'Good')),
+                  _MoodChoice(mood: Mood.calm, label: strings.text('Bình thường', 'Normal')),
+                  _MoodChoice(mood: Mood.sick, label: strings.text('Mệt', 'Tired')),
                 ].map((item) {
                   return ChoiceChip(
                     label: Text(item.label),

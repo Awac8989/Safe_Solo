@@ -151,6 +151,78 @@ function mapAlertPolicyRow(row) {
   };
 }
 
+function mapMedicalProfileRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    userId: row.user_id,
+    fullName: row.full_name,
+    birthYear: row.birth_year,
+    bloodType: row.blood_type,
+    allergies: row.allergies,
+    conditions: row.conditions,
+    medications: row.medications,
+    emergencyPhone: row.emergency_phone,
+    insuranceProvider: row.insurance_provider,
+    insuranceNumber: row.insurance_number,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAutomationSettingsRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    userId: row.user_id,
+    dailyReminderTime: row.daily_reminder_time,
+    shakeSos: Boolean(row.shake_sos),
+    shakeSensitivity: row.shake_sensitivity,
+    fallDetection: Boolean(row.fall_detection),
+    geofenceAutoCheckin: Boolean(row.geofence_auto_checkin),
+    pillReminder: Boolean(row.pill_reminder),
+    pillTime: row.pill_time,
+    homeLocation: safeParse(row.home_location, null),
+    lastGeofenceEventAt: row.last_geofence_event_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapSecuritySettingsRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    userId: row.user_id,
+    stealthMode: Boolean(row.stealth_mode),
+    autoWipeDays: row.auto_wipe_days,
+    encryptionEnabled: Boolean(row.encryption_enabled),
+    lastAutoWipeDueAt: row.last_auto_wipe_due_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapDeviceSignalRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    signalType: row.signal_type,
+    payload: safeParse(row.payload_json, {}),
+    createdAt: row.created_at,
+  };
+}
+
 function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -235,6 +307,58 @@ function initDatabase() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS medical_profiles (
+      user_id TEXT PRIMARY KEY,
+      full_name TEXT NOT NULL DEFAULT '',
+      birth_year TEXT NOT NULL DEFAULT '',
+      blood_type TEXT NOT NULL DEFAULT 'O+',
+      allergies TEXT NOT NULL DEFAULT '',
+      conditions TEXT NOT NULL DEFAULT '',
+      medications TEXT NOT NULL DEFAULT '',
+      emergency_phone TEXT NOT NULL DEFAULT '',
+      insurance_provider TEXT NOT NULL DEFAULT '',
+      insurance_number TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS automation_settings (
+      user_id TEXT PRIMARY KEY,
+      daily_reminder_time TEXT NOT NULL DEFAULT '08:00',
+      shake_sos INTEGER NOT NULL DEFAULT 1,
+      shake_sensitivity INTEGER NOT NULL DEFAULT 3,
+      fall_detection INTEGER NOT NULL DEFAULT 0,
+      geofence_auto_checkin INTEGER NOT NULL DEFAULT 1,
+      pill_reminder INTEGER NOT NULL DEFAULT 0,
+      pill_time TEXT NOT NULL DEFAULT '08:00',
+      home_location TEXT,
+      last_geofence_event_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS security_settings (
+      user_id TEXT PRIMARY KEY,
+      stealth_mode INTEGER NOT NULL DEFAULT 0,
+      auto_wipe_days INTEGER NOT NULL DEFAULT 0,
+      encryption_enabled INTEGER NOT NULL DEFAULT 1,
+      last_auto_wipe_due_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS device_signals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      signal_type TEXT NOT NULL,
+      payload_json TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     CREATE TABLE IF NOT EXISTS sms_dispatch_logs (
       id TEXT PRIMARY KEY,
       emergency_log_id TEXT,
@@ -261,6 +385,12 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_interaction_user_id ON interaction_events(user_id);
     CREATE INDEX IF NOT EXISTS idx_interaction_created_at ON interaction_events(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_policy_user_id ON alert_policies(user_id);
+    CREATE INDEX IF NOT EXISTS idx_medical_user_id ON medical_profiles(user_id);
+    CREATE INDEX IF NOT EXISTS idx_automation_user_id ON automation_settings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_security_user_id ON security_settings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_signal_user_id ON device_signals(user_id);
+    CREATE INDEX IF NOT EXISTS idx_signal_type ON device_signals(signal_type);
+    CREATE INDEX IF NOT EXISTS idx_signal_created_at ON device_signals(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_sms_emergency ON sms_dispatch_logs(emergency_log_id);
     CREATE INDEX IF NOT EXISTS idx_sms_user ON sms_dispatch_logs(user_id);
   `);
@@ -313,6 +443,12 @@ function initDatabase() {
   userStatements.updateLocation = db.prepare(`
     UPDATE users
     SET last_known_location = @last_known_location,
+        updated_at = @updated_at
+    WHERE id = @id
+  `);
+  userStatements.updateContacts = db.prepare(`
+    UPDATE users
+    SET emergency_contacts = @emergency_contacts,
         updated_at = @updated_at
     WHERE id = @id
   `);
@@ -437,6 +573,103 @@ function initDatabase() {
     WHERE user_id = @user_id
   `);
 
+  medicalProfileStatements.getByUserId = db.prepare(`
+    SELECT * FROM medical_profiles WHERE user_id = ?
+  `);
+  medicalProfileStatements.upsert = db.prepare(`
+    INSERT INTO medical_profiles (
+      user_id, full_name, birth_year, blood_type, allergies, conditions,
+      medications, emergency_phone, insurance_provider, insurance_number,
+      created_at, updated_at
+    ) VALUES (
+      @user_id, @full_name, @birth_year, @blood_type, @allergies, @conditions,
+      @medications, @emergency_phone, @insurance_provider, @insurance_number,
+      @created_at, @updated_at
+    )
+    ON CONFLICT(user_id) DO UPDATE SET
+      full_name = excluded.full_name,
+      birth_year = excluded.birth_year,
+      blood_type = excluded.blood_type,
+      allergies = excluded.allergies,
+      conditions = excluded.conditions,
+      medications = excluded.medications,
+      emergency_phone = excluded.emergency_phone,
+      insurance_provider = excluded.insurance_provider,
+      insurance_number = excluded.insurance_number,
+      updated_at = excluded.updated_at
+  `);
+
+  automationSettingsStatements.getByUserId = db.prepare(`
+    SELECT * FROM automation_settings WHERE user_id = ?
+  `);
+  automationSettingsStatements.upsert = db.prepare(`
+    INSERT INTO automation_settings (
+      user_id, daily_reminder_time, shake_sos, shake_sensitivity, fall_detection,
+      geofence_auto_checkin, pill_reminder, pill_time, home_location,
+      last_geofence_event_at, created_at, updated_at
+    ) VALUES (
+      @user_id, @daily_reminder_time, @shake_sos, @shake_sensitivity, @fall_detection,
+      @geofence_auto_checkin, @pill_reminder, @pill_time, @home_location,
+      @last_geofence_event_at, @created_at, @updated_at
+    )
+    ON CONFLICT(user_id) DO UPDATE SET
+      daily_reminder_time = excluded.daily_reminder_time,
+      shake_sos = excluded.shake_sos,
+      shake_sensitivity = excluded.shake_sensitivity,
+      fall_detection = excluded.fall_detection,
+      geofence_auto_checkin = excluded.geofence_auto_checkin,
+      pill_reminder = excluded.pill_reminder,
+      pill_time = excluded.pill_time,
+      home_location = excluded.home_location,
+      last_geofence_event_at = excluded.last_geofence_event_at,
+      updated_at = excluded.updated_at
+  `);
+  automationSettingsStatements.touchGeofenceEvent = db.prepare(`
+    UPDATE automation_settings
+    SET last_geofence_event_at = @last_geofence_event_at,
+        updated_at = @updated_at
+    WHERE user_id = @user_id
+  `);
+
+  securitySettingsStatements.getByUserId = db.prepare(`
+    SELECT * FROM security_settings WHERE user_id = ?
+  `);
+  securitySettingsStatements.upsert = db.prepare(`
+    INSERT INTO security_settings (
+      user_id, stealth_mode, auto_wipe_days, encryption_enabled,
+      last_auto_wipe_due_at, created_at, updated_at
+    ) VALUES (
+      @user_id, @stealth_mode, @auto_wipe_days, @encryption_enabled,
+      @last_auto_wipe_due_at, @created_at, @updated_at
+    )
+    ON CONFLICT(user_id) DO UPDATE SET
+      stealth_mode = excluded.stealth_mode,
+      auto_wipe_days = excluded.auto_wipe_days,
+      encryption_enabled = excluded.encryption_enabled,
+      last_auto_wipe_due_at = excluded.last_auto_wipe_due_at,
+      updated_at = excluded.updated_at
+  `);
+  securitySettingsStatements.markAutoWipeDue = db.prepare(`
+    UPDATE security_settings
+    SET last_auto_wipe_due_at = @last_auto_wipe_due_at,
+        updated_at = @updated_at
+    WHERE user_id = @user_id
+  `);
+
+  deviceSignalStatements.create = db.prepare(`
+    INSERT INTO device_signals (
+      id, user_id, signal_type, payload_json, created_at
+    ) VALUES (
+      @id, @user_id, @signal_type, @payload_json, @created_at
+    )
+  `);
+  deviceSignalStatements.listByUser = db.prepare(`
+    SELECT * FROM device_signals
+    WHERE user_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `);
+
   smsDispatchStatements.create = db.prepare(`
     INSERT INTO sms_dispatch_logs (
       id, emergency_log_id, user_id, to_phone, provider, attempt, success,
@@ -461,6 +694,10 @@ const emergencyStatements = {};
 const alertEventStatements = {};
 const interactionEventStatements = {};
 const alertPolicyStatements = {};
+const medicalProfileStatements = {};
+const automationSettingsStatements = {};
+const securitySettingsStatements = {};
+const deviceSignalStatements = {};
 const smsDispatchStatements = {};
 
 module.exports = {
@@ -472,6 +709,10 @@ module.exports = {
   mapAlertEventRow,
   mapInteractionEventRow,
   mapAlertPolicyRow,
+  mapMedicalProfileRow,
+  mapAutomationSettingsRow,
+  mapSecuritySettingsRow,
+  mapDeviceSignalRow,
   mapSmsDispatchRow,
   userStatements,
   checkinStatements,
@@ -479,5 +720,9 @@ module.exports = {
   alertEventStatements,
   interactionEventStatements,
   alertPolicyStatements,
+  medicalProfileStatements,
+  automationSettingsStatements,
+  securitySettingsStatements,
+  deviceSignalStatements,
   smsDispatchStatements,
 };

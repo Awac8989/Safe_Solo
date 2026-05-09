@@ -6,7 +6,7 @@ import { TrendingUp, Wallet, Building2 } from "lucide-react";
 import { fetchRevenueSummary } from "@/lib/api";
 
 export const Route = createFileRoute("/revenue")({
-  head: () => ({ meta: [{ title: "Doanh thu va doi tac - SafeSolo Admin" }] }),
+  head: () => ({ meta: [{ title: "Doanh thu và đối tác - SafeSolo Admin" }] }),
   component: Page,
 });
 
@@ -26,30 +26,30 @@ function Page() {
 
   return (
     <>
-      <Topbar title="Doanh thu va doi tac" subtitle="Thu nhap AdMob · hoa hong dieu pho y te" />
+      <Topbar title="Doanh thu và đối tác" subtitle="Thu nhập AdMob · hoa hồng điều phối y tế" />
       <div className="space-y-3 p-3">
         <div className="grid gap-3 md:grid-cols-3">
           {[
             {
-              label: "Doanh thu AdMob (30 ngay)",
+              label: "Doanh thu AdMob (30 ngày)",
               value: usd(data?.cards.admobRevenue30d || 0),
               icon: TrendingUp,
               tone: "success" as const,
-              sub: "Chi so tong hop cho admin",
+              sub: "Chỉ số tổng hợp cho admin",
             },
             {
-              label: "Hoa hong chua thanh toan",
+              label: "Hoa hồng chưa thanh toán",
               value: vnd(data?.cards.unpaidCommissions || 0),
               icon: Wallet,
               tone: "warning" as const,
-              sub: `${partners.length} doi tac dang cho`,
+              sub: `${partners.length} đối tác đang chờ`,
             },
             {
-              label: "Benh vien doi tac dang hoat dong",
+              label: "Bệnh viện đối tác đang hoạt động",
               value: String(data?.cards.activePartners || 0),
               icon: Building2,
               tone: "info" as const,
-              sub: "Danh sach dang van hanh",
+              sub: "Danh sách đang vận hành",
             },
           ].map((item) => (
             <div key={item.label} className="rounded-xl border border-border bg-card p-4">
@@ -68,10 +68,10 @@ function Page() {
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Doanh thu quang cao AdMob · 30 ngay gan nhat</h2>
-              <p className="text-[11px] text-muted-foreground">USD moi ngay</p>
+              <h2 className="text-sm font-semibold">Doanh thu quảng cáo AdMob · 30 ngày gần nhất</h2>
+              <p className="text-[11px] text-muted-foreground">USD mỗi ngày</p>
             </div>
-            <Tag tone="success">Dang tang</Tag>
+            <Tag tone="success">Đang tăng</Tag>
           </div>
           <div className="mt-4">
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-48 w-full">
@@ -90,21 +90,21 @@ function Page() {
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div>
-              <h2 className="text-sm font-semibold">Hoa hong dieu xe cuu thuong</h2>
-              <p className="text-[11px] text-muted-foreground">Theo tung benh vien doi tac · ky hien tai</p>
+              <h2 className="text-sm font-semibold">Hoa hồng điều xe cứu thương</h2>
+              <p className="text-[11px] text-muted-foreground">Theo từng bệnh viện đối tác · kỳ hiện tại</p>
             </div>
             <button className="rounded-md bg-success px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">
-              Yeu cau thanh toan
+              Yêu cầu thanh toán
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-background/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium">Doi tac</th>
-                  <th className="px-4 py-2 text-left font-medium">Luot dieu pho thanh cong</th>
-                  <th className="px-4 py-2 text-left font-medium">Ty le</th>
-                  <th className="px-4 py-2 text-left font-medium">So du chua thanh toan</th>
+                  <th className="px-4 py-2 text-left font-medium">Đối tác</th>
+                  <th className="px-4 py-2 text-left font-medium">Lượt điều phối thành công</th>
+                  <th className="px-4 py-2 text-left font-medium">Tỷ lệ</th>
+                  <th className="px-4 py-2 text-left font-medium">Số dư chưa thanh toán</th>
                 </tr>
               </thead>
               <tbody>

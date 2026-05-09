@@ -106,12 +106,31 @@ export type RevenueSummary = {
   }>;
 };
 
+export type AdminUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  source: "sqlite" | "store";
+  role: string;
+  currentStatus: string;
+  timerIntervalMinutes: number;
+  nextCheckinDeadline: string | null;
+  lastCheckInAt: string | null;
+  emergencyContacts: Array<{ name: string; phone: string; relation: string }>;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  falseAlertGraceMinutes: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const fetchAdminOverview = async () => {
   return request<AdminOverviewResponse>("/admin/overview");
 };
 
 export const fetchAdminUsers = async () => {
-  return request<{ success: true; data: unknown[] }>("/admin/users");
+  return request<{ success: true; data: AdminUser[] }>("/admin/users");
 };
 
 export const fetchAdminIncidents = async (status = "open") => {

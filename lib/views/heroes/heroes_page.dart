@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
@@ -19,6 +20,7 @@ class _HeroesPageState extends State<HeroesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final heroes = context.watch<AppProvider>().heroes;
     final rows = _filter == _HeroesFilter.ranking
         ? ([...heroes]..sort((a, b) => b.rescues.compareTo(a.rescues)))
@@ -36,14 +38,17 @@ class _HeroesPageState extends State<HeroesPage> {
                 size: 24,
               ),
               const SizedBox(width: 8),
-              Text('Heroes', style: AppTextStyles.h2.copyWith(fontSize: 28)),
+              Text(strings.text('Hiệp sĩ', 'Heroes'), style: AppTextStyles.h2.copyWith(fontSize: 28)),
               const Spacer(),
               const AppRoundIconButton(icon: Icons.shield_outlined),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            'Bang xep hang tinh nguyen vien va nhung nguoi co the ho tro quanh ban.',
+            strings.text(
+              'Bảng xếp hạng tình nguyện viên và những người có thể hỗ trợ quanh bạn.',
+              'Ranking of volunteers and people who can help nearby.',
+            ),
             style: AppTextStyles.bodyLarge.copyWith(
               color: AppColors.textSecondary,
             ),
