@@ -18,6 +18,11 @@ class _SettingsPageState extends State<SettingsPage> {
   double? _graceHoursDraft;
   double? _autoWipeDaysDraft;
 
+  AppStrings _snapshotStrings() {
+    final language = context.read<AppProvider>().language;
+    return AppStrings(language);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
@@ -29,14 +34,23 @@ class _SettingsPageState extends State<SettingsPage> {
     final autoWipeValue = _autoWipeDaysDraft ?? security.autoWipeDays.toDouble();
 
     return AppPage(
+      safeBottom: true,
       child: ListView(
-        padding: const EdgeInsets.only(top: 18, bottom: 24),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.only(top: 18, bottom: 120),
         children: [
-          Text(strings.text('Cài đặt', 'Settings'), style: AppTextStyles.h2.copyWith(fontSize: 28)),
+          Text(
+            strings.text('Cài đặt', 'Settings'),
+            style: AppTextStyles.h2.copyWith(fontSize: 28),
+          ),
           const SizedBox(height: 18),
           _ProfileCard(
-            name: user?.name.isNotEmpty == true ? user!.name : strings.text('Người dùng', 'User'),
-            subtitle: user?.email.isNotEmpty == true ? user!.email : (user?.phoneNumber ?? ''),
+            name: user?.name.isNotEmpty == true
+                ? user!.name
+                : strings.text('Người dùng', 'User'),
+            subtitle: user?.email.isNotEmpty == true
+                ? user!.email
+                : (user?.phoneNumber ?? ''),
           ),
           const SizedBox(height: 22),
           AppSectionLabel(strings.text('Điểm danh hằng ngày', 'Daily check-in')),
@@ -46,7 +60,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _SliderRow(
                 icon: Icons.access_time_rounded,
                 title: strings.text('Thời gian ân hạn', 'Grace window'),
-                valueText: _formatHours(graceValue.round()),
+                valueText: _formatHours(strings, graceValue.round()),
                 minLabel: '1h',
                 maxLabel: '72h',
                 min: 1,
@@ -55,20 +69,22 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: graceValue.clamp(1, 72),
                 onChanged: (value) => setState(() => _graceHoursDraft = value),
                 onChangeEnd: (value) async {
-                  await _runGuarded(() => context.read<AppProvider>().setGraceHours(value.round()));
+                  await _runGuarded(
+                    () => context.read<AppProvider>().setGraceHours(value.round()),
+                  );
                   if (mounted) {
                     setState(() => _graceHoursDraft = null);
                   }
                 },
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.notifications_active_outlined,
                 title: strings.text('Nhắc nhở mỗi ngày', 'Daily reminder'),
                 valueText: automation.dailyReminderTime,
                 onTap: () => _pickReminderTime(context),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.flight_takeoff_rounded,
                 title: strings.text('Chế độ nghỉ phép', 'Vacation mode'),
@@ -80,7 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Tự động hóa & cảm biến', 'Automation & sensors')),
+          AppSectionLabel(strings.text('Tự động hóa và cảm biến', 'Automation & sensors')),
           const SizedBox(height: 10),
           _SectionCard(
             children: [
@@ -90,21 +106,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 value: automation.fallDetection,
                 onChanged: (value) => _saveAutomation(provider, fallDetection: value),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.vibration_rounded,
                 title: strings.text('Lắc máy tạo SOS', 'Shake for SOS'),
                 value: automation.shakeSos,
                 onChanged: (value) => _saveAutomation(provider, shakeSos: value),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.home_work_outlined,
                 title: strings.text('Tự check-in khi về nhà', 'Auto check-in at home'),
                 value: automation.geofenceAutoCheckin,
                 onChanged: (value) => _saveAutomation(provider, geofenceAutoCheckin: value),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.medication_liquid_outlined,
                 title: strings.text('Nhắc uống thuốc', 'Medication reminder'),
@@ -114,7 +130,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Hồ sơ & thành tựu', 'Profile & achievements')),
+          AppSectionLabel(strings.text('Hồ sơ và thành tựu', 'Profile & achievements')),
           const SizedBox(height: 10),
           _SectionCard(
             children: [
@@ -123,13 +139,13 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: strings.text('Hồ sơ y tế khẩn cấp', 'Emergency medical profile'),
                 onTap: () => Navigator.pushNamed(context, '/medical'),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.groups_2_outlined,
                 title: strings.text('Người bảo hộ', 'Guardians'),
                 onTap: () => Navigator.pushNamed(context, '/network'),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.workspace_premium_outlined,
                 title: strings.text('Huy hiệu của tôi', 'My achievements'),
@@ -146,9 +162,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.contrast_rounded,
                 title: strings.text('Tương phản cao (WCAG AAA)', 'High contrast (WCAG AAA)'),
                 value: provider.highContrast,
-                onChanged: (value) => _runGuarded(() => context.read<AppProvider>().setHighContrast(value)),
+                onChanged: (value) => _runGuarded(
+                  () => context.read<AppProvider>().setHighContrast(value),
+                ),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.translate_rounded,
                 title: strings.text('Ngôn ngữ', 'Language'),
@@ -164,23 +182,23 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _ActionRow(
                 icon: Icons.key_rounded,
-                title: strings.text('Mã PIN thật & PIN giả', 'Real PIN & duress PIN'),
+                title: strings.text('Mã PIN thật và PIN giả', 'Real PIN & duress PIN'),
                 onTap: () => Navigator.pushNamed(context, '/security'),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.auto_awesome_rounded,
                 title: strings.text('Chế độ ẩn danh (Calculator)', 'Stealth mode (Calculator)'),
                 value: security.stealthMode,
                 onChanged: (value) => _saveSecurity(provider, stealthMode: value),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _SliderRow(
                 icon: Icons.delete_sweep_outlined,
-                title: strings.text('Tự huỷ Két sắt', 'Vault auto-wipe'),
+                title: strings.text('Tự hủy Két sắt', 'Vault auto-wipe'),
                 valueText: autoWipeValue.round() == 0
                     ? strings.text('Tắt', 'Off')
-                    : '${autoWipeValue.round()}d',
+                    : strings.text('${autoWipeValue.round()} ngày', '${autoWipeValue.round()} days'),
                 minLabel: strings.text('Tắt', 'Off'),
                 maxLabel: strings.text('60 ngày', '60 days'),
                 min: 0,
@@ -195,16 +213,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   }
                 },
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.lock_person_outlined,
-                title: strings.text('Mã hoá AES-256 E2E', 'AES-256 E2E encryption'),
+                title: strings.text('Mã hóa AES-256 E2E', 'AES-256 E2E encryption'),
                 valueText: provider.security.encryptionEnabled
                     ? strings.text('Đang bật', 'Enabled')
                     : strings.text('Đang tắt', 'Disabled'),
                 onTap: () => Navigator.pushNamed(context, '/vault'),
               ),
-              _SectionDivider(),
+              const _SectionDivider(),
               _ActionRow(
                 icon: Icons.inventory_2_outlined,
                 title: strings.text('Két sắt sinh tử', 'Life vault'),
@@ -212,7 +230,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => context.read<AppProvider>().signOut(),
             icon: const Icon(Icons.logout_rounded),
@@ -248,14 +266,12 @@ class _SettingsPageState extends State<SettingsPage> {
       return;
     }
 
-    await _saveAutomation(
-      provider,
-      dailyReminderTime: _formatTimeOfDay(picked),
-    );
+    await _saveAutomation(provider, dailyReminderTime: _formatTimeOfDay(picked));
   }
 
   Future<void> _showVacationDialog(BuildContext context) async {
     final provider = context.read<AppProvider>();
+    final strings = _snapshotStrings();
     double selectedHours = provider.isVacation ? 24 : 12;
 
     await showDialog<void>(
@@ -264,14 +280,21 @@ class _SettingsPageState extends State<SettingsPage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(provider.isVacation ? 'Chế độ nghỉ phép' : 'Bật nghỉ phép'),
+              title: Text(
+                provider.isVacation
+                    ? strings.text('Chế độ nghỉ phép', 'Vacation mode')
+                    : strings.text('Bật nghỉ phép', 'Turn on vacation mode'),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (provider.isVacation) ...[
                     Text(
-                      'Đang tạm dừng cảnh báo đến ${_formatDateTime(provider.user?.sleepModeUntil)}.',
+                      strings.text(
+                        'Đang tạm dừng cảnh báo đến ${_formatDateTime(provider.user?.sleepModeUntil)}.',
+                        'Alerts are paused until ${_formatDateTime(provider.user?.sleepModeUntil)}.',
+                      ),
                       style: AppTextStyles.body,
                     ),
                     const SizedBox(height: 16),
@@ -282,19 +305,27 @@ class _SettingsPageState extends State<SettingsPage> {
                           Navigator.pop(dialogContext);
                           await _runGuarded(() => provider.endVacation());
                         },
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.destructive),
-                        child: const Text('Tắt nghỉ phép'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.destructive,
+                        ),
+                        child: Text(strings.text('Tắt nghỉ phép', 'Turn off')),
                       ),
                     ),
                   ] else ...[
                     Text(
-                      'Tạm dừng countdown và escalation trong khoảng thời gian bạn chọn.',
+                      strings.text(
+                        'Tạm dừng countdown và escalation trong khoảng thời gian bạn chọn.',
+                        'Pause countdown and escalation for the selected duration.',
+                      ),
                       style: AppTextStyles.body,
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      _formatHours(selectedHours.round()),
-                      style: AppTextStyles.h2.copyWith(fontSize: 32, color: AppColors.primary),
+                      _formatHours(strings, selectedHours.round()),
+                      style: AppTextStyles.h2.copyWith(
+                        fontSize: 32,
+                        color: AppColors.primary,
+                      ),
                     ),
                     Slider(
                       value: selectedHours,
@@ -309,15 +340,17 @@ class _SettingsPageState extends State<SettingsPage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Đóng'),
+                  child: Text(strings.text('Đóng', 'Close')),
                 ),
                 if (!provider.isVacation)
                   ElevatedButton(
                     onPressed: () async {
                       Navigator.pop(dialogContext);
-                      await _runGuarded(() => provider.setSleepModeHours(selectedHours.round()));
+                      await _runGuarded(
+                        () => provider.setSleepModeHours(selectedHours.round()),
+                      );
                     },
-                    child: const Text('Bắt đầu'),
+                    child: Text(strings.text('Bắt đầu', 'Start')),
                   ),
               ],
             );
@@ -329,12 +362,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _showLanguageDialog(BuildContext context) async {
     final provider = context.read<AppProvider>();
+    final strings = _snapshotStrings();
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Ngôn ngữ'),
+          title: Text(strings.text('Ngôn ngữ', 'Language')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -425,16 +459,16 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  static String _formatHours(int hours) {
+  static String _formatHours(AppStrings strings, int hours) {
     final days = hours ~/ 24;
     final remainHours = hours % 24;
     if (days == 0) {
       return '${hours}h';
     }
     if (remainHours == 0) {
-      return '$days ngày';
+      return strings.text('$days ngày', '$days days');
     }
-    return '$days ngày $remainHours h';
+    return strings.text('$days ngày $remainHours h', '$days days $remainHours h');
   }
 
   static TimeOfDay _parseTimeOfDay(String value) {
@@ -523,6 +557,8 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _SectionDivider extends StatelessWidget {
+  const _SectionDivider();
+
   @override
   Widget build(BuildContext context) {
     return const Divider(height: 1, thickness: 1, color: AppColors.border);
@@ -553,13 +589,14 @@ class _ActionRow extends StatelessWidget {
           children: [
             _LeadingIcon(icon: icon),
             const SizedBox(width: 14),
-            Expanded(
-              child: Text(title, style: AppTextStyles.title),
-            ),
+            Expanded(child: Text(title, style: AppTextStyles.title)),
             if (valueText != null) ...[
-              Text(
-                valueText!,
-                style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary),
+              Flexible(
+                child: Text(
+                  valueText!,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary),
+                ),
               ),
               const SizedBox(width: 6),
             ],
@@ -593,11 +630,7 @@ class _SwitchRow extends StatelessWidget {
           _LeadingIcon(icon: icon),
           const SizedBox(width: 14),
           Expanded(child: Text(title, style: AppTextStyles.title)),
-          Switch.adaptive(
-            value: value,
-            onChanged: onChanged,
-            activeTrackColor: AppColors.primary,
-          ),
+          Switch.adaptive(value: value, onChanged: onChanged),
         ],
       ),
     );
@@ -665,15 +698,12 @@ class _SliderRow extends StatelessWidget {
               onChangeEnd: onChangeEnd,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(minLabel, style: AppTextStyles.caption),
-                Text(maxLabel, style: AppTextStyles.caption),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(minLabel, style: AppTextStyles.caption),
+              Text(maxLabel, style: AppTextStyles.caption),
+            ],
           ),
         ],
       ),
@@ -722,7 +752,9 @@ class _LanguageOption extends StatelessWidget {
           children: [
             Expanded(child: Text(label, style: AppTextStyles.bodyLarge)),
             Icon(
-              selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
               color: selected ? AppColors.primary : AppColors.textMuted,
             ),
           ],

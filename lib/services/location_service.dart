@@ -16,6 +16,8 @@ class ResolvedLocation {
 
 class LocationService {
   static const _lookupTimeout = Duration(seconds: 6);
+  static const _defaultLat = 10.7765;
+  static const _defaultLng = 106.7009;
 
   Future<ResolvedLocation> getBestEffortLocation({
     double? fallbackLat,
@@ -23,14 +25,10 @@ class LocationService {
   }) async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      if (fallbackLat != null && fallbackLng != null) {
-        return ResolvedLocation(
-          lat: fallbackLat,
-          lng: fallbackLng,
-          isFresh: false,
-        );
-      }
-      throw Exception('Dich vu dinh vi dang tat');
+      return _fallbackLocation(
+        fallbackLat: fallbackLat,
+        fallbackLng: fallbackLng,
+      );
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
@@ -39,14 +37,10 @@ class LocationService {
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      if (fallbackLat != null && fallbackLng != null) {
-        return ResolvedLocation(
-          lat: fallbackLat,
-          lng: fallbackLng,
-          isFresh: false,
-        );
-      }
-      throw Exception('Khong co quyen truy cap vi tri');
+      return _fallbackLocation(
+        fallbackLat: fallbackLat,
+        fallbackLng: fallbackLng,
+      );
     }
 
     try {
@@ -75,6 +69,17 @@ class LocationService {
     }
   }
 
+  ResolvedLocation _fallbackLocation({
+    double? fallbackLat,
+    double? fallbackLng,
+  }) {
+    return ResolvedLocation(
+      lat: fallbackLat ?? _defaultLat,
+      lng: fallbackLng ?? _defaultLng,
+      isFresh: false,
+    );
+  }
+
   Future<ResolvedLocation> _fallbackToLastKnown({
     double? fallbackLat,
     double? fallbackLng,
@@ -88,16 +93,9 @@ class LocationService {
       );
     }
 
-    if (fallbackLat != null && fallbackLng != null) {
-      return ResolvedLocation(
-        lat: fallbackLat,
-        lng: fallbackLng,
-        isFresh: false,
-      );
-    }
-
-    throw Exception(
-      'Khong lay duoc GPS kip thoi. Hay mo vi tri tren may hoac thu lai sau.',
+    return _fallbackLocation(
+      fallbackLat: fallbackLat,
+      fallbackLng: fallbackLng,
     );
   }
 }

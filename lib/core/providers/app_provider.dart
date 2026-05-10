@@ -931,7 +931,7 @@ class AppProvider with ChangeNotifier {
   Future<void> checkIn({Mood? mood}) async {
     final current = _user;
     if (current == null) {
-      return;
+      throw Exception('Chưa có hồ sơ người dùng. Vui lòng đăng nhập lại.');
     }
 
     await _runBusy(() async {
@@ -949,13 +949,13 @@ class AppProvider with ChangeNotifier {
       _mood = mood ?? _mood ?? Mood.calm;
       _streak += 1;
       _prependOwnPost(
-        message: 'Toi vua check-in an toan. Neu can, moi nguoi co the xem vi tri cap nhat moi nhat cua toi.',
+        message: 'Tôi vừa check-in an toàn. Nếu cần, mọi người có thể xem vị trí cập nhật mới nhất của tôi.',
         moodLabel: _labelForMood(_mood ?? Mood.calm),
         scope: CircleScope.family,
       );
       _updateChatPreview(
         'family',
-        'Da nhan check-in moi cua ${_user?.name ?? 'ban'}',
+        'Đã nhận check-in mới của ${_user?.name ?? 'bạn'}',
       );
       _interactionEvents = await _api.listInteractions(current.id);
       _vaultReleaseAt = null;
@@ -1269,7 +1269,7 @@ class AppProvider with ChangeNotifier {
       );
       _updateChatPreview(
         'emergency',
-        'Da gui SOS im lang tu che do an danh',
+        'Đã gửi SOS im lặng từ chế độ ẩn danh',
       );
       _chatThreads = _chatThreads
           .map(
@@ -1281,9 +1281,9 @@ class AppProvider with ChangeNotifier {
                       ...thread.messages,
                       ChatMessage(
                         id: 'system-${DateTime.now().microsecondsSinceEpoch}',
-                        sender: 'He thong',
+                        sender: 'Hệ thống',
                         content:
-                            'Da ghi nhan ma duress va gui SOS im lang cung vi tri hien tai.',
+                            'Đã ghi nhận mã duress và gửi SOS im lặng cùng vị trí hiện tại.',
                         createdAt: DateTime.now(),
                         isSystem: true,
                       ),
@@ -1350,8 +1350,8 @@ class AppProvider with ChangeNotifier {
     _updateChatPreview(
       post.scope == CircleScope.family ? 'family' : 'community',
       nextCheered
-          ? '${_user?.name ?? 'Ban'} vua gui dong vien cho ${post.author}'
-          : '${_user?.name ?? 'Ban'} da bo gui dong vien',
+          ? '${_user?.name ?? 'Bạn'} vừa gửi động viên cho ${post.author}'
+          : '${_user?.name ?? 'Bạn'} đã bỏ gửi động viên',
     );
     await _saveToStorage();
     notifyListeners();
@@ -1363,7 +1363,7 @@ class AppProvider with ChangeNotifier {
       return;
     }
 
-    final author = _user?.name ?? 'Ban';
+    final author = _user?.name ?? 'Bạn';
     final reply = CircleReply(
       id: 'reply-${DateTime.now().microsecondsSinceEpoch}',
       author: author,
@@ -1405,7 +1405,7 @@ class AppProvider with ChangeNotifier {
       return;
     }
 
-    final sender = _user?.name ?? 'Ban';
+    final sender = _user?.name ?? 'Bạn';
     final now = DateTime.now();
     final outgoing = ChatMessage(
       id: 'msg-${now.microsecondsSinceEpoch}',
@@ -1439,7 +1439,7 @@ class AppProvider with ChangeNotifier {
       return;
     }
 
-    final sender = _user?.name ?? 'Ban';
+    final sender = _user?.name ?? 'Bạn';
     final now = DateTime.now();
     final outgoing = ChatMessage(
       id: 'voice-${now.microsecondsSinceEpoch}',
@@ -1522,7 +1522,7 @@ class AppProvider with ChangeNotifier {
     required String moodLabel,
     required CircleScope scope,
   }) {
-    final author = _user?.name ?? 'Ban';
+    final author = _user?.name ?? 'Bạn';
     final next = CirclePost(
       id: 'post-${DateTime.now().millisecondsSinceEpoch}',
       author: author,
@@ -1582,7 +1582,7 @@ class AppProvider with ChangeNotifier {
       _vaultAutoWipeAt = now;
       _appendSystemMessage(
         'emergency',
-        'Auto-wipe đã xoá dữ liệu nhạy cảm cục bộ trên thiết bị sau ${_security.autoWipeDays} ngày không có check-in.',
+        'Auto-wipe đã xóa dữ liệu nhạy cảm cục bộ trên thiết bị sau ${_security.autoWipeDays} ngày không có check-in.',
       );
       changed = true;
     }
@@ -1632,15 +1632,15 @@ class AppProvider with ChangeNotifier {
   }
 
   void _seedDemoCollections() {
-    final userName = _user?.name.isNotEmpty == true ? _user!.name : 'Ban';
+    final userName = _user?.name.isNotEmpty == true ? _user!.name : 'Bạn';
 
     if (_circlePosts.isEmpty) {
       _circlePosts = [
         CirclePost(
           id: 'family-1',
           author: userName,
-          message: 'Hom nay toi on va da bat SafeSolo de gia dinh yen tam.',
-          moodLabel: 'Binh an',
+          message: 'Hôm nay tôi ổn và đã bật SafeSolo để gia đình yên tâm.',
+          moodLabel: 'Bình an',
           createdAt: DateTime.now().subtract(const Duration(minutes: 35)),
           scope: CircleScope.family,
           cheers: 2,
@@ -1648,8 +1648,8 @@ class AppProvider with ChangeNotifier {
           replyItems: [
             CircleReply(
               id: 'reply-family-1',
-              author: 'Me',
-              message: 'Ca nha da thay check-in cua con, yen tam roi nhe.',
+              author: 'Mẹ',
+              message: 'Cả nhà đã thấy check-in của con, yên tâm rồi nhé.',
               createdAt: DateTime.now().subtract(const Duration(minutes: 22)),
             ),
           ],
@@ -1657,9 +1657,9 @@ class AppProvider with ChangeNotifier {
         ),
         CirclePost(
           id: 'family-2',
-          author: 'Me Lan',
-          message: 'Me vua uong thuoc va dang nghi ngoi. Ca nha yen tam nhe.',
-          moodLabel: 'On dinh',
+          author: 'Mẹ Lan',
+          message: 'Mẹ vừa uống thuốc và đang nghỉ ngơi. Cả nhà yên tâm nhé.',
+          moodLabel: 'Ổn định',
           createdAt: DateTime.now().subtract(const Duration(hours: 3)),
           scope: CircleScope.family,
           cheers: 7,
@@ -1667,14 +1667,14 @@ class AppProvider with ChangeNotifier {
             CircleReply(
               id: 'reply-family-2a',
               author: userName,
-              message: 'Con da xem, me nghi them nhe.',
+              message: 'Con đã xem, mẹ nghỉ thêm nhé.',
               createdAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 40)),
               mine: true,
             ),
             CircleReply(
               id: 'reply-family-2b',
               author: 'Ba',
-              message: 'Toi nay con ghe qua tham me giup ba nhe.',
+              message: 'Tối nay con ghé qua thăm mẹ giúp ba nhé.',
               createdAt: DateTime.now().subtract(const Duration(hours: 2, minutes: 25)),
             ),
           ],
@@ -1682,9 +1682,9 @@ class AppProvider with ChangeNotifier {
         ),
         CirclePost(
           id: 'community-1',
-          author: 'Quoc An',
-          message: 'Toi vua ve den nha sau ca truc toi. Khu vuc hien an toan.',
-          moodLabel: 'Da check-in',
+          author: 'Quốc An',
+          message: 'Tôi vừa về đến nhà sau ca trực tối. Khu vực hiện an toàn.',
+          moodLabel: 'Đã check-in',
           createdAt: DateTime.now().subtract(const Duration(minutes: 55)),
           scope: CircleScope.community,
           cheers: 6,
@@ -1697,29 +1697,29 @@ class AppProvider with ChangeNotifier {
       _chatThreads = [
         ChatThread(
           id: 'family',
-          groupLabel: 'NHOM GIA DINH',
-          name: 'Gia dinh',
-          preview: 'Da dong bo check-in moi nhat',
+          groupLabel: 'NHÓM GIA ĐÌNH',
+          name: 'Gia đình',
+          preview: 'Đã đồng bộ check-in mới nhất',
           updatedAt: DateTime.now().subtract(const Duration(minutes: 10)),
           contactPhone: _user?.emergencyContacts.firstOrNull?.phone ?? '0911132112',
           messages: [
             ChatMessage(
               id: 'family-msg-1',
-              sender: 'Me',
-              content: 'Con nho check-in sau khi tan lam nhe.',
+              sender: 'Mẹ',
+              content: 'Con nhớ check-in sau khi tan làm nhé.',
               createdAt: DateTime.now().subtract(const Duration(hours: 1, minutes: 10)),
             ),
             ChatMessage(
               id: 'family-msg-2',
               sender: userName,
-              content: 'Con vua ve nha an toan roi, da check-in xong.',
+              content: 'Con vừa về nhà an toàn rồi, đã check-in xong.',
               createdAt: DateTime.now().subtract(const Duration(minutes: 10)),
               mine: true,
             ),
             ChatMessage(
               id: 'family-voice-1',
-              sender: 'Me',
-              content: 'Voice note da gui',
+              sender: 'Mẹ',
+              content: 'Voice note đã gửi',
               createdAt: DateTime.now().subtract(const Duration(minutes: 8)),
               voiceSeconds: 11,
             ),
@@ -1728,23 +1728,23 @@ class AppProvider with ChangeNotifier {
         ),
         ChatThread(
           id: 'emergency',
-          groupLabel: 'HO TRO KHAN CAP',
-          name: 'Ho tro - Hiep si Minh Anh',
-          preview: 'Neu co SOS, toi se la nguoi tiep can dau tien.',
+          groupLabel: 'HỖ TRỢ KHẨN CẤP',
+          name: 'Hỗ trợ - Hiệp sĩ Minh Anh',
+          preview: 'Nếu có SOS, tôi sẽ là người tiếp cận đầu tiên.',
           updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
           contactPhone: '115',
           messages: [
             ChatMessage(
               id: 'emergency-msg-1',
-              sender: 'He thong',
-              content: 'Kenh lien lac khan cap da san sang.',
+              sender: 'Hệ thống',
+              content: 'Kênh liên lạc khẩn cấp đã sẵn sàng.',
               createdAt: DateTime.now(),
               isSystem: true,
             ),
             ChatMessage(
               id: 'emergency-msg-2',
-              sender: 'Hiep si Minh Anh',
-              content: 'Neu can ho tro gap, hay nhan tin truc tiep cho toi o day.',
+              sender: 'Hiệp sĩ Minh Anh',
+              content: 'Nếu cần hỗ trợ gấp, hãy nhắn tin trực tiếp cho tôi ở đây.',
               createdAt: DateTime.now(),
             ),
           ],
@@ -1754,22 +1754,22 @@ class AppProvider with ChangeNotifier {
         ),
         ChatThread(
           id: 'community',
-          groupLabel: 'CONG DONG',
+          groupLabel: 'CỘNG ĐỒNG',
           name: 'Alive Circle',
-          preview: 'Moi nguoi dang gui trang thai binh an hom nay',
+          preview: 'Mọi người đang gửi trạng thái bình an hôm nay',
           updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
           contactPhone: null,
           messages: [
             ChatMessage(
               id: 'community-msg-1',
-              sender: 'Quoc An',
-              content: 'Toi vua check-in ve nha, khu vuc dang an toan.',
+              sender: 'Quốc An',
+              content: 'Tôi vừa check-in về nhà, khu vực đang an toàn.',
               createdAt: DateTime.now(),
             ),
             ChatMessage(
               id: 'community-msg-2',
-              sender: 'He thong',
-              content: 'Hay giu thong diep ngan gon va de nguoi than de theo doi.',
+              sender: 'Hệ thống',
+              content: 'Hãy giữ thông điệp ngắn gọn để người thân dễ theo dõi.',
               createdAt: DateTime.now(),
               isSystem: true,
             ),
@@ -1841,13 +1841,13 @@ class AppProvider with ChangeNotifier {
   String formatInteractionType(String type) {
     switch (type) {
       case 'ACCOUNT_REGISTERED':
-        return 'Dang ky tai khoan';
+        return 'Đăng ký tài khoản';
       case 'CHECKIN_TAP_OK':
-        return 'Cham de on';
+        return 'Chạm để ổn';
       case 'MORNING_ACK':
-        return 'Da xem thong bao';
+        return 'Đã xem thông báo';
       case 'STATUS_POSTED':
-        return 'Dang trang thai';
+        return 'Đăng trạng thái';
       default:
         return type;
     }
@@ -1870,15 +1870,15 @@ class AppProvider with ChangeNotifier {
   static String _labelForMood(Mood mood) {
     switch (mood) {
       case Mood.calm:
-        return 'Binh an';
+        return 'Bình an';
       case Mood.happy:
-        return 'Tich cuc';
+        return 'Tích cực';
       case Mood.tired:
-        return 'Hoi met';
+        return 'Hơi mệt';
       case Mood.sick:
-        return 'Can luu y';
+        return 'Cần lưu ý';
       case Mood.focused:
-        return 'Dang tap trung';
+        return 'Đang tập trung';
     }
   }
 }

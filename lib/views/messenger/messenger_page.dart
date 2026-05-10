@@ -9,6 +9,7 @@ import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/push_to_talk_button.dart';
+import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
 
 class MessengerPage extends StatelessWidget {
@@ -21,30 +22,32 @@ class MessengerPage extends StatelessWidget {
     final grouped = <String, List<ChatThread>>{};
 
     for (final thread in threads) {
-      grouped.putIfAbsent(thread.groupLabel, () => []).add(thread);
+      final key = _displayGroupLabel(strings, thread.groupLabel, thread.id);
+      grouped.putIfAbsent(key, () => []).add(thread);
     }
 
     return AppPage(
       child: ListView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 18, bottom: 22),
         children: [
-          Text(strings.text('Tin nhắn', 'Messages'), style: AppTextStyles.h2.copyWith(fontSize: 28)),
+          Text(
+            strings.text('Tin nhắn', 'Messages'),
+            style: AppTextStyles.h2.copyWith(fontSize: 28),
+          ),
           const SizedBox(height: 8),
           Text(
             strings.text(
               'Hộp thư gia đình, cộng đồng và kênh hỗ trợ.',
               'Family, community, and support inboxes.',
             ),
-            style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 26),
           for (final entry in grouped.entries) ...[
-            AppSectionLabel(
-              entry.key,
-              color: entry.value.any((thread) => thread.highlight)
-                  ? AppColors.warning
-                  : AppColors.textSecondary,
-            ),
+            AppSectionLabel(entry.key),
             const SizedBox(height: 12),
             for (final chat in entry.value) ...[
               _ChatCard(chat: chat),
@@ -55,6 +58,19 @@ class MessengerPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  static String _displayGroupLabel(AppStrings strings, String raw, String threadId) {
+    switch (threadId) {
+      case 'family':
+        return strings.text('Gia đình', 'Family');
+      case 'emergency':
+        return strings.text('Hiệp sĩ', 'Heroes');
+      case 'community':
+        return strings.text('Cộng đồng', 'Community');
+      default:
+        return raw;
+    }
   }
 }
 
@@ -88,7 +104,9 @@ class _ChatCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: chat.highlight ? const Color(0xFFFFF1D7) : AppColors.primarySoft,
+                color: chat.highlight
+                    ? const Color(0xFFFFF1D7)
+                    : AppColors.primarySoft,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
@@ -114,21 +132,34 @@ class _ChatCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     chat.preview,
-                    style: AppTextStyles.bodyLarge.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.forum_outlined, size: 14, color: AppColors.textSecondary),
+                      const Icon(
+                        Icons.forum_outlined,
+                        size: 14,
+                        color: AppColors.textSecondary,
+                      ),
                       const SizedBox(width: 4),
-                      Text('${chat.messages.length} tin nhắn', style: AppTextStyles.caption),
+                      Text(
+                        '${chat.messages.length} ${AppStrings.of(context).text('tin nhắn', 'messages')}',
+                        style: AppTextStyles.caption,
+                      ),
                     ],
                   ),
                   if (chat.contactPhone != null && chat.contactPhone!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.call_outlined, size: 14, color: AppColors.primary),
+                        const Icon(
+                          Icons.call_outlined,
+                          size: 14,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(chat.contactPhone!, style: AppTextStyles.caption),
                       ],
@@ -141,13 +172,17 @@ class _ChatCard extends StatelessWidget {
                         Icon(
                           Icons.battery_3_bar_rounded,
                           size: 14,
-                          color: chat.battery == '12%' ? AppColors.destructive : AppColors.textSecondary,
+                          color: chat.battery == '12%'
+                              ? AppColors.destructive
+                              : AppColors.textSecondary,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           chat.battery!,
                           style: AppTextStyles.caption.copyWith(
-                            color: chat.battery == '12%' ? AppColors.destructive : AppColors.textSecondary,
+                            color: chat.battery == '12%'
+                                ? AppColors.destructive
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -161,9 +196,15 @@ class _ChatCard extends StatelessWidget {
               Container(
                 width: 22,
                 height: 22,
-                decoration: const BoxDecoration(color: Color(0xFFEF3C3C), shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFEF3C3C),
+                  shape: BoxShape.circle,
+                ),
                 alignment: Alignment.center,
-                child: Text('${chat.unread}', style: AppTextStyles.caption.copyWith(color: Colors.white)),
+                child: Text(
+                  '${chat.unread}',
+                  style: AppTextStyles.caption.copyWith(color: Colors.white),
+                ),
               ),
           ],
         ),
@@ -204,31 +245,56 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
     FocusScope.of(context).unfocus();
     await context.read<AppProvider>().sendQuickMessage(widget.threadId, text);
     _controller.clear();
+    if (!context.mounted) {
+      return;
+    }
+    TopToast.show(
+      context,
+      message: AppStrings.of(context).text('Đã gửi tin nhắn.', 'Message sent.'),
+      icon: Icons.send_rounded,
+    );
   }
 
   Future<void> _sendVoice(BuildContext context, int seconds) async {
     await context.read<AppProvider>().sendVoiceMessage(widget.threadId, seconds);
+    if (!context.mounted) {
+      return;
+    }
+    TopToast.show(
+      context,
+      message: AppStrings.of(context).text(
+        'Đã gửi ghi âm ${seconds}s.',
+        'Voice note sent (${seconds}s).',
+      ),
+      icon: Icons.mic_rounded,
+    );
   }
 
   Future<void> _callThread(ChatThread thread) async {
+    final strings = AppStrings.of(context);
     final phone = thread.contactPhone;
     if (phone == null || phone.isEmpty) {
-      if (!mounted) {
-        return;
-      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đoạn chat này chưa có số điện thoại để gọi.')),
+        SnackBar(
+          content: Text(
+            strings.text(
+              'Đoạn chat này chưa có số điện thoại để gọi.',
+              'This thread does not have a phone number yet.',
+            ),
+          ),
+        ),
       );
       return;
     }
 
     final uri = Uri.parse('tel:$phone');
-    if (!await launchUrl(uri)) {
-      if (!mounted) {
-        return;
-      }
+    if (!await launchUrl(uri) && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể gọi tới $phone.')),
+        SnackBar(
+          content: Text(
+            strings.text('Không thể gọi tới $phone.', 'Could not call $phone.'),
+          ),
+        ),
       );
     }
   }
@@ -236,12 +302,15 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
+    final strings = AppStrings.of(context);
     final thread = provider.threadById(widget.threadId);
 
     if (thread == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Tin nhắn')),
-        body: const Center(child: Text('Không tìm thấy đoạn chat.')),
+        appBar: AppBar(title: Text(strings.text('Tin nhắn', 'Messages'))),
+        body: Center(
+          child: Text(strings.text('Không tìm thấy đoạn chat.', 'Chat thread not found.')),
+        ),
       );
     }
 
@@ -254,9 +323,9 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
             IconButton(
               onPressed: () => _callThread(thread),
               icon: const Icon(Icons.call_outlined),
-              tooltip: 'Gọi điện',
+              tooltip: strings.text('Gọi điện', 'Call'),
             ),
-          ],
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
@@ -272,7 +341,9 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                     color: thread.highlight ? const Color(0xFFFFFBF2) : AppColors.card,
                     borderRadius: BorderRadius.circular(AppRadius.xl),
                     border: Border.all(
-                      color: thread.highlight ? const Color(0xFFFFD8A1) : AppColors.border,
+                      color: thread.highlight
+                          ? const Color(0xFFFFD8A1)
+                          : AppColors.border,
                     ),
                     boxShadow: AppShadows.card,
                   ),
@@ -283,11 +354,16 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(thread.groupLabel, style: AppTextStyles.caption),
+                            Text(
+                              MessengerPage._displayGroupLabel(strings, thread.groupLabel, thread.id),
+                              style: AppTextStyles.caption,
+                            ),
                             const SizedBox(height: 6),
                             Text(
                               thread.preview,
-                              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -298,20 +374,9 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                           child: OutlinedButton.icon(
                             onPressed: () => _callThread(thread),
                             icon: const Icon(Icons.call_outlined, size: 18),
-                            label: const Text('Gọi'),
+                            label: Text(strings.text('Gọi', 'Call')),
                           ),
                         ),
-                      if (thread.battery != null) ...[
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(thread.battery!, style: AppTextStyles.caption),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -321,16 +386,19 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
                   padding: const EdgeInsets.only(top: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: Colors.white.withValues(alpha: 0.78),
                     borderRadius: BorderRadius.circular(AppRadius.xl),
-                    border: Border.all(color: AppColors.border.withValues(alpha: 0.9)),
+                    border: Border.all(color: AppColors.border.withValues(alpha: 0.95)),
                   ),
                   child: thread.messages.isEmpty
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
                             child: Text(
-                              'Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên hoặc giữ nút mic để gửi voice note.',
+                              strings.text(
+                                'Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên hoặc giữ nút mic để gửi voice note.',
+                                'No messages yet. Send the first message or hold the mic to send a voice note.',
+                              ),
                               textAlign: TextAlign.center,
                               style: AppTextStyles.bodyLarge.copyWith(
                                 color: AppColors.textSecondary,
@@ -339,7 +407,6 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                           ),
                         )
                       : ListView.separated(
-                          reverse: false,
                           padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
                           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                           itemCount: thread.messages.length,
@@ -376,9 +443,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              PushToTalkButton(
-                onSend: (seconds) => _sendVoice(context, seconds),
-              ),
+              PushToTalkButton(onSend: (seconds) => _sendVoice(context, seconds)),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
@@ -387,8 +452,8 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(context),
-                  decoration: const InputDecoration(
-                    hintText: 'Nhập tin nhắn phản hồi...',
+                  decoration: InputDecoration(
+                    hintText: strings.text('Nhập tin nhắn phản hồi...', 'Type a reply...'),
                     filled: true,
                     fillColor: AppColors.backgroundAlt,
                   ),
@@ -475,7 +540,9 @@ class _MessageBubble extends StatelessWidget {
                 Text(
                   _formatTime(message.createdAt),
                   style: AppTextStyles.caption.copyWith(
-                    color: alignEnd ? Colors.white.withValues(alpha: 0.85) : AppColors.textMuted,
+                    color: alignEnd
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : AppColors.textMuted,
                   ),
                 ),
               ],

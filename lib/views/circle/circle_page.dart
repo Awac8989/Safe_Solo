@@ -5,6 +5,7 @@ import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
 
 class CirclePage extends StatefulWidget {
@@ -18,6 +19,7 @@ class _CirclePageState extends State<CirclePage> {
   CircleScope _filter = CircleScope.family;
 
   Future<void> _openComposer() async {
+    final strings = AppStrings.of(context);
     final controller = TextEditingController();
     Mood selectedMood = Mood.calm;
 
@@ -27,15 +29,18 @@ class _CirclePageState extends State<CirclePage> {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: const Text('Dang trang thai'),
+              title: Text(strings.text('Đăng trạng thái', 'Post status')),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: controller,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Ban muon ca nha biet dieu gi hom nay?',
+                    decoration: InputDecoration(
+                      hintText: strings.text(
+                        'Bạn muốn cả nhà biết điều gì hôm nay?',
+                        'What would you like everyone to know today?',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -47,21 +52,16 @@ class _CirclePageState extends State<CirclePage> {
                     style: AppTextStyles.bodyLarge.copyWith(
                       color: AppColors.textPrimary,
                     ),
-                    decoration: const InputDecoration(
-                      labelText: 'Cam xuc',
+                    decoration: InputDecoration(
+                      labelText: strings.text('Cảm xúc', 'Mood'),
                       filled: true,
                       fillColor: Colors.white,
                     ),
                     items: Mood.values
                         .map(
-                          (mood) => DropdownMenuItem(
+                          (mood) => DropdownMenuItem<Mood>(
                             value: mood,
-                            child: Text(
-                              _moodLabel(mood),
-                              style: AppTextStyles.bodyLarge.copyWith(
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
+                            child: Text(strings.moodLabel(mood)),
                           ),
                         )
                         .toList(),
@@ -74,7 +74,7 @@ class _CirclePageState extends State<CirclePage> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Huy'),
+                  child: Text(strings.text('Hủy', 'Cancel')),
                 ),
                 ElevatedButton(
                   onPressed: () async {
@@ -91,8 +91,12 @@ class _CirclePageState extends State<CirclePage> {
                       return;
                     }
                     Navigator.pop(dialogContext);
+                    TopToast.show(
+                      context,
+                      message: strings.text('Đã đăng trạng thái mới.', 'Status posted.'),
+                    );
                   },
-                  child: const Text('Dang'),
+                  child: Text(strings.text('Đăng', 'Post')),
                 ),
               ],
             );
@@ -111,6 +115,7 @@ class _CirclePageState extends State<CirclePage> {
 
     return AppPage(
       child: ListView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 18, bottom: 24),
         children: [
           Row(
@@ -122,7 +127,7 @@ class _CirclePageState extends State<CirclePage> {
               ),
               const SizedBox(width: 8),
               Text(
-                strings.text('Vòng tròn Bình an', 'Alive Circle'),
+                strings.text('Alive Circle', 'Alive Circle'),
                 style: AppTextStyles.h2.copyWith(fontSize: 26),
               ),
             ],
@@ -179,12 +184,15 @@ class _CirclePageState extends State<CirclePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Dang mot status nhanh',
+                          strings.text('Đăng một status nhanh', 'Post a quick status'),
                           style: AppTextStyles.title,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Cham de chia se mood, check-in hoac thong diep ngan',
+                          strings.text(
+                            'Chạm để chia sẻ mood, check-in hoặc thông điệp ngắn',
+                            'Tap to share a mood, check-in, or short message',
+                          ),
                           style: AppTextStyles.body.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -205,7 +213,17 @@ class _CirclePageState extends State<CirclePage> {
           for (final post in posts) ...[
             _CirclePostCard(
               post: post,
-              onCheer: () => context.read<AppProvider>().toggleCircleCheer(post.id),
+              onCheer: () async {
+                await context.read<AppProvider>().toggleCircleCheer(post.id);
+                if (!context.mounted) {
+                  return;
+                }
+                TopToast.show(
+                  context,
+                  message: strings.text('Đã gửi cái ôm.', 'Support sent.'),
+                  icon: Icons.favorite_rounded,
+                );
+              },
               onReply: () => _openReplySheet(context, post),
             ),
             const SizedBox(height: 16),
@@ -213,7 +231,10 @@ class _CirclePageState extends State<CirclePage> {
           if (posts.isEmpty)
             AppCard(
               child: Text(
-                'Chua co bai dang nao. Hay chia se trang thai dau tien cua ban.',
+                strings.text(
+                  'Chưa có bài đăng nào. Hãy chia sẻ trạng thái đầu tiên của bạn.',
+                  'No posts yet. Share your first update.',
+                ),
                 style: AppTextStyles.bodyLarge,
               ),
             ),
@@ -223,6 +244,7 @@ class _CirclePageState extends State<CirclePage> {
   }
 
   Future<void> _openReplySheet(BuildContext context, CirclePost post) async {
+    final strings = AppStrings.of(context);
     final controller = TextEditingController();
 
     await showModalBottomSheet<void>(
@@ -257,7 +279,7 @@ class _CirclePageState extends State<CirclePage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Text('Phan hoi bai dang', style: AppTextStyles.h3),
+                  Text(strings.text('Phản hồi bài đăng', 'Reply to post'), style: AppTextStyles.h3),
                   const SizedBox(height: 6),
                   Text(
                     livePost?.message ?? post.message,
@@ -266,44 +288,46 @@ class _CirclePageState extends State<CirclePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if ((livePost?.replyItems ?? post.replyItems).isNotEmpty)
-                    ...[
-                      SizedBox(
-                        height: 220,
-                        child: ListView.separated(
-                          itemCount: (livePost?.replyItems ?? post.replyItems).length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final reply = (livePost?.replyItems ?? post.replyItems)[index];
-                            return AppCard(
-                              padding: const EdgeInsets.all(14),
-                              color: reply.mine ? AppColors.primarySoft : AppColors.accent,
-                              shadow: const [],
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(reply.author, style: AppTextStyles.bodyStrong),
-                                  const SizedBox(height: 4),
-                                  Text(reply.message, style: AppTextStyles.bodyLarge),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _formatRelativeTime(reply.createdAt),
-                                    style: AppTextStyles.caption,
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                  if ((livePost?.replyItems ?? post.replyItems).isNotEmpty) ...[
+                    SizedBox(
+                      height: 220,
+                      child: ListView.separated(
+                        itemCount: (livePost?.replyItems ?? post.replyItems).length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final reply = (livePost?.replyItems ?? post.replyItems)[index];
+                          return AppCard(
+                            padding: const EdgeInsets.all(14),
+                            color: reply.mine ? AppColors.primarySoft : AppColors.accent,
+                            shadow: const [],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(reply.author, style: AppTextStyles.bodyStrong),
+                                const SizedBox(height: 4),
+                                Text(reply.message, style: AppTextStyles.bodyLarge),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatRelativeTime(reply.createdAt, strings),
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 14),
-                    ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   TextField(
                     controller: controller,
                     minLines: 2,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Gui loi nhan dong vien hoac trao doi nhanh...',
+                    decoration: InputDecoration(
+                      hintText: strings.text(
+                        'Gửi lời nhắn động viên hoặc trao đổi nhanh...',
+                        'Send a quick reply or encouragement...',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -320,8 +344,16 @@ class _CirclePageState extends State<CirclePage> {
                           text,
                         );
                         controller.clear();
+                        if (!sheetContext.mounted) {
+                          return;
+                        }
+                        TopToast.show(
+                          context,
+                          message: strings.text('Đã gửi phản hồi.', 'Reply sent.'),
+                          icon: Icons.reply_rounded,
+                        );
                       },
-                      child: const Text('Gui phan hoi'),
+                      child: Text(strings.text('Gửi phản hồi', 'Send reply')),
                     ),
                   ),
                 ],
@@ -333,33 +365,18 @@ class _CirclePageState extends State<CirclePage> {
     );
   }
 
-  String _moodLabel(Mood mood) {
-    switch (mood) {
-      case Mood.calm:
-        return 'Binh an';
-      case Mood.happy:
-        return 'Tich cuc';
-      case Mood.tired:
-        return 'Hoi met';
-      case Mood.sick:
-        return 'Can luu y';
-      case Mood.focused:
-        return 'Dang tap trung';
-    }
-  }
-
-  String _formatRelativeTime(DateTime value) {
+  String _formatRelativeTime(DateTime value, AppStrings strings) {
     final difference = DateTime.now().difference(value);
     if (difference.inMinutes < 1) {
-      return 'Vua xong';
+      return strings.text('Vừa xong', 'Just now');
     }
     if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} phut truoc';
+      return strings.text('${difference.inMinutes} phút trước', '${difference.inMinutes} min ago');
     }
     if (difference.inHours < 24) {
-      return '${difference.inHours} gio truoc';
+      return strings.text('${difference.inHours} giờ trước', '${difference.inHours}h ago');
     }
-    return '${difference.inDays} ngay truoc';
+    return strings.text('${difference.inDays} ngày trước', '${difference.inDays}d ago');
   }
 }
 
@@ -376,6 +393,8 @@ class _CirclePostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+
     return AppCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -402,7 +421,10 @@ class _CirclePostCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(post.author, style: AppTextStyles.title),
-                    Text(_formatRelativeTime(post.createdAt), style: AppTextStyles.caption),
+                    Text(
+                      _formatRelativeTime(post.createdAt, strings),
+                      style: AppTextStyles.caption,
+                    ),
                   ],
                 ),
               ),
@@ -413,7 +435,9 @@ class _CirclePostCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  post.scope == CircleScope.family ? 'Gia dinh' : 'Cong dong',
+                  post.scope == CircleScope.family
+                      ? strings.text('Gia đình', 'Family')
+                      : strings.text('Cộng đồng', 'Community'),
                   style: AppTextStyles.caption.copyWith(color: AppColors.primary),
                 ),
               ),
@@ -462,7 +486,7 @@ class _CirclePostCard extends StatelessWidget {
                     child: const Icon(Icons.play_arrow_rounded, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: VoiceWaveform(
                       bars: 18,
                       progress: 0.45,
@@ -491,13 +515,14 @@ class _CirclePostCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Phan hoi moi nhat', style: AppTextStyles.bodyStrong),
+                  Text(
+                    strings.text('Phản hồi mới nhất', 'Latest reply'),
+                    style: AppTextStyles.bodyStrong,
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     '${post.replyItems.last.author}: ${post.replyItems.last.message}',
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+                    style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
@@ -513,8 +538,10 @@ class _CirclePostCard extends StatelessWidget {
                   icon: post.cheeredByMe
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
-                  iconColor: post.cheeredByMe ? AppColors.destructive : AppColors.textPrimary,
-                  label: 'Gui dong vien · ${post.cheers}',
+                  iconColor: post.cheeredByMe
+                      ? AppColors.destructive
+                      : AppColors.textPrimary,
+                  label: strings.text('Gửi cái ôm · ${post.cheers}', 'Support · ${post.cheers}'),
                   onTap: onCheer,
                 ),
               ),
@@ -522,7 +549,7 @@ class _CirclePostCard extends StatelessWidget {
               Expanded(
                 child: _ActionPill(
                   icon: Icons.reply_rounded,
-                  label: 'Phan hoi · ${post.replies}',
+                  label: strings.text('Phản hồi · ${post.replies}', 'Reply · ${post.replies}'),
                   onTap: onReply,
                 ),
               ),
@@ -533,18 +560,18 @@ class _CirclePostCard extends StatelessWidget {
     );
   }
 
-  String _formatRelativeTime(DateTime value) {
+  String _formatRelativeTime(DateTime value, AppStrings strings) {
     final difference = DateTime.now().difference(value);
     if (difference.inMinutes < 1) {
-      return 'Vua xong';
+      return strings.text('Vừa xong', 'Just now');
     }
     if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} phut truoc';
+      return strings.text('${difference.inMinutes} phút trước', '${difference.inMinutes} min ago');
     }
     if (difference.inHours < 24) {
-      return '${difference.inHours} gio truoc';
+      return strings.text('${difference.inHours} giờ trước', '${difference.inHours}h ago');
     }
-    return '${difference.inDays} ngay truoc';
+    return strings.text('${difference.inDays} ngày trước', '${difference.inDays}d ago');
   }
 }
 

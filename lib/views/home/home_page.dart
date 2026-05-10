@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../core/widgets/top_toast.dart';
 import '../community_radar/community_radar_page.dart';
 import '../sos_map/sos_map_page.dart';
 
@@ -18,8 +20,14 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   static const _demoPushKey = 'safesolo_demo_push_v1';
+
+  late final AnimationController _pulseController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  )..repeat(reverse: true);
+
   Timer? _ticker;
   Timer? _demoPushTimer;
   Timer? _holdTimer;
@@ -38,28 +46,49 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _ticker?.cancel();
     _demoPushTimer?.cancel();
     _holdTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _handleCheckIn(Mood mood) async {
+  Future<void> _handleCheckIn(Mood? mood) async {
+    final strings = AppStrings(context.read<AppProvider>().language);
+    if (context.read<AppProvider>().user == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            strings.text(
+              'Chưa có hồ sơ đăng nhập. Vui lòng đăng nhập lại trước khi điểm danh.',
+              'No signed-in profile found. Please sign in again before checking in.',
+            ),
+          ),
+        ),
+      );
+      Navigator.pushNamedAndRemoveUntil(context, '/auth', (_) => false);
+      return;
+    }
+
     try {
       await context.read<AppProvider>().checkIn(mood: mood);
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Check-in thanh cong va da cap nhat vi tri.')),
+      TopToast.show(
+        context,
+        message: strings.text('Đã điểm danh và cập nhật an toàn.', 'Check-in completed and safety status updated.'),
       );
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
     }
   }
 
@@ -72,7 +101,7 @@ class _HomePageState extends State<HomePage> {
       await Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => const SosMapPage(victimName: 'Ho Van Tai'),
+          builder: (_) => const SosMapPage(victimName: 'Hồ Văn Tài'),
         ),
       );
     });
@@ -82,18 +111,32 @@ class _HomePageState extends State<HomePage> {
     _holdTimer?.cancel();
   }
 
+  Future<void> _handleCircleTap() async {
+    debugPrint('[HomePage] check-in circle tapped');
+    if (context.read<AppProvider>().isBusy) {
+      return;
+    }
+    await _openMoodPrompt();
+  }
+
   Future<void> _shareMood(Mood mood) async {
+    final strings = AppStrings(context.read<AppProvider>().language);
     await context.read<AppProvider>().createCirclePost(
-      message: 'Trang thai nhanh hom nay: ${_moodText(mood)}.',
+      message: strings.text(
+        'Trạng thái nhanh hôm nay: ${strings.moodLabel(mood)}.',
+        'Quick status today: ${strings.moodLabel(mood)}.',
+      ),
       mood: mood,
       scope: CircleScope.family,
     );
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
+    TopToast.show(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Da chia se trang thai nhanh.')));
+      message: strings.text('Đã chia sẻ trạng thái với gia đình.', 'Status shared with family.'),
+      icon: Icons.favorite_rounded,
+    );
   }
 
   @override
@@ -103,13 +146,17 @@ class _HomePageState extends State<HomePage> {
     final user = appProvider.user;
     final userName = user?.name ?? strings.text('Bạn', 'You');
     final lastCheckIn = user?.lastCheckinTime ?? DateTime.now();
-    final nextDeadline = user?.nextDeadline ?? lastCheckIn.add(const Duration(hours: 12));
+    final nextDeadline =
+        user?.nextDeadline ?? lastCheckIn.add(const Duration(hours: 12));
     final remaining = nextDeadline.difference(_now);
-    final safe = !remaining.isNegative && (user?.currentStatus ?? 'SAFE') == 'SAFE';
+    final state = _buttonState(remaining, appProvider.isVacation);
     final guardians = user?.emergencyContacts.take(3).toList() ?? const [];
+    final mood = appProvider.mood;
+    final pulse = 1 + (_pulseController.value * state.pulseStrength);
 
     return AppPage(
       child: ListView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 20, bottom: 28),
         children: [
           Row(
@@ -120,212 +167,248 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _formatDate(_now),
+                      _formatDate(_now, strings),
                       style: AppTextStyles.bodyStrong.copyWith(
                         color: AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            strings.text('Xin chào, $userName!', 'Hello, $userName!'),
-                            style: AppTextStyles.h2.copyWith(fontSize: 30),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1D7),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.local_fire_department_rounded,
-                                color: AppColors.warning,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${appProvider.streak}',
-                                style: AppTextStyles.bodyStrong.copyWith(
-                                  color: AppColors.warning,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    Text(
+                      strings.text('Xin chào,\n$userName!', 'Hello,\n$userName!'),
+                      style: AppTextStyles.h2.copyWith(fontSize: 28, height: 1.05),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              AppRoundIconButton(
-                icon: Icons.account_circle_outlined,
-                onPressed: () => Navigator.pushNamed(context, '/settings'),
+              Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1D7),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.local_fire_department_rounded,
+                          color: AppColors.warning,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${appProvider.streak}',
+                          style: AppTextStyles.bodyStrong.copyWith(
+                            color: AppColors.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  AppRoundIconButton(
+                    icon: Icons.account_circle_outlined,
+                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          if (appProvider.isVacation)
+          const SizedBox(height: 18),
+          if (appProvider.isVacation) ...[
             MaterialBanner(
               backgroundColor: const Color(0xFFE8F1FF),
               content: Text(
                 strings.text(
-                  'Chế độ nghỉ dưỡng đang bật. Đồng hồ đếm ngược tạm dừng cho đến khi bạn tắt chế độ ngủ.',
-                  'Vacation mode is on. The countdown is paused until you turn off sleep mode.',
+                  'Chế độ nghỉ dưỡng đang bật. Đồng hồ điểm danh đang được tạm dừng.',
+                  'Vacation mode is on. The check-in countdown is currently paused.',
                 ),
               ),
               leading: const Icon(Icons.hotel_rounded, color: Color(0xFF3A7AFE)),
               actions: const [SizedBox.shrink()],
             ),
-          if (appProvider.isVacation) const SizedBox(height: 14),
-          AppCard(
-            child: Row(
-              children: [
-                const Icon(Icons.wb_sunny_outlined, color: AppColors.warning),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    strings.text(
-                      'Chào buổi sáng. Xác nhận bạn đã xem để hệ thống ghi nhận tương tác sáng nay.',
-                      'Good morning. Confirm that you have seen this so the system can record your morning interaction.',
+            const SizedBox(height: 14),
+          ],
+          if (guardians.isNotEmpty)
+            AppCard(
+              color: const Color(0xFFFFFBF4),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_outlined, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      strings.text(
+                        'Liên hệ khẩn cấp: ${guardians.first.name}',
+                        'Emergency contact: ${guardians.first.name}',
+                      ),
+                      style: AppTextStyles.bodyStrong,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                TextButton(
-                  onPressed: appProvider.isBusy
-                      ? null
-                      : () async {
-                          try {
-                            await context.read<AppProvider>().acknowledgeReminder();
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Da ghi nhan tuong tac buoi sang.')),
-                            );
-                          } catch (error) {
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.toString())),
-                            );
-                          }
-                        },
-                  child: Text(strings.text('Đã xem', 'Seen')),
-                ),
-              ],
+                  Text(guardians.first.phone, style: AppTextStyles.caption),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 14),
-          AppCard(
-            color: const Color(0xFFFFFBF4),
-            child: Row(
-              children: [
-                const Icon(Icons.phone_outlined, color: AppColors.primary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    user == null
-                        ? strings.text('Chưa có hồ sơ', 'No profile yet')
-                        : strings.text(
-                            'Liên hệ khẩn cấp: ${user.emergencyContacts.isEmpty ? 'chưa cập nhật' : user.emergencyContacts.first.name}',
-                            'Emergency contact: ${user.emergencyContacts.isEmpty ? 'not set' : user.emergencyContacts.first.name}',
-                          ),
-                    style: AppTextStyles.bodyStrong,
-                  ),
-                ),
-                if (user != null && user.emergencyContacts.isNotEmpty)
-                  Text(
-                    user.emergencyContacts.first.phone,
-                    style: AppTextStyles.caption,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 22),
-          GestureDetector(
-            onTap: appProvider.isBusy
-                ? null
-                : () => _openMoodPrompt(),
-            onTapDown: (_) => _startHoldSos(),
-            onTapUp: (_) => _cancelHoldSos(),
-            onTapCancel: _cancelHoldSos,
-            child: Center(
-              child: Container(
-                width: 290,
-                height: 290,
-                decoration: BoxDecoration(
-                  gradient: safe ? AppColors.safeGradient : AppColors.dangerGradient,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.primarySoft, width: 2),
-                  boxShadow: safe ? AppShadows.safe : AppShadows.danger,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (appProvider.isBusy)
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          if (guardians.isNotEmpty) const SizedBox(height: 22),
+          Center(
+            child: SizedBox(
+              width: 340,
+              height: 340,
+              child: AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      for (final ring in [0.0, 0.18, 0.36, 0.54])
+                        _PulseRing(
+                          progress: (_pulseController.value + ring) % 1,
+                          color: _statusStripColor(state),
                         ),
-                      )
-                    else
-                      Icon(
-                        safe ? Icons.check_rounded : Icons.priority_high_rounded,
-                        size: 78,
-                        color: Colors.white,
+                      Transform.scale(scale: pulse, child: child),
+                      SizedBox(
+                        width: 292,
+                        height: 292,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _handleCircleTap,
+                          onTapDown: (_) => _startHoldSos(),
+                          onTapUp: (_) => _cancelHoldSos(),
+                          onTapCancel: _cancelHoldSos,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    const SizedBox(height: 10),
-                    Text(
-                      safe
-                          ? strings.text('Đã điểm danh', 'Checked in')
-                          : strings.text('Cần check-in', 'Check-in needed'),
-                      style: AppTextStyles.h3.copyWith(color: Colors.white),
+                    ],
+                  );
+                },
+                child: Container(
+                  width: 292,
+                  height: 292,
+                  decoration: BoxDecoration(
+                    gradient: state.gradient,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      width: 6,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      safe
-                          ? strings.text(
-                              'Chạm để gửi vị trí và xác nhận an toàn',
-                              'Tap to share your location and confirm you are safe',
-                            )
-                          : strings.text(
-                              'Mốc thời gian đang đến gần, hãy xác nhận bạn vẫn ổn',
-                              'The deadline is getting close, please confirm you are okay',
-                            ),
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        color: Colors.white.withValues(alpha: 0.92),
+                    boxShadow: state.shadow,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (appProvider.isBusy)
+                        const SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      else
+                        Icon(
+                          state.icon,
+                          size: 68,
+                          color: Colors.white,
+                        ),
+                      const SizedBox(height: 12),
+                      Text(
+                        state.title(strings),
+                        style: AppTextStyles.h2.copyWith(
+                          color: Colors.white,
+                          fontSize: 22,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Text(
+                        state.subtitle(strings),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          color: Colors.white.withValues(alpha: 0.94),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 22),
+          Center(
+            child: Text(
+              strings.text('CÒN LẠI', 'REMAINING'),
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: Text(
+              appProvider.isVacation ? '--:--:--' : _formatDuration(remaining),
+              style: AppTextStyles.timer.copyWith(fontSize: 54),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(
+              strings.text(
+                'Lần điểm danh cuối: ${_formatTime(lastCheckIn)}${mood == null ? '' : ' · Tâm trạng ${_emojiForMood(mood)}'}',
+                'Last check-in: ${_formatTime(lastCheckIn)}${mood == null ? '' : ' · Mood ${_emojiForMood(mood)}'}',
+              ),
+              style: AppTextStyles.bodyLarge.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          AppCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            color: _statusStripColor(state).withValues(alpha: 0.12),
+            border: Border.all(
+              color: _statusStripColor(state).withValues(alpha: 0.24),
+            ),
+            shadow: const [],
+            child: Row(
+              children: [
+                Icon(
+                  mood == null ? Icons.info_outline_rounded : _moodIcon(mood),
+                  color: _statusStripColor(state),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    mood == null
+                        ? strings.text(
+                            'Chạm nút lớn để điểm danh và chọn cảm xúc hôm nay.',
+                            'Tap the main button to check in and choose today’s mood.',
+                          )
+                        : strings.text(
+                            'Tâm trạng hiện tại: ${strings.moodLabel(mood)}',
+                            'Current mood: ${strings.moodLabel(mood)}',
+                          ),
+                    style: AppTextStyles.bodyStrong.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 22),
           if (guardians.isNotEmpty)
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(strings.text('Người bảo hộ đang online', 'Guardians online'), style: AppTextStyles.title),
+                  Text(
+                    strings.text('Người bảo hộ đang online', 'Guardians online'),
+                    style: AppTextStyles.title,
+                  ),
                   const SizedBox(height: 12),
                   for (final guardian in guardians) ...[
                     Row(
@@ -355,14 +438,18 @@ class _HomePageState extends State<HomePage> {
                             ],
                           ),
                         ),
-                        const Icon(Icons.battery_5_bar_rounded, size: 18, color: AppColors.primary),
-                        const SizedBox(width: 4),
-                        Text(
-                          _guardianBattery(guardian.phone),
-                          style: AppTextStyles.caption,
+                        const Icon(
+                          Icons.battery_5_bar_rounded,
+                          size: 18,
+                          color: AppColors.primary,
                         ),
+                        const SizedBox(width: 4),
+                        Text(_guardianBattery(guardian.phone), style: AppTextStyles.caption),
                         const SizedBox(width: 8),
-                        const CircleAvatar(radius: 5, backgroundColor: AppColors.success),
+                        const CircleAvatar(
+                          radius: 5,
+                          backgroundColor: AppColors.success,
+                        ),
                       ],
                     ),
                     if (guardian != guardians.last) const SizedBox(height: 10),
@@ -370,48 +457,21 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-          const SizedBox(height: 28),
-          Center(
-            child: Text(
-              strings.text('CÒN LẠI', 'REMAINING'),
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          if (guardians.isNotEmpty) const SizedBox(height: 24),
+          Text(
+            strings.text('Trạng thái nhanh', 'Quick status'),
+            style: AppTextStyles.title,
           ),
-          const SizedBox(height: 6),
-          Center(
-            child: Text(
-              _formatDuration(remaining),
-              style: AppTextStyles.timer.copyWith(fontSize: 54),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: Text(
-              strings.text(
-                'Lần check-in cuối: ${_formatTime(lastCheckIn)}',
-                'Last check-in: ${_formatTime(lastCheckIn)}',
-              ),
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(strings.text('Trạng thái nhanh', 'Quick status'), style: AppTextStyles.title),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: Mood.values
                 .map(
-                  (mood) => ActionChip(
-                    label: Text(_moodText(mood)),
-                    avatar: Icon(_moodIcon(mood), size: 18),
-                    onPressed: () => _shareMood(mood),
+                  (moodValue) => ActionChip(
+                    label: Text(strings.moodLabel(moodValue)),
+                    avatar: Text(_emojiForMood(moodValue)),
+                    onPressed: () => _shareMood(moodValue),
                   ),
                 )
                 .toList(),
@@ -423,7 +483,7 @@ class _HomePageState extends State<HomePage> {
                 child: _StatCard(
                   icon: Icons.monitor_heart_outlined,
                   label: strings.text('TRẠNG THÁI', 'STATUS'),
-                  value: user?.currentStatus ?? 'SAFE',
+                  value: _statusLabel(strings, state),
                 ),
               ),
               const SizedBox(width: 12),
@@ -443,82 +503,11 @@ class _HomePageState extends State<HomePage> {
                   label: strings.text('THUỐC', 'MEDS'),
                   value: appProvider.automation.pillReminder
                       ? appProvider.automation.pillTime
-                      : 'Tat',
+                      : strings.text('Tắt', 'Off'),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          if (user?.lastKnownLocation != null)
-            AppCard(
-              child: Row(
-                children: [
-                  const Icon(Icons.my_location_rounded, color: AppColors.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      strings.text(
-                        'Vị trí cuối: ${user!.lastKnownLocation!.lat.toStringAsFixed(5)}, ${user.lastKnownLocation!.lng.toStringAsFixed(5)}',
-                        'Last location: ${user!.lastKnownLocation!.lat.toStringAsFixed(5)}, ${user.lastKnownLocation!.lng.toStringAsFixed(5)}',
-                      ),
-                      style: AppTextStyles.bodyStrong,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 14),
-          if (appProvider.alertPolicy != null)
-            AppCard(
-              child: Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      strings.text(
-                        'Chính sách: nhắc trước ${appProvider.alertPolicy!.level1Minutes}p, báo động sau ${appProvider.alertPolicy!.level2Minutes}p, SOS sau ${appProvider.alertPolicy!.level3Minutes}p.',
-                        'Policy: remind at ${appProvider.alertPolicy!.level1Minutes}m, alarm after ${appProvider.alertPolicy!.level2Minutes}m, SOS after ${appProvider.alertPolicy!.level3Minutes}m.',
-                      ),
-                      style: AppTextStyles.bodyStrong,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 14),
-          if (appProvider.interactionEvents.isNotEmpty) ...[
-            Text(strings.text('Lịch sử tương tác', 'Interaction history'), style: AppTextStyles.title),
-            const SizedBox(height: 10),
-            for (final item in appProvider.interactionEvents.take(4)) ...[
-              AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bolt_rounded, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            appProvider.formatInteractionType(item.type),
-                            style: AppTextStyles.bodyStrong,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatEventTime(item.createdAt),
-                            style: AppTextStyles.caption,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ],
         ],
       ),
     );
@@ -526,45 +515,76 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openMoodPrompt() async {
     final strings = AppStrings.of(context);
-    final selected = await showModalBottomSheet<Mood>(
+    final selected = await showDialog<Mood?>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(strings.text('Bạn đang thế nào?', 'How are you feeling?'), style: AppTextStyles.h3),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _MoodChoice(mood: Mood.happy, label: strings.text('Khỏe', 'Good')),
-                  _MoodChoice(mood: Mood.calm, label: strings.text('Bình thường', 'Normal')),
-                  _MoodChoice(mood: Mood.sick, label: strings.text('Mệt', 'Tired')),
-                ].map((item) {
-                  return ChoiceChip(
-                    label: Text(item.label),
-                    avatar: Text(item.emoji, style: const TextStyle(fontSize: 18)),
-                    selected: false,
-                    onSelected: (_) => Navigator.pop(context, item.mood),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-            ],
+      barrierColor: Colors.black.withValues(alpha: 0.28),
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  strings.text('Hôm nay bạn cảm thấy thế nào?', 'How are you feeling today?'),
+                  style: AppTextStyles.h3.copyWith(fontSize: 20),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  strings.text(
+                    'Người bảo hộ sẽ thấy tâm trạng của bạn',
+                    'Your guardians will see your current mood',
+                  ),
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MoodOption(
+                        emoji: '😊',
+                        label: strings.text('Vui vẻ', 'Happy'),
+                        onTap: () => Navigator.pop(dialogContext, Mood.happy),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MoodOption(
+                        emoji: '😐',
+                        label: strings.text('Bình thường', 'Normal'),
+                        onTap: () => Navigator.pop(dialogContext, Mood.calm),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MoodOption(
+                        emoji: '🤒',
+                        label: strings.text('Mệt / Ốm', 'Tired / Sick'),
+                        onTap: () => Navigator.pop(dialogContext, Mood.sick),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, null),
+                  child: Text(strings.text('Bỏ qua', 'Skip')),
+                ),
+              ],
+            ),
           ),
         );
       },
     );
 
-    if (selected != null) {
-      await _handleCheckIn(selected);
-    }
+    await _handleCheckIn(selected);
   }
 
   Future<void> _scheduleDemoPush() async {
@@ -577,76 +597,122 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) {
         return;
       }
-      final opened = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => Dialog(
-          backgroundColor: Colors.transparent,
-          child: GestureDetector(
-            onTap: () => Navigator.pop(dialogContext, true),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: AppColors.dangerGradient,
-                borderRadius: BorderRadius.circular(AppRadius.xl),
-                boxShadow: AppShadows.danger,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.notifications_active_rounded, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SOS gan ban · 800m',
-                          style: AppTextStyles.bodyStrong.copyWith(color: Colors.white),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Cham de mo Community Radar va xem yeu cau ho tro khan.',
-                          style: AppTextStyles.body.copyWith(color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+      TopToast.show(
+        context,
+        message: '🚨 ${AppStrings.of(context).text('SOS gần bạn · 800m', 'Nearby SOS · 800m')}',
+        icon: Icons.notifications_active_rounded,
+        duration: const Duration(seconds: 3),
       );
       await prefs.setBool(_demoPushKey, true);
-      if (opened == true && mounted) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => const CommunityRadarPage(),
-          ),
-        );
+      if (!mounted) {
+        return;
       }
+      await Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (_) => const CommunityRadarPage()),
+      );
     });
   }
 
-  String _formatDate(DateTime date) {
-    const weekdays = [
-      'Thu hai',
-      'Thu ba',
-      'Thu tu',
-      'Thu nam',
-      'Thu sau',
-      'Thu bay',
-      'Chu nhat',
+  _CheckinButtonState _buttonState(Duration remaining, bool isVacation) {
+    if (isVacation) {
+      return _CheckinButtonState(
+        gradient: AppColors.safeGradient,
+        shadow: AppShadows.safe,
+        icon: Icons.hotel_rounded,
+        pulseStrength: 0.01,
+        title: (strings) => strings.text('Đang nghỉ phép', 'Vacation mode'),
+        subtitle: (strings) => strings.text(
+          'Điểm danh tạm dừng',
+          'Check-in paused',
+        ),
+      );
+    }
+    if (remaining.isNegative) {
+      return _CheckinButtonState(
+        gradient: AppColors.dangerGradient,
+        shadow: AppShadows.danger,
+        icon: Icons.priority_high_rounded,
+        pulseStrength: 0.035,
+        title: (strings) => strings.text('Cần điểm danh', 'Check-in needed'),
+        subtitle: (strings) => strings.text(
+          'Bạn đã quá hạn check-in',
+          'You are overdue',
+        ),
+      );
+    }
+    if (remaining.inHours < 1) {
+      return _CheckinButtonState(
+        gradient: AppColors.warnGradient,
+        shadow: AppShadows.warn,
+        icon: Icons.schedule_rounded,
+        pulseStrength: 0.025,
+        title: (strings) => strings.text('Sắp đến hạn', 'Almost due'),
+        subtitle: (strings) => strings.text(
+          'Chạm để xác nhận bạn vẫn ổn',
+          'Tap to confirm you are safe',
+        ),
+      );
+    }
+    return _CheckinButtonState(
+      gradient: AppColors.safeGradient,
+      shadow: AppShadows.safe,
+      icon: Icons.check_rounded,
+      pulseStrength: 0.015,
+      title: (strings) => strings.text('✓ Đã điểm danh', '✓ Checked in'),
+      subtitle: (strings) => strings.text(
+        'Bạn đang an toàn',
+        'You are safe',
+      ),
+    );
+  }
+
+  Color _statusStripColor(_CheckinButtonState state) {
+    if (state.gradient == AppColors.dangerGradient) {
+      return AppColors.destructive;
+    }
+    if (state.gradient == AppColors.warnGradient) {
+      return AppColors.warning;
+    }
+    return AppColors.primary;
+  }
+
+  String _statusLabel(AppStrings strings, _CheckinButtonState state) {
+    if (state.gradient == AppColors.dangerGradient) {
+      return strings.text('Quá hạn', 'Overdue');
+    }
+    if (state.gradient == AppColors.warnGradient) {
+      return strings.text('Cận hạn', 'Due soon');
+    }
+    return strings.text('An toàn', 'Safe');
+  }
+
+  String _formatDate(DateTime date, AppStrings strings) {
+    const viWeekdays = [
+      'Thứ hai',
+      'Thứ ba',
+      'Thứ tư',
+      'Thứ năm',
+      'Thứ sáu',
+      'Thứ bảy',
+      'Chủ nhật',
     ];
-    return '${weekdays[date.weekday - 1]}, ${date.day}/${date.month}/${date.year}';
+    const enWeekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final weekday = strings.isVietnamese
+        ? viWeekdays[date.weekday - 1]
+        : enWeekdays[date.weekday - 1];
+    return strings.text(
+      '$weekday, ${date.day}/${date.month}/${date.year}',
+      '$weekday, ${date.month}/${date.day}/${date.year}',
+    );
   }
 
   String _formatTime(DateTime date) {
@@ -665,39 +731,31 @@ class _HomePageState extends State<HomePage> {
     return '$hours:$minutes:$seconds';
   }
 
-  String _formatEventTime(DateTime value) {
-    final hour = value.hour.toString().padLeft(2, '0');
-    final minute = value.minute.toString().padLeft(2, '0');
-    final day = value.day.toString().padLeft(2, '0');
-    final month = value.month.toString().padLeft(2, '0');
-    return '$hour:$minute - $day/$month';
-  }
-
-  String _moodText(Mood mood) {
+  String _emojiForMood(Mood mood) {
     switch (mood) {
-      case Mood.calm:
-        return 'Binh an';
       case Mood.happy:
-        return 'Tich cuc';
-      case Mood.tired:
-        return 'Hoi met';
+        return '😊';
+      case Mood.calm:
+        return '😐';
       case Mood.sick:
-        return 'Can luu y';
+        return '🤒';
+      case Mood.tired:
+        return '😴';
       case Mood.focused:
-        return 'Dang tap trung';
+        return '🧠';
     }
   }
 
   IconData _moodIcon(Mood mood) {
     switch (mood) {
       case Mood.calm:
-        return Icons.favorite_border_rounded;
+        return Icons.sentiment_neutral_rounded;
       case Mood.happy:
         return Icons.sentiment_satisfied_alt_rounded;
       case Mood.tired:
         return Icons.nightlight_round;
       case Mood.sick:
-        return Icons.medication_outlined;
+        return Icons.healing_rounded;
       case Mood.focused:
         return Icons.psychology_alt_outlined;
     }
@@ -709,27 +767,45 @@ class _HomePageState extends State<HomePage> {
       return '67%';
     }
     final last = int.tryParse(digits.substring(digits.length - 1)) ?? 5;
-    return '${35 + (last * 6).clamp(0, 60)}%';
+    return '${35 + math.min(last * 6, 60)}%';
   }
 }
 
-class _MoodChoice {
-  const _MoodChoice({
-    required this.mood,
+class _MoodOption extends StatelessWidget {
+  const _MoodOption({
+    required this.emoji,
     required this.label,
+    required this.onTap,
   });
 
-  final Mood mood;
+  final String emoji;
   final String label;
+  final VoidCallback onTap;
 
-  String get emoji {
-    return switch (mood) {
-      Mood.happy => '😊',
-      Mood.calm => '😐',
-      Mood.sick => '🤒',
-      Mood.tired => '😴',
-      Mood.focused => '🧠',
-    };
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.secondary,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 30)),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyStrong,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -771,4 +847,53 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PulseRing extends StatelessWidget {
+  const _PulseRing({
+    required this.progress,
+    required this.color,
+  });
+
+  final double progress;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = 0.92 + (progress * 0.42);
+    final opacity = (1 - progress).clamp(0.0, 1.0) * 0.22;
+    final size = 292.0 * scale;
+
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: color.withValues(alpha: opacity),
+            width: 10 - (progress * 5),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckinButtonState {
+  const _CheckinButtonState({
+    required this.gradient,
+    required this.shadow,
+    required this.icon,
+    required this.pulseStrength,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final LinearGradient gradient;
+  final List<BoxShadow> shadow;
+  final IconData icon;
+  final double pulseStrength;
+  final String Function(AppStrings strings) title;
+  final String Function(AppStrings strings) subtitle;
 }

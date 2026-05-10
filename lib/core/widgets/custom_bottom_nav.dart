@@ -82,25 +82,31 @@ class CustomBottomNav extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        AnimatedContainer(
+                        AnimatedScale(
+                          scale: isActive ? 0.95 : 1,
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOut,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? AppColors.primarySoft
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Icon(
-                            isActive ? item.activeIcon : item.icon,
-                            size: 20,
-                            color: isActive
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? AppColors.primarySoft
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(18),
+                              boxShadow: isActive ? AppShadows.card : const [],
+                            ),
+                            child: Icon(
+                              isActive ? item.activeIcon : item.icon,
+                              size: 20,
+                              color: isActive
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 3),

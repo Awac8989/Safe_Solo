@@ -18,12 +18,15 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
-      child: SafeArea(
-        top: safeTop,
-        bottom: safeBottom,
-        child: Padding(padding: padding, child: child),
+    return Material(
+      color: Colors.transparent,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        child: SafeArea(
+          top: safeTop,
+          bottom: safeBottom,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }

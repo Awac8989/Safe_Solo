@@ -40,7 +40,7 @@ class AppStrings {
       case BottomNavLabel.home:
         return text('Điểm danh', 'Check-in');
       case BottomNavLabel.circle:
-        return text('Vòng tròn', 'Circle');
+        return text('Circle', 'Circle');
       case BottomNavLabel.messages:
         return text('Tin nhắn', 'Messages');
       case BottomNavLabel.heroes:

@@ -49,7 +49,7 @@ class ApiService {
             {
               'name': emergencyName,
               'phone': emergencyPhone,
-              'relation': 'Nguoi than',
+              'relation': 'Người thân',
             }
           ],
         }),
@@ -408,11 +408,11 @@ class ApiService {
       return await future.timeout(_timeout);
     } on TimeoutException {
       throw Exception(
-        'Khong ket noi duoc backend. Hay bat backend va kiem tra API_BASE_URL (${AppConstants.backendBaseUrl}).',
+        'Không kết nối được backend. Hãy bật backend và kiểm tra API_BASE_URL (${AppConstants.backendBaseUrl}).',
       );
     } on http.ClientException {
       throw Exception(
-        'Khong ket noi duoc may chu. Vui long kiem tra mang hoac API_BASE_URL (${AppConstants.backendBaseUrl}).',
+        'Không kết nối được máy chủ. Vui lòng kiểm tra mạng hoặc API_BASE_URL (${AppConstants.backendBaseUrl}).',
       );
     }
   }
