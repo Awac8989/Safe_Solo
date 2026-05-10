@@ -57,7 +57,9 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) {
       final start = _startTime;
-      if (start == null) return;
+      if (start == null) {
+        return;
+      }
       setState(() {
         _seconds = DateTime.now().difference(start).inMilliseconds / 1000;
       });
@@ -69,7 +71,9 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   }
 
   void _move(Offset globalPosition) {
-    if (!_recording) return;
+    if (!_recording) {
+      return;
+    }
     setState(() {
       _cancelHover = (_startX - globalPosition.dx) > widget.cancelThreshold;
     });
@@ -77,7 +81,9 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   }
 
   void _end() {
-    if (!_recording) return;
+    if (!_recording) {
+      return;
+    }
 
     final duration = _seconds;
     _ticker?.cancel();
@@ -102,62 +108,65 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
     if (overlay == null) {
       return;
     }
+
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        return Material(
-          color: Colors.transparent,
-          child: Container(
-            color: AppColors.background.withValues(alpha: 0.95),
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    color: _cancelHover
-                        ? const Color(0xFFE7EFEB)
-                        : AppColors.destructive,
-                    shape: BoxShape.circle,
-                    boxShadow: _cancelHover ? AppShadows.card : AppShadows.danger,
+        return IgnorePointer(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              color: AppColors.background.withValues(alpha: 0.95),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 120),
+                    width: 160,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: _cancelHover
+                          ? const Color(0xFFE7EFEB)
+                          : AppColors.destructive,
+                      shape: BoxShape.circle,
+                      boxShadow: _cancelHover ? AppShadows.card : AppShadows.danger,
+                    ),
+                    child: Icon(
+                      _cancelHover ? Icons.delete_rounded : Icons.mic_rounded,
+                      size: 54,
+                      color: _cancelHover
+                          ? AppColors.destructive
+                          : AppColors.primaryForeground,
+                    ),
                   ),
-                  child: Icon(
-                    _cancelHover ? Icons.delete_rounded : Icons.mic_rounded,
-                    size: 54,
-                    color: _cancelHover
-                        ? AppColors.destructive
-                        : AppColors.primaryForeground,
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: 180,
+                    child: VoiceWaveform(
+                      bars: 28,
+                      progress: (_seconds % 4) / 4,
+                      height: 28,
+                      color: _cancelHover ? AppColors.textMuted : AppColors.destructive,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: 180,
-                  child: VoiceWaveform(
-                    bars: 28,
-                    progress: (_seconds % 4) / 4,
-                    height: 28,
-                    color: _cancelHover ? AppColors.textMuted : AppColors.destructive,
+                  const SizedBox(height: 16),
+                  Text(
+                    '${_seconds.toStringAsFixed(1)}s',
+                    style: AppTextStyles.h2.copyWith(
+                      color: _cancelHover
+                          ? AppColors.textMuted
+                          : AppColors.destructive,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '${_seconds.toStringAsFixed(1)}s',
-                  style: AppTextStyles.h2.copyWith(
-                    color: _cancelHover
-                        ? AppColors.textMuted
-                        : AppColors.destructive,
+                  const SizedBox(height: 8),
+                  Text(
+                    _cancelHover ? 'Thả để hủy' : 'Thả để gửi · Vuốt trái để hủy',
+                    style: AppTextStyles.bodyStrong.copyWith(
+                      color: AppColors.destructive,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _cancelHover ? 'Tha de huy' : 'Tha de gui · Vuot trai de huy',
-                  style: AppTextStyles.bodyStrong.copyWith(
-                    color: AppColors.destructive,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

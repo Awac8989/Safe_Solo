@@ -197,7 +197,12 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
   }
 
   Future<void> _send(BuildContext context) async {
-    await context.read<AppProvider>().sendQuickMessage(widget.threadId, _controller.text);
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    await context.read<AppProvider>().sendQuickMessage(widget.threadId, text);
     _controller.clear();
   }
 
@@ -380,6 +385,8 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   controller: _controller,
                   minLines: 1,
                   maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _send(context),
                   decoration: const InputDecoration(
                     hintText: 'Nhập tin nhắn phản hồi...',
                     filled: true,

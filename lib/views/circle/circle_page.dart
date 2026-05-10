@@ -41,12 +41,27 @@ class _CirclePageState extends State<CirclePage> {
                   const SizedBox(height: 16),
                   DropdownButtonFormField<Mood>(
                     initialValue: selectedMood,
-                    decoration: const InputDecoration(labelText: 'Cam xuc'),
+                    dropdownColor: Colors.white,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    iconEnabledColor: AppColors.textPrimary,
+                    style: AppTextStyles.bodyLarge.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Cam xuc',
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
                     items: Mood.values
                         .map(
                           (mood) => DropdownMenuItem(
                             value: mood,
-                            child: Text(_moodLabel(mood)),
+                            child: Text(
+                              _moodLabel(mood),
+                              style: AppTextStyles.bodyLarge.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                           ),
                         )
                         .toList(),

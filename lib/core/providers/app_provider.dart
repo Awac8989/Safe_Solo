@@ -822,14 +822,14 @@ class AppProvider with ChangeNotifier {
 
   Future<void> completeOnboarding() async {
     _onboarded = true;
-    await _saveToStorage();
     notifyListeners();
+    await _saveToStorage();
   }
 
   Future<void> grantPermissions() async {
     _permissionsGranted = true;
-    await _saveToStorage();
     notifyListeners();
+    await _saveToStorage();
   }
 
   Future<void> authenticate({
@@ -899,8 +899,8 @@ class AppProvider with ChangeNotifier {
     _seedDemoCollections();
     _updateBadges();
     await _evaluateSafetyAutomation();
-    await _saveToStorage();
     notifyListeners();
+    await _saveToStorage();
   }
 
   Future<void> signOut() async {
@@ -1401,13 +1401,17 @@ class AppProvider with ChangeNotifier {
     if (message.isEmpty) {
       return;
     }
+    if (!_chatThreads.any((thread) => thread.id == threadId)) {
+      return;
+    }
 
     final sender = _user?.name ?? 'Ban';
+    final now = DateTime.now();
     final outgoing = ChatMessage(
-      id: 'msg-${DateTime.now().microsecondsSinceEpoch}',
+      id: 'msg-${now.microsecondsSinceEpoch}',
       sender: sender,
       content: message,
-      createdAt: DateTime.now(),
+      createdAt: now,
       mine: true,
     );
 
@@ -1415,7 +1419,7 @@ class AppProvider with ChangeNotifier {
         .map((thread) => thread.id == threadId
             ? thread.copyWith(
                 preview: message,
-                updatedAt: DateTime.now(),
+                updatedAt: now,
                 unread: 0,
                 messages: [...thread.messages, outgoing],
               )
@@ -1423,21 +1427,25 @@ class AppProvider with ChangeNotifier {
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    await _saveToStorage();
     notifyListeners();
+    await _saveToStorage();
   }
 
   Future<void> sendVoiceMessage(String threadId, int seconds) async {
     if (seconds <= 0) {
       return;
     }
+    if (!_chatThreads.any((thread) => thread.id == threadId)) {
+      return;
+    }
 
     final sender = _user?.name ?? 'Ban';
+    final now = DateTime.now();
     final outgoing = ChatMessage(
-      id: 'voice-${DateTime.now().microsecondsSinceEpoch}',
+      id: 'voice-${now.microsecondsSinceEpoch}',
       sender: sender,
       content: 'Tin nhắn thoại',
-      createdAt: DateTime.now(),
+      createdAt: now,
       mine: true,
       voiceSeconds: seconds,
     );
@@ -1447,7 +1455,7 @@ class AppProvider with ChangeNotifier {
         .map((thread) => thread.id == threadId
             ? thread.copyWith(
                 preview: preview,
-                updatedAt: DateTime.now(),
+                updatedAt: now,
                 unread: 0,
                 messages: [...thread.messages, outgoing],
               )
@@ -1455,8 +1463,8 @@ class AppProvider with ChangeNotifier {
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    await _saveToStorage();
     notifyListeners();
+    await _saveToStorage();
   }
 
   Future<void> markThreadRead(String threadId) async {
