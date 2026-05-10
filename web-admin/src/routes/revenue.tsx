@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { Building2, Download, TrendingUp, Wallet } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { TrendingUp, Wallet, Building2 } from "lucide-react";
 import { fetchRevenueSummary } from "@/lib/api";
+import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/revenue")({
   head: () => ({ meta: [{ title: "Doanh thu và đối tác - SafeSolo Admin" }] }),
@@ -24,10 +25,51 @@ function Page() {
     .map((value, index) => `${(index / Math.max(sparkline.length - 1, 1)) * 100},${100 - (value / max) * 100}`)
     .join(" ");
 
+  const handleExport = () => {
+    exportWorkbook("safesolo-admin-revenue.xlsx", [
+      {
+        name: "Tong quan",
+        rows: data
+          ? [{
+              Doanh_thu_AdMob_30_ngay: data.cards.admobRevenue30d,
+              Hoa_hong_chua_thanh_toan: data.cards.unpaidCommissions,
+              Doi_tac_dang_hoat_dong: data.cards.activePartners,
+            }]
+          : [],
+      },
+      {
+        name: "Doi tac",
+        rows: partners.map((partner) => ({
+          Ten: partner.name,
+          Khu_vuc: partner.region,
+          Luot_dieu_phoi: partner.dispatches,
+          Ty_le: partner.rate,
+          So_du_chua_thanh_toan: partner.balance,
+        })),
+      },
+      {
+        name: "Sparkline",
+        rows: sparkline.map((value, index) => ({
+          Ngay: index + 1,
+          USD: value,
+        })),
+      },
+    ]);
+  };
+
   return (
     <>
       <Topbar title="Doanh thu và đối tác" subtitle="Thu nhập AdMob · hoa hồng điều phối y tế" />
       <div className="space-y-3 p-3">
+        <div className="flex justify-end">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Download className="h-4 w-4" />
+            Xuất Excel
+          </button>
+        </div>
         <div className="grid gap-3 md:grid-cols-3">
           {[
             {

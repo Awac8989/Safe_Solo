@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Download, Search } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { Search, Download } from "lucide-react";
 import { fetchAuditLogs } from "@/lib/api";
+import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/audit")({
   head: () => ({ meta: [{ title: "Nhật ký hệ thống - SafeSolo Admin" }] }),
@@ -29,6 +30,24 @@ function Page() {
   });
 
   const logs = logsQuery.data?.data ?? [];
+
+  const handleExport = () => {
+    exportWorkbook("safesolo-admin-audit.xlsx", [
+      {
+        name: "Audit",
+        rows: logs.map((log) => ({
+          ID: log.id,
+          Thoi_gian: log.ts,
+          Nguoi_thuc_hien: log.actor,
+          Hanh_dong: log.action,
+          Doi_tuong: log.target,
+          Danh_muc: log.category,
+          Hash: log.hash,
+          Tone: log.tone,
+        })),
+      },
+    ]);
+  };
 
   return (
     <>
@@ -55,8 +74,11 @@ function Page() {
               {item.label}
             </button>
           ))}
-          <button className="ml-auto inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent">
-            <Download className="h-3.5 w-3.5" /> Xuất CSV
+          <button
+            onClick={handleExport}
+            className="ml-auto inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent"
+          >
+            <Download className="h-3.5 w-3.5" /> Xuất Excel
           </button>
         </div>
 

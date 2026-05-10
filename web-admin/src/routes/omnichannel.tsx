@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Download, Mail, MessageSquare, Phone, Send, Smartphone } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { MessageSquare, Send, Mail, Phone, Smartphone, ArrowRight } from "lucide-react";
 import { fetchChannelHealth } from "@/lib/api";
+import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/omnichannel")({
   head: () => ({ meta: [{ title: "Kênh liên lạc - SafeSolo Admin" }] }),
@@ -38,10 +39,44 @@ function Page() {
   const channels = channelsQuery.data?.data.channels ?? [];
   const policy = channelsQuery.data?.data.policy ?? [];
 
+  const handleExport = () => {
+    exportWorkbook("safesolo-admin-channels.xlsx", [
+      {
+        name: "Kenh",
+        rows: channels.map((channel) => ({
+          Ten: channelLabelMap[channel.name] || channel.name,
+          Vendor: channel.vendor,
+          Han_muc: channel.quota,
+          Thanh_cong_phan_tram: channel.success,
+          On_dinh: channel.ok ? "Co" : "Khong",
+          Thu_tu_du_phong: channel.fallbackOrder,
+          Da_gui: channel.sent,
+        })),
+      },
+      {
+        name: "Policy",
+        rows: policy.map((step) => ({
+          Buoc: step.step,
+          Kenh: channelLabelMap[step.name] || step.name,
+          Tone: step.tone,
+        })),
+      },
+    ]);
+  };
+
   return (
     <>
       <Topbar title="Kênh liên lạc" subtitle="Sức khỏe hệ thống · định tuyến gửi thông điệp" />
       <div className="space-y-3 p-3">
+        <div className="flex justify-end">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Download className="h-4 w-4" />
+            Xuất Excel
+          </button>
+        </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {channels.map((channel) => {
             const Icon = iconMap[channel.name as keyof typeof iconMap] || Smartphone;

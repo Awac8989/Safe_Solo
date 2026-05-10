@@ -1,14 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Shield, Phone, Clock3, MapPinned } from "lucide-react";
+import { Search, Shield, Phone, Clock3, MapPinned, Download } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
 import { fetchAdminUsers, type AdminUser } from "@/lib/api";
+import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/users")({
   head: () => ({
-    meta: [{ title: "Nguoi dung ung dung - SafeSolo Admin" }],
+    meta: [{ title: "Người dùng ứng dụng - SafeSolo Admin" }],
   }),
   component: UsersPage,
 });
@@ -39,19 +40,47 @@ function UsersPage() {
     ?? filtered[0]
     ?? null;
 
+  const handleExport = () => {
+    exportWorkbook("safesolo-admin-users.xlsx", [
+      {
+        name: "Nguoi dung",
+        rows: filtered.map((user) => ({
+          ID: user.id,
+          "Ho ten": user.fullName,
+          Email: user.email,
+          "So dien thoai": user.phone,
+          Nguon: user.source,
+          Vai_tro: user.role,
+          Trang_thai: user.currentStatus,
+          "Chu ky check-in (phut)": user.timerIntervalMinutes,
+          "Quiet hours bat dau": user.quietHoursStart,
+          "Quiet hours ket thuc": user.quietHoursEnd,
+          "False alert grace (phut)": user.falseAlertGraceMinutes,
+          "Check-in cuoi": user.lastCheckInAt,
+          "Deadline tiep theo": user.nextCheckinDeadline,
+          "Cap nhat cuoi": user.updatedAt,
+          "Tao luc": user.createdAt,
+          "Guardian / lien he khan cap": user.emergencyContacts
+            .map((contact) => `${contact.name} - ${contact.relation} - ${contact.phone}`)
+            .join(" | "),
+        })),
+      },
+    ]);
+  };
+
   return (
     <>
       <Topbar
-        title="Nguoi dung ung dung"
-        subtitle="Du lieu nguoi dung SafeSolo dong bo tu backend app"
+        title="Người dùng ứng dụng"
+        subtitle="Dữ liệu người dùng SafeSolo đồng bộ từ backend app"
       />
       <div className="grid flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="flex flex-col gap-3 border-b border-border px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-sm font-semibold">Danh sach nguoi dung</h2>
+              <h2 className="text-sm font-semibold">Danh sách người dùng</h2>
               <p className="text-[11px] text-muted-foreground">
-                {filtered.length} / {users.length} nguoi dung hien co
+                {filtered.length} / {users.length} người dùng hiện có
               </p>
             </div>
             <label className="flex items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2 text-sm">
@@ -59,10 +88,17 @@ function UsersPage() {
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Tim theo ten, so dien thoai, trang thai"
+                placeholder="Tìm theo tên, số điện thoại, trạng thái"
                 className="w-72 bg-transparent outline-none placeholder:text-muted-foreground"
               />
             </label>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background/40 px-3 py-2 text-sm font-medium hover:bg-accent"
+            >
+              <Download className="h-4 w-4" />
+              Xuất Excel
+            </button>
           </div>
 
           {usersQuery.isLoading ? (

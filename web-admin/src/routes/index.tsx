@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Ambulance,
   BellRing,
+  Download,
   Droplet,
   HeartPulse,
   MapPin,
@@ -18,6 +19,7 @@ import {
 import { Tag } from "@/components/Badge";
 import { Topbar } from "@/components/Topbar";
 import { fetchAdminOverview, resolveIncident } from "@/lib/api";
+import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -104,10 +106,61 @@ function DispatchCenter() {
     [incidents],
   );
 
+  const handleExport = () => {
+    exportWorkbook("safesolo-admin-dispatch.xlsx", [
+      {
+        name: "Thong ke",
+        rows: stats
+          ? [{
+              Tong_nguoi_dung: stats.totalUsers,
+              Nguoi_dung_theo_doi: stats.monitoredUsers,
+              Su_co_dang_mo: stats.activeIncidents,
+              KYC_cho_duyet: stats.kycPending,
+              Heroes_xac_minh: stats.heroesVerified,
+              Canh_bao_hom_nay: stats.alertsToday,
+            }]
+          : [],
+      },
+      {
+        name: "Su co",
+        rows: incidents.map((incident) => ({
+          ID: incident.id,
+          Loai: formatIncidentType(incident.type),
+          Muc_do: incident.severity,
+          Trang_thai: incident.status,
+          Nguoi_gap_su_co: incident.name,
+          Tuoi: incident.age,
+          Nhom_mau: incident.blood,
+          Di_ung: incident.allergies,
+          Dia_chi: incident.address,
+          Quan_huyen: incident.district,
+          Thanh_pho: incident.city,
+          Kenh: incident.channel,
+          SDT_user: incident.phoneNumber,
+          Lien_he_khan_cap: incident.emergencyContactName,
+          SDT_lien_he: incident.emergencyContactPhone,
+          Thoi_gian_nhan: incident.receivedAt,
+          Ban_do_X: incident.x,
+          Ban_do_Y: incident.y,
+        })),
+      },
+    ]);
+  };
+
   return (
     <>
       <Topbar title="Trung tâm điều phối trực tiếp" subtitle="Luồng SOS thời gian thực · mạng SafeSolo" />
       <div className="space-y-3 p-3">
+        <div className="flex justify-end">
+          <button
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
+          >
+            <Download className="h-4 w-4" />
+            Xuất Excel
+          </button>
+        </div>
+
         {stats && (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard icon={Users} label="Tổng người dùng" value={String(stats.totalUsers)} tone="info" />

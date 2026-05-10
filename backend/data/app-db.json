@@ -1703,6 +1703,426 @@
         "encryptionEnabled": true
       },
       "createdAt": "2026-05-10T01:09:22.625Z"
+    },
+    {
+      "id": "alert_49a8091c-2e5f-4112-a440-b4344bb8c25b",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T02:09:53.356Z"
+      },
+      "createdAt": "2026-05-10T01:39:20.087Z"
+    },
+    {
+      "id": "alert_0d516400-0c6a-4533-ad5d-8dc648eb757d",
+      "userId": "acd2e3db-1aea-48c6-8e6d-29218ab68731",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T02:36:43.756Z"
+      },
+      "createdAt": "2026-05-10T02:06:20.326Z"
+    },
+    {
+      "id": "alert_0136b926-5629-48b3-a269-1a5ba881fb5e",
+      "userId": "2bc6b80a-c9e2-4c17-947d-5cbe5502577f",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T02:36:43.824Z"
+      },
+      "createdAt": "2026-05-10T02:06:20.348Z"
+    },
+    {
+      "id": "alert_8b7a47d7-46f5-4f1c-87bb-346f2cba6198",
+      "userId": "08fdd922-1799-46af-bd5f-5161f5dfb954",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T02:36:44.223Z"
+      },
+      "createdAt": "2026-05-10T02:06:20.366Z"
+    },
+    {
+      "id": "alert_738e0da6-b631-4e07-b04a-8a34d3685abf",
+      "userId": "35f923ae-7b38-4c4c-a7ec-93095b150994",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T02:36:44.258Z"
+      },
+      "createdAt": "2026-05-10T02:06:20.396Z"
+    },
+    {
+      "id": "alert_cc9fa2ee-ea12-4390-8a2f-447e52778298",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "LEVEL_2_ALARM",
+      "status": "WARNING_TRIGGERED",
+      "source": "SYSTEM",
+      "title": "Canh bao muc 2",
+      "message": "Nguoi dung da qua han check-in, da kich hoat canh bao",
+      "metadata": {
+        "overdueMinutes": 8
+      },
+      "createdAt": "2026-05-10T02:18:20.432Z"
+    },
+    {
+      "id": "alert_df375158-bde9-4b06-8ce6-02bf646504bb",
+      "userId": "b5dee95a-4811-47cd-a57f-6673ee228f0c",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "b8fb5c21-d181-447c-a9d1-bdc512f57e79",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.77,
+          "lng": 106.7,
+          "updatedAt": "2026-05-09T23:09:53.356Z"
+        }
+      },
+      "createdAt": "2026-05-10T02:28:20.527Z"
+    },
+    {
+      "id": "alert_1135cb12-c227-418a-8030-9ca03bd1d4f2",
+      "userId": "acd2e3db-1aea-48c6-8e6d-29218ab68731",
+      "level": "LEVEL_2_ALARM",
+      "status": "WARNING_TRIGGERED",
+      "source": "SYSTEM",
+      "title": "Canh bao muc 2",
+      "message": "Nguoi dung da qua han check-in, da kich hoat canh bao",
+      "metadata": {
+        "overdueMinutes": 7
+      },
+      "createdAt": "2026-05-10T02:44:20.811Z"
+    },
+    {
+      "id": "alert_1b3a6be1-82fa-4d26-9f35-5cf7efc5b1f2",
+      "userId": "08fdd922-1799-46af-bd5f-5161f5dfb954",
+      "level": "LEVEL_2_ALARM",
+      "status": "WARNING_TRIGGERED",
+      "source": "SYSTEM",
+      "title": "Canh bao muc 2",
+      "message": "Nguoi dung da qua han check-in, da kich hoat canh bao",
+      "metadata": {
+        "overdueMinutes": 7
+      },
+      "createdAt": "2026-05-10T02:44:20.820Z"
+    },
+    {
+      "id": "alert_79a98663-2c78-4a86-b3bd-8af3b8b007f1",
+      "userId": "2bc6b80a-c9e2-4c17-947d-5cbe5502577f",
+      "level": "LEVEL_2_ALARM",
+      "status": "WARNING_TRIGGERED",
+      "source": "SYSTEM",
+      "title": "Canh bao muc 2",
+      "message": "Nguoi dung da qua han check-in, da kich hoat canh bao",
+      "metadata": {
+        "overdueMinutes": 13
+      },
+      "createdAt": "2026-05-10T02:50:20.882Z"
+    },
+    {
+      "id": "alert_b268449a-d8e9-4758-8ef5-631b2709ae34",
+      "userId": "35f923ae-7b38-4c4c-a7ec-93095b150994",
+      "level": "LEVEL_2_ALARM",
+      "status": "WARNING_TRIGGERED",
+      "source": "SYSTEM",
+      "title": "Canh bao muc 2",
+      "message": "Nguoi dung da qua han check-in, da kich hoat canh bao",
+      "metadata": {
+        "overdueMinutes": 13
+      },
+      "createdAt": "2026-05-10T02:50:20.889Z"
+    },
+    {
+      "id": "alert_827cf5e6-7088-4a76-a74f-f4d7062391fe",
+      "userId": "acd2e3db-1aea-48c6-8e6d-29218ab68731",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "2d699f67-8bf2-4295-b624-3d9c05944e00",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.75,
+          "lng": 106.64,
+          "updatedAt": "2026-05-09T23:36:43.756Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.519Z"
+    },
+    {
+      "id": "alert_31c6e4e7-2e7c-44d6-a86e-fe964980dbfe",
+      "userId": "acd2e3db-1aea-48c6-8e6d-29218ab68731",
+      "level": "LEVEL_4_RESCUE_CALL",
+      "status": "RESCUE_CALL_QUEUED",
+      "source": "SYSTEM",
+      "title": "Kich hoat goi cuu ho",
+      "message": "Vuot nguong SOS, da dua vao hang doi auto-call",
+      "metadata": {
+        "overdueMinutes": 409,
+        "policy": {
+          "_id": "78bf1044-f756-4e83-8550-24eb6d674c41",
+          "userId": "acd2e3db-1aea-48c6-8e6d-29218ab68731",
+          "level1Minutes": 30,
+          "level2Minutes": 5,
+          "level3Minutes": 15,
+          "level4Enabled": true,
+          "createdAt": "2026-05-08T23:36:43.756Z",
+          "updatedAt": "2026-05-09T23:36:43.756Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.522Z"
+    },
+    {
+      "id": "alert_fb994ca7-4423-4049-92e2-16cdc03de449",
+      "userId": "2bc6b80a-c9e2-4c17-947d-5cbe5502577f",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "720ff5e8-afcc-4546-afc9-ecdb6a3300bc",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7521,
+          "lng": 106.6427,
+          "updatedAt": "2026-05-09T22:36:43.824Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.545Z"
+    },
+    {
+      "id": "alert_04bc2617-e1cf-41c7-af5b-1a97bf75d825",
+      "userId": "c17f3264-f500-40e5-8c15-1a104be4f56a",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "47258878-094c-4380-baaa-fe4e7a60c7d7",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7542,
+          "lng": 106.6454,
+          "updatedAt": "2026-05-09T21:36:43.886Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.569Z"
+    },
+    {
+      "id": "alert_d633bc49-33cc-42ab-b2e4-c0076c462577",
+      "userId": "7088d873-6b30-41d4-bf95-08daed666f89",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "c6f93b25-275b-44e9-bab5-bc07571e67c5",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7563,
+          "lng": 106.6481,
+          "updatedAt": "2026-05-09T20:36:43.917Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.597Z"
+    },
+    {
+      "id": "alert_479cf5ae-e893-437f-adf0-8d16fdbba26a",
+      "userId": "546ba75c-afa2-4936-897c-c7ebdf67bb70",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "777f776b-62af-4ca0-9ed0-03dbcb99c119",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7668,
+          "lng": 106.6616,
+          "updatedAt": "2026-05-09T15:36:44.091Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.626Z"
+    },
+    {
+      "id": "alert_d539781e-88fb-45fa-8076-df3bd87d1ec3",
+      "userId": "525ee2db-d11d-4167-b8f9-b0956d1de451",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "8e761ffe-9f7d-4f7e-bafe-ce0e248885e9",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7689,
+          "lng": 106.6643,
+          "updatedAt": "2026-05-09T14:36:44.122Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.652Z"
+    },
+    {
+      "id": "alert_b1c7567e-c37b-4cb6-8a00-8a29da9e74d6",
+      "userId": "ea925120-235b-477c-92fa-0ffd8a60709d",
+      "level": "LEVEL_1_REMINDER",
+      "status": "REMINDER_SENT",
+      "source": "SYSTEM",
+      "title": "Nhac nho check-in",
+      "message": "Sap den han check-in, vui long xac nhan ban an toan",
+      "metadata": {
+        "nextDeadline": "2026-05-10T09:36:44.157Z"
+      },
+      "createdAt": "2026-05-10T09:26:02.659Z"
+    },
+    {
+      "id": "alert_ee93cbd2-a172-4905-aff2-bc9dc7381df8",
+      "userId": "08fdd922-1799-46af-bd5f-5161f5dfb954",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "6a89fc1a-c85b-4227-bc05-bc3f7340d535",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7752,
+          "lng": 106.6724,
+          "updatedAt": "2026-05-09T23:36:44.223Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.686Z"
+    },
+    {
+      "id": "alert_688d64c2-da69-4574-b270-520e826cccdc",
+      "userId": "35f923ae-7b38-4c4c-a7ec-93095b150994",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "645ccaab-7085-4767-8eae-2c49c442efaf",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7773,
+          "lng": 106.6751,
+          "updatedAt": "2026-05-09T22:36:44.258Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.707Z"
+    },
+    {
+      "id": "alert_43463e84-59b3-4761-98ae-451f765f829b",
+      "userId": "032cfbf6-6e49-4263-bffc-0640f1ca29c2",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "800dcef8-b30a-4775-9d5c-39d3efd0b224",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7794,
+          "lng": 106.6778,
+          "updatedAt": "2026-05-09T21:36:44.291Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.731Z"
+    },
+    {
+      "id": "alert_2133cc06-a52f-4b4e-accc-a30056e23372",
+      "userId": "8b191bf9-4b0b-41e2-ad62-207709770d47",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "a805b225-81f4-4a7d-81f1-8a8e021f30a4",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7815,
+          "lng": 106.6805,
+          "updatedAt": "2026-05-09T20:36:44.322Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.754Z"
+    },
+    {
+      "id": "alert_db7672e6-3827-4852-9303-f457cdffe235",
+      "userId": "8b191bf9-4b0b-41e2-ad62-207709770d47",
+      "level": "LEVEL_4_RESCUE_CALL",
+      "status": "RESCUE_CALL_QUEUED",
+      "source": "SYSTEM",
+      "title": "Kich hoat goi cuu ho",
+      "message": "Vuot nguong SOS, da dua vao hang doi auto-call",
+      "metadata": {
+        "overdueMinutes": 289,
+        "policy": {
+          "_id": "84c53117-9a00-4695-b59b-4ebbc489b53a",
+          "userId": "8b191bf9-4b0b-41e2-ad62-207709770d47",
+          "level1Minutes": 30,
+          "level2Minutes": 5,
+          "level3Minutes": 20,
+          "level4Enabled": true,
+          "createdAt": "2026-05-07T23:36:44.322Z",
+          "updatedAt": "2026-05-09T20:36:44.322Z"
+        }
+      },
+      "createdAt": "2026-05-10T09:26:02.757Z"
     }
   ],
   "emergencyMemos": [
