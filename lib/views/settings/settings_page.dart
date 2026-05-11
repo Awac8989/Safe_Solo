@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_language.dart';
@@ -92,6 +93,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     ? strings.text('Đang bật', 'On')
                     : strings.text('Đang tắt', 'Off'),
                 onTap: () => _showVacationDialog(context),
+              ),
+              const _SectionDivider(),
+              _SwitchRow(
+                icon: Icons.directions_walk_rounded,
+                title: strings.text('Đếm bước chân & calo', 'Steps & calories'),
+                value: automation.stepTrackingEnabled,
+                onChanged: (value) => _toggleStepTracking(provider, value),
               ),
             ],
           ),
@@ -408,6 +416,7 @@ class _SettingsPageState extends State<SettingsPage> {
     String? dailyReminderTime,
     bool? pillReminder,
     String? pillTime,
+    bool? stepTrackingEnabled,
   }) async {
     final current = provider.automation;
     await _runGuarded(
@@ -420,9 +429,52 @@ class _SettingsPageState extends State<SettingsPage> {
           geofenceAutoCheckin: geofenceAutoCheckin ?? current.geofenceAutoCheckin,
           pillReminder: pillReminder ?? current.pillReminder,
           pillTime: pillTime ?? current.pillTime,
+          stepTrackingEnabled:
+              stepTrackingEnabled ?? current.stepTrackingEnabled,
         ),
       ),
     );
+  }
+
+  Future<void> _toggleStepTracking(
+    AppProvider provider,
+    bool enabled,
+  ) async {
+    final strings = _snapshotStrings();
+    if (!enabled) {
+      await _saveAutomation(provider, stepTrackingEnabled: false);
+      return;
+    }
+
+    var status = await Permission.activityRecognition.status;
+    if (!status.isGranted) {
+      status = await Permission.activityRecognition.request();
+    }
+
+    if (!status.isGranted) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            strings.text(
+              'SafeSolo cần quyền nhận diện hoạt động để đếm bước chân.',
+              'SafeSolo needs activity recognition permission to count steps.',
+            ),
+          ),
+          action: status.isPermanentlyDenied
+              ? SnackBarAction(
+                  label: strings.text('Mở cài đặt', 'Open settings'),
+                  onPressed: openAppSettings,
+                )
+              : null,
+        ),
+      );
+      return;
+    }
+
+    await _saveAutomation(provider, stepTrackingEnabled: true);
   }
 
   Future<void> _saveSecurity(

@@ -161,7 +161,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     return AppPage(
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(top: 20, bottom: 28),
+        padding: const EdgeInsets.only(top: 20, bottom: 140),
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -512,6 +512,50 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
             ],
           ),
+          if (appProvider.automation.stepTrackingEnabled) ...[
+            const SizedBox(height: 16),
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.directions_walk_rounded,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        strings.text('Vận động hôm nay', 'Today’s activity'),
+                        style: AppTextStyles.title,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.hiking_rounded,
+                          label: strings.text('BƯỚC CHÂN', 'STEPS'),
+                          value: _formatStepCount(appProvider.stepsToday),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.local_fire_department_rounded,
+                          label: strings.text('CALO', 'CALORIES'),
+                          value:
+                              '${appProvider.caloriesBurnedToday.toStringAsFixed(0)} kcal',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -772,6 +816,19 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
     final last = int.tryParse(digits.substring(digits.length - 1)) ?? 5;
     return '${35 + math.min(last * 6, 60)}%';
+  }
+
+  String _formatStepCount(int steps) {
+    final raw = steps.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      final reverseIndex = raw.length - i;
+      buffer.write(raw[i]);
+      if (reverseIndex > 1 && reverseIndex % 3 == 1) {
+        buffer.write(',');
+      }
+    }
+    return '$buffer ${_snapshotStrings().text('bước', 'steps')}';
   }
 }
 

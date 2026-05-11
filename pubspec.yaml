@@ -43,6 +43,7 @@ dependencies:
   google_maps_flutter: ^2.12.3
   flutter_local_notifications: ^21.0.0
   sensors_plus: ^7.0.0
+  pedometer: ^4.1.1
   record: ^6.2.0
   audioplayers: ^6.6.0
   path_provider: ^2.1.5

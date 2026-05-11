@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -195,6 +196,8 @@ class User {
 class MedicalId {
   String fullName;
   String birthYear;
+  String citizenId;
+  String permanentAddress;
   String bloodType;
   String allergies;
   String conditions;
@@ -206,6 +209,8 @@ class MedicalId {
   MedicalId({
     this.fullName = '',
     this.birthYear = '',
+    this.citizenId = '',
+    this.permanentAddress = '',
     this.bloodType = 'O+',
     this.allergies = '',
     this.conditions = '',
@@ -218,6 +223,8 @@ class MedicalId {
   Map<String, dynamic> toJson() => {
     'fullName': fullName,
     'birthYear': birthYear,
+    'citizenId': citizenId,
+    'permanentAddress': permanentAddress,
     'bloodType': bloodType,
     'allergies': allergies,
     'conditions': conditions,
@@ -230,6 +237,8 @@ class MedicalId {
   factory MedicalId.fromJson(Map<String, dynamic> json) => MedicalId(
     fullName: json['fullName'] as String? ?? '',
     birthYear: json['birthYear'] as String? ?? '',
+    citizenId: json['citizenId'] as String? ?? '',
+    permanentAddress: json['permanentAddress'] as String? ?? '',
     bloodType: json['bloodType'] as String? ?? 'O+',
     allergies: json['allergies'] as String? ?? '',
     conditions: json['conditions'] as String? ?? '',
@@ -248,6 +257,7 @@ class Automation {
   bool geofenceAutoCheckin;
   bool pillReminder;
   String pillTime;
+  bool stepTrackingEnabled;
 
   Automation({
     this.dailyReminderTime = '08:00',
@@ -257,6 +267,7 @@ class Automation {
     this.geofenceAutoCheckin = true,
     this.pillReminder = false,
     this.pillTime = '08:00',
+    this.stepTrackingEnabled = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -267,6 +278,7 @@ class Automation {
     'geofenceAutoCheckin': geofenceAutoCheckin,
     'pillReminder': pillReminder,
     'pillTime': pillTime,
+    'stepTrackingEnabled': stepTrackingEnabled,
   };
 
   factory Automation.fromJson(Map<String, dynamic> json) => Automation(
@@ -277,6 +289,7 @@ class Automation {
     geofenceAutoCheckin: json['geofenceAutoCheckin'] as bool? ?? true,
     pillReminder: json['pillReminder'] as bool? ?? false,
     pillTime: json['pillTime'] as String? ?? '08:00',
+    stepTrackingEnabled: json['stepTrackingEnabled'] as bool? ?? false,
   );
 }
 
@@ -697,6 +710,7 @@ class AppProvider with ChangeNotifier {
   Timer? _automationTimer;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
+  StreamSubscription<StepCount>? _stepCountSubscription;
   AppLocation? _homeAnchor;
   DateTime? _lastDailyReminderAt;
   DateTime? _lastMedicationReminderAt;
@@ -709,6 +723,11 @@ class AppProvider with ChangeNotifier {
   DateTime? _lastShakePeakAt;
   bool _wasOutsideHome = false;
   final List<DateTime> _shakePeaks = [];
+  int _stepsToday = 0;
+  double _caloriesBurnedToday = 0;
+  int? _stepBaseline;
+  String? _stepBaselineDayKey;
+  int? _lastRawStepCount;
 
   User? get user => _user;
   bool get onboarded => _onboarded;
@@ -722,6 +741,8 @@ class AppProvider with ChangeNotifier {
   AppLanguage get language => _language;
   MedicalId get medical => _medical;
   Automation get automation => _automation;
+  int get stepsToday => _stepsToday;
+  double get caloriesBurnedToday => _caloriesBurnedToday;
   Security get security => _security;
   List<VaultEntry> get vaultEntries => List.unmodifiable(_vaultEntries);
   DateTime? get vaultReleaseAt => _vaultReleaseAt;
@@ -809,10 +830,18 @@ class AppProvider with ChangeNotifier {
                 Map<String, dynamic>.from(data['homeAnchor'] as Map),
               )
             : null;
+        _stepsToday = data['stepsToday'] as int? ?? 0;
+        _caloriesBurnedToday =
+            (data['caloriesBurnedToday'] as num?)?.toDouble() ?? 0;
+        _stepBaseline = data['stepBaseline'] as int?;
+        _stepBaselineDayKey = data['stepBaselineDayKey'] as String?;
+        _lastRawStepCount = data['lastRawStepCount'] as int?;
       } catch (error) {
         debugPrint('Failed to restore SafeSolo state: $error');
       }
     }
+
+    _resetStepCountersIfNeeded();
 
     _seedDemoCollections();
 
@@ -852,6 +881,11 @@ class AppProvider with ChangeNotifier {
       'circlePosts': _circlePosts.map((item) => item.toJson()).toList(),
       'chatThreads': _chatThreads.map((item) => item.toJson()).toList(),
       'homeAnchor': _homeAnchor?.toJson(),
+      'stepsToday': _stepsToday,
+      'caloriesBurnedToday': _caloriesBurnedToday,
+      'stepBaseline': _stepBaseline,
+      'stepBaselineDayKey': _stepBaselineDayKey,
+      'lastRawStepCount': _lastRawStepCount,
     };
     await prefs.setString(_storageKey, jsonEncode(data));
   }
@@ -901,9 +935,12 @@ class AppProvider with ChangeNotifier {
       _streak = (_streak == 0) ? 1 : _streak;
       _medical = _fromMedicalProfile(
         await _api.getMedicalProfile(_user!.id),
+        citizenId: _medical.citizenId,
+        permanentAddress: _medical.permanentAddress,
       );
       _automation = _fromAutomationSettings(
         await _api.getAutomationSettings(_user!.id),
+        stepTrackingEnabled: _automation.stepTrackingEnabled,
       );
       _security = _mergeSecuritySettings(
         _security,
@@ -926,9 +963,14 @@ class AppProvider with ChangeNotifier {
     }
     final refreshed = await _api.getUserById(current.id);
     _user = User.fromUserModel(refreshed, email: current.email);
-    _medical = _fromMedicalProfile(await _api.getMedicalProfile(current.id));
+    _medical = _fromMedicalProfile(
+      await _api.getMedicalProfile(current.id),
+      citizenId: _medical.citizenId,
+      permanentAddress: _medical.permanentAddress,
+    );
     _automation = _fromAutomationSettings(
       await _api.getAutomationSettings(current.id),
+      stepTrackingEnabled: _automation.stepTrackingEnabled,
     );
     _security = _mergeSecuritySettings(
       _security,
@@ -1163,7 +1205,11 @@ class AppProvider with ChangeNotifier {
         userId: current.id,
         profile: _toMedicalProfile(current.id, medical),
       );
-      _medical = _fromMedicalProfile(profile);
+      _medical = _fromMedicalProfile(
+        profile,
+        citizenId: medical.citizenId,
+        permanentAddress: medical.permanentAddress,
+      );
       _updateBadges();
       await _saveToStorage();
     });
@@ -1185,6 +1231,7 @@ class AppProvider with ChangeNotifier {
         settings: _toAutomationSettings(current.id, automation),
       );
       _automation = _fromAutomationSettings(settings);
+      _automation.stepTrackingEnabled = automation.stepTrackingEnabled;
       _updateBadges();
       await _saveToStorage();
       _restartRuntimeAutomation();
@@ -1565,6 +1612,14 @@ class AppProvider with ChangeNotifier {
         cancelOnError: false,
       );
     }
+
+    if (_automation.stepTrackingEnabled) {
+      _stepCountSubscription = Pedometer.stepCountStream.listen(
+        (event) => unawaited(_handleStepCountEvent(event)),
+        onError: (_) {},
+        cancelOnError: false,
+      );
+    }
   }
 
   void _stopRuntimeAutomation() {
@@ -1574,6 +1629,8 @@ class AppProvider with ChangeNotifier {
     _positionSubscription = null;
     _accelerometerSubscription?.cancel();
     _accelerometerSubscription = null;
+    _stepCountSubscription?.cancel();
+    _stepCountSubscription = null;
   }
 
   Future<void> _runRuntimeAutomationTick() async {
@@ -1742,6 +1799,55 @@ class AppProvider with ChangeNotifier {
     } else if (magnitude > 3) {
       _lowMotionSince = null;
     }
+  }
+
+  Future<void> _handleStepCountEvent(StepCount event) async {
+    _resetStepCountersIfNeeded();
+    final todayKey = _todayKey(DateTime.now());
+    _stepBaselineDayKey ??= todayKey;
+
+    if (_stepBaselineDayKey != todayKey) {
+      _stepBaselineDayKey = todayKey;
+      _stepBaseline = event.steps;
+      _stepsToday = 0;
+      _caloriesBurnedToday = 0;
+    }
+
+    if (_stepBaseline == null || event.steps < _stepBaseline!) {
+      _stepBaseline = event.steps;
+    }
+
+    _lastRawStepCount = event.steps;
+    final computedSteps = math.max(0, event.steps - (_stepBaseline ?? event.steps));
+    if (computedSteps == _stepsToday) {
+      return;
+    }
+
+    _stepsToday = computedSteps;
+    _caloriesBurnedToday = _estimateCaloriesForSteps(_stepsToday);
+    notifyListeners();
+
+    if (_stepsToday % 20 == 0 || _stepsToday < 20) {
+      await _saveToStorage();
+    }
+  }
+
+  void _resetStepCountersIfNeeded() {
+    final todayKey = _todayKey(DateTime.now());
+    if (_stepBaselineDayKey == null) {
+      _stepBaselineDayKey = todayKey;
+      return;
+    }
+    if (_stepBaselineDayKey != todayKey) {
+      _stepBaselineDayKey = todayKey;
+      _stepBaseline = _lastRawStepCount;
+      _stepsToday = 0;
+      _caloriesBurnedToday = 0;
+    }
+  }
+
+  double _estimateCaloriesForSteps(int steps) {
+    return steps * 0.04;
   }
 
   bool _sameMinute(DateTime? a, DateTime? b) {
@@ -2241,10 +2347,16 @@ MedicalProfileModel _toMedicalProfile(String userId, MedicalId medical) {
   );
 }
 
-MedicalId _fromMedicalProfile(MedicalProfileModel profile) {
+MedicalId _fromMedicalProfile(
+  MedicalProfileModel profile, {
+  String citizenId = '',
+  String permanentAddress = '',
+}) {
   return MedicalId(
     fullName: profile.fullName,
     birthYear: profile.birthYear,
+    citizenId: citizenId,
+    permanentAddress: permanentAddress,
     bloodType: profile.bloodType,
     allergies: profile.allergies,
     conditions: profile.conditions,
@@ -2268,7 +2380,10 @@ AutomationSettingsModel _toAutomationSettings(String userId, Automation automati
   );
 }
 
-Automation _fromAutomationSettings(AutomationSettingsModel settings) {
+Automation _fromAutomationSettings(
+  AutomationSettingsModel settings, {
+  bool stepTrackingEnabled = false,
+}) {
   return Automation(
     dailyReminderTime: settings.dailyReminderTime,
     shakeSos: settings.shakeSos,
@@ -2277,6 +2392,7 @@ Automation _fromAutomationSettings(AutomationSettingsModel settings) {
     geofenceAutoCheckin: settings.geofenceAutoCheckin,
     pillReminder: settings.pillReminder,
     pillTime: settings.pillTime,
+    stepTrackingEnabled: stepTrackingEnabled,
   );
 }
 
@@ -2295,4 +2411,10 @@ DateTime? _parseDateTime(Object? value) {
     return DateTime.tryParse(value);
   }
   return null;
+}
+
+String _todayKey(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
 }
