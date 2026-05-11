@@ -1,22 +1,15 @@
 # SafeSolo Backend
 
-Backend hiện tại của SafeSolo là API `Node.js + Express + MongoDB` phục vụ:
+Backend của SafeSolo là API `Node.js + Express + MongoDB` phục vụ:
 
-- Flutter mobile app
-- Web Admin
-- Luồng an toàn: check-in, dead-man switch, SOS, guardians, medical, chat, radar
+- ứng dụng Flutter cho người dùng cuối
+- web-admin điều phối
+- luồng an toàn như check-in, SOS, rescue, guardians, medical, chat, KYC
 
-## Trạng thái hiện tại
-
-- MongoDB là nguồn dữ liệu duy nhất cho runtime backend.
-- Database mặc định: `Safesolo`
-- Default connection string: `mongodb://127.0.0.1:27017/Safesolo`
-- Các nhánh Prisma, PostgreSQL, SQLite runtime và JSON store cũ đã được loại khỏi code path chính.
-
-## Tech stack
+## 1. Công nghệ sử dụng
 
 - Node.js
-- Express.js
+- Express
 - MongoDB + Mongoose
 - Socket.IO
 - BullMQ
@@ -25,146 +18,91 @@ Backend hiện tại của SafeSolo là API `Node.js + Express + MongoDB` phục
 - JWT
 - Multer
 
-## Cấu trúc chính
+## 2. Kết nối dữ liệu
 
-```text
-backend/
-├─ scripts/                 Seed và script kiểm tra
-├─ src/
-│  ├─ config/               MongoDB config
-│  ├─ controllers/          HTTP controllers
-│  ├─ middleware/           Auth, validation, error handling
-│  ├─ models/               Mongoose models
-│  ├─ routes/               API routes
-│  ├─ services/             Business logic
-│  ├─ sockets/              Socket.IO server
-│  └─ workers/              Dead-man / duress workers
-├─ package.json
-└─ server.js
-```
-
-## Cài đặt và chạy
-
-### 1. Cài dependency
-
-```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm install
-```
-
-### 2. Bật MongoDB
-
-Local mặc định:
+Database mặc định:
 
 ```text
 mongodb://127.0.0.1:27017/Safesolo
 ```
 
-Bạn có thể override bằng biến môi trường:
+Tên database mặc định:
+
+```text
+Safesolo
+```
+
+Biến môi trường hỗ trợ:
 
 ```env
+PORT=4000
 MONGODB_URI=mongodb://127.0.0.1:27017/Safesolo
 MONGODB_DB_NAME=Safesolo
-PORT=4000
-JWT_SECRET=your-secret
+JWT_SECRET=change-me
+MAPTILER_KEY=your-key
 ```
 
-### 3. Chạy API
+## 3. Cấu trúc thư mục
 
-```powershell
-npm run dev
+```text
+backend/
+├─ scripts/               Seed và script hỗ trợ
+├─ src/
+│  ├─ config/             Mongo config, Redis config
+│  ├─ controllers/        HTTP controllers
+│  ├─ lib/                Helper và hạ tầng
+│  ├─ middleware/         Auth, validation, error handling
+│  ├─ models/             Mongoose models
+│  ├─ routes/             API routes
+│  ├─ services/           Business logic
+│  ├─ sockets/            Socket.IO
+│  └─ workers/            Dead-man worker, duress worker
+├─ package.json
+└─ server.js
 ```
 
-Hoặc:
+## 4. Collections chính
 
-```powershell
-npm start
-```
+| Collection | Vai trò |
+| --- | --- |
+| `users` | Hồ sơ người dùng và trạng thái check-in |
+| `checkinhistories` | Lịch sử điểm danh |
+| `alertevents` | Timeline cảnh báo theo cấp |
+| `alertpolicies` | Rule thời gian cho reminder, alarm, SOS |
+| `interactionevents` | Các tương tác như check-in, mood, status |
+| `guardianrelationships` | Liên hệ khẩn cấp / guardians |
+| `medicalprofiles` | Hồ sơ y tế và dữ liệu QR |
+| `automationsettings` | Reminder, fall detection, shake SOS, geofence |
+| `securitysettings` | Stealth, auto-wipe, encryption |
+| `devicesignals` | Tín hiệu từ cảm biến và vị trí |
+| `emergencylogs` | Nhật ký SOS và sự cố |
+| `rescueincidents` | Ca cứu hộ cộng đồng |
+| `volunteerresponses` | Người tình nguyện đã nhận ca |
+| `chatrooms` | Phòng chat gia đình, cộng đồng, cứu hộ |
+| `messages` | Tin nhắn văn bản và voice note |
+| `emergencymemos` | Memo khẩn cấp, voice note, toạ độ |
+| `smsdispatchlogs` | Nhật ký gửi SMS |
+| `systemlogs` | Audit log hệ thống |
+| `kycdocuments` | Dữ liệu KYC volunteer |
+| `vaults` | Két sinh tử |
+| `dailystatuses` | Status feed / Alive Circle |
+| `thankyounotes` | Lời cảm ơn gửi hiệp sĩ |
 
-Health endpoint:
+## 5. Nhóm API
 
-- [http://127.0.0.1:4000/health](http://127.0.0.1:4000/health)
-- [http://127.0.0.1:4000/api/health](http://127.0.0.1:4000/api/health)
+### Core / user
 
-## Redis có bắt buộc không
+Tập trung trong `src/routes/index.js`:
 
-Không bắt buộc để API cơ bản hoạt động.
-
-- Nếu Redis chưa bật, API chính vẫn chạy.
-- BullMQ worker có thể log `ECONNREFUSED 127.0.0.1:6379`.
-
-Nếu muốn worker realtime ổn định hơn, hãy bật Redis local.
-
-## Scripts hiện có
-
-```powershell
-npm run dev
-npm start
-npm run seed:demo-users
-```
-
-### Seed user demo
-
-```powershell
-npm run seed:demo-users
-```
-
-## Nhóm API chính
-
-### Health
-
-- `GET /health`
 - `GET /api/health`
-
-### Auth
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/verify-otp`
-- `POST /api/auth/google-mock`
-- `GET /api/auth/profile`
-- `PATCH /api/auth/profile`
-- `PATCH /api/auth/settings`
-- `GET /api/auth/bootstrap`
-
-### User core / Flutter contract
-
-- `POST /api/users/register`
 - `GET /api/users`
-- `GET /api/users/:id`
+- `POST /api/users/register`
 - `POST /api/users/:id/checkin`
-- `PATCH /api/users/:id/timer`
-- `PATCH /api/users/:id/location`
-- `PATCH /api/users/:id/preferences`
-- `PATCH /api/users/:id/sleep-mode`
-
-### Alert policy / interactions
-
+- `GET /api/users/:id/interactions`
 - `GET /api/users/:id/alert-policy`
 - `PATCH /api/users/:id/alert-policy`
-- `GET /api/users/:id/interactions`
-- `POST /api/users/:id/interactions`
-
-### Guardians
-
-- `GET /api/guardians`
-- `GET /api/guardians/search?q=...`
-- `POST /api/guardians/request`
-- `POST /api/guardians/respond`
-- `DELETE /api/guardians/:relationshipId`
-- `GET /api/users/:id/guardians`
-- `POST /api/users/:id/guardians`
-- `DELETE /api/users/:id/guardians/:phone`
-
-### Medical
-
-- `GET /api/medical`
-- `PUT /api/medical`
 - `GET /api/users/:id/medical-profile`
 - `PUT /api/users/:id/medical-profile`
-
-### Automation / Security / Device signals
-
 - `GET /api/users/:id/automation-settings`
 - `PATCH /api/users/:id/automation-settings`
 - `GET /api/users/:id/security-settings`
@@ -172,149 +110,169 @@ npm run seed:demo-users
 - `GET /api/users/:id/device-signals`
 - `POST /api/users/:id/device-signals`
 
-### Radar / Rescue
+### Auth
 
-- `POST /api/radar/broadcast`
-- `GET /api/radar/nearby`
-- `POST /api/radar/:incidentId/accept`
-- `GET /api/radar/:incidentId`
-- `PUT /api/radar/:incidentId/resolve`
+`src/routes/authRoutes.js`
+
+- đăng nhập
+- xác thực token
+- bootstrap session
+
+### Guardians / Medical / Location
+
+- `guardianRoutes.js`
+- `medicalRoutes.js`
+- `locationRoutes.js`
+
+### Emergency / Radar / Community
+
+- `emergencyRoutes.js`
+- `radarRoutes.js`
+- `communityRoutes.js`
+- `feedRoutes.js`
+
+Các nhóm này xử lý:
+
+- broadcast sự cố
+- rescue incident
+- volunteer response
+- feed cộng đồng
+- status nhanh
+- heroes / bảng xếp hạng hỗ trợ
 
 ### Chat
 
-- `GET /api/chat/:roomId/messages`
-- `POST /api/chat/:roomId/messages`
+`chatRoutes.js`
 
-### Feed / Community
-
-- `POST /api/feed/status`
-- `GET /api/feed/circle`
-- `GET /api/community/heroes`
-- `GET /api/community/heroes/:id`
-- `POST /api/community/heroes/:id/thank-you`
+- tạo phòng chat
+- đọc tin nhắn
+- gửi tin nhắn
+- gửi voice note
 
 ### KYC
 
-- `POST /api/kyc/upload`
-- `GET /api/admin/kyc`
-- `PATCH /api/admin/kyc/:id`
+`kycRoutes.js`
 
-### Admin safety
+- gửi hồ sơ KYC
+- duyệt / từ chối
+- phục vụ volunteer onboarding
 
-- `GET /api/admin/overview`
-- `GET /api/admin/users`
-- `GET /api/admin/incidents`
-- `PATCH /api/admin/incidents/:id/resolve`
-- `GET /api/admin/incidents/:id/sms-logs`
-- `GET /api/admin/alerts`
-- `GET /api/admin/emergencies`
-- `PATCH /api/admin/emergencies/:id/resolve`
-- `GET /api/admin/emergencies/:id/sms-logs`
+### Admin
 
-## Mongoose models chính
+`adminPortalRoutes.js`
 
-### Core safety
+- overview
+- users
+- incidents
+- alerts
+- SMS logs
+- audit / admin timeline
+- export / dữ liệu điều phối
 
-- `User`
-- `CheckInHistory`
-- `EmergencyLog`
-- `AlertEvent`
-- `InteractionEvent`
-- `AlertPolicy`
-- `MedicalProfile`
-- `AutomationSetting`
-- `SecuritySetting`
-- `DeviceSignal`
-- `SmsDispatchLog`
+## 6. Workers nền
 
-### Rescue / chat / community
+### Dead-man worker
 
-- `RescueIncident`
-- `VolunteerResponse`
-- `EmergencyMemo`
-- `ChatRoom`
-- `Message`
-- `DailyStatus`
-- `ThankYouNote`
-- `SystemLog`
+File: `src/workers/deadmanWorker.js`
 
-### Other
+Nhiệm vụ:
 
-- `GuardianRelationship`
-- `Vault`
-- `KYCDocument`
+- kiểm tra thời gian check-in của user
+- đánh dấu reminder / warning / SOS
+- tạo `AlertEvent`
+- hỗ trợ auto-wipe theo policy
 
-## Luồng chính
+### Duress worker
 
-### Check-in
+File: `src/workers/duressWorker.js`
 
-1. Mobile gọi `POST /api/users/:id/checkin`
-2. Backend cập nhật `lastCheckinTime`, `nextDeadline`
-3. Ghi interaction event
-4. Web Admin đọc timeline từ Mongo
+Nhiệm vụ:
 
-### Dead-man switch
+- xử lý luồng PIN giả / SOS ngầm
+- hỗ trợ escalation không hiển thị trên client
 
-1. Worker quét user quá hạn
-2. Tạo `AlertEvent`
-3. Gửi SMS theo escalation khi cần
-4. Ghi `SmsDispatchLog`
-5. Đẩy dữ liệu cho admin timeline
+## 7. Cài đặt và chạy
 
-### Silent SOS / duress
-
-1. User kích hoạt duress flow
-2. Backend tạo `RescueIncident`
-3. Chat room được nối với incident
-4. Volunteer accept sẽ được thêm vào room responders
-5. Resolve incident sẽ đóng room sang `READ_ONLY`
-
-### Auto-wipe
-
-1. Worker quét user có `autoWipeDays`
-2. Khi đủ điều kiện, dữ liệu nhạy cảm được cập nhật theo policy
-3. Ghi `SystemLog`
-
-## File quan trọng nên đọc trước
-
-- [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
-- [c:\Users\Admin\SafeSolo\backend\src\config\database.js](c:/Users/Admin/SafeSolo/backend/src/config/database.js)
-- [c:\Users\Admin\SafeSolo\backend\src\routes\index.js](c:/Users/Admin/SafeSolo/backend/src/routes/index.js)
-- [c:\Users\Admin\SafeSolo\backend\src\controllers\userController.js](c:/Users/Admin/SafeSolo/backend/src/controllers/userController.js)
-- [c:\Users\Admin\SafeSolo\backend\src\services\authService.js](c:/Users/Admin/SafeSolo/backend/src/services/authService.js)
-- [c:\Users\Admin\SafeSolo\backend\src\services\adminPortalService.js](c:/Users/Admin/SafeSolo/backend/src/services/adminPortalService.js)
-- [c:\Users\Admin\SafeSolo\backend\src\workers\deadmanWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/deadmanWorker.js)
-- [c:\Users\Admin\SafeSolo\backend\src\workers\duressWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/duressWorker.js)
-
-## Test nhanh
-
-### Health
+### Cài dependency
 
 ```powershell
-curl http://127.0.0.1:4000/api/health
+cd c:\Users\Admin\SafeSolo\backend
+npm install
 ```
 
-### List users
+### Chạy dev
 
 ```powershell
-curl http://127.0.0.1:4000/api/users
+npm run dev
 ```
 
-### Admin overview
+### Chạy production
 
 ```powershell
-curl http://127.0.0.1:4000/api/admin/overview
+npm start
 ```
 
-## Lưu ý khi commit
+### Health check
 
-Không nên commit:
+```text
+http://127.0.0.1:4000/api/health
+```
 
-- `.env`
-- secret keys
-- token thật
-- file runtime phát sinh khi test nếu không cần thiết
+## 8. Seed dữ liệu demo
 
-## License
+Tạo user demo:
 
-Private project. Nội bộ SafeSolo.
+```powershell
+npm run seed:demo-users
+```
+
+Script này dùng để:
+
+- seed người dùng mẫu
+- tạo dữ liệu đủ cho app và admin test
+
+## 9. Socket và realtime
+
+Backend có hỗ trợ realtime qua Socket.IO cho:
+
+- timeline sự cố
+- thay đổi trạng thái rescue
+- cập nhật chat room
+- các tín hiệu admin dashboard
+
+## 10. Ghi chú vận hành
+
+- Redis không bắt buộc để `health` API hoạt động, nhưng một số queue/log realtime sẽ báo cảnh báo nếu Redis chưa bật
+- khi test máy thật Android, backend phải mở qua IP LAN thay vì `10.0.2.2`
+- key bản đồ không nên hardcode; dùng `.env` hoặc config local
+
+## 11. File quan trọng nên đọc đầu tiên
+
+- `server.js`
+- `src/config/database.js`
+- `src/routes/index.js`
+- `src/controllers/userController.js`
+- `src/services/adminPortalService.js`
+- `src/services/emergencyService.js`
+- `src/services/chatService.js`
+- `src/workers/deadmanWorker.js`
+
+## 12. Mục tiêu hiện tại của backend
+
+Backend được tổ chức để phục vụ 3 lớp:
+
+1. `Safety core`
+   - check-in
+   - alert policies
+   - escalation
+
+2. `Rescue & community`
+   - rescue incident
+   - volunteer response
+   - chat / feed / heroes
+
+3. `Admin orchestration`
+   - dashboard
+   - incident handling
+   - audit
+   - user management

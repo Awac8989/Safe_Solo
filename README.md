@@ -1,379 +1,398 @@
 # SafeSolo
 
-SafeSolo là hệ thống bảo vệ an toàn cá nhân gồm 3 phần chính:
+SafeSolo là nền tảng bảo vệ an toàn cá nhân theo mô hình `mobile app + backend + web-admin`.
 
-- Ứng dụng Flutter cho người dùng cuối
-- Backend Node.js/Express + MongoDB cho check-in, SOS, guardians, medical, chat, community
-- Web Admin React/Vite để điều phối sự cố, theo dõi timeline cảnh báo và quản trị dữ liệu
+Hệ thống được xây để hỗ trợ các tình huống:
 
-Repo này đang được tổ chức như một mono-repo thực dụng: Flutter app, backend và web-admin cùng nằm trong một workspace để phát triển và test end-to-end dễ hơn.
+- điểm danh định kỳ để xác nhận người dùng vẫn an toàn
+- phát hiện mất liên lạc theo cơ chế `dead-man switch`
+- kích hoạt SOS thủ công hoặc ngầm
+- chia sẻ tín hiệu khẩn cấp cho người thân, cộng đồng và đội điều phối
+- lưu trữ hồ sơ y tế, két sinh tử, chế độ ngụy trang và các thiết lập an toàn nâng cao
 
-## Kiến trúc tổng quan
+Repo này hiện là một mono-repo gồm:
 
-### 1. Flutter mobile app
+- `Flutter app` cho người dùng cuối
+- `Node.js + Express + MongoDB` backend
+- `React + Vite` web-admin cho điều phối và giám sát
 
-Thư mục: [c:\Users\Admin\SafeSolo\lib](c:/Users/Admin/SafeSolo/lib)
-
-Chức năng chính:
-
-- Onboarding -> Auth -> Permissions
-- Check-in theo chu kỳ
-- Dead-man switch
-- SOS map / community radar
-- Alive Circle
-- Messenger
-- Heroes
-- Settings, Medical ID, Network, Vault, Stealth mode
-- Song ngữ `Tiếng Việt / English`
-
-Tech stack:
-
-- Flutter
-- `provider`
-- `shared_preferences`
-- `geolocator`
-- `permission_handler`
-- `google_maps_flutter`
-- `url_launcher`
-- `qr_flutter`
-
-### 2. Backend API
-
-Thư mục: [c:\Users\Admin\SafeSolo\backend](c:/Users/Admin/SafeSolo/backend)
-
-Chức năng chính:
-
-- Auth, profile, bootstrap
-- User check-in
-- Alert policy
-- Interaction events
-- Guardian CRUD
-- Medical profile sync
-- Automation settings
-- Security settings
-- Device signals
-- Rescue incident / SOS / radar / volunteer response
-- Chat room, messages, emergency memos
-- KYC
-- Admin safety overview, incidents, alerts, SMS logs
-- Background workers cho dead-man switch và auto-wipe
-
-Trạng thái hiện tại:
-
-- Core runtime đã dùng MongoDB làm nguồn chính
-- Mongo mặc định: `mongodb://127.0.0.1:27017/Safesolo`
-- Một số module legacy vẫn còn trong repo để tương thích, nhưng luồng safety chính đã được migrate sang Mongo
-
-### 3. Web Admin
-
-Thư mục: [c:\Users\Admin\SafeSolo\web-admin](c:/Users/Admin/SafeSolo/web-admin)
-
-Chức năng chính:
-
-- Dashboard điều phối
-- Danh sách người dùng app
-- KYC queue
-- Omnichannel / logs / revenue
-- Export Excel
-- Kết nối trực tiếp tới backend API
-
-## Cấu trúc thư mục
-
-```text
-SafeSolo/
-├─ lib/                 Flutter app
-├─ android/             Android runner
-├─ test/                Flutter tests
-├─ backend/             Express API + Mongo models + workers
-├─ web-admin/           React/Vite admin dashboard
-├─ docs/                Product roadmap và tài liệu nội bộ
-├─ web/                 Web build/output cũ
-├─ mobile-app/          Legacy/experimental clients
-└─ database/            SQL scripts / dữ liệu hỗ trợ cũ
-```
-
-## Yêu cầu hệ thống
-
-### Mobile app
-
-- Flutter SDK 3.9+
-- Android Studio hoặc Android SDK
-- Emulator Android hoặc thiết bị thật
-
-### Backend
-
-- Node.js 18+
-- MongoDB chạy local hoặc remote
-- Redis là tùy chọn
-
-Ghi chú:
-
-- API vẫn chạy nếu Redis chưa bật
-- Nếu Redis tắt, worker BullMQ có thể log cảnh báo `ECONNREFUSED 127.0.0.1:6379`
-
-### Web Admin
-
-- Node.js 18+
-- npm
-
-## Cách chạy toàn bộ hệ thống
-
-### 1. Chạy backend
-
-```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm install
-npm run dev
-```
-
-Backend mặc định chạy tại:
-
-- [http://127.0.0.1:4000](http://127.0.0.1:4000)
-- [http://127.0.0.1:4000/api/health](http://127.0.0.1:4000/api/health)
-
-### 2. Chạy Flutter app
-
-```powershell
-cd c:\Users\Admin\SafeSolo
-flutter pub get
-flutter run
-```
-
-Nếu dùng Android Emulator:
-
-- `API_BASE_URL` nên là `http://10.0.2.2:4000/api`
-
-Nếu dùng điện thoại thật:
-
-- đổi sang IP LAN của máy, ví dụ `http://192.168.x.x:4000/api`
-
-### 3. Chạy web-admin
-
-```powershell
-cd c:\Users\Admin\SafeSolo\web-admin
-npm install
-npm run dev
-```
-
-Web admin thường chạy tại:
-
-- [http://localhost:8080](http://localhost:8080)
-
-## Google Maps cấu hình thế nào
-
-Flutter app đang dùng `google_maps_flutter`.
-
-File liên quan:
-
-- [c:\Users\Admin\SafeSolo\android\app\build.gradle.kts](c:/Users/Admin/SafeSolo/android/app/build.gradle.kts)
-- [c:\Users\Admin\SafeSolo\android\app\src\main\AndroidManifest.xml](c:/Users/Admin/SafeSolo/android/app/src/main/AndroidManifest.xml)
-- [c:\Users\Admin\SafeSolo\android\maps-api.properties.example](c:/Users/Admin/SafeSolo/android/maps-api.properties.example)
-
-Cách cấu hình:
-
-1. Tạo file `android/maps-api.properties`
-2. Thêm:
-
-```properties
-GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
-```
-
-3. Build lại app
-
-## Luồng người dùng chính
-
-### 1. Onboarding -> Auth -> Permissions
-
-- User vào onboarding
-- Đăng nhập/đăng ký
-- Cấp quyền vị trí, micro, thông báo, danh bạ
-- Vào shell chính 5 tab
-
-### 2. Check-in
-
-- User bấm nút tròn ở Home
-- App hỏi cảm xúc
-- Gửi check-in về backend
-- Backend cập nhật `lastCheckinTime`, `nextDeadline`, interaction events
-
-### 3. Dead-man switch
-
-- Nếu user không check-in trong khoảng `graceHours`
-- Worker backend sẽ nâng dần mức cảnh báo
-- Tạo `alert_events`
-- Ghi SMS dispatch logs
-- Đẩy dữ liệu sang Web Admin
-
-### 4. SOS / Radar / Rescue
-
-- User hoặc duress flow tạo `RescueIncident`
-- Volunteer chấp nhận cứu hộ
-- Chat room được nối trực tiếp với incident
-- Emergency memo và responder được đồng bộ trong room
-
-### 5. Vault + Stealth
-
-- `Stealth` bảo vệ user khi bị ép mở app
-- `Vault` lưu dữ liệu nhạy cảm theo dead-man switch
-
-## Những tính năng đã có
+## 1. Thành phần chính
 
 ### Flutter app
 
-- Check-in theo chu kỳ
-- Mood prompt
-- Nút check-in lớn có hiệu ứng
-- Circle feed
-- Reply và cheer trong Circle
-- Messenger với text + voice note mock
-- Call từ thread
-- High contrast mode
-- Language switch
-- Stealth mode
-- Vault
-- Medical / Network / Achievements / Security / Settings
+Thư mục: `lib/`, `android/`, `windows/`, `web/`
+
+Chức năng chính:
+
+- Onboarding, đăng nhập, cấp quyền hệ thống
+- Home check-in với vòng tròn trạng thái, đếm ngược, mood prompt
+- Alive Circle cho status, gửi động viên, phản hồi
+- Messenger cho chat gia đình, cộng đồng, hiệp sĩ, ghi âm thoại
+- Heroes / Hiệp sĩ cho bảng xếp hạng tình nguyện viên
+- Settings, Medical ID, Network, Vault, Security, Achievements, Stealth
+- SOS Map và Community Radar
+- Song ngữ `Tiếng Việt / English`
+- MapTiler cho bản đồ hiển thị
 
 ### Backend
 
-- MongoDB connection
-- User core models
-- Check-in, alert policy, interaction events
-- Guardian CRUD
-- Medical profile sync
-- Automation + security settings
-- Device signals
-- SOS / radar / rescue incident
-- Chat room / message / emergency memo
-- KYC queue
-- Admin overview / incidents / alerts / SMS logs
-- Bulk migrate SQLite -> Mongo
-- Verify counts script
+Thư mục: `backend/`
+
+Chức năng chính:
+
+- người dùng, đăng ký, hồ sơ, cài đặt an toàn
+- check-in, interaction events, alert policies
+- dead-man worker, alert timeline, SMS log
+- guardians, medical profile, automation settings, security settings
+- rescue incidents, volunteer response, radar broadcast
+- chat rooms, messages, emergency memos
+- KYC, vault, device signals
+- API cho web-admin
 
 ### Web Admin
 
-- Dashboard điều phối
-- Danh sách người dùng
-- KYC
-- Audit
-- Omnichannel
-- Revenue
-- Export Excel
-- Giao diện tiếng Việt
+Thư mục: `web-admin/`
 
-## Scripts quan trọng
+Chức năng chính:
 
-### Root Flutter
+- dashboard điều phối sự cố
+- quản lý người dùng app
+- timeline cảnh báo, sự cố đang xử lý
+- KYC queue
+- export Excel
+- bản đồ điều phối dùng MapTiler
+
+## 2. Cấu trúc repo
+
+```text
+SafeSolo/
+├─ android/                 Flutter Android runner
+├─ backend/                 API + workers + Mongo models
+├─ docs/                    Tài liệu và ảnh minh họa
+│  └─ screenshots/
+├─ lib/                     Flutter source
+├─ test/                    Flutter tests
+├─ web/                     Flutter web runner
+├─ web-admin/               React/Vite admin portal
+├─ windows/                 Flutter Windows runner
+├─ flutter.env.example.json Cấu hình mẫu cho Flutter
+└─ README.md
+```
+
+## 3. Luồng ứng dụng
+
+```text
+Onboarding
+→ Auth
+→ Permissions
+→ Main Shell
+   ├─ Home
+   ├─ Circle
+   ├─ Messages
+   ├─ Heroes
+   └─ Settings
+```
+
+Các nhánh điều hướng quan trọng:
+
+- `Home` → `Mood Prompt` → `Check-in`
+- `Home` nhấn giữ → `SOS Map`
+- `SOS Map` → broadcast → `Community Radar`
+- `Settings` → `Medical`, `Network`, `Security`, `Vault`, `Achievements`
+- `Stealth mode` bật → toàn app bị ghi đè bởi `StealthScreen`
+
+## 4. Chức năng nổi bật
+
+### 4.1 Home và check-in
+
+- vòng tròn check-in lớn có hiệu ứng nhịp đập và halo nhiều lớp
+- đổi trạng thái theo thời gian còn lại:
+  - an toàn
+  - sắp đến hạn
+  - cần điểm danh
+- chạm vào vòng tròn để điểm danh
+- sau khi điểm danh, người dùng chọn cảm xúc:
+  - Vui vẻ
+  - Bình thường
+  - Mệt / Ốm
+- có hiển thị mood hiện tại, thời điểm check-in cuối và countdown
+- hỗ trợ hiển thị bước chân và calo nếu người dùng bật trong `Cài đặt`
+
+### 4.2 SOS và cứu hộ
+
+- long press từ Home để mở SOS map
+- hiển thị vị trí nạn nhân, vị trí người hỗ trợ, polyline, voice memo
+- broadcast ẩn danh sang Community Radar
+- volunteer có thể nhận ca cứu hộ và vào chat room cứu hộ
+- web-admin nhận timeline cảnh báo và trạng thái xử lý
+
+### 4.3 Alive Circle
+
+- đăng status nhanh
+- đồng bộ status check-in sang feed
+- gửi động viên
+- phản hồi bài đăng
+- hỗ trợ ghi âm và hiển thị voice note
+
+### 4.4 Tin nhắn
+
+- hộp thư theo nhóm:
+  - Gia đình
+  - Cộng đồng
+  - Hiệp sĩ
+- nhắn tin văn bản
+- ghi âm thật bằng file âm thanh
+- gọi điện trực tiếp
+
+### 4.5 Y tế, bảo mật và quyền riêng tư
+
+- Medical ID có mã QR cấp cứu
+- Vault / Két sinh tử
+- Stealth mode dạng máy tính
+- PIN thật và PIN giả
+- auto-wipe
+- theo dõi té ngã, lắc máy tạo SOS, geofence về nhà
+
+## 5. Gallery giao diện
+
+### Home
+
+![Home](docs/screenshots/home_final.png)
+
+### Circle
+
+![Circle](docs/screenshots/circle_final2.png)
+
+### Tin nhắn
+
+![Messages](docs/screenshots/messages_final2.png)
+
+### Hiệp sĩ
+
+![Heroes](docs/screenshots/heroes_final2.png)
+
+### Cài đặt
+
+![Settings](docs/screenshots/settings_final2.png)
+
+### Mã QR y tế
+
+![Medical QR](docs/screenshots/medical.png)
+
+## 6. Kiến trúc dữ liệu MongoDB
+
+Backend hiện chạy trên MongoDB database mặc định:
+
+```text
+mongodb://127.0.0.1:27017/Safesolo
+```
+
+Các collection chính:
+
+| Collection | Mục đích |
+| --- | --- |
+| `users` | Hồ sơ người dùng, check-in gần nhất, trạng thái cơ bản |
+| `checkinhistories` | Nhật ký check-in |
+| `alertevents` | Timeline cảnh báo theo cấp độ |
+| `alertpolicies` | Rule engine cho thời gian nhắc, báo động, SOS |
+| `interactionevents` | Nhật ký thao tác như check-in, mood, status |
+| `medicalprofiles` | Nhóm máu, dị ứng, bệnh nền, thuốc, QR rescue |
+| `automationsettings` | Nhắc hằng ngày, phát hiện té ngã, geofence, pill reminder |
+| `securitysettings` | Stealth, encryption flag, auto wipe |
+| `devicesignals` | Tín hiệu từ cảm biến và geofence |
+| `guardianrelationships` | Guardians và trusted contacts |
+| `rescueincidents` | Ca cứu hộ, trạng thái điều phối |
+| `volunteerresponses` | Tình nguyện viên nhận ca cứu |
+| `chatrooms` | Phòng chat gia đình, cộng đồng, cứu hộ |
+| `messages` | Tin nhắn văn bản và voice note |
+| `emergencylogs` | Sự kiện SOS và khẩn cấp |
+| `emergencymemos` | Ghi chú và ghi âm khẩn cấp |
+| `smsdispatchlogs` | Nhật ký gửi SMS |
+| `systemlogs` | Audit log và event hệ thống |
+| `kycdocuments` | Xác minh danh tính cho volunteer |
+| `vaults` | Dữ liệu két sinh tử |
+| `dailystatuses` | Bài đăng / trạng thái nhanh |
+| `thankyounotes` | Lời cảm ơn gửi hiệp sĩ / cộng đồng |
+
+## 7. Cài đặt môi trường
+
+### 7.1 Flutter app
+
+Tạo file local từ mẫu:
+
+```powershell
+Copy-Item flutter.env.example.json flutter.env.json
+```
+
+Ví dụ:
+
+```json
+{
+  "API_BASE_URL": "http://127.0.0.1:4000/api",
+  "MAPTILER_KEY": "your-key",
+  "MAPTILER_STYLE": "streets-v2"
+}
+```
+
+Chạy app:
 
 ```powershell
 flutter pub get
-flutter analyze
-flutter test
-flutter run
-flutter build apk --debug
-flutter build apk --release
+flutter run --dart-define-from-file=flutter.env.json
 ```
 
-### Backend
+Lưu ý:
+
+- Android Emulator: có thể dùng `10.0.2.2`
+- máy thật: phải dùng IP LAN, ví dụ `http://192.168.1.10:4000/api`
+
+### 7.2 Backend
 
 ```powershell
+cd backend
+npm install
 npm run dev
-npm run start
-npm run seed:demo-users
-npm run migrate:sqlite-to-mongo
-npm run verify:mongo-counts
 ```
 
-### Web Admin
+Biến môi trường gợi ý:
+
+```env
+PORT=4000
+MONGODB_URI=mongodb://127.0.0.1:27017/Safesolo
+MONGODB_DB_NAME=Safesolo
+JWT_SECRET=change-me
+MAPTILER_KEY=your-key
+```
+
+Health check:
+
+```text
+http://127.0.0.1:4000/api/health
+```
+
+### 7.3 Web Admin
+
+Tạo file local:
 
 ```powershell
-npm run dev
-npm run build
+Copy-Item web-admin\\.env.local.example web-admin\\.env.local
 ```
 
-## Seed dữ liệu demo
+Ví dụ:
 
-Backend có script seed user demo:
-
-- [c:\Users\Admin\SafeSolo\backend\scripts\seedDemoUsers.js](c:/Users/Admin/SafeSolo/backend/scripts/seedDemoUsers.js)
+```env
+VITE_API_BASE_URL=http://127.0.0.1:4000/api
+VITE_MAPTILER_KEY=your-key
+VITE_MAPTILER_STYLE=streets-v2
+```
 
 Chạy:
 
 ```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm run seed:demo-users
+cd web-admin
+npm install
+npm run dev -- --host 0.0.0.0 --port 4173
 ```
 
-## Kiểm tra nhanh hệ thống
+Mở:
 
-### Backend health
-
-```powershell
-curl http://127.0.0.1:4000/api/health
+```text
+http://127.0.0.1:4173
 ```
 
-### Flutter analyze
+## 8. API và module backend
 
-```powershell
-cd c:\Users\Admin\SafeSolo
-flutter analyze
-```
+Các nhóm route chính trong `backend/src/routes`:
 
-### Flutter test
+- `index.js`:
+  - `/api/health`
+  - `/api/users/...`
+- `authRoutes.js`
+- `guardianRoutes.js`
+- `medicalRoutes.js`
+- `locationRoutes.js`
+- `emergencyRoutes.js`
+- `chatRoutes.js`
+- `feedRoutes.js`
+- `communityRoutes.js`
+- `radarRoutes.js`
+- `kycRoutes.js`
+- `adminPortalRoutes.js`
 
-```powershell
-flutter test
-```
+## 9. Cấu trúc giao diện Flutter
 
-### Web Admin build
+Các màn hình chính:
 
-```powershell
-cd c:\Users\Admin\SafeSolo\web-admin
-npm run build
-```
+- `OnboardingPage`
+- `AuthPage`
+- `PermissionsPage`
+- `HomePage`
+- `CirclePage`
+- `MessengerPage`
+- `HeroesPage`
+- `SettingsPage`
+- `MedicalPage`
+- `NetworkPage`
+- `SecurityPage`
+- `VaultPage`
+- `AchievementsPage`
+- `SosMapPage`
+- `CommunityRadarPage`
+- `StealthPage`
 
-## Các file đáng chú ý
+## 10. Tính năng nền và cảm biến
+
+- local notification cho nhắc check-in và tín hiệu an toàn
+- MapTiler tile map cho app và admin
+- GPS từ `geolocator`
+- ghi âm thật bằng file âm thanh
+- đếm bước chân và calo
+- cảm biến té ngã / lắc máy tạo SOS
+- geofence về nhà
+
+## 11. Lệnh hữu ích
 
 ### Flutter
 
-- [c:\Users\Admin\SafeSolo\lib\main.dart](c:/Users/Admin/SafeSolo/lib/main.dart)
-- [c:\Users\Admin\SafeSolo\lib\core\providers\app_provider.dart](c:/Users/Admin/SafeSolo/lib/core/providers/app_provider.dart)
-- [c:\Users\Admin\SafeSolo\lib\views\home\home_page.dart](c:/Users/Admin/SafeSolo/lib/views/home/home_page.dart)
-- [c:\Users\Admin\SafeSolo\lib\views\circle\circle_page.dart](c:/Users/Admin/SafeSolo/lib/views/circle/circle_page.dart)
-- [c:\Users\Admin\SafeSolo\lib\views\messenger\messenger_page.dart](c:/Users/Admin/SafeSolo/lib/views/messenger/messenger_page.dart)
+```powershell
+flutter analyze
+flutter test
+flutter build apk --debug --dart-define-from-file=flutter.env.json
+```
 
 ### Backend
 
-- [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
-- [c:\Users\Admin\SafeSolo\backend\src\config\database.js](c:/Users/Admin/SafeSolo/backend/src/config/database.js)
-- [c:\Users\Admin\SafeSolo\backend\src\routes\index.js](c:/Users/Admin/SafeSolo/backend/src/routes/index.js)
-- [c:\Users\Admin\SafeSolo\backend\src\controllers\userController.js](c:/Users/Admin/SafeSolo/backend/src/controllers/userController.js)
-- [c:\Users\Admin\SafeSolo\backend\src\services\adminPortalService.js](c:/Users/Admin/SafeSolo/backend/src/services/adminPortalService.js)
-- [c:\Users\Admin\SafeSolo\backend\src\workers\deadmanWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/deadmanWorker.js)
-- [c:\Users\Admin\SafeSolo\backend\src\workers\duressWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/duressWorker.js)
+```powershell
+cd backend
+npm run dev
+npm run seed:demo-users
+```
 
 ### Web Admin
 
-- [c:\Users\Admin\SafeSolo\web-admin\src\lib\api.ts](c:/Users/Admin/SafeSolo/web-admin/src/lib/api.ts)
-- [c:\Users\Admin\SafeSolo\web-admin\src\routes\index.tsx](c:/Users/Admin/SafeSolo/web-admin/src/routes/index.tsx)
-- [c:\Users\Admin\SafeSolo\web-admin\src\routes\users.tsx](c:/Users/Admin/SafeSolo/web-admin/src/routes/users.tsx)
+```powershell
+cd web-admin
+npm run dev -- --host 0.0.0.0 --port 4173
+npm run build
+```
 
-## Ghi chú quan trọng
+## 12. Ghi chú triển khai
 
-- File runtime như `backend/data/app-db.json` có thể thay đổi khi test backend. Không nên coi đó là thay đổi code cốt lõi.
-- Một số thư mục legacy vẫn còn trong repo để tương thích và tham chiếu trong quá trình migrate.
-- Nếu app không check-in được trên emulator, kiểm tra:
-  - backend đang chạy chưa
-  - đúng `API_BASE_URL` chưa
-  - app có user đã đăng nhập chưa
+- key MapTiler được giữ trong file local `.env` / `dart-define`, không commit vào Git
+- `backend/data/app-db.json` là dữ liệu runtime cũ, không nên commit như mã nguồn
+- nếu test trên máy thật Android, backend phải lắng nghe trên IP LAN và firewall mở cổng `4000`
 
-## Hướng phát triển tiếp theo
+## 13. Trạng thái hiện tại
 
-- Chuẩn hóa toàn bộ text UI sang UTF-8 sạch hoàn toàn
-- Ghi âm thật bằng file audio thay vì mock duration
-- Push notification thật
-- Background geofence / fall detection native
-- Hoàn tất migrate các module legacy còn lại sang Mongo 100%
+SafeSolo hiện đã có:
 
-## License
+- app Flutter chạy được với flow check-in, Circle, chat, Heroes, settings
+- backend MongoDB cho runtime chính
+- web-admin có dashboard, map và export Excel
+- tài liệu cơ bản và gallery giao diện
 
-Private project. Nội bộ SafeSolo.
+Nếu muốn mở rộng tiếp, các hướng ưu tiên hợp lý là:
+
+- FCM push thật từ backend
+- background geofence bền hơn khi app bị kill
+- tối ưu đồng bộ chat/voice note qua backend và object storage
