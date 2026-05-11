@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const router = express.Router();
 router.use(auth);
 
+router.get('/heroes', communityController.listHeroes);
 router.get('/heroes/:id', communityController.getHeroProfile);
 router.post('/heroes/:id/thank-you', validate(communitySchemas.thankYou), communityController.postThankYou);
 

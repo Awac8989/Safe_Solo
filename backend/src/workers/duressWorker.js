@@ -1,7 +1,9 @@
 const { Queue, Worker, JobScheduler } = require('bullmq');
-const { randomUUID } = require('crypto');
-const prisma = require('../config/database');
 const redis = require('../config/redis');
+const User = require('../models/User');
+const RescueIncident = require('../models/RescueIncident');
+const SecuritySetting = require('../models/SecuritySetting');
+const Vault = require('../models/Vault');
 const emergencyService = require('../services/emergencyService');
 const vaultService = require('../services/vaultService');
 const systemLogService = require('../services/systemLogService');
@@ -19,7 +21,7 @@ async function acquireLock(lockKey, ttl = 240000) {
 async function releaseLock(lockKey) {
   try {
     await redis.del(lockKey);
-  } catch (error) {
+  } catch (_error) {
     // ignore release errors
   }
 }
@@ -27,40 +29,42 @@ async function releaseLock(lockKey) {
 async function monitorCheckinsJob() {
   const now = new Date();
 
-  const users = await prisma.user.findMany({
-    where: {
-      next_checkin_deadline: { lt: now },
-      victimIncidents: { none: { status: 'ACTIVE' } },
-    },
+  const users = await User.find({
+    nextDeadline: { $lt: now },
+    role: 'user',
   });
 
   for (const user of users) {
-    const lockKey = `deadman:lock:${user.id}`;
+    const activeIncident = await RescueIncident.findOne({
+      victimId: user._id,
+      status: 'ACTIVE',
+    });
+    if (activeIncident) {
+      continue;
+    }
+
+    const lockKey = `deadman:lock:${user._id}`;
     const locked = await acquireLock(lockKey);
     if (!locked) {
       continue;
     }
 
     try {
-      if (user.deadmanStage >= 1) {
+      if (Number(user.deadmanStage || 0) >= 1) {
         continue;
       }
 
       await emergencyService.notifyGuardians(user, 1);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          deadmanStage: 1,
-          deadmanEscalationTriggeredAt: new Date(),
-        },
-      });
+      user.deadmanStage = 1;
+      user.deadmanEscalationTriggeredAt = new Date();
+      await user.save();
 
       await duressQueue.add(
         'escalate-user',
-        { userId: user.id },
+        { userId: user._id },
         {
           delay: 5 * 60 * 1000,
-          jobId: `deadman-escalate-${user.id}`,
+          jobId: `deadman-escalate-${user._id}`,
           removeOnComplete: true,
           removeOnFail: false,
         },
@@ -68,12 +72,12 @@ async function monitorCheckinsJob() {
 
       await systemLogService.createLog({
         actionType: 'DEADMAN_LEVEL_1_SENT',
-        description: `Level 1 dead man alert queued for user ${user.id}`,
+        description: `Level 1 dead man alert queued for user ${user._id}`,
       });
     } catch (error) {
       await systemLogService.createLog({
         actionType: 'DEADMAN_MONITOR_ERROR',
-        description: `Failed to process dead man check for user ${user.id}: ${error.message}`,
+        description: `Failed to process dead man check for user ${user._id}: ${error.message}`,
       });
     } finally {
       await releaseLock(lockKey);
@@ -83,9 +87,7 @@ async function monitorCheckinsJob() {
 
 async function escalateUserJob(data) {
   const { userId } = data;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+  const user = await User.findById(userId);
 
   if (!user) {
     await systemLogService.createLog({
@@ -95,19 +97,17 @@ async function escalateUserJob(data) {
     return;
   }
 
-  if (user.deadmanStage !== 1) {
+  if (Number(user.deadmanStage || 0) !== 1) {
     return;
   }
 
-  if (user.next_checkin_deadline && user.next_checkin_deadline > new Date()) {
+  if (user.nextDeadline && user.nextDeadline > new Date()) {
     return;
   }
 
-  const activeIncident = await prisma.rescueIncident.findFirst({
-    where: {
-      victimId: userId,
-      status: 'ACTIVE',
-    },
+  const activeIncident = await RescueIncident.findOne({
+    victimId: userId,
+    status: 'ACTIVE',
   });
 
   if (activeIncident) {
@@ -119,13 +119,9 @@ async function escalateUserJob(data) {
   }
 
   await emergencyService.notifyGuardians(user, 2);
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      deadmanStage: 2,
-      deadmanEscalationTriggeredAt: new Date(),
-    },
-  });
+  user.deadmanStage = 2;
+  user.deadmanEscalationTriggeredAt = new Date();
+  await user.save();
 
   await systemLogService.createLog({
     actionType: 'DEADMAN_LEVEL_2_SENT',
@@ -135,36 +131,36 @@ async function escalateUserJob(data) {
 
 async function autoWipeJob() {
   const now = new Date();
-  const users = await prisma.user.findMany({
-    where: {
-      isAutoWipeEnabled: true,
-      autoWipeDays: { not: null },
-    },
-    include: { vault: true },
+  const securitySettings = await SecuritySetting.find({
+    autoWipeDays: { $gt: 0 },
   });
 
-  for (const user of users) {
-    if (!user.next_checkin_deadline || !user.auto_wipe_days) {
+  for (const security of securitySettings) {
+    const user = await User.findById(security.userId);
+    if (!user || !user.lastCheckinTime) {
       continue;
     }
 
-    const threshold = new Date(now.getTime() - user.auto_wipe_days * 24 * 60 * 60 * 1000);
-    if (user.next_checkin_deadline > threshold) {
+    const threshold = new Date(now.getTime() - Number(security.autoWipeDays) * 24 * 60 * 60 * 1000);
+    if (new Date(user.lastCheckinTime) > threshold) {
       continue;
     }
 
-    if (!user.vault) {
+    const vault = await Vault.findOne({ userId: user._id });
+    if (!vault) {
       await systemLogService.createLog({
         actionType: 'AUTO_WIPE_SKIPPED',
-        description: `No vault found for user ${user.id}, skipping auto-wipe`,
+        description: `No vault found for user ${user._id}, skipping auto-wipe`,
       });
       continue;
     }
 
-    await vaultService.shredVaultForUser(user.id);
+    await vaultService.shredVaultForUser(user._id);
+    security.lastAutoWipeDueAt = new Date();
+    await security.save();
     await systemLogService.createLog({
       actionType: 'AUTO_WIPE_EXECUTED',
-      description: `User ${user.id} vault data shredded after ${user.autoWipeDays} days overdue`,
+      description: `User ${user._id} vault data shredded after ${security.autoWipeDays} days overdue`,
     });
   }
 }
@@ -217,7 +213,7 @@ function startDuressWorkers() {
   );
 
   // eslint-disable-next-line no-console
-  console.log('✅ Duress workers started: deadman monitor and auto-wipe');
+  console.log('Duress workers started: deadman monitor and auto-wipe');
 }
 
 module.exports = { startDuressWorkers };

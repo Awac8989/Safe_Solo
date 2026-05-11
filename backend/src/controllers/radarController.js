@@ -132,7 +132,7 @@ class RadarController {
         });
       }
 
-      const resolvedIncident = await radarService.resolveIncident(incidentId);
+      const resolvedIncident = await radarService.resolveIncident(incidentId, req.user.id);
 
       res.status(200).json({
         success: true,

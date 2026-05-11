@@ -10,7 +10,6 @@ const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler
 const prisma = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
 const { startDeadManWorker } = require('./src/workers/deadmanWorker');
-const { initDatabase } = require('./src/config/sqlite');
 const { apiRouter } = require('./src/routes');
 
 const emergencyRoutes = require('./src/routes/emergencyRoutes');
@@ -94,7 +93,6 @@ process.on('SIGINT', async () => {
 
 server.listen(port, async () => {
   try {
-    initDatabase();
     await prisma.$connect();
     console.log('Database connected successfully');
   } catch (error) {

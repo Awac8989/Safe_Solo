@@ -1,9 +1,6 @@
 const crypto = require('crypto');
 
-const {
-  nowIso,
-  smsDispatchStatements,
-} = require('../config/sqlite');
+const SmsDispatchLog = require('../models/SmsDispatchLog');
 
 function buildEmergencyMessage({ user, location }) {
   return [
@@ -100,7 +97,7 @@ async function sendWithProvider(config, { to, message }, timeoutMs) {
   throw new Error(`Unsupported provider: ${config.provider}`);
 }
 
-function logDispatch({
+async function logDispatch({
   emergencyLogId,
   userId,
   toPhone,
@@ -111,18 +108,17 @@ function logDispatch({
   errorMessage,
   responseBody,
 }) {
-  smsDispatchStatements.create.run({
-    id: crypto.randomUUID(),
-    emergency_log_id: emergencyLogId || null,
-    user_id: userId,
-    to_phone: toPhone,
+  await SmsDispatchLog.create({
+    _id: crypto.randomUUID(),
+    emergencyLogId: emergencyLogId || null,
+    userId,
+    toPhone,
     provider,
     attempt,
-    success: success ? 1 : 0,
-    provider_message_id: providerMessageId || null,
-    error_message: errorMessage || null,
-    response_body: responseBody ? JSON.stringify(responseBody) : null,
-    created_at: nowIso(),
+    success: Boolean(success),
+    providerMessageId: providerMessageId || null,
+    errorMessage: errorMessage || null,
+    responseBody: responseBody || null,
   });
 }
 
@@ -153,7 +149,7 @@ async function sendToSingleContact({
           policy.requestTimeoutMs,
         );
 
-        logDispatch({
+        await logDispatch({
           emergencyLogId,
           userId: user._id,
           toPhone: contact.phone,
@@ -176,7 +172,7 @@ async function sendToSingleContact({
         const messageText = error?.message || 'Unknown SMS error';
         errors.push(`${providerConfigItem.provider}#${retry}: ${messageText}`);
 
-        logDispatch({
+        await logDispatch({
           emergencyLogId,
           userId: user._id,
           toPhone: contact.phone,

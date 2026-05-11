@@ -1,19 +1,9 @@
-const crypto = require('crypto');
-
-const {
-  nowIso,
-  mapUserRow,
-  mapMedicalProfileRow,
-  mapAutomationSettingsRow,
-  mapSecuritySettingsRow,
-  mapDeviceSignalRow,
-  userStatements,
-  checkinStatements,
-  medicalProfileStatements,
-  automationSettingsStatements,
-  securitySettingsStatements,
-  deviceSignalStatements,
-} = require('../config/sqlite');
+const User = require('../models/User');
+const CheckInHistory = require('../models/CheckInHistory');
+const MedicalProfile = require('../models/MedicalProfile');
+const AutomationSetting = require('../models/AutomationSetting');
+const SecuritySetting = require('../models/SecuritySetting');
+const DeviceSignal = require('../models/DeviceSignal');
 const { createAlertEvent } = require('../services/alertEventService');
 const {
   createInteractionEvent,
@@ -25,86 +15,79 @@ const {
 } = require('../services/alertPolicyService');
 const { triggerSosForUser } = require('../services/sosService');
 const { getIo } = require('../sockets/socketServer');
+const {
+  nowIso,
+  computeDeadlineIso,
+  normalizeContacts,
+  mapUserDoc,
+  mapMedicalProfileDoc,
+  mapAutomationSettingDoc,
+  mapSecuritySettingDoc,
+  toIso,
+} = require('../lib/mongoCore');
 
-function computeDeadlineIso(minutes) {
-  return new Date(Date.now() + minutes * 60 * 1000).toISOString();
+function isValidHourMinute(value) {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
 }
 
-function ensureMedicalProfile(userId, fallback = {}) {
-  let row = medicalProfileStatements.getByUserId.get(userId);
-  if (!row) {
-    const now = nowIso();
-    medicalProfileStatements.upsert.run({
-      user_id: userId,
-      full_name: fallback.fullName || '',
-      birth_year: '',
-      blood_type: 'O+',
+async function ensureUserById(userId) {
+  return User.findById(userId);
+}
+
+async function ensureUserByPhone(phoneNumber) {
+  return User.findOne({ phoneNumber: String(phoneNumber || '').trim() });
+}
+
+function mapDeviceSignalDoc(doc) {
+  if (!doc) {
+    return null;
+  }
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: row._id,
+    userId: row.userId,
+    signalType: row.signalType,
+    payload: row.payload || {},
+    createdAt: toIso(row.createdAt),
+  };
+}
+
+async function ensureMedicalProfile(userId, fallback = {}) {
+  let profile = await MedicalProfile.findOne({ userId });
+  if (!profile) {
+    profile = await MedicalProfile.create({
+      userId,
+      fullName: fallback.fullName || '',
+      birthYear: '',
+      bloodType: 'O+',
       allergies: '',
       conditions: '',
       medications: '',
-      emergency_phone: fallback.emergencyPhone || '',
-      insurance_provider: '',
-      insurance_number: '',
-      created_at: now,
-      updated_at: now,
+      emergencyPhone: fallback.emergencyPhone || '',
+      insuranceProvider: '',
+      insuranceNumber: '',
     });
-    row = medicalProfileStatements.getByUserId.get(userId);
   }
-  return mapMedicalProfileRow(row);
+
+  return mapMedicalProfileDoc(profile);
 }
 
-function ensureAutomationSettings(userId) {
-  let row = automationSettingsStatements.getByUserId.get(userId);
-  if (!row) {
-    const now = nowIso();
-    automationSettingsStatements.upsert.run({
-      user_id: userId,
-      daily_reminder_time: '08:00',
-      shake_sos: 1,
-      shake_sensitivity: 3,
-      fall_detection: 0,
-      geofence_auto_checkin: 1,
-      pill_reminder: 0,
-      pill_time: '08:00',
-      home_location: null,
-      last_geofence_event_at: null,
-      created_at: now,
-      updated_at: now,
-    });
-    row = automationSettingsStatements.getByUserId.get(userId);
+async function ensureAutomationSettings(userId) {
+  let settings = await AutomationSetting.findOne({ userId });
+  if (!settings) {
+    settings = await AutomationSetting.create({ userId });
   }
-  return mapAutomationSettingsRow(row);
+
+  return mapAutomationSettingDoc(settings);
 }
 
-function ensureSecuritySettings(userId) {
-  let row = securitySettingsStatements.getByUserId.get(userId);
-  if (!row) {
-    const now = nowIso();
-    securitySettingsStatements.upsert.run({
-      user_id: userId,
-      stealth_mode: 0,
-      auto_wipe_days: 0,
-      encryption_enabled: 1,
-      last_auto_wipe_due_at: null,
-      created_at: now,
-      updated_at: now,
-    });
-    row = securitySettingsStatements.getByUserId.get(userId);
+async function ensureSecuritySettings(userId) {
+  let settings = await SecuritySetting.findOne({ userId });
+  if (!settings) {
+    settings = await SecuritySetting.create({ userId });
   }
-  return mapSecuritySettingsRow(row);
-}
 
-function normalizeContacts(rawContacts) {
-  if (!Array.isArray(rawContacts)) {
-    return [];
-  }
-  return rawContacts
-    .map((item) => ({
-      name: String(item?.name || '').trim(),
-      phone: String(item?.phone || '').trim(),
-      relation: String(item?.relation || '').trim(),
-    }))
-    .filter((item) => item.name && item.phone && item.relation);
+  return mapSecuritySettingDoc(settings);
 }
 
 async function registerUser(req, res) {
@@ -122,50 +105,49 @@ async function registerUser(req, res) {
     return res.status(400).json({ message: 'fullName and phoneNumber are required' });
   }
 
-  const existed = userStatements.getByPhone.get(phoneNumber.trim());
+  const existed = await ensureUserByPhone(phoneNumber);
   if (existed) {
     return res.status(409).json({ message: 'phoneNumber already exists' });
   }
 
   const interval = Number(timerIntervalMinutes) || 720;
-  const now = nowIso();
-  const id = crypto.randomUUID();
-
-  userStatements.create.run({
-    id,
-    full_name: fullName.trim(),
-    phone_number: phoneNumber.trim(),
+  const now = new Date();
+  const userDoc = await User.create({
+    fullName: fullName.trim(),
+    phoneNumber: phoneNumber.trim(),
     role: role === 'admin' ? 'admin' : 'user',
-    medical_notes: medicalNotes || '',
-    emergency_contacts: JSON.stringify(Array.isArray(emergencyContacts) ? emergencyContacts : []),
-    timer_interval_minutes: interval,
-    last_checkin_time: now,
-    next_deadline: computeDeadlineIso(interval),
-    current_status: 'SAFE',
-    last_known_location: location
-      ? JSON.stringify({ lat: Number(location.lat), lng: Number(location.lng), updatedAt: now })
+    medicalNotes: medicalNotes || '',
+    emergencyContacts: normalizeContacts(Array.isArray(emergencyContacts) ? emergencyContacts : []),
+    timerIntervalMinutes: interval,
+    lastCheckinTime: now,
+    nextDeadline: new Date(Date.now() + interval * 60 * 1000),
+    currentStatus: 'SAFE',
+    lastKnownLocation: location
+      ? { lat: Number(location.lat), lng: Number(location.lng), updatedAt: now }
       : null,
-    quiet_hours_start: '23:00',
-    quiet_hours_end: '06:00',
-    sleep_mode_until: null,
-    false_alert_grace_minutes: 3,
-    created_at: now,
-    updated_at: now,
+    quietHoursStart: '23:00',
+    quietHoursEnd: '06:00',
+    falseAlertGraceMinutes: 3,
   });
 
-  const created = userStatements.getById.get(id);
-  ensureAlertPolicy(id);
-  ensureMedicalProfile(id, { fullName: fullName.trim(), emergencyPhone: emergencyContacts?.[0]?.phone || '' });
-  ensureAutomationSettings(id);
-  ensureSecuritySettings(id);
-  createInteractionEvent({
-    userId: id,
+  await Promise.all([
+    ensureAlertPolicy(userDoc._id),
+    ensureMedicalProfile(userDoc._id, {
+      fullName: fullName.trim(),
+      emergencyPhone: emergencyContacts?.[0]?.phone || '',
+    }),
+    ensureAutomationSettings(userDoc._id),
+    ensureSecuritySettings(userDoc._id),
+  ]);
+
+  await createInteractionEvent({
+    userId: userDoc._id,
     type: 'ACCOUNT_REGISTERED',
     source: 'MOBILE_APP',
     metadata: { timerIntervalMinutes: interval },
   });
-  createAlertEvent({
-    userId: id,
+  await createAlertEvent({
+    userId: userDoc._id,
     level: 'INFO',
     status: 'REGISTERED',
     source: 'USER',
@@ -173,7 +155,8 @@ async function registerUser(req, res) {
     message: `${fullName.trim()} da dang ky SafeSolo`,
     metadata: { timerIntervalMinutes: interval },
   });
-  return res.status(201).json(mapUserRow(created));
+
+  return res.status(201).json(mapUserDoc(userDoc));
 }
 
 async function checkin(req, res) {
@@ -184,40 +167,32 @@ async function checkin(req, res) {
     return res.status(400).json({ message: 'location.lat and location.lng are required numbers' });
   }
 
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const now = nowIso();
-  const deadline = computeDeadlineIso(user.timer_interval_minutes);
-  const locationJson = JSON.stringify({ lat: location.lat, lng: location.lng, updatedAt: now });
+  const now = new Date();
+  userDoc.lastCheckinTime = now;
+  userDoc.nextDeadline = new Date(Date.now() + userDoc.timerIntervalMinutes * 60 * 1000);
+  userDoc.lastKnownLocation = { lat: location.lat, lng: location.lng, updatedAt: now };
+  userDoc.currentStatus = 'SAFE';
+  await userDoc.save();
 
-  userStatements.updateCheckin.run({
-    id,
-    last_checkin_time: now,
-    next_deadline: deadline,
-    last_known_location: locationJson,
-    updated_at: now,
+  await CheckInHistory.create({
+    userId: id,
+    checkinTime: now,
+    locationAtCheckin: { lat: location.lat, lng: location.lng },
+    isSystemAutoTriggered: false,
   });
 
-  checkinStatements.create.run({
-    id: crypto.randomUUID(),
-    user_id: id,
-    checkin_time: now,
-    location_at_checkin: JSON.stringify({ lat: location.lat, lng: location.lng }),
-    is_system_auto_triggered: 0,
-    created_at: now,
-  });
-
-  const updated = userStatements.getById.get(id);
-  createInteractionEvent({
+  await createInteractionEvent({
     userId: id,
     type: 'CHECKIN_TAP_OK',
     source: 'MOBILE_APP',
     metadata: { location },
   });
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'CHECKIN_OK',
@@ -226,7 +201,8 @@ async function checkin(req, res) {
     message: 'Nguoi dung da xac nhan an toan',
     metadata: { location },
   });
-  return res.json({ message: 'Check-in successful', user: mapUserRow(updated) });
+
+  return res.json({ message: 'Check-in successful', user: mapUserDoc(userDoc) });
 }
 
 async function updateTimer(req, res) {
@@ -238,20 +214,16 @@ async function updateTimer(req, res) {
     return res.status(400).json({ message: 'timerIntervalMinutes must be >= 30' });
   }
 
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  userStatements.updateTimer.run({
-    id,
-    timer_interval_minutes: interval,
-    next_deadline: computeDeadlineIso(interval),
-    updated_at: nowIso(),
-  });
+  userDoc.timerIntervalMinutes = interval;
+  userDoc.nextDeadline = new Date(Date.now() + interval * 60 * 1000);
+  await userDoc.save();
 
-  const updated = userStatements.getById.get(id);
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'TIMER_UPDATED',
@@ -260,7 +232,8 @@ async function updateTimer(req, res) {
     message: `Chu ky moi: ${interval} phut`,
     metadata: { timerIntervalMinutes: interval },
   });
-  return res.json({ message: 'Timer updated', user: mapUserRow(updated) });
+
+  return res.json({ message: 'Timer updated', user: mapUserDoc(userDoc) });
 }
 
 async function updateLocation(req, res) {
@@ -271,24 +244,15 @@ async function updateLocation(req, res) {
     return res.status(400).json({ message: 'location.lat and location.lng are required numbers' });
   }
 
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const now = nowIso();
-  userStatements.updateLocation.run({
-    id,
-    last_known_location: JSON.stringify({ lat: location.lat, lng: location.lng, updatedAt: now }),
-    updated_at: now,
-  });
+  userDoc.lastKnownLocation = { lat: location.lat, lng: location.lng, updatedAt: new Date() };
+  await userDoc.save();
 
-  const updated = userStatements.getById.get(id);
-  return res.json({ message: 'Location updated', user: mapUserRow(updated) });
-}
-
-function isValidHourMinute(value) {
-  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
+  return res.json({ message: 'Location updated', user: mapUserDoc(userDoc) });
 }
 
 async function updatePreferences(req, res) {
@@ -304,21 +268,17 @@ async function updatePreferences(req, res) {
     return res.status(400).json({ message: 'falseAlertGraceMinutes must be between 0 and 30' });
   }
 
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  userStatements.updatePreferences.run({
-    id,
-    quiet_hours_start: quietHoursStart,
-    quiet_hours_end: quietHoursEnd,
-    false_alert_grace_minutes: grace,
-    updated_at: nowIso(),
-  });
+  userDoc.quietHoursStart = quietHoursStart;
+  userDoc.quietHoursEnd = quietHoursEnd;
+  userDoc.falseAlertGraceMinutes = grace;
+  await userDoc.save();
 
-  const updated = userStatements.getById.get(id);
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'PREFERENCES_UPDATED',
@@ -328,7 +288,7 @@ async function updatePreferences(req, res) {
     metadata: { quietHoursStart, quietHoursEnd, falseAlertGraceMinutes: grace },
   });
 
-  return res.json({ message: 'Preferences updated', user: mapUserRow(updated) });
+  return res.json({ message: 'Preferences updated', user: mapUserDoc(userDoc) });
 }
 
 async function setSleepMode(req, res) {
@@ -340,60 +300,54 @@ async function setSleepMode(req, res) {
     return res.status(400).json({ message: 'minutes must be between 0 and 1440' });
   }
 
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const sleepUntil = duration === 0 ? null : new Date(Date.now() + duration * 60 * 1000).toISOString();
+  userDoc.sleepModeUntil = duration === 0 ? null : new Date(Date.now() + duration * 60 * 1000);
+  await userDoc.save();
 
-  userStatements.updateSleepMode.run({
-    id,
-    sleep_mode_until: sleepUntil,
-    updated_at: nowIso(),
-  });
-
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: duration === 0 ? 'SLEEP_MODE_OFF' : 'SLEEP_MODE_ON',
     source: 'USER',
     title: duration === 0 ? 'Tat sleep mode' : 'Bat sleep mode',
     message: duration === 0 ? 'Da tat che do tam dung canh bao' : `Tam dung canh bao trong ${duration} phut`,
-    metadata: { minutes: duration, sleepModeUntil: sleepUntil },
+    metadata: { minutes: duration, sleepModeUntil: toIso(userDoc.sleepModeUntil) },
   });
 
-  const updated = userStatements.getById.get(id);
-  return res.json({ message: 'Sleep mode updated', user: mapUserRow(updated) });
+  return res.json({ message: 'Sleep mode updated', user: mapUserDoc(userDoc) });
 }
 
 async function listUsers(_req, res) {
-  const users = userStatements.list.all().map(mapUserRow);
-  return res.json(users);
+  const users = await User.find().sort({ createdAt: -1 });
+  return res.json(users.map(mapUserDoc));
 }
 
 async function getUserById(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json(mapUserRow(user));
+  return res.json(mapUserDoc(userDoc));
 }
 
 async function getAlertPolicy(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json(ensureAlertPolicy(id));
+  return res.json(await ensureAlertPolicy(id));
 }
 
 async function updateAlertPolicyByUser(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
@@ -415,14 +369,14 @@ async function updateAlertPolicyByUser(req, res) {
     });
   }
 
-  const policy = updateAlertPolicy(id, {
+  const policy = await updateAlertPolicy(id, {
     level1Minutes,
     level2Minutes,
     level3Minutes,
     level4Enabled,
   });
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'ALERT_POLICY_UPDATED',
@@ -437,19 +391,19 @@ async function updateAlertPolicyByUser(req, res) {
 
 async function listUserInteractions(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const events = listInteractionEvents(id, req.query.limit);
+  const events = await listInteractionEvents(id, req.query.limit);
   return res.json(events);
 }
 
 async function createUserInteraction(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
@@ -458,7 +412,7 @@ async function createUserInteraction(req, res) {
     return res.status(400).json({ message: 'type and source are required' });
   }
 
-  createInteractionEvent({
+  await createInteractionEvent({
     userId: id,
     type,
     source,
@@ -470,18 +424,18 @@ async function createUserInteraction(req, res) {
 
 async function listGuardians(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  return res.json(mapUserRow(user).emergencyContacts || []);
+  return res.json(mapUserDoc(userDoc).emergencyContacts || []);
 }
 
 async function createGuardian(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
@@ -495,7 +449,7 @@ async function createGuardian(req, res) {
     return res.status(400).json({ message: 'name, phone, and relation are required' });
   }
 
-  const contacts = normalizeContacts(mapUserRow(user).emergencyContacts);
+  const contacts = normalizeContacts(userDoc.emergencyContacts);
   if (contacts.some((item) => item.phone === guardian.phone)) {
     return res.status(409).json({ message: 'Guardian phone already exists' });
   }
@@ -503,14 +457,10 @@ async function createGuardian(req, res) {
     return res.status(400).json({ message: 'Maximum 3 guardians allowed' });
   }
 
-  const nextContacts = [...contacts, guardian];
-  userStatements.updateContacts.run({
-    id,
-    emergency_contacts: JSON.stringify(nextContacts),
-    updated_at: nowIso(),
-  });
+  userDoc.emergencyContacts = [...contacts, guardian];
+  await userDoc.save();
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'GUARDIAN_ADDED',
@@ -520,30 +470,27 @@ async function createGuardian(req, res) {
     metadata: guardian,
   });
 
-  return res.status(201).json(nextContacts);
+  return res.status(201).json(normalizeContacts(userDoc.emergencyContacts));
 }
 
 async function deleteGuardian(req, res) {
   const { id, phone } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
   const targetPhone = decodeURIComponent(phone);
-  const contacts = normalizeContacts(mapUserRow(user).emergencyContacts);
+  const contacts = normalizeContacts(userDoc.emergencyContacts);
   const nextContacts = contacts.filter((item) => item.phone !== targetPhone);
-  if (nextContacts.length == contacts.length) {
+  if (nextContacts.length === contacts.length) {
     return res.status(404).json({ message: 'Guardian not found' });
   }
 
-  userStatements.updateContacts.run({
-    id,
-    emergency_contacts: JSON.stringify(nextContacts),
-    updated_at: nowIso(),
-  });
+  userDoc.emergencyContacts = nextContacts;
+  await userDoc.save();
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'GUARDIAN_REMOVED',
@@ -558,40 +505,41 @@ async function deleteGuardian(req, res) {
 
 async function getMedicalProfile(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json(ensureMedicalProfile(id, {
-    fullName: user.full_name,
-    emergencyPhone: normalizeContacts(mapUserRow(user).emergencyContacts)[0]?.phone || '',
+  return res.json(await ensureMedicalProfile(id, {
+    fullName: userDoc.fullName,
+    emergencyPhone: normalizeContacts(userDoc.emergencyContacts)[0]?.phone || '',
   }));
 }
 
 async function updateMedicalProfile(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const now = nowIso();
-  medicalProfileStatements.upsert.run({
-    user_id: id,
-    full_name: String(req.body.fullName || '').trim(),
-    birth_year: String(req.body.birthYear || '').trim(),
-    blood_type: String(req.body.bloodType || 'O+').trim() || 'O+',
-    allergies: String(req.body.allergies || '').trim(),
-    conditions: String(req.body.conditions || '').trim(),
-    medications: String(req.body.medications || '').trim(),
-    emergency_phone: String(req.body.emergencyPhone || '').trim(),
-    insurance_provider: String(req.body.insuranceProvider || '').trim(),
-    insurance_number: String(req.body.insuranceNumber || '').trim(),
-    created_at: now,
-    updated_at: now,
-  });
+  const profile = await MedicalProfile.findOneAndUpdate(
+    { userId: id },
+    {
+      userId: id,
+      fullName: String(req.body.fullName || '').trim(),
+      birthYear: String(req.body.birthYear || '').trim(),
+      bloodType: String(req.body.bloodType || 'O+').trim() || 'O+',
+      allergies: String(req.body.allergies || '').trim(),
+      conditions: String(req.body.conditions || '').trim(),
+      medications: String(req.body.medications || '').trim(),
+      emergencyPhone: String(req.body.emergencyPhone || '').trim(),
+      insuranceProvider: String(req.body.insuranceProvider || '').trim(),
+      insuranceNumber: String(req.body.insuranceNumber || '').trim(),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'MEDICAL_PROFILE_UPDATED',
@@ -601,53 +549,54 @@ async function updateMedicalProfile(req, res) {
     metadata: { bloodType: req.body.bloodType || 'O+' },
   });
 
-  return res.json(ensureMedicalProfile(id));
+  return res.json(mapMedicalProfileDoc(profile));
 }
 
 async function getAutomationSettings(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json(ensureAutomationSettings(id));
+  return res.json(await ensureAutomationSettings(id));
 }
 
 async function updateAutomationSettings(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const current = ensureAutomationSettings(id);
+  const current = await ensureAutomationSettings(id);
   const dailyReminderTime = String(req.body.dailyReminderTime || current.dailyReminderTime).trim();
   const pillTime = String(req.body.pillTime || current.pillTime).trim();
   if (!isValidHourMinute(dailyReminderTime) || !isValidHourMinute(pillTime)) {
     return res.status(400).json({ message: 'dailyReminderTime and pillTime must be HH:mm' });
   }
 
-  const now = nowIso();
   const shakeSos = req.body.shakeSos ?? current.shakeSos;
   const fallDetection = req.body.fallDetection ?? current.fallDetection;
   const geofenceAutoCheckin = req.body.geofenceAutoCheckin ?? current.geofenceAutoCheckin;
   const pillReminder = req.body.pillReminder ?? current.pillReminder;
-  automationSettingsStatements.upsert.run({
-    user_id: id,
-    daily_reminder_time: dailyReminderTime,
-    shake_sos: shakeSos ? 1 : 0,
-    shake_sensitivity: Number(req.body.shakeSensitivity ?? current.shakeSensitivity) || 3,
-    fall_detection: fallDetection ? 1 : 0,
-    geofence_auto_checkin: geofenceAutoCheckin ? 1 : 0,
-    pill_reminder: pillReminder ? 1 : 0,
-    pill_time: pillTime,
-    home_location: req.body.homeLocation ? JSON.stringify(req.body.homeLocation) : JSON.stringify(current.homeLocation),
-    last_geofence_event_at: current.lastGeofenceEventAt,
-    created_at: now,
-    updated_at: now,
-  });
+  const settings = await AutomationSetting.findOneAndUpdate(
+    { userId: id },
+    {
+      userId: id,
+      dailyReminderTime,
+      shakeSos: Boolean(shakeSos),
+      shakeSensitivity: Number(req.body.shakeSensitivity ?? current.shakeSensitivity) || 3,
+      fallDetection: Boolean(fallDetection),
+      geofenceAutoCheckin: Boolean(geofenceAutoCheckin),
+      pillReminder: Boolean(pillReminder),
+      pillTime,
+      homeLocation: req.body.homeLocation ?? current.homeLocation,
+      lastGeofenceEventAt: current.lastGeofenceEventAt,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'AUTOMATION_UPDATED',
@@ -657,32 +606,32 @@ async function updateAutomationSettings(req, res) {
     metadata: {
       dailyReminderTime,
       pillTime,
-        geofenceAutoCheckin: Boolean(req.body.geofenceAutoCheckin ?? current.geofenceAutoCheckin),
+      geofenceAutoCheckin: Boolean(geofenceAutoCheckin),
       fallDetection: Boolean(fallDetection),
       shakeSos: Boolean(shakeSos),
     },
   });
 
-  return res.json(ensureAutomationSettings(id));
+  return res.json(mapAutomationSettingDoc(settings));
 }
 
 async function getSecuritySettings(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
-  return res.json(ensureSecuritySettings(id));
+  return res.json(await ensureSecuritySettings(id));
 }
 
 async function updateSecuritySettings(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const current = ensureSecuritySettings(id);
+  const current = await ensureSecuritySettings(id);
   const autoWipeDays = Number(req.body.autoWipeDays ?? current.autoWipeDays);
   const stealthMode = req.body.stealthMode ?? current.stealthMode;
   const encryptionEnabled = req.body.encryptionEnabled ?? current.encryptionEnabled;
@@ -690,48 +639,50 @@ async function updateSecuritySettings(req, res) {
     return res.status(400).json({ message: 'autoWipeDays must be between 0 and 60' });
   }
 
-  const now = nowIso();
-  securitySettingsStatements.upsert.run({
-    user_id: id,
-    stealth_mode: stealthMode ? 1 : 0,
-    auto_wipe_days: autoWipeDays,
-    encryption_enabled: encryptionEnabled ? 1 : 0,
-    last_auto_wipe_due_at: current.lastAutoWipeDueAt,
-    created_at: now,
-    updated_at: now,
-  });
+  const settings = await SecuritySetting.findOneAndUpdate(
+    { userId: id },
+    {
+      userId: id,
+      stealthMode: Boolean(stealthMode),
+      autoWipeDays,
+      encryptionEnabled: Boolean(encryptionEnabled),
+      lastAutoWipeDueAt: current.lastAutoWipeDueAt,
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
 
-  createAlertEvent({
+  await createAlertEvent({
     userId: id,
     level: 'INFO',
     status: 'SECURITY_UPDATED',
     source: 'USER',
     title: 'Cap nhat bao mat',
-      message: 'Stealth mode, auto-wipe va trang thai ma hoa da duoc cap nhat',
-      metadata: {
+    message: 'Stealth mode, auto-wipe va trang thai ma hoa da duoc cap nhat',
+    metadata: {
       stealthMode: Boolean(stealthMode),
       autoWipeDays,
       encryptionEnabled: Boolean(encryptionEnabled),
     },
   });
 
-  return res.json(ensureSecuritySettings(id));
+  return res.json(mapSecuritySettingDoc(settings));
 }
 
 async function listDeviceSignals(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
   const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 100);
-  return res.json(deviceSignalStatements.listByUser.all(id, limit).map(mapDeviceSignalRow));
+  const docs = await DeviceSignal.find({ userId: id }).sort({ createdAt: -1 }).limit(limit);
+  return res.json(docs.map(mapDeviceSignalDoc));
 }
 
 async function createDeviceSignal(req, res) {
   const { id } = req.params;
-  const user = userStatements.getById.get(id);
-  if (!user) {
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
     return res.status(404).json({ message: 'User not found' });
   }
 
@@ -741,51 +692,49 @@ async function createDeviceSignal(req, res) {
     return res.status(400).json({ message: 'signalType is required' });
   }
 
-  const createdAt = nowIso();
-  deviceSignalStatements.create.run({
-    id: crypto.randomUUID(),
-    user_id: id,
-    signal_type: signalType,
-    payload_json: JSON.stringify(payload),
-    created_at: createdAt,
+  await DeviceSignal.create({
+    userId: id,
+    signalType,
+    payload,
   });
 
-  createInteractionEvent({
+  await createInteractionEvent({
     userId: id,
     type: signalType,
     source: 'DEVICE_SIGNAL',
     metadata: payload,
   });
 
-  const automation = ensureAutomationSettings(id);
+  const automation = await ensureAutomationSettings(id);
   let action = 'RECORDED';
 
   if (signalType === 'GEOFENCE_HOME_ARRIVAL' && automation.geofenceAutoCheckin) {
     const lat = Number(payload.lat);
     const lng = Number(payload.lng);
     if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
-      const now = nowIso();
-      userStatements.updateCheckin.run({
-        id,
-        last_checkin_time: now,
-        next_deadline: computeDeadlineIso(user.timer_interval_minutes),
-        last_known_location: JSON.stringify({ lat, lng, updatedAt: now }),
-        updated_at: now,
+      const now = new Date();
+      userDoc.lastCheckinTime = now;
+      userDoc.nextDeadline = new Date(
+        Date.now() + (userDoc.timerIntervalMinutes || 720) * 60 * 1000,
+      );
+      userDoc.lastKnownLocation = { lat, lng, updatedAt: now };
+      userDoc.currentStatus = 'SAFE';
+      await userDoc.save();
+
+      await CheckInHistory.create({
+        userId: id,
+        checkinTime: now,
+        locationAtCheckin: { lat, lng },
+        isSystemAutoTriggered: true,
       });
-      checkinStatements.create.run({
-        id: crypto.randomUUID(),
-        user_id: id,
-        checkin_time: now,
-        location_at_checkin: JSON.stringify({ lat, lng }),
-        is_system_auto_triggered: 1,
-        created_at: now,
-      });
-      automationSettingsStatements.touchGeofenceEvent.run({
-        user_id: id,
-        last_geofence_event_at: now,
-        updated_at: now,
-      });
-      createAlertEvent({
+
+      await AutomationSetting.findOneAndUpdate(
+        { userId: id },
+        { lastGeofenceEventAt: now },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+
+      await createAlertEvent({
         userId: id,
         level: 'INFO',
         status: 'AUTO_CHECKIN_HOME',
@@ -806,8 +755,8 @@ async function createDeviceSignal(req, res) {
     } catch (_) {
       io = { emit() {} };
     }
-    await triggerSosForUser(io, mapUserRow(user));
-    createAlertEvent({
+    await triggerSosForUser(io, mapUserDoc(userDoc));
+    await createAlertEvent({
       userId: id,
       level: signalType === 'FALL_DETECTED' ? 'LEVEL_2_ALARM' : 'LEVEL_3_SOS',
       status: signalType,

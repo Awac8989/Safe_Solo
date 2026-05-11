@@ -1,19 +1,18 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 const CheckInHistorySchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    _id: { type: String, default: () => crypto.randomUUID() },
+    userId: { type: String, required: true, index: true },
     checkinTime: { type: Date, required: true, default: Date.now },
-    locationAtCheckin: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
-    },
+    locationAtCheckin: { type: mongoose.Schema.Types.Mixed, default: null },
     isSystemAutoTriggered: { type: Boolean, default: false },
   },
   {
-    timestamps: true,
+    timestamps: { createdAt: 'createdAt', updatedAt: false },
     versionKey: false,
   },
 );
 
-module.exports = mongoose.model('CheckInHistory', CheckInHistorySchema);
+module.exports = mongoose.models.CheckInHistory || mongoose.model('CheckInHistory', CheckInHistorySchema);

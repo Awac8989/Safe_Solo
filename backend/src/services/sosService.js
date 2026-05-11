@@ -1,67 +1,62 @@
 const crypto = require('crypto');
 
-const {
-  nowIso,
-  mapEmergencyRow,
-  mapUserRow,
-  userStatements,
-  emergencyStatements,
-} = require('../config/sqlite');
+const User = require('../models/User');
+const EmergencyLog = require('../models/EmergencyLog');
 const { sendEmergencySms } = require('./smsService');
 const { createAlertEvent } = require('./alertEventService');
 const { getIo } = require('../sockets/socketServer');
+const { mapUserDoc, toIso } = require('../lib/mongoCore');
 
-async function triggerSosForUser(io, userLike) {
-  if (!userLike || userLike.currentStatus === 'SOS') {
+function mapEmergencyDoc(doc) {
+  if (!doc) {
     return null;
   }
 
-  const userRow = userStatements.getById.get(userLike._id || userLike.id);
-  if (!userRow) {
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    _id: row._id,
+    userId: row.userId,
+    triggeredAt: toIso(row.triggeredAt),
+    resolvedAt: toIso(row.resolvedAt),
+    isResolved: Boolean(row.isResolved),
+    smsSentStatus: Boolean(row.smsSentStatus),
+    locationSnapshot: row.locationSnapshot || null,
+    notes: row.notes || '',
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+  };
+}
+
+async function triggerSosForMongoUser(io, userDoc) {
+  const user = mapUserDoc(userDoc);
+  if (!user || user.currentStatus === 'SOS') {
     return null;
   }
-  const user = mapUserRow(userRow);
 
-  if (user.currentStatus === 'SOS') {
-    return null;
-  }
-
-  const now = nowIso();
-  const emergencyId = crypto.randomUUID();
-  emergencyStatements.create.run({
-    id: emergencyId,
-    user_id: user._id,
-    triggered_at: now,
-    is_resolved: 0,
-    sms_sent_status: 0,
-    location_snapshot: user.lastKnownLocation ? JSON.stringify(user.lastKnownLocation) : null,
+  const emergencyLog = await EmergencyLog.create({
+    _id: crypto.randomUUID(),
+    userId: user._id,
+    triggeredAt: new Date(),
+    isResolved: false,
+    smsSentStatus: false,
+    locationSnapshot: user.lastKnownLocation,
     notes: '',
-    created_at: now,
-    updated_at: now,
   });
 
   const smsResults = await sendEmergencySms({
-    emergencyLogId: emergencyId,
+    emergencyLogId: emergencyLog._id,
     user,
     contacts: user.emergencyContacts,
     location: user.lastKnownLocation,
   });
 
   const successCount = smsResults.filter((item) => item.success).length;
-  emergencyStatements.updateSmsStatus.run({
-    id: emergencyId,
-    sms_sent_status: successCount > 0 ? 1 : 0,
-    updated_at: nowIso(),
-  });
+  emergencyLog.smsSentStatus = successCount > 0;
+  await emergencyLog.save();
 
-  userStatements.updateStatusFields.run({
-    id: user._id,
-    current_status: 'SOS',
-    last_reminder_at: user.lastReminderAt || null,
-    last_warning_at: user.lastWarningAt || null,
-    last_sos_at: now,
-    updated_at: now,
-  });
+  userDoc.currentStatus = 'SOS';
+  userDoc.lastSosAt = new Date();
+  await userDoc.save();
 
   const payload = {
     type: 'EMERGENCY_SOS',
@@ -71,13 +66,13 @@ async function triggerSosForUser(io, userLike) {
     medicalNotes: user.medicalNotes,
     emergencyContacts: user.emergencyContacts,
     location: user.lastKnownLocation,
-    triggeredAt: now,
-    emergencyLogId: emergencyId,
+    triggeredAt: toIso(emergencyLog.triggeredAt),
+    emergencyLogId: emergencyLog._id,
   };
 
   io.emit('EMERGENCY_SOS', payload);
 
-  const alertEvent = createAlertEvent({
+  const alertEvent = await createAlertEvent({
     userId: user._id,
     level: 'LEVEL_3_SOS',
     status: 'SOS_DISPATCHED',
@@ -85,7 +80,7 @@ async function triggerSosForUser(io, userLike) {
     title: 'Kich hoat SOS',
     message: 'He thong da gui canh bao khan cap den danh ba tin cay',
     metadata: {
-      emergencyLogId: emergencyId,
+      emergencyLogId: emergencyLog._id,
       smsSent: successCount,
       smsAttempted: smsResults.length,
       smsFailed: smsResults.length - successCount,
@@ -97,29 +92,40 @@ async function triggerSosForUser(io, userLike) {
   return payload;
 }
 
+async function triggerSosForUser(io, userLike) {
+  if (!userLike) {
+    return null;
+  }
+
+  const mongoUser = await User.findById(userLike._id || userLike.id);
+  if (!mongoUser || userLike.currentStatus === 'SOS') {
+    return null;
+  }
+
+  return triggerSosForMongoUser(io, mongoUser);
+}
+
 async function resolveEmergency(logId, notes) {
-  const row = emergencyStatements.getById.get(logId);
-  if (!row) {
+  const mongoLog = await EmergencyLog.findById(logId);
+  if (!mongoLog) {
     const error = new Error('Emergency log not found');
     error.statusCode = 404;
     throw error;
   }
 
-  const now = nowIso();
-  emergencyStatements.resolve.run({
-    id: logId,
-    resolved_at: now,
-    notes: notes || row.notes || '',
-    updated_at: now,
+  mongoLog.isResolved = true;
+  mongoLog.resolvedAt = new Date();
+  mongoLog.notes = notes || mongoLog.notes || '';
+  await mongoLog.save();
+
+  await User.findByIdAndUpdate(mongoLog.userId, {
+    currentStatus: 'SAFE',
+    lastReminderAt: null,
+    lastWarningAt: null,
   });
 
-  userStatements.clearToSafe.run({
-    id: row.user_id,
-    updated_at: now,
-  });
-
-  const event = createAlertEvent({
-    userId: row.user_id,
+  const event = await createAlertEvent({
+    userId: mongoLog.userId,
     level: 'INFO',
     status: 'EMERGENCY_RESOLVED',
     source: 'ADMIN',
@@ -132,9 +138,7 @@ async function resolveEmergency(logId, notes) {
   } catch (_) {
     // ignore when socket server is not initialized
   }
-
-  const updated = emergencyStatements.getById.get(logId);
-  return mapEmergencyRow(updated);
+  return mapEmergencyDoc(mongoLog);
 }
 
 module.exports = { triggerSosForUser, resolveEmergency };

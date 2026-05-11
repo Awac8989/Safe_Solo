@@ -37,6 +37,33 @@ const upload = multer({
 });
 
 class ChatController {
+  // @desc    Send message to chat room
+  // @route   POST /api/chat/:roomId/messages
+  // @access  Private
+  async sendMessage(req, res, next) {
+    try {
+      const { roomId } = req.params;
+      const userId = req.user.id;
+      const { messageType, content, metadata } = req.body;
+
+      await chatService.checkUserAccessToRoom(userId, roomId);
+      const message = await chatService.createMessage(
+        roomId,
+        userId,
+        messageType,
+        content || '',
+        metadata || null,
+      );
+
+      res.status(201).json({
+        success: true,
+        data: { message },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // @desc    Upload voice message to chat room
   // @route   POST /api/chat/:roomId/upload-voice
   // @access  Private

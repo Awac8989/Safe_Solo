@@ -1,787 +1,353 @@
 # SafeSolo Backend
 
-A comprehensive backend API for the SafeSolo personal safety application, built with Node.js, Express, and PostgreSQL.
+Backend hiện tại của SafeSolo là API Node.js/Express phục vụ:
 
-## Features
+- Flutter mobile app
+- Web Admin
+- Safety flow như check-in, dead-man switch, SOS, guardians, medical, chat, radar
 
-- **Passwordless Authentication**: OTP-based authentication via email
-- **User Management**: Complete user profile management
-- **Medical Profiles**: Emergency medical information storage
-- **Guardian Network**: Connect with emergency contacts and guardians
-- **JWT Authorization**: Secure token-based authentication
-- **Rate Limiting**: Protection against abuse
-- **Clean Architecture**: Well-structured codebase with separation of concerns
+Trạng thái hiện tại:
 
-## Tech Stack
+- MongoDB là nguồn dữ liệu chính cho core runtime
+- Database mặc định: `Safesolo`
+- Default connection string: `mongodb://127.0.0.1:27017/Safesolo`
+- Một số phần legacy vẫn còn trong repo để hỗ trợ migrate và tương thích, nhưng luồng an toàn chính đã chạy trên Mongo
 
-- **Runtime**: Node.js
-- **Framework**: Express.js
-- **Database**: PostgreSQL
-- **ORM**: Prisma
-- **Authentication**: JWT + OTP
-- **Validation**: Joi
-- **Rate Limiting**: express-rate-limit
+## Tech stack
 
-## Quick Start
+- Node.js
+- Express.js
+- MongoDB + Mongoose
+- Socket.IO
+- BullMQ
+- ioredis
+- Joi
+- JWT
+- Multer
 
-### Prerequisites
+## Thư mục quan trọng
 
-- Node.js (v16 or higher)
-- PostgreSQL database
-- npm or yarn
-
-### Installation
-
-1. **Clone and navigate to backend directory**
-   ```bash
-   cd backend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Environment Setup**
-   ```bash
-   cp .env.example .env
-   ```
-
-   Update `.env` with your configuration:
-   ```env
-   DATABASE_URL="postgresql://username:password@localhost:5432/safesolo_db"
-   JWT_SECRET="your-super-secret-jwt-key"
-   ```
-
-4. **Database Setup**
-   ```bash
-   # Generate Prisma client
-   npx prisma generate
-
-   # Run database migrations
-   npx prisma migrate dev --name init
-
-   # (Optional) Seed database
-   npx prisma db seed
-   ```
-
-5. **Start the server**
-   ```bash
-   npm run dev  # Development with nodemon
-   # or
-   npm start    # Production
-   ```
-
-The API will be available at `http://localhost:4000`
-
-## API Documentation
-
-### Authentication Endpoints
-
-#### Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "firstName": "John",
-  "lastName": "Doe",
-  "phone": "+1234567890",
-  "dateOfBirth": "1990-01-01",
-  "gender": "MALE"
-}
-```
-
-#### Login (Send OTP)
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com"
-}
-```
-
-#### Verify OTP
-```http
-POST /api/auth/verify-otp
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "otp": "123456"
-}
-```
-
-#### Get Profile
-```http
-GET /api/auth/profile
-Authorization: Bearer <jwt_token>
-```
-
-### Medical Profile Endpoints
-
-#### Create Medical Profile
-```http
-POST /api/medical
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "bloodType": "A_POSITIVE",
-  "allergies": ["Peanuts", "Penicillin"],
-  "medications": ["Lisinopril 10mg"],
-  "medicalConditions": ["Hypertension"],
-  "emergencyContact": {
-    "name": "Jane Doe",
-    "phone": "+1234567890",
-    "relationship": "Spouse"
-  },
-  "insuranceInfo": {
-    "provider": "Blue Cross",
-    "policyNumber": "POL123456",
-    "groupNumber": "GRP789"
-  }
-}
-```
-
-### Guardian Network Endpoints
-
-#### Send Guardian Request
-```http
-POST /api/guardians/request
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "guardianId": "user_id_here",
-  "message": "I'd like to add you as my emergency contact"
-}
-```
-
-#### Get Guardians and Proteges
-```http
-GET /api/guardians
-Authorization: Bearer <jwt_token>
-```
-
-#### Search Users
-```http
-GET /api/guardians/search?q=john&limit=10
-Authorization: Bearer <jwt_token>
-```
-
-## Community Radar & Spatial Query APIs
-
-### Location Endpoints
-
-#### Update User Location
-```http
-POST /api/location
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "lat": 21.0285,
-  "lng": 105.8542
-}
-```
-
-#### Get User Location
-```http
-GET /api/location
-Authorization: Bearer <jwt_token>
-```
-
-### Radar Endpoints
-
-#### Broadcast SOS
-```http
-POST /api/radar/broadcast
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "incidentType": "medical_emergency",
-  "lat": 21.0285,
-  "lng": 105.8542
-}
-```
-
-#### Get Nearby Incidents (Volunteers)
-```http
-GET /api/radar/nearby?lat=21.0285&lng=105.8542
-Authorization: Bearer <jwt_token>
-```
-
-#### Accept Rescue Mission
-```http
-POST /api/radar/:incident_id/accept
-Authorization: Bearer <jwt_token>
-```
-
-#### Get Incident Details
-```http
-GET /api/radar/:incident_id
-Authorization: Bearer <jwt_token>
-```
-
-#### Resolve Incident (Victim Only)
-```http
-PUT /api/radar/:incident_id/resolve
-Authorization: Bearer <jwt_token>
-```
-
-## Emergency Chat & Voice APIs
-
-### Chat Endpoints
-
-#### Upload Voice Message
-```http
-POST /api/chat/:room_id/upload-voice
-Authorization: Bearer <jwt_token>
-Content-Type: multipart/form-data
-
-Form Data:
-- voice: File (audio/mpeg, audio/wav, audio/m4a, max 5MB)
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "message": {
-      "id": "message_id",
-      "roomId": "room_id",
-      "senderId": "user_id",
-      "messageType": "AUDIO",
-      "content": "/uploads/voices/filename.mp3",
-      "createdAt": "2024-01-01T00:00:00.000Z",
-      "sender": {
-        "id": "user_id",
-        "firstName": "John",
-        "lastName": "Doe",
-        "avatar": "avatar_url"
-      }
-    },
-    "fileUrl": "/uploads/voices/filename.mp3"
-  }
-}
-```
-
-#### Get Chat Messages
-```http
-GET /api/chat/:room_id/messages
-Authorization: Bearer <jwt_token>
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "messages": [
-      {
-        "id": "message_id",
-        "roomId": "room_id",
-        "senderId": "user_id",
-        "messageType": "TEXT|AUDIO|SYSTEM|LOCATION",
-        "content": "message content or file URL",
-        "createdAt": "2024-01-01T00:00:00.000Z",
-        "sender": {
-          "id": "user_id",
-          "firstName": "John",
-          "lastName": "Doe",
-          "avatar": "avatar_url"
-        }
-      }
-    ]
-  }
-}
-```
-
-### Real-time Communication (Socket.io)
-
-#### Connection
-```javascript
-import io from 'socket.io-client';
-
-const socket = io('http://localhost:4000', {
-  auth: {
-    token: 'your-jwt-token'
-  }
-});
-```
-
-#### Join Chat Room
-```javascript
-socket.emit('join_rescue_room', roomId);
-
-// Listen for join confirmation
-socket.on('joined_room', (data) => {
-  console.log('Joined room:', data.roomId);
-});
-
-// Listen for errors
-socket.on('error', (error) => {
-  console.error('Socket error:', error.message);
-});
-```
-
-#### Send Message
-```javascript
-socket.emit('send_message', {
-  roomId: 'room_id',
-  messageType: 'TEXT', // TEXT, AUDIO, SYSTEM, LOCATION
-  content: 'Hello world!'
-});
-
-// Listen for sent confirmation
-socket.on('message_sent', (message) => {
-  console.log('Message sent:', message);
-});
-
-// Listen for new messages from others
-socket.on('new_message', (message) => {
-  console.log('New message:', message);
-});
-```
-
-#### Leave Chat Room
-```javascript
-socket.emit('leave_rescue_room', roomId);
-```
-
-## Alive Circle & Community APIs
-
-### Feed Endpoints
-
-#### Create Daily Status
-```http
-POST /api/feed/status
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "mood_emoji": "😊",
-  "audio_url": "https://example.com/audio.mp3" // optional
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "status_id",
-    "userId": "user_id",
-    "mood_emoji": "😊",
-    "audio_url": null,
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "user": {
-      "firstName": "John",
-      "lastName": "Doe",
-      "avatar": "avatar_url",
-      "is_kyc_verified": true
-    }
-  }
-}
-```
-
-#### Get Alive Circle Feed
-```http
-GET /api/feed/circle?limit=20&offset=0
-Authorization: Bearer <jwt_token>
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "statuses": [
-      {
-        "id": "status_id",
-        "userId": "user_id",
-        "mood_emoji": "😊",
-        "audio_url": null,
-        "createdAt": "2024-01-01T00:00:00.000Z",
-        "user": {
-          "id": "user_id",
-          "firstName": "John",
-          "lastName": "Doe",
-          "avatar": "avatar_url",
-          "is_kyc_verified": true
-        }
-      }
-    ],
-    "pagination": {
-      "limit": 20,
-      "offset": 0,
-      "count": 1
-    }
-  }
-}
-```
-
-### Community Endpoints
-
-#### Get Hero Profile
-```http
-GET /api/community/heroes/:id
-Authorization: Bearer <jwt_token>
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "hero_id",
-    "firstName": "John",
-    "lastName": "Doe",
-    "avatar": "avatar_url",
-    "trust_score": 4.8,
-    "rescues_count": 15,
-    "is_kyc_verified": true,
-    "receivedThankYouNotes": [
-      {
-        "id": "note_id",
-        "content": "Thank you for saving my life!",
-        "createdAt": "2024-01-01T00:00:00.000Z",
-        "author": {
-          "id": "author_id",
-          "firstName": "Jane",
-          "lastName": "Smith",
-          "avatar": "avatar_url"
-        }
-      }
-    ]
-  }
-}
-```
-
-#### Post Thank You Note
-```http
-POST /api/community/heroes/:id/thank-you
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "content": "Thank you for your bravery and kindness!",
-  "rating": 5 // optional, 1-5
-}
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "note_id",
-    "volunteerId": "hero_id",
-    "authorId": "user_id",
-    "content": "Thank you for your bravery and kindness!",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "author": {
-      "id": "user_id",
-      "firstName": "Jane",
-      "lastName": "Smith",
-      "avatar": "avatar_url"
-    }
-  }
-}
-```
-
-### KYC Endpoints
-
-#### Upload KYC Documents
-```http
-POST /api/kyc/upload
-Authorization: Bearer <jwt_token>
-Content-Type: multipart/form-data
-
-Form Data:
-- front_image: File (JPG, JPEG, PNG, max 5MB)
-- back_image: File (JPG, JPEG, PNG, max 5MB)
-```
-
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "kyc_id",
-    "userId": "user_id",
-    "front_image_url": "/uploads/kyc/front-image.jpg",
-    "back_image_url": "/uploads/kyc/back-image.jpg",
-    "status": "PENDING",
-    "submitted_at": "2024-01-01T00:00:00.000Z"
-  }
-}
-```
-
-## Database Schema
-
-### User Model
-- `id`: String (CUID)
-- `email`: String (unique)
-- `phone`: String (optional, unique)
-- `firstName`: String
-- `lastName`: String
-- `dateOfBirth`: DateTime (optional)
-- `gender`: Enum (optional)
-- `avatar`: String (optional)
-- `isActive`: Boolean (default: true)
-- `isVerified`: Boolean (default: false)
-- `otpCode`: String (hashed)
-- `otpExpiresAt`: DateTime
-- `lastLoginAt`: DateTime
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
-
-### MedicalProfile Model
-- `id`: String (CUID)
-- `userId`: String (unique, foreign key)
-- `bloodType`: Enum (optional)
-- `allergies`: String[] (array)
-- `medications`: String[] (array)
-- `medicalConditions`: String[] (array)
-- `emergencyContact`: JSON (optional)
-- `insuranceInfo`: JSON (optional)
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
-
-### GuardianRelationship Model
-- `id`: String (CUID)
-- `requesterId`: String (foreign key)
-- `guardianId`: String (foreign key)
-- `status`: Enum (PENDING, ACCEPTED, REJECTED, BLOCKED)
-- `message`: String (optional)
-- `createdAt`: DateTime
-- `updatedAt`: DateTime
-
-### ChatRoom Model
-- `id`: String (CUID)
-- `incidentId`: String (unique, foreign key to RescueIncident)
-- `status`: Enum (ACTIVE, READ_ONLY)
-- `createdAt`: DateTime
-- `closedAt`: DateTime (optional)
-
-### Message Model
-- `id`: String (CUID)
-- `roomId`: String (foreign key to ChatRoom)
-- `senderId`: String (optional, foreign key to User, null for system messages)
-- `messageType`: Enum (TEXT, AUDIO, SYSTEM, LOCATION)
-- `content`: String (text content or file URL)
-- `createdAt`: DateTime
-
-### DailyStatus Model
-- `id`: String (CUID)
-- `userId`: String (foreign key to User)
-- `mood_emoji`: String
-- `audio_url`: String (optional)
-- `createdAt`: DateTime
-
-### ThankYouNote Model
-- `id`: String (CUID)
-- `volunteerId`: String (foreign key to User)
-- `authorId`: String (foreign key to User)
-- `content`: String
-- `createdAt`: DateTime
-
-### KYCDocument Model
-- `id`: String (CUID)
-- `userId`: String (unique, foreign key to User)
-- `front_image_url`: String
-- `back_image_url`: String
-- `status`: Enum (PENDING, APPROVED, REJECTED)
-- `submitted_at`: DateTime
-
-## Development
-
-### Available Scripts
-
-- `npm run dev`: Start development server with nodemon
-- `npm start`: Start production server
-- `npm test`: Run tests (when implemented)
-
-### Project Structure
-
-```
+```text
 backend/
-├── prisma/
-│   ├── schema.prisma          # Database schema
-│   └── migrations/            # Database migrations
-├── src/
-│   ├── config/
-│   │   └── database.js        # Prisma client setup
-│   ├── controllers/           # Route handlers
-│   ├── middleware/            # Custom middleware
-│   ├── routes/               # API routes
-│   ├── services/             # Business logic
-│   └── utils/                # Utility functions
-├── .env.example              # Environment variables template
-├── package.json
-├── server.js                 # Application entry point
-└── README.md
+├─ data/                    Dữ liệu legacy/runtime cũ
+├─ scripts/                 Seed, migrate, verify
+├─ src/
+│  ├─ config/               DB config
+│  ├─ controllers/          HTTP controllers
+│  ├─ middleware/           Auth, error handling
+│  ├─ models/               Mongoose models
+│  ├─ routes/               API routes
+│  ├─ services/             Business logic
+│  ├─ sockets/              Socket.IO server
+│  └─ workers/              BullMQ workers
+├─ package.json
+└─ server.js
 ```
 
-## System Logic and Data Flow
+## Cách chạy
 
-### Silent SOS / Duress Code
+### 1. Cài dependency
 
-- Khi người dùng nhập mã PIN giả, frontend gọi `POST /api/emergency/silent-sos`.
-- Backend trả ngay `200 { success: true, message: 'Alarm disabled' }` trước khi thực hiện bất kỳ thao tác nặng nào.
-- Sau đó, hàm xử lý background tạo một `RescueIncident` mới với:
-  - `status = 'ACTIVE'`
-  - `incidentType = 'silent_sos'`
-  - `severity = 3`
-- Backend cũng ghi một dòng `SystemLog` để câu chuyện có thể audit.
-- Sau khi incident được tạo, hệ thống phát sự kiện Socket `ADMIN_SILENT_SOS` để Web Admin hoặc tổng đài viên can thiệp.
-
-### Dead Man's Switch (Grace Period)
-
-- Trường dữ liệu `next_checkin_deadline` được lưu trong bảng `User`.
-- Worker BullMQ/Redis chạy mỗi phút và quét các user:
-  - `next_checkin_deadline < now`
-  - không có `RescueIncident` nào đang mở (`ACTIVE`).
-- Worker kiểm tra lock Redis để tránh chạy trùng nhiều server.
-- Nếu user quá hạn mà chưa có cảnh báo, worker gửi cảnh báo cho guardian cấp 1 (`escalationLevel = 1`).
-- Hệ thống cập nhật:
-  - `deadmanStage = 1`
-  - `deadmanEscalationTriggeredAt`
-- Worker đẩy một job delay 5 phút (`escalate-user`) để kiểm tra lại.
-- Sau 5 phút, nếu user vẫn chưa check-in và vẫn chưa có incident mở, worker gửi cảnh báo tiếp cho guardian cấp 2.
-- Mọi bước đều ghi `SystemLog` để theo dõi và tránh loop gửi tin rác.
-
-### Auto-Wipe / Dead Man's Delete
-
-- Model `Vault` chứa dữ liệu nhạy cảm của user.
-- User bật `is_auto_wipe_enabled = true` và cấu hình `auto_wipe_days`.
-- Job hàng đêm chạy vào `00:00` bằng BullMQ repeatable job `auto-wipe`.
-- Job quét user có `is_auto_wipe_enabled = true` và `auto_wipe_days` khác null.
-- Nếu `next_checkin_deadline` của user đã quá hạn hơn `auto_wipe_days`, hệ thống:
-  - mã hóa rác hoặc gán `content: { shredded: true }`
-  - cập nhật `shreddedAt`
-- Job cũng ghi `SystemLog` với hành vi `AUTO_WIPE_EXECUTED`.
-
-## Dữ liệu được lưu như thế nào
-
-### Bảng chính và ý nghĩa
-
-- `users`: thông tin profile, auth, check-in, duress, auto-wipe.
-- `rescue_incidents`: các sự kiện cứu hộ khẩn cấp, bao gồm Silent SOS.
-- `guardian_relationships`: mạng guardian và cấp độ cảnh báo.
-- `chat_rooms` / `messages`: lưu chat thoại và tin nhắn emergencies.
-- `system_logs`: nhật ký audit cho automation và cảnh báo.
-- `vaults`: dữ liệu nhạy cảm cần xóa hoặc shred.
-- `kyc_documents`: hình KYC front/back và trạng thái duyệt.
-
-### Cách lưu file upload
-
-- Voice/audio chat được lưu trong thư mục `backend/uploads/voices`.
-- URL file được lưu vào trường `content` của `Message` dưới dạng đường dẫn nội bộ.
-- KYC image được lưu trong `backend/uploads/kyc` và đường dẫn lưu vào `KYCDocument`.
-
-### Cơ chế phối hợp giữa API và worker
-
-- API `silent-sos`: ghi `RescueIncident`, kích hoạt socket và audit log.
-- Worker `monitor-checkins`: quét user, gửi SMS/Zalo, tạo job delay, update trạng thái user.
-- Worker `auto-wipe`: quét vault, shred dữ liệu nhạy cảm, log hành động.
-
-## Deploy and GitHub Push
-
-### 1. Cập nhật code
-
-```bash
-cd backend
+```powershell
+cd c:\Users\Admin\SafeSolo\backend
 npm install
 ```
 
-### 2. Kiểm tra thay đổi
+### 2. Bật MongoDB
 
-```bash
-git status
+Local mặc định:
+
+```text
+mongodb://127.0.0.1:27017/Safesolo
 ```
 
-### 3. Thêm thay đổi vào stage
+Bạn có thể override bằng biến môi trường:
 
-```bash
-git add .
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/Safesolo
+MONGODB_DB_NAME=Safesolo
+PORT=4000
+JWT_SECRET=your-secret
 ```
 
-### 4. Commit với thông điệp rõ ràng
+### 3. Chạy API
 
-```bash
-git commit -m "Add silent SOS duress worker, dead man switch, auto-wipe, and audit logging"
+```powershell
+npm run dev
 ```
 
-### 5. Push lên GitHub
+Hoặc:
 
-```bash
-git push origin <ten-nhanh>
+```powershell
+npm start
 ```
 
-### 6. Nếu chưa có nhánh remote
+Health endpoint:
 
-```bash
-git checkout -b <ten-nhanh>
-git push -u origin <ten-nhanh>
+- [http://127.0.0.1:4000/health](http://127.0.0.1:4000/health)
+- [http://127.0.0.1:4000/api/health](http://127.0.0.1:4000/api/health)
+
+## Redis có bắt buộc không
+
+Không bắt buộc để API cơ bản hoạt động.
+
+Nếu Redis chưa bật:
+
+- API chính vẫn chạy
+- worker BullMQ có thể log `ECONNREFUSED 127.0.0.1:6379`
+
+Nếu muốn dùng đầy đủ worker realtime ổn định hơn, hãy bật Redis local.
+
+## Các script sẵn có
+
+```powershell
+npm run dev
+npm start
+npm run seed:demo-users
+npm run migrate:sqlite-to-mongo
+npm run verify:mongo-counts
 ```
 
-### 7. Kiểm tra remote
+### Seed user demo
 
-```bash
-git remote -v
+```powershell
+npm run seed:demo-users
 ```
 
-> Lưu ý: trước khi push, hãy đảm bảo `.env` không được add vào Git và chỉ giữ file cấu hình môi trường cục bộ.
+### Migrate dữ liệu cũ từ SQLite sang Mongo
 
-## Security Features
-
-- **JWT Authentication**: Secure token-based auth with 7-day expiration
-- **OTP Verification**: 6-digit OTP with 10-minute expiration
-- **Rate Limiting**: 100 requests per 15 minutes per IP
-- **Input Validation**: Joi schema validation for all inputs
-- **SQL Injection Protection**: Prisma ORM prevents SQL injection
-- **CORS**: Configured CORS for cross-origin requests
-
-## Error Handling
-
-The API uses consistent error response format:
-
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "details": ["Validation error details"] // optional
-}
+```powershell
+npm run migrate:sqlite-to-mongo
 ```
 
-Common HTTP status codes:
+### Verify số lượng dữ liệu sau migrate
 
-| Status Code | Meaning |
-| --- | --- |
-| `200` | Success |
-| `201` | Created |
-| `400` | Bad Request (validation errors) |
-| `401` | Unauthorized |
-| `403` | Forbidden |
-| `404` | Not Found |
-| `409` | Conflict (duplicate data) |
-| `500` | Internal Server Error |
+```powershell
+npm run verify:mongo-counts
+```
 
-## Contributing
+## Các nhóm API chính
 
-1. Follow the existing code structure and naming conventions
-2. Add proper validation for new endpoints
-3. Include error handling for all operations
-4. Update this README for API changes
-5. Test your changes thoroughly
+### 1. Health
+
+- `GET /health`
+- `GET /api/health`
+
+### 2. Auth
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/verify-otp`
+- `POST /api/auth/google-mock`
+- `GET /api/auth/profile`
+- `PATCH /api/auth/profile`
+- `PATCH /api/auth/settings`
+- `GET /api/auth/bootstrap`
+
+### 3. User core / Flutter legacy contract
+
+- `POST /api/users/register`
+- `GET /api/users`
+- `GET /api/users/:id`
+- `POST /api/users/:id/checkin`
+- `PATCH /api/users/:id/timer`
+- `PATCH /api/users/:id/location`
+- `PATCH /api/users/:id/preferences`
+- `PATCH /api/users/:id/sleep-mode`
+
+### 4. Alert policy / interactions
+
+- `GET /api/users/:id/alert-policy`
+- `PATCH /api/users/:id/alert-policy`
+- `GET /api/users/:id/interactions`
+- `POST /api/users/:id/interactions`
+
+### 5. Guardians
+
+- `GET /api/guardians`
+- `GET /api/guardians/search?q=...`
+- `POST /api/guardians/request`
+- `POST /api/guardians/respond`
+- `DELETE /api/guardians/:relationshipId`
+- `GET /api/users/:id/guardians`
+- `POST /api/users/:id/guardians`
+- `DELETE /api/users/:id/guardians/:phone`
+
+### 6. Medical
+
+- `GET /api/medical`
+- `PUT /api/medical`
+- `GET /api/users/:id/medical-profile`
+- `PUT /api/users/:id/medical-profile`
+
+### 7. Automation / Security / Device signals
+
+- `GET /api/users/:id/automation-settings`
+- `PATCH /api/users/:id/automation-settings`
+- `GET /api/users/:id/security-settings`
+- `PATCH /api/users/:id/security-settings`
+- `GET /api/users/:id/device-signals`
+- `POST /api/users/:id/device-signals`
+
+### 8. Radar / Rescue
+
+- `POST /api/radar/broadcast`
+- `GET /api/radar/nearby`
+- `POST /api/radar/:incidentId/accept`
+- `GET /api/radar/:incidentId`
+- `PUT /api/radar/:incidentId/resolve`
+
+### 9. Chat
+
+- `GET /api/chat/:roomId/messages`
+- `POST /api/chat/:roomId/messages`
+
+### 10. Feed / Community
+
+- `POST /api/feed/status`
+- `GET /api/feed/circle`
+- `GET /api/community/heroes`
+- `GET /api/community/heroes/:id`
+- `POST /api/community/heroes/:id/thank-you`
+
+### 11. KYC
+
+- `POST /api/kyc/upload`
+- `GET /api/admin/kyc`
+- `PATCH /api/admin/kyc/:id`
+
+### 12. Admin safety
+
+- `GET /api/admin/overview`
+- `GET /api/admin/users`
+- `GET /api/admin/incidents`
+- `PATCH /api/admin/incidents/:id/resolve`
+- `GET /api/admin/incidents/:id/sms-logs`
+- `GET /api/admin/alerts`
+- `GET /api/admin/emergencies`
+- `PATCH /api/admin/emergencies/:id/resolve`
+- `GET /api/admin/emergencies/:id/sms-logs`
+
+## Mongoose models chính
+
+### User core
+
+- `User`
+- `CheckInHistory`
+- `EmergencyLog`
+- `AlertEvent`
+- `InteractionEvent`
+- `AlertPolicy`
+- `MedicalProfile`
+- `AutomationSetting`
+- `SecuritySetting`
+- `DeviceSignal`
+- `SmsDispatchLog`
+
+### Rescue / chat / community
+
+- `RescueIncident`
+- `VolunteerResponse`
+- `EmergencyMemo`
+- `ChatRoom`
+- `Message`
+- `DailyStatus`
+- `ThankYouNote`
+- `SystemLog`
+
+### Other
+
+- `GuardianRelationship`
+- `Vault`
+- `KYCDocument`
+
+## Luồng nghiệp vụ chính
+
+### Check-in
+
+1. Mobile gọi `POST /api/users/:id/checkin`
+2. Backend cập nhật `lastCheckinTime`, `nextDeadline`
+3. Tạo interaction event
+4. Web Admin có thể thấy timeline cảnh báo nếu user quá hạn sau đó
+
+### Dead-man switch
+
+1. Worker quét user quá hạn
+2. Tạo `AlertEvent`
+3. Gửi SMS theo escalation nếu cần
+4. Ghi `SmsDispatchLog`
+5. Đẩy dữ liệu cho admin timeline
+
+### Silent SOS / duress
+
+1. User kích hoạt duress flow
+2. Backend tạo `RescueIncident`
+3. Chat room được nối với incident
+4. Volunteer accept sẽ được thêm vào room responders
+5. Resolve incident sẽ đóng room sang `READ_ONLY`
+
+### Auto-wipe
+
+1. Worker quét user có `autoWipeDays`
+2. Khi đủ điều kiện, dữ liệu Vault local/server tương ứng được cập nhật theo policy
+3. Ghi `SystemLog`
+
+## Socket / realtime
+
+Socket server được khởi tạo trong:
+
+- [c:\Users\Admin\SafeSolo\backend\src\sockets\socketServer.js](c:/Users/Admin/SafeSolo/backend/src/sockets/socketServer.js)
+
+Server bootstrap:
+
+- [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
+
+## Các file quan trọng nên đọc trước
+
+- [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
+- [c:\Users\Admin\SafeSolo\backend\src\config\database.js](c:/Users/Admin/SafeSolo/backend/src/config/database.js)
+- [c:\Users\Admin\SafeSolo\backend\src\routes\index.js](c:/Users/Admin/SafeSolo/backend/src/routes/index.js)
+- [c:\Users\Admin\SafeSolo\backend\src\controllers\userController.js](c:/Users/Admin/SafeSolo/backend/src/controllers/userController.js)
+- [c:\Users\Admin\SafeSolo\backend\src\services\authService.js](c:/Users/Admin/SafeSolo/backend/src/services/authService.js)
+- [c:\Users\Admin\SafeSolo\backend\src\services\adminPortalService.js](c:/Users/Admin/SafeSolo/backend/src/services/adminPortalService.js)
+- [c:\Users\Admin\SafeSolo\backend\src\workers\deadmanWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/deadmanWorker.js)
+- [c:\Users\Admin\SafeSolo\backend\src\workers\duressWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/duressWorker.js)
+
+## Test nhanh bằng curl
+
+### Health
+
+```powershell
+curl http://127.0.0.1:4000/api/health
+```
+
+### List users
+
+```powershell
+curl http://127.0.0.1:4000/api/users
+```
+
+### Admin overview
+
+```powershell
+curl http://127.0.0.1:4000/api/admin/overview
+```
+
+## Ghi chú migrate
+
+- Repo vẫn còn dấu vết Prisma/SQLite/JSON store cũ ở một số module legacy
+- Core runtime cho safety, chat, rescue, community và admin safety đã được đưa sang Mongo
+- Dùng các script migrate + verify trước khi xóa hoàn toàn dữ liệu cũ
+
+## Cảnh báo khi commit
+
+Không nên commit:
+
+- `.env`
+- secret keys
+- token thật
+- file runtime không cần thiết nếu chỉ phát sinh do test
 
 ## License
 
-This project is part of the SafeSolo application.
+Private project. Nội bộ SafeSolo.

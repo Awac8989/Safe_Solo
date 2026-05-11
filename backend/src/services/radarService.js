@@ -1,65 +1,141 @@
-const { readState, withState, createId, nowIso } = require('../data/store');
-const { AppError, ensure } = require('../lib/errors');
-const { fuzzCoordinates, haversineKm, sanitizeUser } = require('../lib/utils');
+const User = require('../models/User');
+const RescueIncident = require('../models/RescueIncident');
+const VolunteerResponse = require('../models/VolunteerResponse');
+const EmergencyMemo = require('../models/EmergencyMemo');
 const chatService = require('./chatService');
 const trustService = require('./trustService');
 const { createAlertEvent } = require('./alertEventService');
 const systemLogService = require('./systemLogService');
 const { getIo } = require('../sockets/socketServer');
+const { AppError, ensure } = require('../lib/errors');
+const { fuzzCoordinates, haversineKm, sanitizeUser } = require('../lib/utils');
+const { toIso } = require('../lib/mongoCore');
+
+function mapIncident(doc) {
+  if (!doc) {
+    return null;
+  }
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: row._id,
+    victimId: row.victimId,
+    status: row.status,
+    incidentType: row.incidentType,
+    severity: row.severity,
+    source: row.source,
+    exactLat: row.exactLat,
+    exactLng: row.exactLng,
+    fuzzedLat: row.fuzzedLat,
+    fuzzedLng: row.fuzzedLng,
+    approxAddress: row.approxAddress || null,
+    batteryLevel: row.batteryLevel ?? null,
+    communityRequestedAt: toIso(row.communityRequestedAt),
+    createdAt: toIso(row.createdAt),
+    resolvedAt: toIso(row.resolvedAt),
+  };
+}
+
+function mapResponse(doc) {
+  if (!doc) {
+    return null;
+  }
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: row._id,
+    incidentId: row.incidentId,
+    volunteerId: row.volunteerId,
+    status: row.status,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
+  };
+}
+
+function mapMemo(doc) {
+  if (!doc) {
+    return null;
+  }
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: row._id,
+    incidentId: row.incidentId,
+    victimId: row.victimId,
+    createdAt: toIso(row.createdAt),
+    duration: row.duration,
+    victimName: row.victimName,
+    lat: row.lat,
+    lng: row.lng,
+    approxAddress: row.approxAddress,
+    contentUrl: row.contentUrl,
+    transcript: row.transcript,
+    isAnonymous: Boolean(row.isAnonymous),
+  };
+}
 
 class RadarService {
+  async getGuardiansForVictim(victimDoc) {
+    const phones = [...new Set((victimDoc.emergencyContacts || []).map((item) => String(item?.phone || '').trim()).filter(Boolean))];
+    if (!phones.length) {
+      return [];
+    }
+    return User.find({ phoneNumber: { $in: phones }, isActive: { $ne: false } }).lean();
+  }
+
+  async getIncidentDetailsForBroadcast(incidentId) {
+    const incidentDoc = await RescueIncident.findById(incidentId);
+    if (!incidentDoc) {
+      throw new AppError('Incident not found', 404);
+    }
+    const victim = await User.findById(incidentDoc.victimId).lean();
+    const room = await chatService.getChatRoomByIncident(incidentDoc._id).catch(() => null);
+    return {
+      ...mapIncident(incidentDoc),
+      victim: victim ? sanitizeUser(victim) : null,
+      roomId: room?._id || room?.id || null,
+    };
+  }
+
   async broadcastSOS(victimId, incidentType, exactLat, exactLng, options = {}) {
-    const result = withState((state) => {
-      const victim = state.users.find((item) => item.id === victimId);
-      ensure(victim, 'Victim not found', 404);
+    const victim = await User.findById(victimId);
+    ensure(victim, 'Victim not found', 404);
 
-      const { fuzzedLat, fuzzedLng } = fuzzCoordinates(exactLat, exactLng);
-      const incident = {
-        id: createId('incident'),
-        victimId,
-        status: 'ACTIVE',
-        incidentType,
-        severity: Number(options.severity || 3),
-        source: options.source || 'SOS',
-        exactLat,
-        exactLng,
-        fuzzedLat,
-        fuzzedLng,
-        approxAddress: options.approxAddress || victim.approxAddress || null,
-        batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
-        communityRequestedAt: null,
-        createdAt: nowIso(),
-        resolvedAt: null,
-      };
-
-      state.rescueIncidents.push(incident);
-      victim.lastLat = exactLat;
-      victim.lastLng = exactLng;
-      victim.lastLocationTime = nowIso();
-      victim.approxAddress = incident.approxAddress;
-      victim.batteryLevel = incident.batteryLevel;
-      victim.updatedAt = nowIso();
-
-      return {
-        incident,
-        victim: sanitizeUser(victim),
-      };
+    const { fuzzedLat, fuzzedLng } = fuzzCoordinates(exactLat, exactLng);
+    const incident = await RescueIncident.create({
+      victimId,
+      status: 'ACTIVE',
+      incidentType,
+      severity: Number(options.severity || 3),
+      source: options.source || 'SOS',
+      exactLat,
+      exactLng,
+      fuzzedLat,
+      fuzzedLng,
+      approxAddress: options.approxAddress || victim.approxAddress || null,
+      batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
+      communityRequestedAt: null,
+      resolvedAt: null,
     });
 
-    await chatService.createChatRoom(result.incident.id);
+    victim.lastKnownLocation = { lat: exactLat, lng: exactLng, updatedAt: new Date() };
+    victim.approxAddress = incident.approxAddress;
+    victim.batteryLevel = incident.batteryLevel;
+    await victim.save();
+
+    const guardians = await this.getGuardiansForVictim(victim);
+    await chatService.syncIncidentRoomParticipants(
+      incident._id,
+      [victimId, ...guardians.map((item) => item._id)],
+      [],
+    );
+
     await systemLogService.createLog({
-      incidentId: result.incident.id,
+      incidentId: incident._id,
       actionType: 'SOS_BROADCASTED',
-      description: `SOS incident ${result.incident.id} created for victim ${victimId}`,
-      metadata: {
-        incidentType,
-        lat: exactLat,
-        lng: exactLng,
-      },
+      description: `SOS incident ${incident._id} created for victim ${victimId}`,
+      metadata: { incidentType, lat: exactLat, lng: exactLng },
     });
 
     const nearbyVolunteers = await this.findNearbyVolunteers(exactLat, exactLng, victimId);
-    createAlertEvent({
+    await createAlertEvent({
       userId: victimId,
       level: 'SOS',
       status: 'SOS_BROADCASTED',
@@ -67,68 +143,80 @@ class RadarService {
       title: 'Da phat SOS',
       message: 'He thong dang thong bao cho guardians va tinh nguyen vien gan ban',
       metadata: {
-        incidentId: result.incident.id,
+        incidentId: incident._id,
         nearbyVolunteersCount: nearbyVolunteers.length,
       },
     });
 
     try {
       getIo().emit('RADAR_INCIDENT_CREATED', {
-        incident: await this.getIncidentDetailsForBroadcast(result.incident.id),
+        incident: await this.getIncidentDetailsForBroadcast(incident._id),
       });
     } catch (_error) {
       // socket optional
     }
 
     return {
-      incident: await this.getIncidentDetailsForBroadcast(result.incident.id),
+      incident: await this.getIncidentDetailsForBroadcast(incident._id),
       nearbyVolunteers,
     };
   }
 
-  async getIncidentDetailsForBroadcast(incidentId) {
-    const state = readState();
-    const incident = state.rescueIncidents.find((item) => item.id === incidentId);
-    if (!incident) {
-      throw new AppError('Incident not found', 404);
-    }
-    const victim = state.users.find((item) => item.id === incident.victimId);
-    return {
-      ...incident,
-      victim: victim ? sanitizeUser(victim) : null,
-      roomId: state.chatRooms.find((item) => item.incidentId === incident.id)?.id || null,
-    };
-  }
-
   async findNearbyVolunteers(lat, lng, excludeUserId, radiusKm = 3) {
-    const state = readState();
-    return state.users
-      .filter((item) => item.id !== excludeUserId && item.isActive)
-      .filter((item) => item.role === 'VOLUNTEER' || item.role === 'HERO')
-      .filter((item) => item.isKycVerified)
-      .filter((item) => item.lastLat != null && item.lastLng != null)
+    const users = await User.find({
+      _id: { $ne: excludeUserId },
+      isActive: { $ne: false },
+      isKycVerified: true,
+      lastKnownLocation: { $ne: null },
+    }).lean();
+
+    return users
       .map((item) => ({
         ...sanitizeUser(item),
-        distanceKm: Number(haversineKm(lat, lng, item.lastLat, item.lastLng).toFixed(2)),
+        distanceKm: Number(
+          haversineKm(
+            lat,
+            lng,
+            Number(item.lastKnownLocation?.lat),
+            Number(item.lastKnownLocation?.lng),
+          ).toFixed(2),
+        ),
       }))
       .filter((item) => item.distanceKm <= radiusKm)
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }
 
   async getNearbyIncidents(volunteerLat, volunteerLng, volunteerId, radiusKm = 3) {
-    const state = readState();
-    return state.rescueIncidents
-      .filter((item) => item.status === 'ACTIVE' && item.victimId !== volunteerId)
+    const incidents = await RescueIncident.find({
+      status: 'ACTIVE',
+      victimId: { $ne: volunteerId },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const victimIds = [...new Set(incidents.map((item) => item.victimId))];
+    const victims = victimIds.length ? await User.find({ _id: { $in: victimIds } }).lean() : [];
+    const victimMap = new Map(victims.map((item) => [item._id, sanitizeUser(item)]));
+
+    const accepted = await VolunteerResponse.find({
+      volunteerId,
+      incidentId: { $in: incidents.map((item) => item._id) },
+    }).lean();
+    const acceptedSet = new Set(accepted.map((item) => item.incidentId));
+
+    return incidents
       .map((incident) => {
-        const victim = state.users.find((user) => user.id === incident.victimId);
-        const distanceKm = haversineKm(volunteerLat, volunteerLng, incident.fuzzedLat, incident.fuzzedLng);
+        const distanceKm = haversineKm(
+          volunteerLat,
+          volunteerLng,
+          incident.fuzzedLat,
+          incident.fuzzedLng,
+        );
         return {
-          ...incident,
-          victim: victim ? sanitizeUser(victim) : null,
+          ...mapIncident(incident),
+          victim: victimMap.get(incident.victimId) || null,
           distanceKm: Number(distanceKm.toFixed(2)),
-          hasAccepted: state.volunteerResponses.some(
-            (response) => response.incidentId === incident.id && response.volunteerId === volunteerId,
-          ),
+          hasAccepted: acceptedSet.has(incident._id),
         };
       })
       .filter((item) => item.distanceKm <= radiusKm)
@@ -136,115 +224,113 @@ class RadarService {
   }
 
   async acceptRescueIncident(incidentId, volunteerId) {
-    return withState((state) => {
-      const volunteer = state.users.find((item) => item.id === volunteerId);
-      ensure(volunteer, 'Volunteer not found', 404);
-      ensure(volunteer.isKycVerified, 'KYC verification required before accepting rescue missions', 403);
+    const volunteer = await User.findById(volunteerId);
+    ensure(volunteer, 'Volunteer not found', 404);
+    ensure(volunteer.isKycVerified, 'KYC verification required before accepting rescue missions', 403);
 
-      const incident = state.rescueIncidents.find((item) => item.id === incidentId);
-      ensure(incident, 'Incident not found', 404);
-      ensure(incident.status === 'ACTIVE', 'Incident is no longer active', 409);
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(incident.status === 'ACTIVE', 'Incident is no longer active', 409);
 
-      const existing = state.volunteerResponses.find(
-        (item) => item.incidentId === incidentId && item.volunteerId === volunteerId,
-      );
-      if (existing) {
-        throw new AppError('You have already accepted this rescue mission', 409);
-      }
-
-      const response = {
-        id: createId('resp'),
+    let response = await VolunteerResponse.findOne({ incidentId, volunteerId });
+    if (!response) {
+      response = await VolunteerResponse.create({
         incidentId,
         volunteerId,
         status: 'EN_ROUTE',
-        createdAt: nowIso(),
-      };
-      state.volunteerResponses.push(response);
-
-      createAlertEvent({
-        userId: incident.victimId,
-        level: 'INFO',
-        status: 'VOLUNTEER_ACCEPTED',
-        source: 'COMMUNITY',
-        title: 'Tinh nguyen vien dang den',
-        message: `${volunteer.firstName} ${volunteer.lastName}`.trim() + ' da nhan ho tro',
-        metadata: { incidentId, volunteerId },
       });
+    } else {
+      throw new AppError('You have already accepted this rescue mission', 409);
+    }
 
-      return {
-        response,
-        incident: {
-          ...incident,
-          victim: sanitizeUser(state.users.find((item) => item.id === incident.victimId)),
-        },
-      };
+    await chatService.addResponderToIncidentRoom(incidentId, volunteerId);
+    await createAlertEvent({
+      userId: incident.victimId,
+      level: 'INFO',
+      status: 'VOLUNTEER_ACCEPTED',
+      source: 'COMMUNITY',
+      title: 'Tinh nguyen vien dang den',
+      message: `${sanitizeUser(volunteer).fullName} da nhan ho tro`,
+      metadata: { incidentId, volunteerId },
     });
+
+    return {
+      response: mapResponse(response),
+      incident: await this.getIncidentDetails(incidentId, volunteerId),
+    };
   }
 
   async markVolunteerArrived(incidentId, volunteerId) {
-    return withState((state) => {
-      const response = state.volunteerResponses.find(
-        (item) => item.incidentId === incidentId && item.volunteerId === volunteerId,
-      );
-      ensure(response, 'Volunteer response not found', 404);
-      response.status = 'ARRIVED';
-      return response;
-    });
+    const response = await VolunteerResponse.findOne({ incidentId, volunteerId });
+    ensure(response, 'Volunteer response not found', 404);
+    response.status = 'ARRIVED';
+    await response.save();
+    return mapResponse(response);
   }
 
   async getIncidentDetails(incidentId, requesterId) {
-    const state = readState();
-    const incident = state.rescueIncidents.find((item) => item.id === incidentId);
+    const incident = await RescueIncident.findById(incidentId);
     ensure(incident, 'Incident not found', 404);
 
+    const victim = await User.findById(incident.victimId).lean();
+    ensure(victim, 'Victim not found', 404);
+    const guardians = await this.getGuardiansForVictim(victim);
+    const guardianIds = new Set(guardians.map((item) => item._id));
+    const responses = await VolunteerResponse.find({ incidentId }).sort({ createdAt: 1 });
+    const responderIds = new Set(responses.map((item) => item.volunteerId));
     const canAccess =
       incident.victimId === requesterId ||
-      state.volunteerResponses.some(
-        (item) => item.incidentId === incidentId && item.volunteerId === requesterId,
-      ) ||
-      state.guardianRelationships.some(
-        (item) =>
-          item.requesterId === incident.victimId &&
-          item.guardianId === requesterId &&
-          item.status === 'ACCEPTED',
-      );
-
+      guardianIds.has(requesterId) ||
+      responderIds.has(requesterId);
     ensure(canAccess, 'Unauthorized to access this incident', 403);
 
+    const responderDocs = responderIds.size
+      ? await User.find({ _id: { $in: [...responderIds] } }).lean()
+      : [];
+    const responderMap = new Map(responderDocs.map((item) => [item._id, sanitizeUser(item)]));
+    const room = await chatService.getChatRoomByIncident(incidentId).catch(() => null);
+    const memos = await EmergencyMemo.find({ incidentId }).sort({ createdAt: -1 }).limit(50).lean();
+
     return {
-      ...incident,
-      victim: sanitizeUser(state.users.find((item) => item.id === incident.victimId)),
-      responses: state.volunteerResponses
-        .filter((item) => item.incidentId === incidentId)
-        .map((response) => ({
-          ...response,
-          volunteer: sanitizeUser(state.users.find((item) => item.id === response.volunteerId)),
-        })),
-      chatRoom: state.chatRooms.find((item) => item.incidentId === incidentId) || null,
-      emergencyMemos: state.emergencyMemos.filter((item) => item.incidentId === incidentId),
+      ...mapIncident(incident),
+      victim: sanitizeUser(victim),
+      responses: responses.map((response) => ({
+        ...mapResponse(response),
+        volunteer: responderMap.get(response.volunteerId) || null,
+      })),
+      chatRoom: room
+        ? {
+            id: room._id || room.id,
+            incidentId: room.incidentId,
+            roomType: room.roomType,
+            participantIds: room.participantIds || [],
+            responderIds: room.responderIds || [],
+            status: room.status,
+            createdAt: room.createdAt,
+            closedAt: room.closedAt,
+          }
+        : null,
+      emergencyMemos: memos.map(mapMemo),
     };
   }
 
   async resolveIncident(incidentId, requesterId) {
-    const result = withState((state) => {
-      const incident = state.rescueIncidents.find((item) => item.id === incidentId);
-      ensure(incident, 'Incident not found', 404);
-      ensure(incident.victimId === requesterId, 'Only the victim can resolve this incident', 403);
-      ensure(incident.status === 'ACTIVE', 'Incident is already resolved', 409);
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(incident.victimId === requesterId, 'Only the victim can resolve this incident', 403);
+    ensure(incident.status === 'ACTIVE', 'Incident is already resolved', 409);
 
-      incident.status = 'RESOLVED';
-      incident.resolvedAt = nowIso();
+    incident.status = 'RESOLVED';
+    incident.resolvedAt = new Date();
+    await incident.save();
 
-      return {
-        incident,
-        arrivedVolunteerIds: state.volunteerResponses
-          .filter((item) => item.incidentId === incidentId && item.status === 'ARRIVED')
-          .map((item) => item.volunteerId),
-      };
-    });
-
-    for (const volunteerId of result.arrivedVolunteerIds) {
-      await trustService.calculateAndUpdateTrustScore(volunteerId, 5);
+    const arrivedResponses = await VolunteerResponse.find({
+      incidentId,
+      status: 'ARRIVED',
+    }).lean();
+    for (const response of arrivedResponses) {
+      // eslint-disable-next-line no-await-in-loop
+      await trustService.calculateAndUpdateTrustScore(response.volunteerId, 5);
     }
 
     await chatService.closeChatRoom(incidentId);

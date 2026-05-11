@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
-const prisma = require('../config/database');
+const KYCDocument = require('../models/KYCDocument');
+const User = require('../models/User');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -65,30 +66,31 @@ class KYCController {
         const frontUrl = `/uploads/kyc/${frontFile.filename}`;
         const backUrl = `/uploads/kyc/${backFile.filename}`;
 
-        const document = await prisma.kYCDocument.upsert({
-          where: { userId },
-          update: {
-            front_image_url: frontUrl,
-            back_image_url: backUrl,
-            status: 'PENDING',
-            submitted_at: new Date()
-          },
-          create: {
-            userId,
-            front_image_url: frontUrl,
-            back_image_url: backUrl,
-            status: 'PENDING'
-          }
+        const document = await KYCDocument.findOneAndUpdate({
+          userId,
+        }, {
+          userId,
+          frontImageUrl: frontUrl,
+          backImageUrl: backUrl,
+          status: 'PENDING',
+          submittedAt: new Date(),
+          reviewedAt: null,
+        }, {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
         });
 
-        await prisma.user.update({
-          where: { id: userId },
-          data: { is_kyc_verified: false }
+        await User.findByIdAndUpdate(userId, {
+          isKycVerified: false,
         });
 
         res.status(201).json({
           success: true,
-          data: document
+          data: {
+            ...(document.toObject ? document.toObject() : document),
+            id: document._id,
+          }
         });
       } catch (error) {
         next(error);

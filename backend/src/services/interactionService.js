@@ -1,32 +1,45 @@
-const crypto = require('crypto');
+const InteractionEvent = require('../models/InteractionEvent');
+const { toIso } = require('../lib/mongoCore');
 
-const {
-  nowIso,
-  mapInteractionEventRow,
-  interactionEventStatements,
-} = require('../config/sqlite');
+function mapInteractionEventDoc(doc) {
+  if (!doc) {
+    return null;
+  }
 
-function createInteractionEvent({
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    _id: row._id,
+    userId: row.userId,
+    type: row.type,
+    source: row.source,
+    metadata: row.metadata || {},
+    createdAt: toIso(row.createdAt),
+  };
+}
+
+async function createInteractionEvent({
   userId,
   type,
   source,
   metadata = {},
 }) {
-  interactionEventStatements.create.run({
-    id: crypto.randomUUID(),
-    user_id: userId,
+  const event = await InteractionEvent.create({
+    userId,
     type,
     source,
-    meta_json: JSON.stringify(metadata),
-    created_at: nowIso(),
+    metadata,
   });
+
+  return mapInteractionEventDoc(event);
 }
 
-function listInteractionEvents(userId, limit = 20) {
+async function listInteractionEvents(userId, limit = 20) {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
-  return interactionEventStatements.listByUser
-    .all(userId, safeLimit)
-    .map(mapInteractionEventRow);
+  const docs = await InteractionEvent.find({ userId })
+    .sort({ createdAt: -1 })
+    .limit(safeLimit);
+
+  return docs.map(mapInteractionEventDoc);
 }
 
 module.exports = {

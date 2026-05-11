@@ -1,17 +1,11 @@
-const crypto = require('crypto');
-
-const {
-  initDatabase,
-  nowIso,
-  userStatements,
-  checkinStatements,
-  alertPolicyStatements,
-  medicalProfileStatements,
-  automationSettingsStatements,
-  securitySettingsStatements,
-} = require('../src/config/sqlite');
-
-initDatabase();
+const { connectDatabase, $disconnect } = require('../src/config/db');
+const User = require('../src/models/User');
+const CheckInHistory = require('../src/models/CheckInHistory');
+const AlertPolicy = require('../src/models/AlertPolicy');
+const MedicalProfile = require('../src/models/MedicalProfile');
+const AutomationSetting = require('../src/models/AutomationSetting');
+const SecuritySetting = require('../src/models/SecuritySetting');
+const DailyStatus = require('../src/models/DailyStatus');
 
 const demoUsers = [
   ['Nguyen Minh Anh', '0909001001'],
@@ -37,11 +31,11 @@ const demoUsers = [
 ];
 
 function hoursAgo(hours) {
-  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+  return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
 
 function hoursFromNow(hours) {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
 function buildContacts(index) {
@@ -59,12 +53,17 @@ function buildContacts(index) {
   ];
 }
 
-function seedOne([fullName, phoneNumber], index) {
-  const existed = userStatements.getByPhone.get(phoneNumber);
-  if (existed) {
-    return { created: false, id: existed.id, fullName, phoneNumber };
-  }
+function buildEmail(fullName, index) {
+  const slug = fullName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/(^\.|\.$)/g, '');
+  return `${slug || `demo.user.${index + 1}`}@safesolo.local`;
+}
 
+async function seedOne([fullName, phoneNumber], index) {
   const timerIntervalMinutes = [180, 240, 360, 480, 720, 1440][index % 6];
   const quietHoursStart = index % 2 === 0 ? '22:00' : '23:00';
   const quietHoursEnd = index % 3 === 0 ? '06:00' : '07:00';
@@ -78,106 +77,224 @@ function seedOne([fullName, phoneNumber], index) {
     lng: 106.64 + index * 0.0027,
     updatedAt,
   };
-  const id = crypto.randomUUID();
+  const contacts = buildContacts(index);
+  const existing = await User.findOne({ phoneNumber });
+  if (existing) {
+    existing.fullName = existing.fullName || fullName;
+    existing.email = existing.email || buildEmail(fullName, index);
+    existing.isActive = existing.isActive !== false;
+    existing.isVerified = existing.isVerified !== false;
+    existing.isKycVerified = existing.isKycVerified || index % 4 === 0;
+    existing.trustScore = Math.max(Number(existing.trustScore || 0), index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0);
+    existing.rescuesCount = Math.max(Number(existing.rescuesCount || 0), index % 4 === 0 ? 2 + (index % 5) : 0);
+    existing.batteryLevel = existing.batteryLevel ?? (35 + ((index * 7) % 60));
+    existing.approxAddress = existing.approxAddress || `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`;
+    existing.emergencyContacts = Array.isArray(existing.emergencyContacts) && existing.emergencyContacts.length
+      ? existing.emergencyContacts
+      : contacts;
+    existing.timerIntervalMinutes = existing.timerIntervalMinutes || timerIntervalMinutes;
+    existing.lastKnownLocation = existing.lastKnownLocation || location;
+    existing.quietHoursStart = existing.quietHoursStart || quietHoursStart;
+    existing.quietHoursEnd = existing.quietHoursEnd || quietHoursEnd;
+    existing.falseAlertGraceMinutes = existing.falseAlertGraceMinutes ?? falseAlertGraceMinutes;
+    await existing.save();
 
-  userStatements.create.run({
-    id,
-    full_name: fullName,
-    phone_number: phoneNumber,
-    role: 'user',
-    medical_notes: index % 4 === 0 ? 'Hen suyễn nhẹ' : '',
-    emergency_contacts: JSON.stringify(buildContacts(index)),
-    timer_interval_minutes: timerIntervalMinutes,
-    last_checkin_time: lastCheckinTime,
-    next_deadline: nextDeadline,
-    current_status: 'SAFE',
-    last_known_location: JSON.stringify(location),
-    quiet_hours_start: quietHoursStart,
-    quiet_hours_end: quietHoursEnd,
-    sleep_mode_until: null,
-    false_alert_grace_minutes: falseAlertGraceMinutes,
-    created_at: createdAt,
-    updated_at: updatedAt,
-  });
+    await Promise.all([
+      AlertPolicy.findOneAndUpdate(
+        { userId: existing._id },
+        {
+          userId: existing._id,
+          level1Minutes: 30,
+          level2Minutes: 5 + (index % 3) * 5,
+          level3Minutes: 15 + (index % 2) * 5,
+          level4Enabled: index % 5 === 0,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ),
+      MedicalProfile.findOneAndUpdate(
+        { userId: existing._id },
+        {
+          userId: existing._id,
+          fullName: existing.fullName,
+          birthYear: String(1988 + (index % 12)),
+          bloodType: ['A+', 'B+', 'AB+', 'O+', 'O-'][index % 5],
+          allergies: index % 4 === 0 ? 'Penicillin' : '',
+          conditions: index % 3 === 0 ? 'Tang huyet ap' : '',
+          medications: index % 2 === 0 ? 'Vitamin C' : '',
+          emergencyPhone: contacts[0].phone,
+          insuranceProvider: index % 2 === 0 ? 'Bao Viet' : 'PVI',
+          insuranceNumber: `BH-${1000 + index}`,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ),
+      AutomationSetting.findOneAndUpdate(
+        { userId: existing._id },
+        {
+          userId: existing._id,
+          dailyReminderTime: index % 2 === 0 ? '07:30' : '08:00',
+          shakeSos: true,
+          shakeSensitivity: 3,
+          fallDetection: index % 4 === 0,
+          geofenceAutoCheckin: index % 3 !== 0,
+          pillReminder: index % 2 === 0,
+          pillTime: index % 2 === 0 ? '08:15' : '20:00',
+          homeLocation: { lat: location.lat + 0.001, lng: location.lng + 0.001 },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ),
+      SecuritySetting.findOneAndUpdate(
+        { userId: existing._id },
+        {
+          userId: existing._id,
+          stealthMode: index % 6 === 0,
+          autoWipeDays: [0, 7, 30, 60][index % 4],
+          encryptionEnabled: true,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ),
+      DailyStatus.findOneAndUpdate(
+        { userId: existing._id },
+        {
+          userId: existing._id,
+          moodEmoji: ['😊', '😐', '🤒'][index % 3],
+          text: index % 2 === 0 ? 'Da check-in va van on.' : 'Hom nay toi van an toan.',
+          visibility: index % 3 === 0 ? 'COMMUNITY' : 'FAMILY',
+          batteryLevel: 35 + ((index * 7) % 60),
+          isCheckIn: true,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      ),
+    ]);
 
-  checkinStatements.create.run({
-    id: crypto.randomUUID(),
-    user_id: id,
-    checkin_time: lastCheckinTime,
-    location_at_checkin: JSON.stringify({ lat: location.lat, lng: location.lng }),
-    is_system_auto_triggered: 0,
-    created_at: lastCheckinTime,
-  });
-
-  if (!alertPolicyStatements.getByUserId.get(id)) {
-    alertPolicyStatements.create.run({
-      id: crypto.randomUUID(),
-      user_id: id,
-      level1_minutes: 30,
-      level2_minutes: 5 + (index % 3) * 5,
-      level3_minutes: 15 + (index % 2) * 5,
-      level4_enabled: index % 5 === 0 ? 1 : 0,
-      created_at: createdAt,
-      updated_at: updatedAt,
-    });
+    return { created: false, id: existing._id, fullName, phoneNumber };
   }
 
-  medicalProfileStatements.upsert.run({
-    user_id: id,
-    full_name: fullName,
-    birth_year: String(1988 + (index % 12)),
-    blood_type: ['A+', 'B+', 'AB+', 'O+', 'O-'][index % 5],
-    allergies: index % 4 === 0 ? 'Penicillin' : '',
-    conditions: index % 3 === 0 ? 'Tang huyet ap' : '',
-    medications: index % 2 === 0 ? 'Vitamin C' : '',
-    emergency_phone: buildContacts(index)[0].phone,
-    insurance_provider: index % 2 === 0 ? 'Bao Viet' : 'PVI',
-    insurance_number: `BH-${1000 + index}`,
-    created_at: createdAt,
-    updated_at: updatedAt,
+  const user = await User.create({
+    fullName,
+    phoneNumber,
+    role: 'user',
+    email: buildEmail(fullName, index),
+    avatar: null,
+    isActive: true,
+    isVerified: true,
+    isKycVerified: index % 4 === 0,
+    trustScore: index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0,
+    rescuesCount: index % 4 === 0 ? 2 + (index % 5) : 0,
+    batteryLevel: 35 + ((index * 7) % 60),
+    approxAddress: `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`,
+    medicalNotes: index % 4 === 0 ? 'Hen suyen nhe' : '',
+    emergencyContacts: contacts,
+    timerIntervalMinutes,
+    lastCheckinTime,
+    nextDeadline,
+    currentStatus: 'SAFE',
+    lastKnownLocation: location,
+    quietHoursStart,
+    quietHoursEnd,
+    falseAlertGraceMinutes,
+    createdAt,
+    updatedAt,
   });
 
-  automationSettingsStatements.upsert.run({
-    user_id: id,
-    daily_reminder_time: index % 2 === 0 ? '07:30' : '08:00',
-    shake_sos: 1,
-    shake_sensitivity: 3,
-    fall_detection: index % 4 === 0 ? 1 : 0,
-    geofence_auto_checkin: index % 3 !== 0 ? 1 : 0,
-    pill_reminder: index % 2 === 0 ? 1 : 0,
-    pill_time: index % 2 === 0 ? '08:15' : '20:00',
-    home_location: JSON.stringify({ lat: location.lat + 0.001, lng: location.lng + 0.001 }),
-    last_geofence_event_at: null,
-    created_at: createdAt,
-    updated_at: updatedAt,
-  });
+  await Promise.all([
+    CheckInHistory.create({
+      userId: user._id,
+      checkinTime: lastCheckinTime,
+      locationAtCheckin: { lat: location.lat, lng: location.lng },
+      isSystemAutoTriggered: false,
+      createdAt: lastCheckinTime,
+    }),
+    AlertPolicy.create({
+      userId: user._id,
+      level1Minutes: 30,
+      level2Minutes: 5 + (index % 3) * 5,
+      level3Minutes: 15 + (index % 2) * 5,
+      level4Enabled: index % 5 === 0,
+      createdAt,
+      updatedAt,
+    }),
+    MedicalProfile.create({
+      userId: user._id,
+      fullName,
+      birthYear: String(1988 + (index % 12)),
+      bloodType: ['A+', 'B+', 'AB+', 'O+', 'O-'][index % 5],
+      allergies: index % 4 === 0 ? 'Penicillin' : '',
+      conditions: index % 3 === 0 ? 'Tang huyet ap' : '',
+      medications: index % 2 === 0 ? 'Vitamin C' : '',
+      emergencyPhone: contacts[0].phone,
+      insuranceProvider: index % 2 === 0 ? 'Bao Viet' : 'PVI',
+      insuranceNumber: `BH-${1000 + index}`,
+      createdAt,
+      updatedAt,
+    }),
+    AutomationSetting.create({
+      userId: user._id,
+      dailyReminderTime: index % 2 === 0 ? '07:30' : '08:00',
+      shakeSos: true,
+      shakeSensitivity: 3,
+      fallDetection: index % 4 === 0,
+      geofenceAutoCheckin: index % 3 !== 0,
+      pillReminder: index % 2 === 0,
+      pillTime: index % 2 === 0 ? '08:15' : '20:00',
+      homeLocation: { lat: location.lat + 0.001, lng: location.lng + 0.001 },
+      lastGeofenceEventAt: null,
+      createdAt,
+      updatedAt,
+    }),
+    SecuritySetting.create({
+      userId: user._id,
+      stealthMode: index % 6 === 0,
+      autoWipeDays: [0, 7, 30, 60][index % 4],
+      encryptionEnabled: true,
+      lastAutoWipeDueAt: null,
+      createdAt,
+      updatedAt,
+    }),
+    DailyStatus.create({
+      userId: user._id,
+      moodEmoji: ['😊', '😐', '🤒'][index % 3],
+      text: index % 2 === 0 ? 'Da check-in va van on.' : 'Hom nay toi van an toan.',
+      visibility: index % 3 === 0 ? 'COMMUNITY' : 'FAMILY',
+      batteryLevel: 35 + ((index * 7) % 60),
+      isCheckIn: true,
+      createdAt,
+      updatedAt,
+    }),
+  ]);
 
-  securitySettingsStatements.upsert.run({
-    user_id: id,
-    stealth_mode: index % 6 === 0 ? 1 : 0,
-    auto_wipe_days: [0, 7, 30, 60][index % 4],
-    encryption_enabled: 1,
-    last_auto_wipe_due_at: null,
-    created_at: createdAt,
-    updated_at: updatedAt,
-  });
-
-  return { created: true, id, fullName, phoneNumber };
+  return { created: true, id: user._id, fullName, phoneNumber };
 }
 
-const results = demoUsers.map(seedOne);
-const created = results.filter((item) => item.created);
-const skipped = results.filter((item) => !item.created);
+async function main() {
+  await connectDatabase();
+  const results = [];
+  for (let index = 0; index < demoUsers.length; index += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await seedOne(demoUsers[index], index));
+  }
 
-console.log(
-  JSON.stringify(
-    {
-      ok: true,
-      created: created.length,
-      skipped: skipped.length,
-      users: results,
-    },
-    null,
-    2,
-  ),
-);
+  const created = results.filter((item) => item.created);
+  const skipped = results.filter((item) => !item.created);
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        created: created.length,
+        skipped: skipped.length,
+        users: results,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await $disconnect();
+  });

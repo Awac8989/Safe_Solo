@@ -1,5 +1,25 @@
+function splitFullName(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return { firstName: '', lastName: '' };
+  }
+
+  const parts = text.split(/\s+/);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: '' };
+  }
+
+  return {
+    firstName: parts.slice(0, -1).join(' '),
+    lastName: parts[parts.length - 1],
+  };
+}
+
 function fullName(user) {
-  return [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+  if (user?.fullName) {
+    return String(user.fullName).trim();
+  }
+  return [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
 }
 
 function normalizeEmail(email) {
@@ -7,27 +27,34 @@ function normalizeEmail(email) {
 }
 
 function sanitizeUser(user) {
+  const name = fullName(user);
+  const parsedName = splitFullName(name);
+  const lastKnownLocation = user.lastKnownLocation || null;
+  const nextCheckinDeadline = user.nextCheckinDeadline || user.nextDeadline || null;
+  const lastCheckInAt = user.lastCheckInAt || user.lastCheckinTime || null;
+  const graceHours = user.graceHours || Math.max(1, Math.round(Number(user.timerIntervalMinutes || 1440) / 60));
+
   return {
-    id: user.id,
+    id: user.id || user._id,
     email: user.email,
-    phone: user.phone || null,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    fullName: fullName(user),
+    phone: user.phone || user.phoneNumber || null,
+    firstName: user.firstName || parsedName.firstName,
+    lastName: user.lastName || parsedName.lastName,
+    fullName: name,
     dateOfBirth: user.dateOfBirth || null,
     gender: user.gender || null,
     avatar: user.avatar || null,
-    isActive: Boolean(user.isActive),
-    isVerified: Boolean(user.isVerified),
+    isActive: user.isActive !== false,
+    isVerified: user.isVerified !== false,
     isKycVerified: Boolean(user.isKycVerified),
     trustScore: Number(user.trustScore || 0),
     rescuesCount: Number(user.rescuesCount || 0),
-    nextCheckinDeadline: user.nextCheckinDeadline || null,
-    lastCheckInAt: user.lastCheckInAt || null,
-    graceHours: Number(user.graceHours || 24),
-    lastLat: user.lastLat ?? null,
-    lastLng: user.lastLng ?? null,
-    lastLocationTime: user.lastLocationTime || null,
+    nextCheckinDeadline,
+    lastCheckInAt,
+    graceHours: Number(graceHours || 24),
+    lastLat: user.lastLat ?? lastKnownLocation?.lat ?? null,
+    lastLng: user.lastLng ?? lastKnownLocation?.lng ?? null,
+    lastLocationTime: user.lastLocationTime || lastKnownLocation?.updatedAt || null,
     batteryLevel: user.batteryLevel ?? null,
     approxAddress: user.approxAddress || null,
     security: user.security || {},
@@ -77,6 +104,7 @@ function paginate(items, limit = 20, offset = 0) {
 
 module.exports = {
   fullName,
+  splitFullName,
   normalizeEmail,
   sanitizeUser,
   fuzzCoordinates,

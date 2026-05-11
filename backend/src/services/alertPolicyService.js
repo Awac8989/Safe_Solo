@@ -1,44 +1,30 @@
-const crypto = require('crypto');
+const AlertPolicy = require('../models/AlertPolicy');
+const { mapAlertPolicyDoc } = require('../lib/mongoCore');
 
-const {
-  nowIso,
-  mapAlertPolicyRow,
-  alertPolicyStatements,
-} = require('../config/sqlite');
-
-function ensureAlertPolicy(userId) {
-  let row = alertPolicyStatements.getByUserId.get(userId);
-  if (!row) {
-    const now = nowIso();
-    alertPolicyStatements.create.run({
-      id: crypto.randomUUID(),
-      user_id: userId,
-      level1_minutes: 30,
-      level2_minutes: 5,
-      level3_minutes: 15,
-      level4_enabled: 0,
-      created_at: now,
-      updated_at: now,
-    });
-    row = alertPolicyStatements.getByUserId.get(userId);
+async function ensureAlertPolicy(userId) {
+  let policy = await AlertPolicy.findOne({ userId });
+  if (!policy) {
+    policy = await AlertPolicy.create({ userId });
   }
 
-  return mapAlertPolicyRow(row);
+  return mapAlertPolicyDoc(policy);
 }
 
-function updateAlertPolicy(userId, payload) {
-  const current = ensureAlertPolicy(userId);
-  const next = {
-    user_id: userId,
-    level1_minutes: Number(payload.level1Minutes ?? current.level1Minutes),
-    level2_minutes: Number(payload.level2Minutes ?? current.level2Minutes),
-    level3_minutes: Number(payload.level3Minutes ?? current.level3Minutes),
-    level4_enabled: (payload.level4Enabled ?? current.level4Enabled) ? 1 : 0,
-    updated_at: nowIso(),
-  };
+async function updateAlertPolicy(userId, payload) {
+  const current = await ensureAlertPolicy(userId);
+  const policy = await AlertPolicy.findOneAndUpdate(
+    { userId },
+    {
+      userId,
+      level1Minutes: Number(payload.level1Minutes ?? current.level1Minutes),
+      level2Minutes: Number(payload.level2Minutes ?? current.level2Minutes),
+      level3Minutes: Number(payload.level3Minutes ?? current.level3Minutes),
+      level4Enabled: Boolean(payload.level4Enabled ?? current.level4Enabled),
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true },
+  );
 
-  alertPolicyStatements.updateByUserId.run(next);
-  return ensureAlertPolicy(userId);
+  return mapAlertPolicyDoc(policy);
 }
 
 module.exports = {

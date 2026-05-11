@@ -18,8 +18,12 @@ class CirclePage extends StatefulWidget {
 class _CirclePageState extends State<CirclePage> {
   CircleScope _filter = CircleScope.family;
 
+  AppStrings _snapshotStrings() {
+    return AppStrings(context.read<AppProvider>().language);
+  }
+
   Future<void> _openComposer() async {
-    final strings = AppStrings.of(context);
+    final strings = _snapshotStrings();
     final controller = TextEditingController();
     Mood selectedMood = Mood.calm;
 
@@ -244,7 +248,7 @@ class _CirclePageState extends State<CirclePage> {
   }
 
   Future<void> _openReplySheet(BuildContext context, CirclePost post) async {
-    final strings = AppStrings.of(context);
+    final strings = AppStrings(context.read<AppProvider>().language);
     final controller = TextEditingController();
 
     await showModalBottomSheet<void>(

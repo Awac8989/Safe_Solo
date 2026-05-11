@@ -1,28 +1,36 @@
-const { withState, createId, nowIso } = require('../data/store');
+const SystemLog = require('../models/SystemLog');
+const { toIso } = require('../lib/mongoCore');
+
+function mapSystemLog(doc) {
+  if (!doc) {
+    return null;
+  }
+  const row = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: row._id,
+    incidentId: row.incidentId || null,
+    actionType: row.actionType,
+    description: row.description,
+    metadata: row.metadata || {},
+    createdAt: toIso(row.createdAt),
+  };
+}
 
 class SystemLogService {
   async createLog({ incidentId = null, actionType, description, metadata = {} }) {
-    return withState((state) => {
-      const log = {
-        id: createId('log'),
-        incidentId,
-        actionType,
-        description,
-        metadata,
-        createdAt: nowIso(),
-      };
-
-      state.systemLogs.push(log);
-      return log;
+    const log = await SystemLog.create({
+      incidentId,
+      actionType,
+      description,
+      metadata,
     });
+    return mapSystemLog(log);
   }
 
   async listLogs({ incidentId = null } = {}) {
-    const { readState } = require('../data/store');
-    const state = readState();
-    return state.systemLogs
-      .filter((item) => (incidentId ? item.incidentId === incidentId : true))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const query = incidentId ? { incidentId } : {};
+    const logs = await SystemLog.find(query).sort({ createdAt: -1 });
+    return logs.map(mapSystemLog);
   }
 }
 

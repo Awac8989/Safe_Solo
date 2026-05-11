@@ -1,20 +1,16 @@
-const {
-  mapUserRow,
-  mapSecuritySettingsRow,
-  nowIso,
-  userStatements,
-  securitySettingsStatements,
-} = require('../config/sqlite');
+const User = require('../models/User');
+const SecuritySetting = require('../models/SecuritySetting');
 const { triggerSosForUser } = require('../services/sosService');
 const { createAlertEvent } = require('../services/alertEventService');
 const { ensureAlertPolicy } = require('../services/alertPolicyService');
+const { mapUserDoc } = require('../lib/mongoCore');
 
 function toMinutes(ms) {
   return Math.floor(ms / 60000);
 }
 
 function toMinuteOfDay(time) {
-  const [hour, minute] = time.split(':').map(Number);
+  const [hour, minute] = String(time || '00:00').split(':').map(Number);
   return hour * 60 + minute;
 }
 
@@ -47,11 +43,12 @@ function startDeadManWorker(io) {
 
   setInterval(async () => {
     try {
-      const users = userStatements.listByRole.all('user').map(mapUserRow);
+      const users = await User.find({ role: 'user' }).sort({ updatedAt: -1 });
       const now = new Date();
 
-      for (const user of users) {
-        const policy = ensureAlertPolicy(user._id);
+      for (const userDoc of users) {
+        const user = mapUserDoc(userDoc);
+        const policy = await ensureAlertPolicy(user._id);
         const deadline = new Date(user.nextDeadline);
         const msUntilDeadline = deadline.getTime() - now.getTime();
         const minutesUntilDeadline = toMinutes(msUntilDeadline);
@@ -62,9 +59,7 @@ function startDeadManWorker(io) {
         const sosMinutes = Number(policy?.level3Minutes || defaultSosMinutes);
         const inQuietHours = isInQuietHours(now, user.quietHoursStart, user.quietHoursEnd);
         const sleepModeActive = isSleepModeActive(now, user.sleepModeUntil);
-        const security = mapSecuritySettingsRow(
-          securitySettingsStatements.getByUserId.get(user._id),
-        );
+        const security = await SecuritySetting.findOne({ userId: user._id });
 
         if (inQuietHours || sleepModeActive) {
           continue;
@@ -76,13 +71,10 @@ function startDeadManWorker(io) {
           (!security.lastAutoWipeDueAt || new Date(security.lastAutoWipeDueAt) < new Date(user.lastCheckinTime)) &&
           now.getTime() >= new Date(user.lastCheckinTime).getTime() + security.autoWipeDays * 24 * 60 * 60 * 1000
         ) {
-          const updatedAt = nowIso();
-          securitySettingsStatements.markAutoWipeDue.run({
-            user_id: user._id,
-            last_auto_wipe_due_at: updatedAt,
-            updated_at: updatedAt,
-          });
-          const event = createAlertEvent({
+          security.lastAutoWipeDueAt = now;
+          await security.save();
+
+          const event = await createAlertEvent({
             userId: user._id,
             level: 'INFO',
             status: 'AUTO_WIPE_DUE',
@@ -99,15 +91,9 @@ function startDeadManWorker(io) {
           minutesUntilDeadline >= 0 &&
           (!user.lastReminderAt || new Date(user.lastReminderAt) < new Date(user.lastCheckinTime))
         ) {
-          const updatedAt = nowIso();
-          userStatements.updateStatusFields.run({
-            id: user._id,
-            current_status: 'REMINDER',
-            last_reminder_at: updatedAt,
-            last_warning_at: user.lastWarningAt || null,
-            last_sos_at: user.lastSosAt || null,
-            updated_at: updatedAt,
-          });
+          userDoc.currentStatus = 'REMINDER';
+          userDoc.lastReminderAt = now;
+          await userDoc.save();
 
           io.emit('CHECKIN_REMINDER', {
             userId: user._id,
@@ -116,7 +102,7 @@ function startDeadManWorker(io) {
             message: 'Sap den han check-in',
           });
 
-          const event = createAlertEvent({
+          const event = await createAlertEvent({
             userId: user._id,
             level: 'LEVEL_1_REMINDER',
             status: 'REMINDER_SENT',
@@ -134,15 +120,9 @@ function startDeadManWorker(io) {
           overdueMinutes < sosMinutes + grace &&
           user.currentStatus !== 'WARNING'
         ) {
-          const updatedAt = nowIso();
-          userStatements.updateStatusFields.run({
-            id: user._id,
-            current_status: 'WARNING',
-            last_reminder_at: user.lastReminderAt || null,
-            last_warning_at: updatedAt,
-            last_sos_at: user.lastSosAt || null,
-            updated_at: updatedAt,
-          });
+          userDoc.currentStatus = 'WARNING';
+          userDoc.lastWarningAt = now;
+          await userDoc.save();
 
           io.emit('CHECKIN_WARNING', {
             userId: user._id,
@@ -151,7 +131,7 @@ function startDeadManWorker(io) {
             message: 'Da qua han check-in, kich hoat canh bao cap 1',
           });
 
-          const event = createAlertEvent({
+          const event = await createAlertEvent({
             userId: user._id,
             level: 'LEVEL_2_ALARM',
             status: 'WARNING_TRIGGERED',
@@ -167,7 +147,7 @@ function startDeadManWorker(io) {
         if (overdueMinutes >= sosMinutes + grace && user.currentStatus !== 'SOS') {
           await triggerSosForUser(io, user);
           if (policy?.level4Enabled && overdueMinutes >= sosMinutes + grace + 10) {
-            const event = createAlertEvent({
+            const event = await createAlertEvent({
               userId: user._id,
               level: 'LEVEL_4_RESCUE_CALL',
               status: 'RESCUE_CALL_QUEUED',

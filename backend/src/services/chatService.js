@@ -1,12 +1,38 @@
 const path = require('path');
 
-const { readState, withState, createId, nowIso } = require('../data/store');
+const ChatRoom = require('../models/ChatRoom');
+const Message = require('../models/Message');
+const EmergencyLog = require('../models/EmergencyLog');
+const RescueIncident = require('../models/RescueIncident');
+const User = require('../models/User');
 const { AppError } = require('../lib/errors');
 const { sanitizeUser } = require('../lib/utils');
 
 class ChatService {
-  ensureRoomAccess(state, userId, roomId) {
-    const room = state.chatRooms.find((item) => item.id === roomId);
+  async getAccessibleIncidentUserIds(victimId) {
+    const victim = await User.findById(victimId).lean();
+    if (!victim) {
+      throw new AppError('Victim not found', 404);
+    }
+
+    const phones = new Set(
+      (victim.emergencyContacts || [])
+        .map((item) => String(item?.phone || '').trim())
+        .filter(Boolean),
+    );
+
+    const guardians = phones.size
+      ? await User.find({ phoneNumber: { $in: [...phones] } }).lean()
+      : [];
+
+    return {
+      victim,
+      accessibleIds: [victimId, ...guardians.map((item) => item._id)],
+    };
+  }
+
+  async ensureRoomAccess(userId, roomId) {
+    const room = await ChatRoom.findById(roomId);
     if (!room) {
       throw new AppError('Chat room not found', 404);
     }
@@ -14,22 +40,35 @@ class ChatService {
       throw new AppError('Chat room is closed', 403);
     }
 
-    const incident = state.rescueIncidents.find((item) => item.id === room.incidentId);
+    if (room.roomType === 'DIRECT' || room.roomType === 'GROUP') {
+      if (!room.participantIds.includes(userId)) {
+        throw new AppError('Unauthorized access to chat room', 403);
+      }
+      return { room, incident: null };
+    }
+
+    if (!room.incidentId) {
+      if (!room.participantIds.includes(userId)) {
+        throw new AppError('Unauthorized access to chat room', 403);
+      }
+      return { room, incident: null };
+    }
+
+    const incident =
+      (await RescueIncident.findById(room.incidentId)) ||
+      (await EmergencyLog.findById(room.incidentId));
     if (!incident) {
       throw new AppError('Incident not found', 404);
     }
 
-    const acceptedVolunteer = state.volunteerResponses.some(
-      (item) => item.incidentId === incident.id && item.volunteerId === userId,
-    );
-    const guardian = state.guardianRelationships.some(
-      (item) =>
-        item.requesterId === incident.victimId &&
-        item.guardianId === userId &&
-        item.status === 'ACCEPTED',
-    );
+    const incidentUserId = incident.victimId || incident.userId;
+    const { accessibleIds } = await this.getAccessibleIncidentUserIds(incidentUserId);
+    const canAccess =
+      accessibleIds.includes(userId) ||
+      room.participantIds.includes(userId) ||
+      room.responderIds.includes(userId);
 
-    if (incident.victimId !== userId && !acceptedVolunteer && !guardian) {
+    if (!canAccess) {
       throw new AppError('Unauthorized access to chat room', 403);
     }
 
@@ -37,167 +76,145 @@ class ChatService {
   }
 
   async checkUserAccessToRoom(userId, roomId) {
-    const state = readState();
-    this.ensureRoomAccess(state, userId, roomId);
+    await this.ensureRoomAccess(userId, roomId);
     return true;
   }
 
-  async createChatRoom(incidentId) {
-    return withState((state) => {
-      let room = state.chatRooms.find((item) => item.incidentId === incidentId);
-      if (!room) {
-        room = {
-          id: createId('room'),
-          incidentId,
-          status: 'ACTIVE',
-          createdAt: nowIso(),
-          closedAt: null,
-        };
-        state.chatRooms.push(room);
-      }
+  async createChatRoom(incidentId, options = {}) {
+    let room = await ChatRoom.findOne({ incidentId });
+    if (room) {
       return room;
+    }
+
+    const incident =
+      (await RescueIncident.findById(incidentId).lean()) ||
+      (await EmergencyLog.findById(incidentId).lean());
+    const participantIds = Array.isArray(options.participantIds) ? [...new Set(options.participantIds)] : [];
+    const incidentUserId = incident?.victimId || incident?.userId;
+    if (incidentUserId && !participantIds.includes(incidentUserId)) {
+      participantIds.push(incidentUserId);
+    }
+
+    room = await ChatRoom.create({
+      roomType: options.roomType || 'INCIDENT',
+      title: options.title || '',
+      incidentId,
+      participantIds,
+      responderIds: Array.isArray(options.responderIds) ? [...new Set(options.responderIds)] : [],
+      status: 'ACTIVE',
+      metadata: options.metadata || null,
     });
+    return room;
+  }
+
+  async syncIncidentRoomParticipants(incidentId, participantIds = [], responderIds = []) {
+    const room = await this.createChatRoom(incidentId, { participantIds, responderIds });
+    const nextParticipants = [...new Set([...(room.participantIds || []), ...participantIds, ...responderIds])];
+    const nextResponders = [...new Set([...(room.responderIds || []), ...responderIds])];
+    room.participantIds = nextParticipants;
+    room.responderIds = nextResponders;
+    await room.save();
+    return room;
+  }
+
+  async addResponderToIncidentRoom(incidentId, responderId) {
+    return this.syncIncidentRoomParticipants(incidentId, [], [responderId]);
   }
 
   async getChatRoomByIncident(incidentId) {
-    const state = readState();
-    const room = state.chatRooms.find((item) => item.incidentId === incidentId);
+    const room = await ChatRoom.findOne({ incidentId });
     if (!room) {
       throw new AppError('Chat room not found', 404);
     }
 
     return {
-      ...room,
-      messages: state.messages
-        .filter((item) => item.roomId === room.id)
-        .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))
-        .map((message) => this.enrichMessage(state, message)),
+      ...(room.toObject ? room.toObject() : room),
+      messages: await this.getMessagesByRoomId(room._id),
+    };
+  }
+
+  async enrichMessage(message) {
+    const sender = message.senderId ? await User.findById(message.senderId).lean() : null;
+    const payload = message.toObject ? message.toObject() : message;
+    return {
+      ...payload,
+      id: payload._id,
+      sender: sender ? sanitizeUser(sender) : null,
     };
   }
 
   async createMessage(roomId, senderId, messageType, content, metadata = null) {
-    return withState((state) => {
-      if (senderId) {
-        this.ensureRoomAccess(state, senderId, roomId);
-      }
+    if (senderId) {
+      await this.ensureRoomAccess(senderId, roomId);
+    }
 
-      const message = {
-        id: createId('msg'),
-        roomId,
-        senderId: senderId || null,
-        messageType,
-        content,
-        metadata: metadata || null,
-        createdAt: nowIso(),
-      };
-      state.messages.push(message);
-      return this.enrichMessage(state, message);
+    const message = await Message.create({
+      roomId,
+      senderId: senderId || null,
+      messageType,
+      content,
+      metadata: metadata || null,
+      createdAt: new Date(),
     });
+
+    return this.enrichMessage(message);
   }
 
   async broadcastSystemMessage(roomId, text, metadata = null) {
     return this.createMessage(roomId, null, 'SYSTEM', text, metadata);
   }
 
-  enrichMessage(state, message) {
-    const sender = message.senderId
-      ? state.users.find((item) => item.id === message.senderId)
-      : null;
-
-    return {
-      ...message,
-      sender: sender ? sanitizeUser(sender) : null,
-    };
-  }
-
   async getMessagesByRoomId(roomId) {
-    const state = readState();
-    return state.messages
-      .filter((item) => item.roomId === roomId)
-      .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1))
-      .map((message) => this.enrichMessage(state, message));
+    const messages = await Message.find({ roomId }).sort({ createdAt: 1 }).lean();
+    const senderIds = [...new Set(messages.map((item) => item.senderId).filter(Boolean))];
+    const senders = senderIds.length
+      ? await User.find({ _id: { $in: senderIds } }).lean()
+      : [];
+    const senderMap = new Map(senders.map((item) => [item._id, sanitizeUser(item)]));
+
+    return messages.map((message) => ({
+      ...message,
+      id: message._id,
+      sender: message.senderId ? senderMap.get(message.senderId) || null : null,
+    }));
   }
 
   async closeChatRoom(incidentId) {
-    return withState((state) => {
-      const room = state.chatRooms.find((item) => item.incidentId === incidentId);
-      if (!room) {
-        throw new AppError('Chat room not found for this incident', 404);
-      }
-      room.status = 'READ_ONLY';
-      room.closedAt = nowIso();
-      state.messages.push({
-        id: createId('msg'),
-        roomId: room.id,
-        senderId: null,
-        messageType: 'SYSTEM',
-        content: 'Chat khan cap da duoc dong vi su co da ket thuc.',
-        metadata: { incidentId },
-        createdAt: nowIso(),
-      });
-      return room;
+    const room = await ChatRoom.findOne({ incidentId });
+    if (!room) {
+      throw new AppError('Chat room not found for this incident', 404);
+    }
+    room.status = 'READ_ONLY';
+    room.closedAt = new Date();
+    await room.save();
+
+    await Message.create({
+      roomId: room._id,
+      senderId: null,
+      messageType: 'SYSTEM',
+      content: 'Chat khan cap da duoc dong vi su co da ket thuc.',
+      metadata: { incidentId },
+      createdAt: new Date(),
     });
+
+    return room;
   }
 
   async getInbox(userId) {
-    const state = readState();
+    const directRooms = await ChatRoom.find({
+      roomType: { $in: ['DIRECT', 'GROUP'] },
+      participantIds: userId,
+    }).sort({ updatedAt: -1 }).lean();
 
-    const incidentRooms = state.chatRooms
-      .map((room) => {
-        const incident = state.rescueIncidents.find((item) => item.id === room.incidentId);
-        if (!incident) return null;
+    const incidentInfo = await this.getAccessibleIncidentUserIds(userId).catch(() => null);
+    const incidentRooms = incidentInfo
+      ? await ChatRoom.find({
+          roomType: 'INCIDENT',
+          participantIds: { $in: [userId] },
+        }).sort({ updatedAt: -1 }).lean()
+      : [];
 
-        const canAccess =
-          incident.victimId === userId ||
-          state.guardianRelationships.some(
-            (item) =>
-              item.requesterId === incident.victimId &&
-              item.guardianId === userId &&
-              item.status === 'ACCEPTED',
-          ) ||
-          state.volunteerResponses.some(
-            (item) => item.incidentId === incident.id && item.volunteerId === userId,
-          );
-
-        if (!canAccess) return null;
-        const messages = state.messages
-          .filter((item) => item.roomId === room.id)
-          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-        const lastMessage = messages[0] || null;
-        const victim = state.users.find((item) => item.id === incident.victimId);
-
-        return {
-          roomId: room.id,
-          type: 'INCIDENT',
-          incidentId: incident.id,
-          title: victim ? `${victim.firstName} ${victim.lastName}`.trim() : 'Emergency Room',
-          preview: lastMessage ? lastMessage.content : 'Chua co tin nhan',
-          timestamp: lastMessage ? lastMessage.createdAt : room.createdAt,
-          batteryLevel: victim?.batteryLevel ?? null,
-          status: room.status,
-        };
-      })
-      .filter(Boolean);
-
-    const familyRooms = state.guardianRelationships
-      .filter((item) => item.status === 'ACCEPTED' && (item.requesterId === userId || item.guardianId === userId))
-      .map((item) => {
-        const otherId = item.requesterId === userId ? item.guardianId : item.requesterId;
-        const otherUser = state.users.find((user) => user.id === otherId);
-        if (!otherUser) return null;
-        return {
-          roomId: `direct_${[userId, otherId].sort().join('_')}`,
-          type: 'DIRECT',
-          title: `${otherUser.firstName} ${otherUser.lastName}`.trim(),
-          preview: otherUser.approxAddress ? `Vi tri gan nhat: ${otherUser.approxAddress}` : 'Guardian da ket noi',
-          timestamp: item.updatedAt,
-          batteryLevel: otherUser.batteryLevel ?? null,
-          status: 'ACTIVE',
-        };
-      })
-      .filter(Boolean);
-
-    return [...incidentRooms, ...familyRooms].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+    return [...incidentRooms, ...directRooms];
   }
 
   buildVoiceUrl(filename) {

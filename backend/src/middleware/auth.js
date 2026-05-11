@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
-const { readState } = require('../data/store');
 const { sanitizeUser } = require('../lib/utils');
+const User = require('../models/User');
 
 module.exports = async function auth(req, res, next) {
   try {
@@ -16,17 +16,16 @@ module.exports = async function auth(req, res, next) {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'safesolo-dev-secret');
-    const state = readState();
-    const user = state.users.find((item) => item.id === decoded.id);
+    const mongoUser = await User.findById(decoded.id);
 
-    if (!user || !user.isActive) {
+    if (!mongoUser || mongoUser.isActive === false) {
       return res.status(401).json({
         success: false,
         error: 'User not found or inactive',
       });
     }
 
-    req.user = sanitizeUser(user);
+    req.user = sanitizeUser(mongoUser);
     next();
   } catch (_error) {
     return res.status(401).json({

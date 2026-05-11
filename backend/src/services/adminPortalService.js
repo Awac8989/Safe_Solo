@@ -1,96 +1,80 @@
-const { readState, withState, nowIso } = require('../data/store');
 const { fullName, sanitizeUser } = require('../lib/utils');
 const { listAlertEvents } = require('./alertEventService');
 const { resolveEmergency } = require('./sosService');
-const {
-  initDatabase,
-  mapEmergencyRow,
-  mapSmsDispatchRow,
-  mapUserRow,
-  emergencyStatements,
-  smsDispatchStatements,
-  userStatements,
-} = require('../config/sqlite');
+const emergencyService = require('./emergencyService');
+const User = require('../models/User');
+const EmergencyLog = require('../models/EmergencyLog');
+const SmsDispatchLog = require('../models/SmsDispatchLog');
+const RescueIncident = require('../models/RescueIncident');
+const SystemLog = require('../models/SystemLog');
+const KYCDocument = require('../models/KYCDocument');
+const ThankYouNote = require('../models/ThankYouNote');
+const VolunteerResponse = require('../models/VolunteerResponse');
+const { mapUserDoc, toIso } = require('../lib/mongoCore');
 
-initDatabase();
-
-function parseJson(value, fallback = null) {
-  if (!value) {
-    return fallback;
+function mapEmergencyDoc(log) {
+  if (!log) {
+    return null;
   }
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}
-
-function getSqliteUsers() {
-  return userStatements.list.all().map(mapUserRow);
-}
-
-function getStoreUsers() {
-  const state = readState();
-  return state.users.map(sanitizeUser);
-}
-
-function unifyUser(sqliteUser) {
+  const row = log.toObject ? log.toObject() : log;
   return {
-    id: sqliteUser._id,
-    fullName: sqliteUser.fullName,
-    email: '',
-    phone: sqliteUser.phoneNumber,
-    source: 'sqlite',
-    role: sqliteUser.role || 'user',
-    currentStatus: sqliteUser.currentStatus,
-    timerIntervalMinutes: sqliteUser.timerIntervalMinutes,
-    nextCheckinDeadline: sqliteUser.nextDeadline,
-    lastCheckInAt: sqliteUser.lastCheckinTime,
-    emergencyContacts: sqliteUser.emergencyContacts || [],
-    location: sqliteUser.lastKnownLocation || null,
-    quietHoursStart: sqliteUser.quietHoursStart,
-    quietHoursEnd: sqliteUser.quietHoursEnd,
-    falseAlertGraceMinutes: sqliteUser.falseAlertGraceMinutes,
-    createdAt: sqliteUser.createdAt,
-    updatedAt: sqliteUser.updatedAt,
+    _id: row._id,
+    userId: row.userId,
+    triggeredAt: toIso(row.triggeredAt),
+    resolvedAt: toIso(row.resolvedAt),
+    isResolved: Boolean(row.isResolved),
+    smsSentStatus: Boolean(row.smsSentStatus),
+    locationSnapshot: row.locationSnapshot || null,
+    notes: row.notes || '',
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt),
   };
 }
 
-function unifyStoreUser(user, medicalProfiles, kycDocuments) {
-  const medical = medicalProfiles.find((item) => item.userId === user.id) || null;
-  const kyc = kycDocuments.find((item) => item.userId === user.id) || null;
-
+function mapSmsDispatchDoc(log) {
+  if (!log) {
+    return null;
+  }
+  const row = log.toObject ? log.toObject() : log;
   return {
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email || '',
-    phone: user.phone || '',
-    source: 'store',
-    role: user.role || 'USER',
-    currentStatus: 'SAFE',
-    timerIntervalMinutes: Number(user.graceHours || 24) * 60,
-    nextCheckinDeadline: user.nextCheckinDeadline,
-    lastCheckInAt: user.lastCheckInAt,
-    emergencyContacts: medical?.emergencyContact ? [medical.emergencyContact] : [],
-    location:
-      user.lastLat != null && user.lastLng != null
-        ? {
-            lat: user.lastLat,
-            lng: user.lastLng,
-            updatedAt: user.lastLocationTime || null,
-          }
-        : null,
-    quietHoursStart: user.security?.quietHoursStart || '23:00',
-    quietHoursEnd: user.security?.quietHoursEnd || '06:00',
-    falseAlertGraceMinutes: Number(user.security?.falseAlertGraceMinutes || 0),
-    batteryLevel: user.batteryLevel ?? null,
-    trustScore: user.trustScore ?? 0,
-    rescuesCount: user.rescuesCount ?? 0,
-    isKycVerified: Boolean(user.isKycVerified),
-    kycStatus: kyc?.status || null,
-    approxAddress: user.approxAddress || null,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
+    _id: row._id,
+    emergencyLogId: row.emergencyLogId,
+    userId: row.userId,
+    toPhone: row.toPhone,
+    provider: row.provider,
+    attempt: row.attempt,
+    success: Boolean(row.success),
+    providerMessageId: row.providerMessageId,
+    errorMessage: row.errorMessage,
+    responseBody: row.responseBody || null,
+    createdAt: toIso(row.createdAt),
+  };
+}
+
+async function getMongoUsers() {
+  const users = await User.find().sort({ updatedAt: -1 });
+  return users.map(mapUserDoc);
+}
+
+function unifyUser(mongoUser) {
+  return {
+    id: mongoUser._id,
+    fullName: mongoUser.fullName,
+    email: '',
+    phone: mongoUser.phoneNumber,
+    source: 'mongo',
+    role: mongoUser.role || 'user',
+    currentStatus: mongoUser.currentStatus,
+    timerIntervalMinutes: mongoUser.timerIntervalMinutes,
+    nextCheckinDeadline: mongoUser.nextDeadline,
+    lastCheckInAt: mongoUser.lastCheckinTime,
+    emergencyContacts: mongoUser.emergencyContacts || [],
+    location: mongoUser.lastKnownLocation || null,
+    quietHoursStart: mongoUser.quietHoursStart,
+    quietHoursEnd: mongoUser.quietHoursEnd,
+    falseAlertGraceMinutes: mongoUser.falseAlertGraceMinutes,
+    createdAt: mongoUser.createdAt,
+    updatedAt: mongoUser.updatedAt,
   };
 }
 
@@ -124,78 +108,69 @@ function buildDispatchIncidentFromEmergency(log) {
     emergencyContactName: firstContact?.name || '',
     emergencyContactPhone: firstContact?.phone || '',
     location,
-    source: 'sqlite',
+    source: 'mongo',
   };
 }
 
-function buildDispatchIncidentFromStore(incident, state) {
-  const victim = state.users.find((item) => item.id === incident.victimId);
-  const medical = state.medicalProfiles.find((item) => item.userId === incident.victimId);
-  const relationship = state.guardianRelationships.find(
-    (item) => item.requesterId === incident.victimId && item.status === 'ACCEPTED',
-  );
-  const guardian = relationship
-    ? state.users.find((item) => item.id === relationship.guardianId)
-    : null;
+function buildDispatchIncidentFromRescue(incident, user) {
+  const contacts = user?.emergencyContacts || [];
+  const firstContact = contacts[0] || null;
+  const [firstName, ...rest] = String(user?.fullName || 'Unknown User').split(' ');
 
   return {
-    id: incident.id,
-    type: incident.source === 'DURESS' ? 'DURESS' : incident.severity >= 3 ? 'MEDICAL' : 'SOS',
-    severity: incident.severity,
-    status: incident.status,
-    name: victim ? fullName(victim) : 'Unknown User',
-    firstName: victim?.firstName || '',
-    lastName: victim?.lastName || '',
-    age: victim?.dateOfBirth
-      ? new Date().getFullYear() - new Date(victim.dateOfBirth).getFullYear()
-      : null,
-    blood: medical?.bloodType || 'N/A',
-    allergies: Array.isArray(medical?.allergies) && medical.allergies.length > 0
-      ? medical.allergies.join(', ')
-      : 'None',
-    address: incident.approxAddress || victim?.approxAddress || 'Unknown',
-    district: victim?.approxAddress || 'Unknown',
-    city: 'Vietnam',
-    x: 20 + Math.abs((incident.exactLng * 19) % 60),
-    y: 20 + Math.abs((incident.exactLat * 29) % 60),
-    receivedAt: incident.createdAt,
-    channel: incident.source === 'DURESS' ? 'Telegram' : 'App',
-    phoneNumber: victim?.phone || '',
-    medicalNotes: Array.isArray(medical?.medicalConditions)
-      ? medical.medicalConditions.join(', ')
-      : '',
-    emergencyContactName: guardian ? fullName(guardian) : medical?.emergencyContact?.name || '',
-    emergencyContactPhone: guardian?.phone || medical?.emergencyContact?.phone || '',
+    id: incident._id,
+    type: String(incident.incidentType || 'SOS').toUpperCase(),
+    severity: Number(incident.severity || 3),
+    status: incident.status === 'RESOLVED' ? 'RESOLVED' : 'ACTIVE',
+    name: user?.fullName || 'Unknown User',
+    firstName,
+    lastName: rest.join(' '),
+    age: null,
+    blood: 'N/A',
+    allergies: user?.medicalNotes || 'No notes',
+    address: incident.approxAddress || `${incident.exactLat}, ${incident.exactLng}`,
+    district: 'Live GPS',
+    city: 'SafeSolo',
+    x: 20 + Math.abs((incident.fuzzedLng * 17) % 60),
+    y: 20 + Math.abs((incident.fuzzedLat * 23) % 60),
+    receivedAt: toIso(incident.createdAt),
+    channel: incident.source || 'App',
+    phoneNumber: user?.phoneNumber || '',
+    medicalNotes: user?.medicalNotes || '',
+    emergencyContactName: firstContact?.name || '',
+    emergencyContactPhone: firstContact?.phone || '',
     location: {
       lat: incident.exactLat,
       lng: incident.exactLng,
-      updatedAt: incident.createdAt,
     },
-    source: 'store',
+    source: 'mongo-rescue',
   };
 }
 
 class AdminPortalService {
   async getOverview() {
-    const state = readState();
-    const sqliteUsers = getSqliteUsers();
-    const openEmergencies = emergencyStatements.listOpen.all().map(mapEmergencyRow);
-    const incidents = [
-      ...openEmergencies.map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item))),
-      ...state.rescueIncidents
-        .filter((item) => item.status === 'ACTIVE')
-        .map((item) => buildDispatchIncidentFromStore(item, state)),
-    ]
+    const mongoUsers = await getMongoUsers();
+    const openEmergencies = (await EmergencyLog.find({ isResolved: false }).sort({ createdAt: -1 }))
+      .map(mapEmergencyDoc);
+    const rescueIncidents = await RescueIncident.find({ status: 'ACTIVE' }).sort({ createdAt: -1 }).lean();
+    const incidents = openEmergencies
+      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers)))
+      .concat(
+        rescueIncidents.map((item) => {
+          const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
+          return buildDispatchIncidentFromRescue(item, user);
+        }),
+      )
       .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
       .slice(0, 12);
 
     const stats = {
-      totalUsers: sqliteUsers.length + state.users.length,
-      monitoredUsers: sqliteUsers.length,
+      totalUsers: mongoUsers.length,
+      monitoredUsers: mongoUsers.length,
       activeIncidents: incidents.length,
-      kycPending: state.kycDocuments.filter((item) => item.status === 'PENDING').length,
-      heroesVerified: state.users.filter((item) => item.isKycVerified).length,
-      alertsToday: listAlertEvents({ page: 1, limit: 200 }).items.filter((item) =>
+      kycPending: 0,
+      heroesVerified: 0,
+      alertsToday: (await listAlertEvents({ page: 1, limit: 200 })).items.filter((item) =>
         String(item.createdAt).startsWith(new Date().toISOString().slice(0, 10)),
       ).length,
     };
@@ -207,20 +182,14 @@ class AdminPortalService {
   }
 
   async listUsers() {
-    const state = readState();
-    const sqliteUsers = getSqliteUsers().map(unifyUser);
-    const storeUsers = state.users.map((item) =>
-      unifyStoreUser(item, state.medicalProfiles, state.kycDocuments),
-    );
-
-    return [...sqliteUsers, ...storeUsers].sort((a, b) =>
+    const mongoUsers = (await getMongoUsers()).map(unifyUser);
+    return mongoUsers.sort((a, b) =>
       String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')),
     );
   }
 
-  attachEmergencyUser(log) {
-    const userRow = userStatements.getById.get(log.userId);
-    const user = userRow ? mapUserRow(userRow) : null;
+  attachEmergencyUser(log, mongoUsers = []) {
+    const user = mongoUsers.find((item) => item._id === log.userId) || null;
     return {
       ...log,
       userId: user
@@ -236,64 +205,59 @@ class AdminPortalService {
   }
 
   async listIncidents(status = 'open') {
-    const state = readState();
-    const sqliteRows =
+    const mongoUsers = await getMongoUsers();
+    const mongoQuery =
       status === 'resolved'
-        ? emergencyStatements.listResolved.all()
+        ? { isResolved: true }
         : status === 'all'
-        ? emergencyStatements.listAll.all()
-        : emergencyStatements.listOpen.all();
+        ? {}
+        : { isResolved: false };
 
-    const sqliteIncidents = sqliteRows
-      .map(mapEmergencyRow)
-      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item)));
+    const mongoIncidents = (await EmergencyLog.find(mongoQuery).sort({ createdAt: -1 }))
+      .map(mapEmergencyDoc)
+      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers)));
 
-    const storeIncidents = state.rescueIncidents
-      .filter((item) => (status === 'all' ? true : status === 'resolved' ? item.status === 'RESOLVED' : item.status === 'ACTIVE'))
-      .map((item) => buildDispatchIncidentFromStore(item, state));
+    const rescueQuery =
+      status === 'resolved'
+        ? { status: 'RESOLVED' }
+        : status === 'all'
+        ? {}
+        : { status: 'ACTIVE' };
+    const rescueIncidents = (await RescueIncident.find(rescueQuery).sort({ createdAt: -1 }).lean())
+      .map((item) => {
+        const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
+        return buildDispatchIncidentFromRescue(item, user);
+      });
 
-    return [...sqliteIncidents, ...storeIncidents].sort((a, b) =>
+    return mongoIncidents.concat(rescueIncidents).sort((a, b) =>
       String(b.receivedAt).localeCompare(String(a.receivedAt)),
     );
   }
 
   async resolveIncident(id, notes = '') {
-    const emergencyRow = emergencyStatements.getById.get(id);
+    const emergencyRow = await EmergencyLog.findById(id);
     if (emergencyRow) {
       return resolveEmergency(id, notes);
     }
-
-    return withState((state) => {
-      const incident = state.rescueIncidents.find((item) => item.id === id);
-      if (!incident) {
-        const error = new Error('Incident not found');
-        error.statusCode = 404;
-        throw error;
-      }
-      incident.status = 'RESOLVED';
-      incident.resolvedAt = nowIso();
-      state.systemLogs.push({
-        id: `audit_${id}_${Date.now()}`,
-        incidentId: id,
-        actionType: 'RESOLVE_INCIDENT',
-        description: notes || 'Incident resolved from web admin',
-        metadata: { source: 'admin-portal' },
-        createdAt: nowIso(),
-      });
-      return incident;
-    });
+    const rescueIncident = await RescueIncident.findById(id);
+    if (rescueIncident) {
+      return emergencyService.resolveIncidentFromAdmin(id, notes);
+    }
+    const error = new Error('Incident not found');
+    error.statusCode = 404;
+    throw error;
   }
 
   async listSmsLogs(logId) {
-    return smsDispatchStatements.listByEmergency.all(logId).map(mapSmsDispatchRow);
+    const logs = await SmsDispatchLog.find({ emergencyLogId: logId }).sort({ createdAt: -1 });
+    return logs.map(mapSmsDispatchDoc);
   }
 
   async listAuditLogs({ q = '', category = 'All' } = {}) {
-    const state = readState();
     const query = String(q || '').trim().toLowerCase();
     const normalizedCategory = String(category || 'All').toLowerCase();
 
-    const sqliteAlerts = listAlertEvents({ page: 1, limit: 500 }).items.map((item) => ({
+    const dispatchAlerts = (await listAlertEvents({ page: 1, limit: 500 })).items.map((item) => ({
       id: item.id,
       ts: item.createdAt,
       actor: item.source?.toLowerCase() === 'admin' ? 'admin' : 'system',
@@ -310,25 +274,20 @@ class AdminPortalService {
       metadata: item.metadata || {},
     }));
 
-    const storeLogs = state.systemLogs.map((item) => ({
-      id: item.id,
-      ts: item.createdAt,
-      actor: 'admin_portal',
+    const systemLogs = (await SystemLog.find().sort({ createdAt: -1 }).limit(500)).map((item) => ({
+      id: item._id,
+      ts: toIso(item.createdAt),
+      actor: 'system',
       action: item.actionType,
-      target: item.incidentId || item.description,
-      tone: /reject|block|fail/i.test(item.actionType) ? 'sos' : 'info',
-      hash: `0x${Buffer.from(item.id).toString('hex').slice(0, 16)}`,
-      category: /kyc/i.test(item.actionType)
-        ? 'KYC'
-        : /dispatch|incident|alert/i.test(item.actionType)
-        ? 'Dispatch'
-        : /payout|revenue|finance/i.test(item.actionType)
-        ? 'Finance'
-        : 'System',
+      target: item.incidentId || 'runtime',
+      tone: item.actionType.includes('RESOLVED') ? 'warning' : 'info',
+      hash: `0x${Buffer.from(String(item._id)).toString('hex').slice(0, 16)}`,
+      category: 'Dispatch',
       metadata: item.metadata || {},
     }));
 
-    return [...sqliteAlerts, ...storeLogs]
+    return dispatchAlerts
+      .concat(systemLogs)
       .filter((item) =>
         normalizedCategory === 'all'
           ? true
@@ -345,18 +304,24 @@ class AdminPortalService {
   }
 
   async listKycQueue() {
-    const state = readState();
-    return state.kycDocuments.map((document) => {
-      const user = state.users.find((item) => item.id === document.userId);
-      const heroNotes = state.thankYouNotes.filter((item) => item.volunteerId === document.userId);
+    const documents = await KYCDocument.find().sort({ submittedAt: -1 }).lean();
+    const userIds = [...new Set(documents.map((item) => item.userId))];
+    const users = userIds.length ? await User.find({ _id: { $in: userIds } }).lean() : [];
+    const userMap = new Map(users.map((item) => [item._id, item]));
+    const thankYouCounts = await Promise.all(
+      userIds.map(async (userId) => [userId, await ThankYouNote.countDocuments({ volunteerId: userId })]),
+    );
+    const thankYouMap = new Map(thankYouCounts);
+
+    return documents.map((document) => {
+      const user = userMap.get(document.userId);
       const scoreBase = Number(user?.trustScore || 4.5);
       const match = Math.min(99, Math.max(60, Math.round(scoreBase * 20)));
-
       return {
-        id: document.id,
+        id: document._id,
         userId: document.userId,
         name: user ? fullName(user) : 'Unknown user',
-        applied: document.submittedAt,
+        applied: toIso(document.submittedAt),
         status:
           document.status === 'PENDING'
             ? 'pending'
@@ -365,14 +330,14 @@ class AdminPortalService {
             : 'review',
         region: user?.approxAddress || 'Unknown',
         match,
-        phone: user?.phone || '',
+        phone: user?.phoneNumber || '',
         frontImageUrl: document.frontImageUrl,
         backImageUrl: document.backImageUrl,
         isKycVerified: Boolean(user?.isKycVerified),
         liveness: 'OK',
         trustScore: scoreBase,
         rescuesCount: Number(user?.rescuesCount || 0),
-        thankYouCount: heroNotes.length,
+        thankYouCount: thankYouMap.get(document.userId) || 0,
       };
     });
   }
@@ -380,47 +345,40 @@ class AdminPortalService {
   async updateKycStatus(documentId, action) {
     const normalized = String(action || '').toUpperCase();
     const nextStatus = normalized === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+    const document = await KYCDocument.findById(documentId);
+    if (!document) {
+      const error = new Error('KYC document not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    document.status = nextStatus;
+    document.reviewedAt = new Date();
+    await document.save();
 
-    return withState((state) => {
-      const document = state.kycDocuments.find((item) => item.id === documentId);
-      if (!document) {
-        const error = new Error('KYC document not found');
-        error.statusCode = 404;
-        throw error;
-      }
+    const user = await User.findByIdAndUpdate(
+      document.userId,
+      { isKycVerified: nextStatus === 'APPROVED' },
+      { new: true },
+    );
 
-      document.status = nextStatus;
-      document.reviewedAt = nowIso();
-
-      const user = state.users.find((item) => item.id === document.userId);
-      if (user) {
-        user.isKycVerified = nextStatus === 'APPROVED';
-        user.updatedAt = nowIso();
-      }
-
-      state.systemLogs.push({
-        id: `kyc_${document.id}_${Date.now()}`,
-        incidentId: null,
-        actionType: `${normalized}_KYC`,
-        description: `${normalized} KYC for ${document.userId}`,
-        metadata: { documentId: document.id, userId: document.userId },
-        createdAt: nowIso(),
-      });
-
-      return {
-        document,
-        user: user ? sanitizeUser(user) : null,
-      };
+    await SystemLog.create({
+      incidentId: null,
+      actionType: `${normalized}_KYC`,
+      description: `${normalized} KYC for ${document.userId}`,
+      metadata: { documentId: document._id, userId: document.userId },
     });
+
+    return {
+      document: {
+        ...(document.toObject ? document.toObject() : document),
+        id: document._id,
+      },
+      user: user ? sanitizeUser(user) : null,
+    };
   }
 
   async getChannelHealth() {
-    const smsLogs = smsDispatchStatements.listByEmergency
-      .all
-      ? emergencyStatements.listAll.all().flatMap((item) =>
-          smsDispatchStatements.listByEmergency.all(item.id).map(mapSmsDispatchRow),
-        )
-      : [];
+    const smsLogs = (await SmsDispatchLog.find().sort({ createdAt: -1 })).map(mapSmsDispatchDoc);
 
     const countByProvider = (provider) =>
       smsLogs.filter((item) => item.provider === provider);
@@ -467,7 +425,6 @@ class AdminPortalService {
   }
 
   async getRevenueSummary() {
-    const state = readState();
     const partners = [
       { name: 'Vinmec Central Park', rate: 15, region: 'TP.HCM' },
       { name: 'FV Hospital', rate: 12, region: 'TP.HCM' },
@@ -475,7 +432,7 @@ class AdminPortalService {
       { name: 'Hoan My Saigon', rate: 15, region: 'TP.HCM' },
     ];
 
-    const dispatchCount = state.volunteerResponses.length || 1;
+    const dispatchCount = (await VolunteerResponse.countDocuments()) || 1;
     const partnerRows = partners.map((partner, index) => {
       const successfulDispatches = dispatchCount * (index + 2);
       const unpaidBalance = successfulDispatches * partner.rate * 120000;

@@ -53,8 +53,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     super.dispose();
   }
 
+  AppStrings _snapshotStrings() {
+    return AppStrings(context.read<AppProvider>().language);
+  }
+
   Future<void> _handleCheckIn(Mood? mood) async {
-    final strings = AppStrings(context.read<AppProvider>().language);
+    final strings = _snapshotStrings();
     if (context.read<AppProvider>().user == null) {
       if (!mounted) {
         return;
@@ -120,7 +124,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _shareMood(Mood mood) async {
-    final strings = AppStrings(context.read<AppProvider>().language);
+    final strings = _snapshotStrings();
     await context.read<AppProvider>().createCirclePost(
       message: strings.text(
         'Trạng thái nhanh hôm nay: ${strings.moodLabel(mood)}.',
@@ -514,7 +518,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _openMoodPrompt() async {
-    final strings = AppStrings.of(context);
+    final strings = _snapshotStrings();
     final selected = await showDialog<Mood?>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.28),
@@ -599,7 +603,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
       TopToast.show(
         context,
-        message: '🚨 ${AppStrings.of(context).text('SOS gần bạn · 800m', 'Nearby SOS · 800m')}',
+        message: '🚨 ${_snapshotStrings().text('SOS gần bạn · 800m', 'Nearby SOS · 800m')}',
         icon: Icons.notifications_active_rounded,
         duration: const Duration(seconds: 3),
       );

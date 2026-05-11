@@ -182,30 +182,27 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: (event) => _begin(event.position),
-      onPointerMove: (event) => _move(event.position),
-      onPointerUp: (_) => _end(),
-      onPointerCancel: (_) => _end(),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedScale(
+    return GestureDetector(
+      onTap: widget.onTap,
+      onLongPressStart: (details) => _begin(details.globalPosition),
+      onLongPressMoveUpdate: (details) => _move(details.globalPosition),
+      onLongPressEnd: (_) => _end(),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 180),
+        scale: _recording ? 1.2 : 1,
+        child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          scale: _recording ? 1.2 : 1,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: _buttonSize,
-            height: _buttonSize,
-            decoration: BoxDecoration(
-              color: _recording ? AppColors.destructive : AppColors.primary,
-              shape: BoxShape.circle,
-              boxShadow: _recording ? AppShadows.danger : AppShadows.safe,
-            ),
-            child: Icon(
-              Icons.mic_rounded,
-              size: _iconSize,
-              color: AppColors.primaryForeground,
-            ),
+          width: _buttonSize,
+          height: _buttonSize,
+          decoration: BoxDecoration(
+            color: _recording ? AppColors.destructive : AppColors.primary,
+            shape: BoxShape.circle,
+            boxShadow: _recording ? AppShadows.danger : AppShadows.safe,
+          ),
+          child: Icon(
+            Icons.mic_rounded,
+            size: _iconSize,
+            color: AppColors.primaryForeground,
           ),
         ),
       ),

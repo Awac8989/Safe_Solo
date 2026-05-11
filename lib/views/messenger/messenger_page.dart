@@ -60,7 +60,11 @@ class MessengerPage extends StatelessWidget {
     );
   }
 
-  static String _displayGroupLabel(AppStrings strings, String raw, String threadId) {
+  static String _displayGroupLabel(
+    AppStrings strings,
+    String raw,
+    String threadId,
+  ) {
     switch (threadId) {
       case 'family':
         return strings.text('Gia đình', 'Family');
@@ -93,6 +97,7 @@ class _ChatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     return GestureDetector(
       onTap: () => _openThread(context),
       child: AppCard(
@@ -146,7 +151,7 @@ class _ChatCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${chat.messages.length} ${AppStrings.of(context).text('tin nhắn', 'messages')}',
+                        '${chat.messages.length} ${strings.text('tin nhắn', 'messages')}',
                         style: AppTextStyles.caption,
                       ),
                     ],
@@ -231,6 +236,10 @@ class _ThreadDetailPage extends StatefulWidget {
 class _ThreadDetailPageState extends State<_ThreadDetailPage> {
   final TextEditingController _controller = TextEditingController();
 
+  AppStrings _snapshotStrings() {
+    return AppStrings(context.read<AppProvider>().language);
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -248,9 +257,10 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
     if (!context.mounted) {
       return;
     }
+    final strings = _snapshotStrings();
     TopToast.show(
       context,
-      message: AppStrings.of(context).text('Đã gửi tin nhắn.', 'Message sent.'),
+      message: strings.text('Đã gửi tin nhắn.', 'Message sent.'),
       icon: Icons.send_rounded,
     );
   }
@@ -260,9 +270,10 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
     if (!context.mounted) {
       return;
     }
+    final strings = _snapshotStrings();
     TopToast.show(
       context,
-      message: AppStrings.of(context).text(
+      message: strings.text(
         'Đã gửi ghi âm ${seconds}s.',
         'Voice note sent (${seconds}s).',
       ),
@@ -271,7 +282,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
   }
 
   Future<void> _callThread(ChatThread thread) async {
-    final strings = AppStrings.of(context);
+    final strings = _snapshotStrings();
     final phone = thread.contactPhone;
     if (phone == null || phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -355,7 +366,11 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              MessengerPage._displayGroupLabel(strings, thread.groupLabel, thread.id),
+                              MessengerPage._displayGroupLabel(
+                                strings,
+                                thread.groupLabel,
+                                thread.id,
+                              ),
                               style: AppTextStyles.caption,
                             ),
                             const SizedBox(height: 6),
@@ -383,7 +398,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
               ),
               Expanded(
                 child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
                   padding: const EdgeInsets.only(top: 8),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.78),
@@ -396,7 +411,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                             padding: const EdgeInsets.all(24),
                             child: Text(
                               strings.text(
-                                'Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên hoặc giữ nút mic để gửi voice note.',
+                                'Chưa có tin nhắn nào. Hãy gửi tin nhắn đầu tiên hoặc giữ nút mic để gửi ghi âm.',
                                 'No messages yet. Send the first message or hold the mic to send a voice note.',
                               ),
                               textAlign: TextAlign.center,
@@ -408,7 +423,8 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
-                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           itemCount: thread.messages.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 10),
                           itemBuilder: (context, index) {
@@ -524,7 +540,9 @@ class _MessageBubble extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       message.sender,
-                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 if (message.isVoiceNote)
@@ -617,7 +635,6 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
         : AppColors.textSecondary;
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         InkWell(
           onTap: _togglePlay,
@@ -638,8 +655,7 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
           ),
         ),
         const SizedBox(width: 10),
-        SizedBox(
-          width: 120,
+        Expanded(
           child: VoiceWaveform(
             seed: widget.message.id,
             progress: _progress,
@@ -650,7 +666,7 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
         ),
         const SizedBox(width: 10),
         Text(
-          '${widget.message.voiceSeconds}s',
+          '${widget.message.voiceSeconds ?? 0}s',
           style: AppTextStyles.bodyStrong.copyWith(color: foreground),
         ),
       ],

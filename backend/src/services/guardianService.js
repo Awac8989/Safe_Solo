@@ -1,186 +1,177 @@
-const { readState, withState, createId, nowIso } = require('../data/store');
+const GuardianRelationship = require('../models/GuardianRelationship');
+const User = require('../models/User');
 const { AppError, ensure } = require('../lib/errors');
 const { sanitizeUser, normalizeEmail, fullName } = require('../lib/utils');
 const { createAlertEvent } = require('./alertEventService');
 
 class GuardianService {
   async sendGuardianRequest(requesterId, guardianId, message = null, escalationLevel = 1) {
-    return withState((state) => {
-      const requester = state.users.find((item) => item.id === requesterId);
-      const guardian = state.users.find((item) => item.id === guardianId);
+    const [requester, guardian] = await Promise.all([
+      User.findById(requesterId),
+      User.findById(guardianId),
+    ]);
 
-      ensure(requester, 'Requester not found', 404);
-      ensure(guardian, 'Guardian not found', 404);
-      ensure(requesterId !== guardianId, 'Cannot send request to yourself');
+    ensure(requester, 'Requester not found', 404);
+    ensure(guardian, 'Guardian not found', 404);
+    ensure(requesterId !== guardianId, 'Cannot send request to yourself');
 
-      const existing = state.guardianRelationships.find(
-        (item) =>
-          item.requesterId === requesterId &&
-          item.guardianId === guardianId &&
-          item.status !== 'REJECTED',
-      );
-
-      if (existing) {
-        throw new AppError('Guardian request already exists', 409);
-      }
-
-      const relationship = {
-        id: createId('guard'),
-        requesterId,
-        guardianId,
-        status: 'PENDING',
-        escalationLevel,
-        guardianConfirmedAt: null,
-        lastNotifiedAt: null,
-        message: message || '',
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      };
-
-      state.guardianRelationships.push(relationship);
-      createAlertEvent({
-        userId: guardianId,
-        level: 'INFO',
-        status: 'GUARDIAN_REQUEST_RECEIVED',
-        source: 'USER',
-        title: 'Loi moi guardian',
-        message: `${fullName(requester)} muon ket noi voi ban`,
-        metadata: { relationshipId: relationship.id },
-      });
-
-      return {
-        ...relationship,
-        requester: sanitizeUser(requester),
-        guardian: sanitizeUser(guardian),
-      };
+    const existing = await GuardianRelationship.findOne({
+      requesterId,
+      guardianId,
+      status: { $ne: 'REJECTED' },
     });
+
+    if (existing) {
+      throw new AppError('Guardian request already exists', 409);
+    }
+
+    const relationship = await GuardianRelationship.create({
+      requesterId,
+      guardianId,
+      status: 'PENDING',
+      escalationLevel,
+      guardianConfirmedAt: null,
+      lastNotifiedAt: null,
+      message: message || '',
+    });
+
+    await createAlertEvent({
+      userId: guardianId,
+      level: 'INFO',
+      status: 'GUARDIAN_REQUEST_RECEIVED',
+      source: 'USER',
+      title: 'Loi moi guardian',
+      message: `${fullName(requester)} muon ket noi voi ban`,
+      metadata: { relationshipId: relationship._id },
+    });
+
+    return {
+      ...relationship.toObject(),
+      id: relationship._id,
+      requester: sanitizeUser(requester),
+      guardian: sanitizeUser(guardian),
+    };
   }
 
   async respondToRequest(relationshipId, guardianId, action) {
-    return withState((state) => {
-      const relationship = state.guardianRelationships.find((item) => item.id === relationshipId);
-      ensure(relationship, 'Guardian request not found', 404);
-      ensure(relationship.guardianId === guardianId, 'Unauthorized', 403);
-      ensure(relationship.status === 'PENDING', 'Guardian request already handled', 409);
+    const relationship = await GuardianRelationship.findById(relationshipId);
+    ensure(relationship, 'Guardian request not found', 404);
+    ensure(relationship.guardianId === guardianId, 'Unauthorized', 403);
+    ensure(relationship.status === 'PENDING', 'Guardian request already handled', 409);
 
-      relationship.status = action === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
-      relationship.guardianConfirmedAt = action === 'ACCEPT' ? nowIso() : null;
-      relationship.updatedAt = nowIso();
+    relationship.status = action === 'ACCEPT' ? 'ACCEPTED' : 'REJECTED';
+    relationship.guardianConfirmedAt = action === 'ACCEPT' ? new Date() : null;
+    await relationship.save();
 
-      createAlertEvent({
-        userId: relationship.requesterId,
-        level: 'INFO',
-        status: relationship.status === 'ACCEPTED' ? 'GUARDIAN_ACCEPTED' : 'GUARDIAN_REJECTED',
-        source: 'USER',
-        title: 'Cap nhat guardian',
-        message: `Guardian request ${relationship.status.toLowerCase()}`,
-        metadata: { relationshipId },
-      });
-
-      return relationship;
+    await createAlertEvent({
+      userId: relationship.requesterId,
+      level: 'INFO',
+      status: relationship.status === 'ACCEPTED' ? 'GUARDIAN_ACCEPTED' : 'GUARDIAN_REJECTED',
+      source: 'USER',
+      title: 'Cap nhat guardian',
+      message: `Guardian request ${relationship.status.toLowerCase()}`,
+      metadata: { relationshipId },
     });
+
+    return {
+      ...relationship.toObject(),
+      id: relationship._id,
+    };
   }
 
   async getUserGuardians(userId) {
-    const state = readState();
-    const accepted = state.guardianRelationships.filter(
-      (item) =>
-        item.status === 'ACCEPTED' &&
-        (item.requesterId === userId || item.guardianId === userId),
-    );
+    const accepted = await GuardianRelationship.find({
+      status: 'ACCEPTED',
+      $or: [{ requesterId: userId }, { guardianId: userId }],
+    }).lean();
+
+    const userIds = [...new Set(accepted.flatMap((item) => [item.requesterId, item.guardianId]))];
+    const users = userIds.length ? await User.find({ _id: { $in: userIds } }).lean() : [];
+    const userMap = new Map(users.map((item) => [item._id, sanitizeUser(item)]));
 
     const guardians = accepted
       .filter((item) => item.requesterId === userId)
-      .map((item) => {
-        const user = state.users.find((entry) => entry.id === item.guardianId);
-        return {
-          relationshipId: item.id,
-          escalationLevel: item.escalationLevel,
-          guardianConfirmedAt: item.guardianConfirmedAt,
-          relationship: 'guardian',
-          user: user ? sanitizeUser(user) : null,
-        };
-      })
+      .map((item) => ({
+        relationshipId: item._id,
+        escalationLevel: item.escalationLevel,
+        guardianConfirmedAt: item.guardianConfirmedAt,
+        relationship: 'guardian',
+        user: userMap.get(item.guardianId) || null,
+      }))
       .filter((item) => item.user);
 
     const proteges = accepted
       .filter((item) => item.guardianId === userId)
-      .map((item) => {
-        const user = state.users.find((entry) => entry.id === item.requesterId);
-        return {
-          relationshipId: item.id,
-          escalationLevel: item.escalationLevel,
-          guardianConfirmedAt: item.guardianConfirmedAt,
-          relationship: 'protege',
-          user: user ? sanitizeUser(user) : null,
-        };
-      })
+      .map((item) => ({
+        relationshipId: item._id,
+        escalationLevel: item.escalationLevel,
+        guardianConfirmedAt: item.guardianConfirmedAt,
+        relationship: 'protege',
+        user: userMap.get(item.requesterId) || null,
+      }))
       .filter((item) => item.user);
 
     return { guardians, proteges };
   }
 
   async getPendingRequests(userId) {
-    const state = readState();
+    const [sent, received] = await Promise.all([
+      GuardianRelationship.find({ requesterId: userId, status: 'PENDING' }).lean(),
+      GuardianRelationship.find({ guardianId: userId, status: 'PENDING' }).lean(),
+    ]);
+    const userIds = [...new Set([
+      ...sent.map((item) => item.guardianId),
+      ...received.map((item) => item.requesterId),
+    ])];
+    const users = userIds.length ? await User.find({ _id: { $in: userIds } }).lean() : [];
+    const userMap = new Map(users.map((item) => [item._id, sanitizeUser(item)]));
+
     return {
-      sent: state.guardianRelationships
-        .filter((item) => item.requesterId === userId && item.status === 'PENDING')
-        .map((item) => ({
-          ...item,
-          user: sanitizeUser(state.users.find((entry) => entry.id === item.guardianId)),
-        })),
-      received: state.guardianRelationships
-        .filter((item) => item.guardianId === userId && item.status === 'PENDING')
-        .map((item) => ({
-          ...item,
-          user: sanitizeUser(state.users.find((entry) => entry.id === item.requesterId)),
-        })),
+      sent: sent.map((item) => ({
+        ...item,
+        id: item._id,
+        user: userMap.get(item.guardianId) || null,
+      })),
+      received: received.map((item) => ({
+        ...item,
+        id: item._id,
+        user: userMap.get(item.requesterId) || null,
+      })),
     };
   }
 
   async removeRelationship(relationshipId, userId) {
-    return withState((state) => {
-      const index = state.guardianRelationships.findIndex((item) => item.id === relationshipId);
-      ensure(index >= 0, 'Relationship not found', 404);
-
-      const relationship = state.guardianRelationships[index];
-      ensure(
-        relationship.requesterId === userId || relationship.guardianId === userId,
-        'Unauthorized',
-        403,
-      );
-
-      state.guardianRelationships.splice(index, 1);
-      return { message: 'Relationship removed successfully' };
-    });
+    const relationship = await GuardianRelationship.findById(relationshipId);
+    ensure(relationship, 'Relationship not found', 404);
+    ensure(
+      relationship.requesterId === userId || relationship.guardianId === userId,
+      'Unauthorized',
+      403,
+    );
+    await GuardianRelationship.deleteOne({ _id: relationshipId });
+    return { message: 'Relationship removed successfully' };
   }
 
   async blockUser(relationshipId, userId) {
-    return withState((state) => {
-      const relationship = state.guardianRelationships.find((item) => item.id === relationshipId);
-      ensure(relationship, 'Relationship not found', 404);
-      ensure(
-        relationship.requesterId === userId || relationship.guardianId === userId,
-        'Unauthorized',
-        403,
-      );
-
-      relationship.status = 'BLOCKED';
-      relationship.updatedAt = nowIso();
-      return { message: 'User blocked successfully' };
-    });
+    const relationship = await GuardianRelationship.findById(relationshipId);
+    ensure(relationship, 'Relationship not found', 404);
+    ensure(
+      relationship.requesterId === userId || relationship.guardianId === userId,
+      'Unauthorized',
+      403,
+    );
+    relationship.status = 'BLOCKED';
+    await relationship.save();
+    return { message: 'User blocked successfully' };
   }
 
   async searchUsers(term, currentUserId, limit = 20) {
-    const state = readState();
     const query = String(term || '').trim().toLowerCase();
-
-    return state.users
-      .filter((item) => item.id !== currentUserId && item.isActive)
+    return (await User.find({ _id: { $ne: currentUserId }, isActive: { $ne: false } }).lean())
       .filter((item) => {
         const haystack = [
           normalizeEmail(item.email),
-          item.phone || '',
+          item.phoneNumber || '',
           item.firstName || '',
           item.lastName || '',
           fullName(item),
