@@ -1,4 +1,5 @@
 @import "tailwindcss" source(none);
+@import "maplibre-gl/dist/maplibre-gl.css";
 @source "../src";
 @import "tw-animate-css";
 

@@ -1,26 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 
 class NetworkPage extends StatelessWidget {
   const NetworkPage({super.key});
 
+  AppStrings _strings(BuildContext context) =>
+      AppStrings(context.read<AppProvider>().language);
+
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
+    final strings = _strings(context);
     final contacts = appProvider.user?.emergencyContacts ?? const [];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Guardians'),
+        title: Text(strings.text('Người bảo hộ', 'Guardians')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Toi da 3 guardians co the nhan canh bao va lien he nhanh khi can.',
+            strings.text(
+              'Tối đa 3 người bảo hộ có thể nhận cảnh báo và liên hệ nhanh khi cần.',
+              'Up to 3 guardians can receive alerts and reach you quickly when needed.',
+            ),
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 18),
@@ -35,27 +43,36 @@ class NetworkPage extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: () => _openGuardianDialog(context),
               icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Them guardian'),
+              label: Text(strings.text('Thêm người bảo hộ', 'Add guardian')),
             ),
         ],
       ),
     );
   }
 
-  Future<void> _deleteGuardian(BuildContext context, EmergencyContact contact) async {
+  Future<void> _deleteGuardian(
+    BuildContext context,
+    EmergencyContact contact,
+  ) async {
+    final strings = _strings(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Xoa guardian'),
-        content: Text('Ban co chac muon xoa ${contact.name} khoi mang bao ve?'),
+        title: Text(strings.text('Xóa người bảo hộ', 'Remove guardian')),
+        content: Text(
+          strings.text(
+            'Bạn có chắc muốn xóa ${contact.name} khỏi mạng bảo vệ?',
+            'Are you sure you want to remove ${contact.name} from your safety network?',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Huy'),
+            child: Text(strings.text('Hủy', 'Cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Xoa'),
+            child: Text(strings.text('Xóa', 'Remove')),
           ),
         ],
       ),
@@ -72,6 +89,7 @@ class NetworkPage extends StatelessWidget {
   }
 
   Future<void> _openGuardianDialog(BuildContext context) async {
+    final strings = _strings(context);
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final relationController = TextEditingController();
@@ -79,31 +97,37 @@ class NetworkPage extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Them guardian'),
+        title: Text(strings.text('Thêm người bảo hộ', 'Add guardian')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Ho ten'),
+              decoration: InputDecoration(
+                labelText: strings.text('Họ và tên', 'Full name'),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: phoneController,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'So dien thoai'),
+              decoration: InputDecoration(
+                labelText: strings.text('Số điện thoại', 'Phone number'),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: relationController,
-              decoration: const InputDecoration(labelText: 'Quan he'),
+              decoration: InputDecoration(
+                labelText: strings.text('Quan hệ', 'Relationship'),
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Huy'),
+            child: Text(strings.text('Hủy', 'Cancel')),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -128,7 +152,7 @@ class NetworkPage extends StatelessWidget {
                 Navigator.pop(dialogContext);
               }
             },
-            child: const Text('Luu'),
+            child: Text(strings.text('Lưu', 'Save')),
           ),
         ],
       ),

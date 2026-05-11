@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
+import '../../core/constants.dart';
+import '../../core/maptiler_tile_provider.dart';
+import '../../core/providers/app_provider.dart';
 import '../../core/widgets/push_to_talk_button.dart';
 import '../../core/widgets/voice_waveform.dart';
+import '../../services/audio_note_service.dart';
 import '../community_radar/community_radar_page.dart';
 
 class SosMapPage extends StatefulWidget {
   const SosMapPage({
     super.key,
-    this.victimName = 'Ho Van Tai',
+    this.victimName = 'Hồ Văn Tài',
   });
 
   final String victimName;
@@ -21,6 +27,8 @@ class SosMapPage extends StatefulWidget {
 
 class _SosMapPageState extends State<SosMapPage>
     with SingleTickerProviderStateMixin {
+  AppStrings _strings(BuildContext context) =>
+      AppStrings(context.read<AppProvider>().language);
   late final AnimationController _blink = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
@@ -28,17 +36,17 @@ class _SosMapPageState extends State<SosMapPage>
 
   final List<_EmergencyMessage> _messages = [
     _EmergencyMessage(
-      author: 'He thong',
-      text: 'SOS da kich hoat luc 14:32 · pin 18%',
+      author: 'Hệ thống',
+      text: 'SOS đã kích hoạt lúc 14:32 · pin 18%',
       system: true,
     ),
     _EmergencyMessage(
       author: 'Guardian Minh Anh',
-      text: 'Toi dang den noi, ETA 6 phut.',
+      text: 'Tôi đang đến nơi, ETA 6 phút.',
     ),
   ];
 
-  int? _voiceSeconds;
+  RecordedAudioNote? _voiceNote;
   final TextEditingController _chatController = TextEditingController();
 
   @override
@@ -50,6 +58,7 @@ class _SosMapPageState extends State<SosMapPage>
 
   @override
   Widget build(BuildContext context) {
+    final strings = _strings(context);
     const victim = LatLng(10.7766, 106.7009);
     const guardian = LatLng(10.7818, 106.6968);
 
@@ -69,7 +78,10 @@ class _SosMapPageState extends State<SosMapPage>
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -77,12 +89,19 @@ class _SosMapPageState extends State<SosMapPage>
                         children: [
                           Text(
                             widget.victimName,
-                            style: AppTextStyles.title.copyWith(color: Colors.white),
+                            style: AppTextStyles.title.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'SOS dang hoat dong · Pin 18%',
-                            style: AppTextStyles.body.copyWith(color: Colors.white),
+                            strings.text(
+                              'SOS đang hoạt động · Pin 18%',
+                              'SOS is active · Battery 18%',
+                            ),
+                            style: AppTextStyles.body.copyWith(
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
@@ -103,11 +122,26 @@ class _SosMapPageState extends State<SosMapPage>
                       target: victim,
                       zoom: 14.5,
                     ),
+                    mapToolbarEnabled: false,
+                    myLocationButtonEnabled: false,
+                    myLocationEnabled: false,
+                    tileOverlays: AppConstants.hasMapTiler
+                        ? {
+                            TileOverlay(
+                              tileOverlayId: const TileOverlayId('maptiler_sos'),
+                              tileProvider: MapTilerTileProvider(),
+                              transparency: 0.05,
+                              zIndex: 1,
+                            ),
+                          }
+                        : {},
                     markers: {
-                      const Marker(
-                        markerId: MarkerId('victim'),
+                      Marker(
+                        markerId: const MarkerId('victim'),
                         position: victim,
-                        infoWindow: InfoWindow(title: 'Nan nhan'),
+                        infoWindow: InfoWindow(
+                          title: strings.text('Nạn nhân', 'Victim'),
+                        ),
                       ),
                       const Marker(
                         markerId: MarkerId('guardian'),
@@ -161,10 +195,13 @@ class _SosMapPageState extends State<SosMapPage>
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Text('Chat khan cap', style: AppTextStyles.h3),
+                            Text(
+                              strings.text('Chat khẩn cấp', 'Emergency chat'),
+                              style: AppTextStyles.h3,
+                            ),
                             const SizedBox(height: 14),
                             for (final item in _messages) ...[
-                              _MessageBubble(item: item),
+                              _MessageBubble(item: item, strings: strings),
                               const SizedBox(height: 10),
                             ],
                             const SizedBox(height: 10),
@@ -172,37 +209,59 @@ class _SosMapPageState extends State<SosMapPage>
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFF7EA),
-                                borderRadius: BorderRadius.circular(AppRadius.lg),
-                                border: Border.all(color: const Color(0xFFFFD7A3)),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.lg,
+                                ),
+                                border: Border.all(
+                                  color: const Color(0xFFFFD7A3),
+                                ),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.graphic_eq_rounded, color: AppColors.warning),
+                                  const Icon(
+                                    Icons.graphic_eq_rounded,
+                                    color: AppColors.warning,
+                                  ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Text('Ghi am khan cap', style: AppTextStyles.bodyStrong),
+                                        Text(
+                                          strings.text(
+                                            'Ghi âm khẩn cấp',
+                                            'Emergency voice note',
+                                          ),
+                                          style: AppTextStyles.bodyStrong,
+                                        ),
                                         const SizedBox(height: 6),
                                         Text(
-                                          'Nhan giu de gui voice note kem GPS hien tai vao kenh khan cap.',
-                                          style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                                          strings.text(
+                                            'Nhấn giữ để gửi voice note kèm GPS hiện tại vào kênh khẩn cấp.',
+                                            'Hold to send a voice note with your current GPS to the emergency channel.',
+                                          ),
+                                          style: AppTextStyles.body.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
                                   PushToTalkButton(
                                     size: PushToTalkSize.large,
-                                    onSend: (seconds) {
+                                    onSend: (note) {
                                       setState(() {
-                                        _voiceSeconds = seconds;
+                                        _voiceNote = note;
                                         _messages.add(
                                           _EmergencyMessage(
-                                            author: 'Ban',
-                                            text: 'Voice note da gui kem GPS 10.7766, 106.7009',
-                                            voiceSeconds: seconds,
+                                            author: strings.text('Bạn', 'You'),
+                                            text: strings.text(
+                                              'Đã gửi voice note kèm GPS 10.7766, 106.7009',
+                                              'Voice note sent with GPS 10.7766, 106.7009',
+                                            ),
+                                            voiceSeconds: note.durationSeconds,
                                           ),
                                         );
                                       });
@@ -211,13 +270,15 @@ class _SosMapPageState extends State<SosMapPage>
                                 ],
                               ),
                             ),
-                            if (_voiceSeconds != null) ...[
+                            if (_voiceNote != null) ...[
                               const SizedBox(height: 14),
                               Container(
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: AppColors.accent,
-                                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.lg,
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
@@ -231,7 +292,7 @@ class _SosMapPageState extends State<SosMapPage>
                                       ),
                                     ),
                                     const SizedBox(width: 10),
-                                    Text('${_voiceSeconds}s'),
+                                    Text('${_voiceNote!.durationSeconds}s'),
                                   ],
                                 ),
                               ),
@@ -241,9 +302,13 @@ class _SosMapPageState extends State<SosMapPage>
                               children: [
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () => _launch(Uri.parse('tel:115')),
+                                    onPressed: () => _launch(
+                                      Uri.parse('tel:115'),
+                                    ),
                                     icon: const Icon(Icons.call_outlined),
-                                    label: const Text('Goi 115'),
+                                    label: Text(
+                                      strings.text('Gọi 115', 'Call 115'),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
@@ -254,8 +319,12 @@ class _SosMapPageState extends State<SosMapPage>
                                         'https://www.google.com/maps/dir/?api=1&destination=${victim.latitude},${victim.longitude}',
                                       ),
                                     ),
-                                    icon: const Icon(Icons.navigation_outlined),
-                                    label: const Text('Chi duong'),
+                                    icon: const Icon(
+                                      Icons.navigation_outlined,
+                                    ),
+                                    label: Text(
+                                      strings.text('Chỉ đường', 'Directions'),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -266,7 +335,12 @@ class _SosMapPageState extends State<SosMapPage>
                               child: TextButton.icon(
                                 onPressed: _openBroadcast,
                                 icon: const Icon(Icons.campaign_rounded),
-                                label: const Text('Ban dang o qua xa? Mo Community Radar'),
+                                label: Text(
+                                  strings.text(
+                                    'Bạn đang ở quá xa? Mở Community Radar',
+                                    'Too far away? Open Community Radar',
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -275,8 +349,11 @@ class _SosMapPageState extends State<SosMapPage>
                                 Expanded(
                                   child: TextField(
                                     controller: _chatController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Nhap tin nhan khan cap...',
+                                    decoration: InputDecoration(
+                                      hintText: strings.text(
+                                        'Nhập tin nhắn khẩn cấp...',
+                                        'Type an emergency message...',
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -292,12 +369,17 @@ class _SosMapPageState extends State<SosMapPage>
                                       }
                                       setState(() {
                                         _messages.add(
-                                          _EmergencyMessage(author: 'Ban', text: text),
+                                          _EmergencyMessage(
+                                            author: strings.text('Bạn', 'You'),
+                                            text: text,
+                                          ),
                                         );
                                         _chatController.clear();
                                       });
                                     },
-                                    style: ElevatedButton.styleFrom(padding: EdgeInsets.zero),
+                                    style: ElevatedButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                    ),
                                     child: const Icon(Icons.send_rounded),
                                   ),
                                 ),
@@ -318,32 +400,54 @@ class _SosMapPageState extends State<SosMapPage>
   }
 
   Future<void> _openBroadcast() async {
-    final noteController = TextEditingController(text: 'Nguoi nha can duoc tiep can nhanh');
-    String selectedReason = 'Y te';
+    final strings = _strings(context);
+    final noteController = TextEditingController(
+      text: strings.text(
+        'Người nhà cần được tiếp cận nhanh',
+        'The victim needs support as soon as possible',
+      ),
+    );
+    String selectedReason = strings.text('Y tế', 'Medical');
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) => AlertDialog(
-            title: const Text('Keu goi cong dong'),
+            title: Text(
+              strings.text('Kêu gọi cộng đồng', 'Broadcast to community'),
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: selectedReason,
-                  decoration: const InputDecoration(labelText: 'Ly do'),
-                  items: const ['Y te', 'Toi pham', 'Tai nan', 'Khac']
-                      .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+                  decoration: InputDecoration(
+                    labelText: strings.text('Lý do', 'Reason'),
+                  ),
+                  items: [
+                    strings.text('Y tế', 'Medical'),
+                    strings.text('Tội phạm', 'Crime'),
+                    strings.text('Tai nạn', 'Accident'),
+                    strings.text('Khác', 'Other'),
+                  ]
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item,
+                          child: Text(item),
+                        ),
+                      )
                       .toList(),
-                  onChanged: (value) => setState(() => selectedReason = value ?? selectedReason),
+                  onChanged: (value) => setState(
+                    () => selectedReason = value ?? selectedReason,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: noteController,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Ghi chu',
+                  decoration: InputDecoration(
+                    labelText: strings.text('Ghi chú', 'Note'),
                   ),
                 ),
               ],
@@ -351,11 +455,13 @@ class _SosMapPageState extends State<SosMapPage>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Huy'),
+                child: Text(strings.text('Hủy', 'Cancel')),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Phat canh bao'),
+                child: Text(
+                  strings.text('Phát cảnh báo', 'Send broadcast'),
+                ),
               ),
             ],
           ),
@@ -398,9 +504,13 @@ class _EmergencyMessage {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.item});
+  const _MessageBubble({
+    required this.item,
+    required this.strings,
+  });
 
   final _EmergencyMessage item;
+  final AppStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -417,9 +527,10 @@ class _MessageBubble extends StatelessWidget {
       );
     }
 
-    final mine = item.author == 'Ban';
+    final mine = item.author == strings.text('Bạn', 'You');
     return Row(
-      mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment:
+          mine ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         Flexible(
           child: Container(

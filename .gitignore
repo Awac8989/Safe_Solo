@@ -1,9 +1,38 @@
-# Miscellaneous
-*.class
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins-dependencies
+.metadata
+.pub/
+.pub-cache/
+*.env.json
+build/
+coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+
+# Flutter generated outputs
+app.*.symbols
+app.*.map.json
+
+# Android local secrets / build outputs
+/android/app/debug
+/android/app/profile
+/android/app/release
+/android/maps-api.properties
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS / misc
+.DS_Store
 *.log
 *.pyc
 *.swp
-.DS_Store
+*.class
 .atom/
 .build/
 .buildlog/
@@ -12,41 +41,18 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# Cloned React app (temporary)
-alive-beacon-system-773c2a3b/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# Node / web
 **/node_modules/
-.metadata
+
+# Local runtime data
 *.db
+.env
+.env.local
+.env.*
+!.env.example
+!*.example
+!*.example.json
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-/android/maps-api.properties
+# Legacy folders kept out of repo
+mobile-app/
+database/

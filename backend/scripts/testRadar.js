@@ -1,12 +1,17 @@
 const jwt = require('jsonwebtoken');
 const path = require('path');
+
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-console.log('TEST SCRIPT DATABASE_URL:', process.env.DATABASE_URL);
-const prisma = require('../src/config/database');
+
+const database = require('../src/config/database');
+const User = require('../src/models/User');
+
 const fetch = global.fetch;
 
 if (!fetch) {
-  throw new Error('Global fetch is not available in this Node runtime. Use Node 18+ or install a fetch polyfill.');
+  throw new Error(
+    'Global fetch is not available in this Node runtime. Use Node 18+ or install a fetch polyfill.',
+  );
 }
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
@@ -16,7 +21,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 const baseUrl = `http://localhost:${process.env.TEST_PORT}`;
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function waitForServer() {
   for (let i = 0; i < 20; i += 1) {
@@ -25,8 +30,8 @@ async function waitForServer() {
       if (res.ok) {
         return;
       }
-    } catch (err) {
-      // ignore until server is ready
+    } catch (_error) {
+      // Wait for server startup.
     }
     await delay(500);
   }
@@ -37,37 +42,47 @@ function generateToken(userId) {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
-async function upsertTestUser(email, firstName, lastName, lat, lng) {
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {
-      firstName,
-      lastName,
-      isActive: true,
-      isVerified: true
+async function upsertTestUser(email, fullName, phoneNumber, lat, lng) {
+  const user = await User.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        fullName,
+        phoneNumber,
+        isActive: true,
+        isVerified: true,
+        nextDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+      $setOnInsert: {
+        firstName: fullName.split(' ').slice(0, -1).join(' ') || fullName,
+        lastName: fullName.split(' ').slice(-1).join(' '),
+        role: 'user',
+        timerIntervalMinutes: 24 * 60,
+        lastCheckinTime: new Date(),
+      },
     },
-    create: {
-      email,
-      firstName,
-      lastName,
-      isActive: true,
-      isVerified: true
-    }
-  });
+    {
+      upsert: true,
+      new: true,
+      setDefaultsOnInsert: true,
+    },
+  );
 
   if (typeof lat === 'number' && typeof lng === 'number') {
-    const token = generateToken(user.id);
+    const token = generateToken(user.id || user._id);
     const res = await fetch(`${baseUrl}/api/location/ping`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ lat, lng })
+      body: JSON.stringify({ lat, lng }),
     });
     const body = await res.json();
     if (!res.ok) {
-      throw new Error(`Location ping failed for ${email}: ${JSON.stringify(body)}`);
+      throw new Error(
+        `Location ping failed for ${email}: ${JSON.stringify(body)}`,
+      );
     }
     console.log(`Updated location for ${email}:`, body.data.location);
   }
@@ -88,25 +103,39 @@ async function main() {
   await waitForServer();
 
   console.log('Server is healthy');
-  await prisma.$connect();
-  console.log('Prisma connected from test script');
-  const ping = await prisma.$queryRaw`SELECT 1 as result`;
-  console.log('Raw query OK:', ping);
+  await database.$connect();
+  console.log('MongoDB connected from test script');
 
-  const victim = await upsertTestUser('victim-radar@example.com', 'Radar', 'Victim', 21.0285, 105.8542);
-  const volunteer = await upsertTestUser('volunteer-radar@example.com', 'Radar', 'Volunteer', 21.0350, 105.8600);
+  const victim = await upsertTestUser(
+    'victim-radar@example.com',
+    'Radar Victim',
+    '0901000001',
+    21.0285,
+    105.8542,
+  );
+  const volunteer = await upsertTestUser(
+    'volunteer-radar@example.com',
+    'Radar Volunteer',
+    '0901000002',
+    21.0350,
+    105.86,
+  );
 
-  const victimToken = generateToken(victim.id);
-  const volunteerToken = generateToken(volunteer.id);
+  const victimToken = generateToken(victim.id || victim._id);
+  const volunteerToken = generateToken(volunteer.id || volunteer._id);
 
   console.log('Broadcasting SOS as victim...');
   const broadcast = await requestJson(`${baseUrl}/api/radar/broadcast`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${victimToken}`
+      Authorization: `Bearer ${victimToken}`,
     },
-    body: JSON.stringify({ incidentType: 'medical_emergency', lat: 21.0285, lng: 105.8542 })
+    body: JSON.stringify({
+      incidentType: 'medical_emergency',
+      lat: 21.0285,
+      lng: 105.8542,
+    }),
   });
 
   console.log('Broadcast response:', broadcast.data.message);
@@ -114,11 +143,14 @@ async function main() {
   console.log('Incident id created:', incidentId);
 
   console.log('Getting nearby incidents for volunteer...');
-  const nearby = await requestJson(`${baseUrl}/api/radar/nearby?lat=21.0350&lng=105.8600`, {
-    headers: {
-      Authorization: `Bearer ${volunteerToken}`
-    }
-  });
+  const nearby = await requestJson(
+    `${baseUrl}/api/radar/nearby?lat=21.0350&lng=105.8600`,
+    {
+      headers: {
+        Authorization: `Bearer ${volunteerToken}`,
+      },
+    },
+  );
 
   console.log('Nearby incidents count:', nearby.data.length);
   if (nearby.data.length === 0) {
@@ -129,21 +161,27 @@ async function main() {
   const accept = await requestJson(`${baseUrl}/api/radar/${incidentId}/accept`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${volunteerToken}`
-    }
+      Authorization: `Bearer ${volunteerToken}`,
+    },
   });
 
   console.log('Accept response:', accept.data.message);
-  console.log('Incident exact coordinates returned:', accept.data.incident.exactLat, accept.data.incident.exactLng);
+  console.log(
+    'Incident exact coordinates returned:',
+    accept.data.incident.exactLat,
+    accept.data.incident.exactLng,
+  );
   console.log('Volunteer accepted successfully.');
 }
 
 main()
-  .then(() => {
+  .then(async () => {
     console.log('Radar endpoint tests completed successfully.');
+    await database.$disconnect();
     process.exit(0);
   })
-  .catch(err => {
-    console.error('Radar endpoint test failed:', err);
+  .catch(async (error) => {
+    console.error('Radar endpoint test failed:', error);
+    await database.$disconnect();
     process.exit(1);
   });

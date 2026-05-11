@@ -1,17 +1,17 @@
 # SafeSolo Backend
 
-Backend hiện tại của SafeSolo là API Node.js/Express phục vụ:
+Backend hiện tại của SafeSolo là API `Node.js + Express + MongoDB` phục vụ:
 
 - Flutter mobile app
 - Web Admin
-- Safety flow như check-in, dead-man switch, SOS, guardians, medical, chat, radar
+- Luồng an toàn: check-in, dead-man switch, SOS, guardians, medical, chat, radar
 
-Trạng thái hiện tại:
+## Trạng thái hiện tại
 
-- MongoDB là nguồn dữ liệu chính cho core runtime
+- MongoDB là nguồn dữ liệu duy nhất cho runtime backend.
 - Database mặc định: `Safesolo`
 - Default connection string: `mongodb://127.0.0.1:27017/Safesolo`
-- Một số phần legacy vẫn còn trong repo để hỗ trợ migrate và tương thích, nhưng luồng an toàn chính đã chạy trên Mongo
+- Các nhánh Prisma, PostgreSQL, SQLite runtime và JSON store cũ đã được loại khỏi code path chính.
 
 ## Tech stack
 
@@ -25,26 +25,25 @@ Trạng thái hiện tại:
 - JWT
 - Multer
 
-## Thư mục quan trọng
+## Cấu trúc chính
 
 ```text
 backend/
-├─ data/                    Dữ liệu legacy/runtime cũ
-├─ scripts/                 Seed, migrate, verify
+├─ scripts/                 Seed và script kiểm tra
 ├─ src/
-│  ├─ config/               DB config
+│  ├─ config/               MongoDB config
 │  ├─ controllers/          HTTP controllers
-│  ├─ middleware/           Auth, error handling
+│  ├─ middleware/           Auth, validation, error handling
 │  ├─ models/               Mongoose models
 │  ├─ routes/               API routes
 │  ├─ services/             Business logic
 │  ├─ sockets/              Socket.IO server
-│  └─ workers/              BullMQ workers
+│  └─ workers/              Dead-man / duress workers
 ├─ package.json
 └─ server.js
 ```
 
-## Cách chạy
+## Cài đặt và chạy
 
 ### 1. Cài dependency
 
@@ -91,21 +90,17 @@ Health endpoint:
 
 Không bắt buộc để API cơ bản hoạt động.
 
-Nếu Redis chưa bật:
+- Nếu Redis chưa bật, API chính vẫn chạy.
+- BullMQ worker có thể log `ECONNREFUSED 127.0.0.1:6379`.
 
-- API chính vẫn chạy
-- worker BullMQ có thể log `ECONNREFUSED 127.0.0.1:6379`
+Nếu muốn worker realtime ổn định hơn, hãy bật Redis local.
 
-Nếu muốn dùng đầy đủ worker realtime ổn định hơn, hãy bật Redis local.
-
-## Các script sẵn có
+## Scripts hiện có
 
 ```powershell
 npm run dev
 npm start
 npm run seed:demo-users
-npm run migrate:sqlite-to-mongo
-npm run verify:mongo-counts
 ```
 
 ### Seed user demo
@@ -114,26 +109,14 @@ npm run verify:mongo-counts
 npm run seed:demo-users
 ```
 
-### Migrate dữ liệu cũ từ SQLite sang Mongo
+## Nhóm API chính
 
-```powershell
-npm run migrate:sqlite-to-mongo
-```
-
-### Verify số lượng dữ liệu sau migrate
-
-```powershell
-npm run verify:mongo-counts
-```
-
-## Các nhóm API chính
-
-### 1. Health
+### Health
 
 - `GET /health`
 - `GET /api/health`
 
-### 2. Auth
+### Auth
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -144,7 +127,7 @@ npm run verify:mongo-counts
 - `PATCH /api/auth/settings`
 - `GET /api/auth/bootstrap`
 
-### 3. User core / Flutter legacy contract
+### User core / Flutter contract
 
 - `POST /api/users/register`
 - `GET /api/users`
@@ -155,14 +138,14 @@ npm run verify:mongo-counts
 - `PATCH /api/users/:id/preferences`
 - `PATCH /api/users/:id/sleep-mode`
 
-### 4. Alert policy / interactions
+### Alert policy / interactions
 
 - `GET /api/users/:id/alert-policy`
 - `PATCH /api/users/:id/alert-policy`
 - `GET /api/users/:id/interactions`
 - `POST /api/users/:id/interactions`
 
-### 5. Guardians
+### Guardians
 
 - `GET /api/guardians`
 - `GET /api/guardians/search?q=...`
@@ -173,14 +156,14 @@ npm run verify:mongo-counts
 - `POST /api/users/:id/guardians`
 - `DELETE /api/users/:id/guardians/:phone`
 
-### 6. Medical
+### Medical
 
 - `GET /api/medical`
 - `PUT /api/medical`
 - `GET /api/users/:id/medical-profile`
 - `PUT /api/users/:id/medical-profile`
 
-### 7. Automation / Security / Device signals
+### Automation / Security / Device signals
 
 - `GET /api/users/:id/automation-settings`
 - `PATCH /api/users/:id/automation-settings`
@@ -189,7 +172,7 @@ npm run verify:mongo-counts
 - `GET /api/users/:id/device-signals`
 - `POST /api/users/:id/device-signals`
 
-### 8. Radar / Rescue
+### Radar / Rescue
 
 - `POST /api/radar/broadcast`
 - `GET /api/radar/nearby`
@@ -197,12 +180,12 @@ npm run verify:mongo-counts
 - `GET /api/radar/:incidentId`
 - `PUT /api/radar/:incidentId/resolve`
 
-### 9. Chat
+### Chat
 
 - `GET /api/chat/:roomId/messages`
 - `POST /api/chat/:roomId/messages`
 
-### 10. Feed / Community
+### Feed / Community
 
 - `POST /api/feed/status`
 - `GET /api/feed/circle`
@@ -210,13 +193,13 @@ npm run verify:mongo-counts
 - `GET /api/community/heroes/:id`
 - `POST /api/community/heroes/:id/thank-you`
 
-### 11. KYC
+### KYC
 
 - `POST /api/kyc/upload`
 - `GET /api/admin/kyc`
 - `PATCH /api/admin/kyc/:id`
 
-### 12. Admin safety
+### Admin safety
 
 - `GET /api/admin/overview`
 - `GET /api/admin/users`
@@ -230,7 +213,7 @@ npm run verify:mongo-counts
 
 ## Mongoose models chính
 
-### User core
+### Core safety
 
 - `User`
 - `CheckInHistory`
@@ -261,20 +244,20 @@ npm run verify:mongo-counts
 - `Vault`
 - `KYCDocument`
 
-## Luồng nghiệp vụ chính
+## Luồng chính
 
 ### Check-in
 
 1. Mobile gọi `POST /api/users/:id/checkin`
 2. Backend cập nhật `lastCheckinTime`, `nextDeadline`
-3. Tạo interaction event
-4. Web Admin có thể thấy timeline cảnh báo nếu user quá hạn sau đó
+3. Ghi interaction event
+4. Web Admin đọc timeline từ Mongo
 
 ### Dead-man switch
 
 1. Worker quét user quá hạn
 2. Tạo `AlertEvent`
-3. Gửi SMS theo escalation nếu cần
+3. Gửi SMS theo escalation khi cần
 4. Ghi `SmsDispatchLog`
 5. Đẩy dữ liệu cho admin timeline
 
@@ -289,20 +272,10 @@ npm run verify:mongo-counts
 ### Auto-wipe
 
 1. Worker quét user có `autoWipeDays`
-2. Khi đủ điều kiện, dữ liệu Vault local/server tương ứng được cập nhật theo policy
+2. Khi đủ điều kiện, dữ liệu nhạy cảm được cập nhật theo policy
 3. Ghi `SystemLog`
 
-## Socket / realtime
-
-Socket server được khởi tạo trong:
-
-- [c:\Users\Admin\SafeSolo\backend\src\sockets\socketServer.js](c:/Users/Admin/SafeSolo/backend/src/sockets/socketServer.js)
-
-Server bootstrap:
-
-- [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
-
-## Các file quan trọng nên đọc trước
+## File quan trọng nên đọc trước
 
 - [c:\Users\Admin\SafeSolo\backend\server.js](c:/Users/Admin/SafeSolo/backend/server.js)
 - [c:\Users\Admin\SafeSolo\backend\src\config\database.js](c:/Users/Admin/SafeSolo/backend/src/config/database.js)
@@ -313,7 +286,7 @@ Server bootstrap:
 - [c:\Users\Admin\SafeSolo\backend\src\workers\deadmanWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/deadmanWorker.js)
 - [c:\Users\Admin\SafeSolo\backend\src\workers\duressWorker.js](c:/Users/Admin/SafeSolo/backend/src/workers/duressWorker.js)
 
-## Test nhanh bằng curl
+## Test nhanh
 
 ### Health
 
@@ -333,20 +306,14 @@ curl http://127.0.0.1:4000/api/users
 curl http://127.0.0.1:4000/api/admin/overview
 ```
 
-## Ghi chú migrate
-
-- Repo vẫn còn dấu vết Prisma/SQLite/JSON store cũ ở một số module legacy
-- Core runtime cho safety, chat, rescue, community và admin safety đã được đưa sang Mongo
-- Dùng các script migrate + verify trước khi xóa hoàn toàn dữ liệu cũ
-
-## Cảnh báo khi commit
+## Lưu ý khi commit
 
 Không nên commit:
 
 - `.env`
 - secret keys
 - token thật
-- file runtime không cần thiết nếu chỉ phát sinh do test
+- file runtime phát sinh khi test nếu không cần thiết
 
 ## License
 

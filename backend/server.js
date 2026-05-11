@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const { initializeSocket } = require('./src/sockets/socketServer');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
-const prisma = require('./src/config/database');
+const database = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
 const { startDeadManWorker } = require('./src/workers/deadmanWorker');
 const { apiRouter } = require('./src/routes');
@@ -81,19 +81,19 @@ app.use(errorHandler);
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
-  await prisma.$disconnect();
+  await database.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully');
-  await prisma.$disconnect();
+  await database.$disconnect();
   process.exit(0);
 });
 
 server.listen(port, async () => {
   try {
-    await prisma.$connect();
+    await database.$connect();
     console.log('Database connected successfully');
   } catch (error) {
     console.error('Database connection failed:', error);

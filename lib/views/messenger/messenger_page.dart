@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +13,7 @@ import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/push_to_talk_button.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
+import '../../services/audio_note_service.dart';
 
 class MessengerPage extends StatelessWidget {
   const MessengerPage({super.key});
@@ -265,17 +268,18 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
     );
   }
 
-  Future<void> _sendVoice(BuildContext context, int seconds) async {
-    await context.read<AppProvider>().sendVoiceMessage(widget.threadId, seconds);
+  Future<void> _sendVoice(BuildContext context, RecordedAudioNote note) async {
+    await context.read<AppProvider>().sendVoiceMessage(widget.threadId, note);
     if (!context.mounted) {
       return;
     }
+    final seconds = note.durationSeconds;
     final strings = _snapshotStrings();
     TopToast.show(
       context,
       message: strings.text(
         'Đã gửi ghi âm ${seconds}s.',
-        'Voice note sent (${seconds}s).',
+        'Voice note sent (${note.durationSeconds}s).',
       ),
       icon: Icons.mic_rounded,
     );
@@ -459,7 +463,17 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              PushToTalkButton(onSend: (seconds) => _sendVoice(context, seconds)),
+              PushToTalkButton(
+                onSend: (note) => _sendVoice(context, note),
+                onError: (message) {
+                  if (!context.mounted) {
+                    return;
+                  }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(message)),
+                  );
+                },
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
@@ -589,17 +603,68 @@ class _VoiceNotePlayer extends StatefulWidget {
 }
 
 class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
+  late final AudioPlayer _player = AudioPlayer();
   Timer? _ticker;
   double _progress = 0;
   bool _playing = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _player.onDurationChanged.listen((value) {
+      if (mounted) {
+        setState(() => _duration = value);
+      }
+    });
+    _player.onPositionChanged.listen((value) {
+      if (mounted) {
+        setState(() => _position = value);
+      }
+    });
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) {
+        setState(() {
+          _playing = false;
+          _position = Duration.zero;
+          _progress = 0;
+        });
+      }
+    });
+  }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _player.dispose();
     super.dispose();
   }
 
-  void _togglePlay() {
+  Future<void> _togglePlay() async {
+    final voicePath = widget.message.voicePath;
+    if (voicePath != null && voicePath.isNotEmpty) {
+      if (!File(voicePath).existsSync()) {
+        return;
+      }
+      if (_playing) {
+        await _player.pause();
+        if (mounted) {
+          setState(() => _playing = false);
+        }
+        return;
+      }
+
+      await _player.stop();
+      setState(() {
+        _position = Duration.zero;
+        _duration = Duration.zero;
+      });
+      setState(() => _playing = true);
+      await _player.play(DeviceFileSource(voicePath));
+      return;
+    }
+
     if (_playing) {
       _ticker?.cancel();
       setState(() => _playing = false);
@@ -633,6 +698,9 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
     final muted = widget.alignEnd
         ? Colors.white.withValues(alpha: 0.78)
         : AppColors.textSecondary;
+    final liveProgress = _duration.inMilliseconds > 0
+        ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+        : _progress;
 
     return Row(
       children: [
@@ -658,7 +726,7 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
         Expanded(
           child: VoiceWaveform(
             seed: widget.message.id,
-            progress: _progress,
+            progress: liveProgress,
             height: 22,
             color: muted,
             activeColor: foreground,

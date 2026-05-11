@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 
 import '../app_language.dart';
 import '../../models/alert_policy_model.dart';
@@ -11,7 +15,9 @@ import '../../models/medical_profile_model.dart';
 import '../../models/security_settings_model.dart';
 import '../../models/user_model.dart';
 import '../../services/api_service.dart';
+import '../../services/audio_note_service.dart';
 import '../../services/location_service.dart';
+import '../../services/notification_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -575,6 +581,7 @@ class ChatMessage {
     this.mine = false,
     this.isSystem = false,
     this.voiceSeconds,
+    this.voicePath,
   });
 
   final String id;
@@ -584,8 +591,11 @@ class ChatMessage {
   final bool mine;
   final bool isSystem;
   final int? voiceSeconds;
+  final String? voicePath;
 
-  bool get isVoiceNote => voiceSeconds != null && voiceSeconds! > 0;
+  bool get isVoiceNote =>
+      (voicePath != null && voicePath!.isNotEmpty) ||
+      (voiceSeconds != null && voiceSeconds! > 0);
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -595,6 +605,7 @@ class ChatMessage {
     'mine': mine,
     'isSystem': isSystem,
     'voiceSeconds': voiceSeconds,
+    'voicePath': voicePath,
   };
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -606,6 +617,7 @@ class ChatMessage {
       mine: json['mine'] as bool? ?? false,
       isSystem: json['isSystem'] as bool? ?? false,
       voiceSeconds: json['voiceSeconds'] as int?,
+      voicePath: json['voicePath'] as String?,
     );
   }
 }
@@ -657,6 +669,7 @@ class AppProvider with ChangeNotifier {
 
   final ApiService _api = ApiService();
   final LocationService _locationService = LocationService();
+  final NotificationService _notifications = NotificationService.instance;
 
   User? _user;
   bool _onboarded = false;
@@ -681,6 +694,21 @@ class AppProvider with ChangeNotifier {
   List<RadarIncident> _radarIncidents = const [];
   AlertPolicyModel? _alertPolicy;
   List<InteractionEventModel> _interactionEvents = const [];
+  Timer? _automationTimer;
+  StreamSubscription<Position>? _positionSubscription;
+  StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
+  AppLocation? _homeAnchor;
+  DateTime? _lastDailyReminderAt;
+  DateTime? _lastMedicationReminderAt;
+  DateTime? _lastOverdueNotificationAt;
+  DateTime? _lastGeofenceCheckInAt;
+  DateTime? _lastFallSignalAt;
+  DateTime? _lastShakeSignalAt;
+  DateTime? _fallCandidateAt;
+  DateTime? _lowMotionSince;
+  DateTime? _lastShakePeakAt;
+  bool _wasOutsideHome = false;
+  final List<DateTime> _shakePeaks = [];
 
   User? get user => _user;
   bool get onboarded => _onboarded;
@@ -776,6 +804,11 @@ class AppProvider with ChangeNotifier {
         _chatThreads = (data['chatThreads'] as List<dynamic>? ?? const [])
             .map((item) => ChatThread.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList();
+        _homeAnchor = data['homeAnchor'] is Map<String, dynamic>
+            ? AppLocation.fromJson(
+                Map<String, dynamic>.from(data['homeAnchor'] as Map),
+              )
+            : null;
       } catch (error) {
         debugPrint('Failed to restore SafeSolo state: $error');
       }
@@ -792,6 +825,8 @@ class AppProvider with ChangeNotifier {
     }
 
     await _evaluateSafetyAutomation();
+    await _notifications.initialize();
+    _restartRuntimeAutomation();
 
     _isInitializing = false;
     notifyListeners();
@@ -816,6 +851,7 @@ class AppProvider with ChangeNotifier {
       'badges': _badges,
       'circlePosts': _circlePosts.map((item) => item.toJson()).toList(),
       'chatThreads': _chatThreads.map((item) => item.toJson()).toList(),
+      'homeAnchor': _homeAnchor?.toJson(),
     };
     await prefs.setString(_storageKey, jsonEncode(data));
   }
@@ -828,6 +864,8 @@ class AppProvider with ChangeNotifier {
 
   Future<void> grantPermissions() async {
     _permissionsGranted = true;
+    await _notifications.initialize();
+    _restartRuntimeAutomation();
     notifyListeners();
     await _saveToStorage();
   }
@@ -874,8 +912,10 @@ class AppProvider with ChangeNotifier {
       _alertPolicy = await _api.getAlertPolicy(_user!.id);
       _interactionEvents = await _api.listInteractions(_user!.id);
       _seedDemoCollections();
+      _homeAnchor ??= _user?.lastKnownLocation;
       _updateBadges();
       await _saveToStorage();
+      _restartRuntimeAutomation();
     });
   }
 
@@ -897,13 +937,16 @@ class AppProvider with ChangeNotifier {
     _alertPolicy = await _api.getAlertPolicy(current.id);
     _interactionEvents = await _api.listInteractions(current.id);
     _seedDemoCollections();
+    _homeAnchor ??= _user?.lastKnownLocation;
     _updateBadges();
     await _evaluateSafetyAutomation();
+    _restartRuntimeAutomation();
     notifyListeners();
     await _saveToStorage();
   }
 
   Future<void> signOut() async {
+    _stopRuntimeAutomation();
     _user = null;
     _lastError = null;
     final prefs = await SharedPreferences.getInstance();
@@ -925,6 +968,7 @@ class AppProvider with ChangeNotifier {
     _radarIncidents = const [];
     _alertPolicy = null;
     _interactionEvents = const [];
+    _homeAnchor = null;
     notifyListeners();
   }
 
@@ -946,6 +990,13 @@ class AppProvider with ChangeNotifier {
       );
 
       _user = User.fromUserModel(updated, email: current.email);
+      _homeAnchor = AppLocation(
+        lat: position.lat,
+        lng: position.lng,
+        updatedAt: DateTime.now(),
+      );
+      _wasOutsideHome = false;
+      _lastOverdueNotificationAt = null;
       _mood = mood ?? _mood ?? Mood.calm;
       _streak += 1;
       _prependOwnPost(
@@ -962,6 +1013,7 @@ class AppProvider with ChangeNotifier {
       _updateBadges();
       await _evaluateSafetyAutomation();
       await _saveToStorage();
+      _restartRuntimeAutomation();
     });
   }
 
@@ -1123,6 +1175,7 @@ class AppProvider with ChangeNotifier {
       _automation = automation;
       _updateBadges();
       await _saveToStorage();
+      _restartRuntimeAutomation();
       notifyListeners();
       return;
     }
@@ -1134,6 +1187,7 @@ class AppProvider with ChangeNotifier {
       _automation = _fromAutomationSettings(settings);
       _updateBadges();
       await _saveToStorage();
+      _restartRuntimeAutomation();
     });
   }
 
@@ -1431,10 +1485,11 @@ class AppProvider with ChangeNotifier {
     await _saveToStorage();
   }
 
-  Future<void> sendVoiceMessage(String threadId, int seconds) async {
-    if (seconds <= 0) {
+  Future<void> sendVoiceMessage(String threadId, RecordedAudioNote note) async {
+    if (note.durationSeconds <= 0) {
       return;
     }
+    final seconds = note.durationSeconds;
     if (!_chatThreads.any((thread) => thread.id == threadId)) {
       return;
     }
@@ -1447,7 +1502,8 @@ class AppProvider with ChangeNotifier {
       content: 'Tin nhắn thoại',
       createdAt: now,
       mine: true,
-      voiceSeconds: seconds,
+      voiceSeconds: note.durationSeconds,
+      voicePath: note.path,
     );
 
     final preview = 'Tin nhắn thoại ${seconds}s';
@@ -1475,6 +1531,234 @@ class AppProvider with ChangeNotifier {
         .toList();
     await _saveToStorage();
     notifyListeners();
+  }
+
+  void _restartRuntimeAutomation() {
+    _stopRuntimeAutomation();
+    if (_user == null || !_permissionsGranted) {
+      return;
+    }
+
+    _automationTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _runRuntimeAutomationTick(),
+    );
+    unawaited(_runRuntimeAutomationTick());
+
+    if (_automation.geofenceAutoCheckin) {
+      final settings = const LocationSettings(
+        accuracy: LocationAccuracy.medium,
+        distanceFilter: 30,
+      );
+      _positionSubscription = Geolocator.getPositionStream(
+        locationSettings: settings,
+      ).listen(
+        (position) => unawaited(_handleGeofencePosition(position)),
+        onError: (_) {},
+      );
+    }
+
+    if (_automation.fallDetection || _automation.shakeSos) {
+      _accelerometerSubscription = userAccelerometerEventStream().listen(
+        (event) => unawaited(_handleMotionEvent(event)),
+        onError: (_) {},
+        cancelOnError: false,
+      );
+    }
+  }
+
+  void _stopRuntimeAutomation() {
+    _automationTimer?.cancel();
+    _automationTimer = null;
+    _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _accelerometerSubscription?.cancel();
+    _accelerometerSubscription = null;
+  }
+
+  Future<void> _runRuntimeAutomationTick() async {
+    final user = _user;
+    if (user == null || isVacation) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final hhmm =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final todayKey = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+
+    if (_automation.dailyReminderTime == hhmm &&
+        !_sameMinute(_lastDailyReminderAt, todayKey)) {
+      _lastDailyReminderAt = todayKey;
+      await _notifications.showDailyReminder(
+        hhmm,
+        isVietnamese: _language == AppLanguage.vi,
+      );
+    }
+
+    if (_automation.pillReminder &&
+        _automation.pillTime == hhmm &&
+        !_sameMinute(_lastMedicationReminderAt, todayKey)) {
+      _lastMedicationReminderAt = todayKey;
+      await _notifications.showMedicationReminder(
+        hhmm,
+        isVietnamese: _language == AppLanguage.vi,
+      );
+    }
+
+    final deadline = user.nextDeadline;
+    if (deadline != null &&
+        now.isAfter(deadline) &&
+        !_sameMinute(_lastOverdueNotificationAt, todayKey)) {
+      _lastOverdueNotificationAt = todayKey;
+      await _notifications.showOverdueCheckIn(
+        isVietnamese: _language == AppLanguage.vi,
+      );
+    }
+  }
+
+  Future<void> _handleGeofencePosition(Position position) async {
+    final user = _user;
+    if (user == null || !_automation.geofenceAutoCheckin) {
+      return;
+    }
+
+    _homeAnchor ??= user.lastKnownLocation;
+    final anchor = _homeAnchor;
+    if (anchor == null) {
+      return;
+    }
+
+    final distance = Geolocator.distanceBetween(
+      anchor.lat,
+      anchor.lng,
+      position.latitude,
+      position.longitude,
+    );
+
+    if (distance > 250) {
+      _wasOutsideHome = true;
+      return;
+    }
+
+    if (_wasOutsideHome && distance <= 120) {
+      final now = DateTime.now();
+      if (_lastGeofenceCheckInAt == null ||
+          now.difference(_lastGeofenceCheckInAt!).inMinutes >= 15) {
+        _lastGeofenceCheckInAt = now;
+        _wasOutsideHome = false;
+        await reportDeviceSignal(
+          signalType: 'GEOFENCE_HOME_ARRIVAL',
+          payload: {
+            'lat': position.latitude,
+            'lng': position.longitude,
+            'distanceMeters': distance.round(),
+            'triggeredAt': now.toIso8601String(),
+          },
+        );
+        await _notifications.showHomeArrivalAutoCheckIn(
+          isVietnamese: _language == AppLanguage.vi,
+        );
+      }
+    }
+  }
+
+  Future<void> _handleMotionEvent(UserAccelerometerEvent event) async {
+    final now = DateTime.now();
+    final magnitude = math.sqrt(
+      event.x * event.x + event.y * event.y + event.z * event.z,
+    );
+
+    if (_automation.shakeSos) {
+      final lastPeak = _lastShakePeakAt;
+      if (magnitude > 16 &&
+          (lastPeak == null ||
+              now.difference(lastPeak).inMilliseconds > 350)) {
+        _lastShakePeakAt = now;
+        _shakePeaks.add(now);
+        _shakePeaks.removeWhere(
+          (item) => now.difference(item).inSeconds > 2,
+        );
+        if (_shakePeaks.length >= 3 &&
+            (_lastShakeSignalAt == null ||
+                now.difference(_lastShakeSignalAt!).inSeconds > 45)) {
+          _lastShakeSignalAt = now;
+          _shakePeaks.clear();
+          await reportDeviceSignal(
+            signalType: 'SHAKE_SOS',
+            payload: {
+              'magnitude': magnitude,
+              'triggeredAt': now.toIso8601String(),
+            },
+          );
+          await _notifications.showShakeSosTriggered(
+            isVietnamese: _language == AppLanguage.vi,
+          );
+        }
+      }
+    }
+
+    if (!_automation.fallDetection) {
+      return;
+    }
+
+    if (magnitude > 18) {
+      _fallCandidateAt = now;
+      _lowMotionSince = null;
+      return;
+    }
+
+    final candidate = _fallCandidateAt;
+    if (candidate == null) {
+      return;
+    }
+
+    if (now.difference(candidate).inSeconds > 12) {
+      _fallCandidateAt = null;
+      _lowMotionSince = null;
+      return;
+    }
+
+    if (magnitude < 1.2) {
+      _lowMotionSince ??= now;
+      if (_lowMotionSince != null &&
+          now.difference(_lowMotionSince!).inSeconds >= 4 &&
+          (_lastFallSignalAt == null ||
+              now.difference(_lastFallSignalAt!).inSeconds > 60)) {
+        _lastFallSignalAt = now;
+        _fallCandidateAt = null;
+        _lowMotionSince = null;
+        await reportDeviceSignal(
+          signalType: 'FALL_DETECTED',
+          payload: {
+            'magnitude': magnitude,
+            'triggeredAt': now.toIso8601String(),
+          },
+        );
+        await _notifications.showFallDetected(
+          isVietnamese: _language == AppLanguage.vi,
+        );
+      }
+    } else if (magnitude > 3) {
+      _lowMotionSince = null;
+    }
+  }
+
+  bool _sameMinute(DateTime? a, DateTime? b) {
+    if (a == null || b == null) {
+      return false;
+    }
+    return a.year == b.year &&
+        a.month == b.month &&
+        a.day == b.day &&
+        a.hour == b.hour &&
+        a.minute == b.minute;
+  }
+
+  @override
+  void dispose() {
+    _stopRuntimeAutomation();
+    super.dispose();
   }
 
   Future<void> _runBusy(Future<void> Function() action) async {

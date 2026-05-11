@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
+import { IncidentMap } from "@/components/IncidentMap";
 import { Topbar } from "@/components/Topbar";
 import { fetchAdminOverview, resolveIncident } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
@@ -172,38 +173,14 @@ function DispatchCenter() {
 
         <div className="grid flex-1 grid-cols-1 gap-3 lg:grid-cols-[1fr_380px]">
           <div className="relative overflow-hidden rounded-xl border border-border bg-card">
-            <div className="absolute inset-0 scanline-bg" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_color-mix(in_oklab,_var(--info)_15%,_transparent),_transparent_70%)]" />
-            <svg className="absolute inset-0 h-full w-full opacity-30" preserveAspectRatio="none" viewBox="0 0 100 100">
-              <path d="M0,55 C20,40 40,70 60,55 S90,40 100,60" stroke="oklch(0.72 0.18 220)" strokeWidth="0.4" fill="none" />
-              <path d="M10,0 L40,100" stroke="oklch(0.6 0.05 260)" strokeWidth="0.2" fill="none" />
-              <path d="M70,0 L60,100" stroke="oklch(0.6 0.05 260)" strokeWidth="0.2" fill="none" />
-              <path d="M0,30 L100,35" stroke="oklch(0.6 0.05 260)" strokeWidth="0.2" fill="none" />
-              <path d="M0,80 L100,75" stroke="oklch(0.6 0.05 260)" strokeWidth="0.2" fill="none" />
-            </svg>
-
-            {incidents.map((incident) => (
-              <button
-                key={incident.id}
-                onClick={() => {
-                  setSelectedId(incident.id);
-                  setIsDetailOpen(true);
-                }}
-                className="absolute -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${incident.x}%`, top: `${incident.y}%` }}
-                aria-label={incident.id}
-              >
-                <span
-                  className={`block h-3 w-3 rounded-full ${
-                    incident.type === "DURESS"
-                      ? "bg-duress pulse-duress"
-                      : incident.type === "SOS"
-                        ? "bg-sos pulse-sos"
-                        : "bg-warning"
-                  }`}
-                />
-              </button>
-            ))}
+            <IncidentMap
+              incidents={incidents}
+              selectedId={selectedId}
+              onSelect={(incidentId) => {
+                setSelectedId(incidentId);
+                setIsDetailOpen(true);
+              }}
+            />
 
             <div className="absolute left-3 top-3 flex flex-wrap gap-2">
               <div className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur">

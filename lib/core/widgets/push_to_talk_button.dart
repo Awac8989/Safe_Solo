@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
+import '../../services/audio_note_service.dart';
 import 'voice_waveform.dart';
 
 class PushToTalkButton extends StatefulWidget {
@@ -12,13 +13,15 @@ class PushToTalkButton extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.onSend,
+    this.onError,
     this.cancelThreshold = 80,
   });
 
   final PushToTalkSize size;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
-  final ValueChanged<int>? onSend;
+  final ValueChanged<RecordedAudioNote>? onSend;
+  final ValueChanged<String>? onError;
   final double cancelThreshold;
 
   @override
@@ -35,6 +38,7 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   DateTime? _startTime;
   Timer? _ticker;
   OverlayEntry? _overlayEntry;
+  late final AudioNoteService _audioNoteService = AudioNoteService();
 
   double get _buttonSize => widget.size == PushToTalkSize.large ? 80 : 56;
   double get _iconSize => widget.size == PushToTalkSize.large ? 32 : 24;
@@ -43,10 +47,17 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   void dispose() {
     _ticker?.cancel();
     _removeOverlay();
+    _audioNoteService.dispose();
     super.dispose();
   }
 
-  void _begin(Offset globalPosition) {
+  Future<void> _begin(Offset globalPosition) async {
+    final started = await _audioNoteService.start();
+    if (!started) {
+      widget.onError?.call('Microphone permission is required to record audio.');
+      return;
+    }
+
     widget.onLongPress?.call();
     _startX = globalPosition.dx;
     _startTime = DateTime.now();
@@ -80,7 +91,7 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
     _overlayEntry?.markNeedsBuild();
   }
 
-  void _end() {
+  Future<void> _end() async {
     if (!_recording) {
       return;
     }
@@ -89,8 +100,15 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
     _ticker?.cancel();
     _ticker = null;
 
-    if (!_cancelHover && duration >= 0.4) {
-      widget.onSend?.call(duration.round().clamp(1, 999));
+    if (_cancelHover) {
+      await _audioNoteService.cancel();
+    } else if (duration >= 0.4) {
+      final note = await _audioNoteService.stop();
+      if (note != null) {
+        widget.onSend?.call(note);
+      }
+    } else {
+      await _audioNoteService.cancel();
     }
 
     setState(() {
@@ -184,9 +202,13 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
-      onLongPressStart: (details) => _begin(details.globalPosition),
+      onLongPressStart: (details) {
+        _begin(details.globalPosition);
+      },
       onLongPressMoveUpdate: (details) => _move(details.globalPosition),
-      onLongPressEnd: (_) => _end(),
+      onLongPressEnd: (_) {
+        _end();
+      },
       child: AnimatedScale(
         duration: const Duration(milliseconds: 180),
         scale: _recording ? 1.2 : 1,

@@ -47,6 +47,11 @@ export type AdminOverviewResponse = {
       phoneNumber: string;
       emergencyContactName: string;
       emergencyContactPhone: string;
+      location?: {
+        lat: number;
+        lng: number;
+        updatedAt?: string;
+      } | null;
     }>;
   };
 };

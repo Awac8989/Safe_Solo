@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:provider/provider.dart';
 
+import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
+import '../../core/constants.dart';
+import '../../core/maptiler_tile_provider.dart';
+import '../../core/providers/app_provider.dart';
 
 class CommunityRadarPage extends StatefulWidget {
   const CommunityRadarPage({
     super.key,
-    this.reason = 'Cap cuu y te',
-    this.note = 'Nguoi cao tuoi dang can ho tro gap',
+    this.reason = 'Cấp cứu y tế',
+    this.note = 'Người cao tuổi đang cần hỗ trợ gấp',
   });
 
   final String reason;
@@ -20,6 +25,8 @@ class CommunityRadarPage extends StatefulWidget {
 class _CommunityRadarPageState extends State<CommunityRadarPage>
     with SingleTickerProviderStateMixin {
   bool _accepted = false;
+  AppStrings _strings(BuildContext context) =>
+      AppStrings(context.read<AppProvider>().language);
   late final AnimationController _blink = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 900),
@@ -33,6 +40,7 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
 
   @override
   Widget build(BuildContext context) {
+    final strings = _strings(context);
     const victim = LatLng(10.7766, 106.7009);
     const me = LatLng(10.7818, 106.6968);
 
@@ -84,6 +92,19 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
                   target: victim,
                   zoom: 14.5,
                 ),
+                mapToolbarEnabled: false,
+                myLocationButtonEnabled: false,
+                myLocationEnabled: false,
+                tileOverlays: AppConstants.hasMapTiler
+                    ? {
+                        TileOverlay(
+                          tileOverlayId: const TileOverlayId('maptiler_radar'),
+                          tileProvider: MapTilerTileProvider(),
+                          transparency: 0.05,
+                          zIndex: 1,
+                        ),
+                      }
+                    : {},
                 circles: {
                   const Circle(
                     circleId: CircleId('danger'),
@@ -105,16 +126,21 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
                       }
                     : {},
                 markers: {
-                  const Marker(
-                    markerId: MarkerId('victim'),
+                  Marker(
+                    markerId: const MarkerId('victim'),
                     position: victim,
-                    infoWindow: InfoWindow(title: '≈ Q.7, TP.HCM'),
+                    infoWindow: InfoWindow(
+                      title: strings.text(
+                        '≈ Q.7, TP.HCM',
+                        '≈ District 7, Ho Chi Minh City',
+                      ),
+                    ),
                   ),
                   if (_accepted)
                     const Marker(
                       markerId: MarkerId('volunteer'),
                       position: me,
-                      infoWindow: InfoWindow(title: 'Tinh nguyen vien'),
+                      infoWindow: InfoWindow(title: 'Volunteer'),
                     ),
                 },
               ),
@@ -124,30 +150,52 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
               padding: const EdgeInsets.all(18),
               decoration: const BoxDecoration(
                 color: AppColors.card,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xxl)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppRadius.xxl),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vi tri an danh', style: AppTextStyles.caption),
+                  Text(
+                    strings.text('Vị trí ẩn danh', 'Anonymous location'),
+                    style: AppTextStyles.caption,
+                  ),
                   const SizedBox(height: 6),
                   Text(
-                    _accepted ? '123 Nguyen Huu Tho, Q.7, TP.HCM' : '≈ Q.7, TP.HCM',
+                    _accepted
+                        ? '123 Nguyen Huu Tho, Q.7, TP.HCM'
+                        : strings.text(
+                            '≈ Q.7, TP.HCM',
+                            '≈ District 7, Ho Chi Minh City',
+                          ),
                     style: AppTextStyles.title,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _accepted
-                        ? 'Trang thai: Dang tren duong · ETA 6 phut'
-                        : 'Dia chi chinh xac chi mo sau khi xac minh KYC va nhan loi.',
-                    style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                        ? strings.text(
+                            'Trạng thái: Đang trên đường · ETA 6 phút',
+                            'Status: On the way · ETA 6 minutes',
+                          )
+                        : strings.text(
+                            'Địa chỉ chính xác chỉ mở sau khi xác minh KYC và nhận lời.',
+                            'The exact address is revealed only after KYC verification and acceptance.',
+                          ),
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _accepted ? null : _confirmKyc,
-                      child: Text(_accepted ? 'Dang tren duong' : 'TOI SE DI CUU'),
+                      child: Text(
+                        _accepted
+                            ? strings.text('Đang trên đường', 'On the way')
+                            : strings.text('TÔI SẼ ĐI CỨU', 'I WILL RESPOND'),
+                      ),
                     ),
                   ),
                 ],
@@ -160,21 +208,25 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
   }
 
   Future<void> _confirmKyc() async {
+    final strings = _strings(context);
     final accepted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Xac minh KYC'),
-        content: const Text(
-          'Vui long xac nhan ban da co CCCD/KYC hop le truoc khi nhan ca cuu ho nay.',
+        title: Text(strings.text('Xác minh KYC', 'KYC verification')),
+        content: Text(
+          strings.text(
+            'Vui lòng xác nhận bạn đã có CCCD/KYC hợp lệ trước khi nhận ca cứu hộ này.',
+            'Please confirm that you have valid ID/KYC before accepting this rescue.',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Chua san sang'),
+            child: Text(strings.text('Chưa sẵn sàng', 'Not yet')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Da xac minh'),
+            child: Text(strings.text('Đã xác minh', 'Verified')),
           ),
         ],
       ),
