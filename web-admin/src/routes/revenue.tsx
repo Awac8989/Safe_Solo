@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, Download, TrendingUp, Wallet } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
@@ -28,29 +28,29 @@ function Page() {
   const handleExport = () => {
     exportWorkbook("safesolo-admin-revenue.xlsx", [
       {
-        name: "Tong quan",
+        name: "Tổng quan",
         rows: data
           ? [{
-              Doanh_thu_AdMob_30_ngay: data.cards.admobRevenue30d,
-              Hoa_hong_chua_thanh_toan: data.cards.unpaidCommissions,
-              Doi_tac_dang_hoat_dong: data.cards.activePartners,
+              "Doanh thu AdMob 30 ngày": data.cards.admobRevenue30d,
+              "Hoa hồng chưa thanh toán": data.cards.unpaidCommissions,
+              "Đối tác đang hoạt động": data.cards.activePartners,
             }]
           : [],
       },
       {
-        name: "Doi tac",
+        name: "Đối tác",
         rows: partners.map((partner) => ({
-          Ten: partner.name,
-          Khu_vuc: partner.region,
-          Luot_dieu_phoi: partner.dispatches,
-          Ty_le: partner.rate,
-          So_du_chua_thanh_toan: partner.balance,
+          Tên: partner.name,
+          "Khu vực": partner.region,
+          "Lượt điều phối": partner.dispatches,
+          "Tỷ lệ": partner.rate,
+          "Số dư chưa thanh toán": partner.balance,
         })),
       },
       {
         name: "Sparkline",
         rows: sparkline.map((value, index) => ({
-          Ngay: index + 1,
+          Ngày: index + 1,
           USD: value,
         })),
       },

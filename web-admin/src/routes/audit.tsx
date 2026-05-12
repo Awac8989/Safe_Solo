@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Search } from "lucide-react";
@@ -37,11 +37,11 @@ function Page() {
         name: "Audit",
         rows: logs.map((log) => ({
           ID: log.id,
-          Thoi_gian: log.ts,
-          Nguoi_thuc_hien: log.actor,
-          Hanh_dong: log.action,
-          Doi_tuong: log.target,
-          Danh_muc: log.category,
+          "Thời gian": log.ts,
+          "Người thực hiện": log.actor,
+          "Hành động": log.action,
+          "Đối tượng": log.target,
+          "Danh mục": log.category,
           Hash: log.hash,
           Tone: log.tone,
         })),

@@ -1,7 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Shield, Phone, Clock3, MapPinned, Download } from "lucide-react";
+import { Search, Shield, Phone, Clock3, MapPinned, Download, BadgeCheck } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
 import { fetchAdminUsers, type AdminUser } from "@/lib/api";
@@ -36,31 +36,29 @@ function UsersPage() {
     });
   }, [query, users]);
 
-  const selected = filtered.find((item) => item.id === selectedUserId)
-    ?? filtered[0]
-    ?? null;
+  const selected = filtered.find((item) => item.id === selectedUserId) ?? filtered[0] ?? null;
 
   const handleExport = () => {
     exportWorkbook("safesolo-admin-users.xlsx", [
       {
-        name: "Nguoi dung",
+        name: "Người dùng",
         rows: filtered.map((user) => ({
           ID: user.id,
-          "Ho ten": user.fullName,
+          "Họ tên": user.fullName,
           Email: user.email,
-          "So dien thoai": user.phone,
-          Nguon: user.source,
-          Vai_tro: user.role,
-          Trang_thai: user.currentStatus,
-          "Chu ky check-in (phut)": user.timerIntervalMinutes,
-          "Quiet hours bat dau": user.quietHoursStart,
-          "Quiet hours ket thuc": user.quietHoursEnd,
-          "False alert grace (phut)": user.falseAlertGraceMinutes,
-          "Check-in cuoi": user.lastCheckInAt,
-          "Deadline tiep theo": user.nextCheckinDeadline,
-          "Cap nhat cuoi": user.updatedAt,
-          "Tao luc": user.createdAt,
-          "Guardian / lien he khan cap": user.emergencyContacts
+          "Số điện thoại": user.phone,
+          Nguồn: formatSource(user.source),
+          "Vai trò": formatRole(user),
+          "Trạng thái": formatStatus(user.currentStatus),
+          "Chu kỳ check-in (phút)": user.timerIntervalMinutes,
+          "Quiet hours bắt đầu": user.quietHoursStart,
+          "Quiet hours kết thúc": user.quietHoursEnd,
+          "False alert grace (phút)": user.falseAlertGraceMinutes,
+          "Check-in cuối": user.lastCheckInAt,
+          "Deadline tiếp theo": user.nextCheckinDeadline,
+          "Cập nhật cuối": user.updatedAt,
+          "Tạo lúc": user.createdAt,
+          "Guardian / liên hệ khẩn cấp": user.emergencyContacts
             .map((contact) => `${contact.name} - ${contact.relation} - ${contact.phone}`)
             .join(" | "),
         })),
@@ -72,7 +70,7 @@ function UsersPage() {
     <>
       <Topbar
         title="Người dùng ứng dụng"
-        subtitle="Dữ liệu người dùng SafeSolo đồng bộ từ backend app"
+        subtitle="Dữ liệu người dùng SafeSolo đồng bộ trực tiếp từ backend"
       />
       <div className="grid flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -102,7 +100,7 @@ function UsersPage() {
           </div>
 
           {usersQuery.isLoading ? (
-            <div className="p-4 text-sm text-muted-foreground">Dang tai danh sach nguoi dung...</div>
+            <div className="p-4 text-sm text-muted-foreground">Đang tải danh sách người dùng...</div>
           ) : usersQuery.isError ? (
             <div className="p-4 text-sm text-sos">{usersQuery.error.message}</div>
           ) : (
@@ -110,11 +108,11 @@ function UsersPage() {
               <table className="w-full text-sm">
                 <thead className="bg-background/40 text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2 text-left font-medium">Nguoi dung</th>
-                    <th className="px-4 py-2 text-left font-medium">Nguon</th>
-                    <th className="px-4 py-2 text-left font-medium">Trang thai</th>
-                    <th className="px-4 py-2 text-left font-medium">Chu ky</th>
-                    <th className="px-4 py-2 text-left font-medium">Cap nhat</th>
+                    <th className="px-4 py-2 text-left font-medium">Người dùng</th>
+                    <th className="px-4 py-2 text-left font-medium">Nguồn</th>
+                    <th className="px-4 py-2 text-left font-medium">Trạng thái</th>
+                    <th className="px-4 py-2 text-left font-medium">Chu kỳ</th>
+                    <th className="px-4 py-2 text-left font-medium">Cập nhật</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -127,18 +125,25 @@ function UsersPage() {
                       }`}
                     >
                       <td className="px-4 py-3">
-                        <div className="font-medium">{user.fullName}</div>
-                        <div className="text-[10px] text-muted-foreground">{user.phone || "Chua co SDT"}</div>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="font-medium">{user.fullName}</div>
+                            <div className="text-[10px] text-muted-foreground">{user.phone || "Chưa có số điện thoại"}</div>
+                          </div>
+                          {user.role === "hero" && (
+                            <Tag tone="success">
+                              <BadgeCheck className="h-3 w-3" /> Hiệp sĩ
+                            </Tag>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Tag tone={user.source === "sqlite" ? "info" : "warning"}>
-                          {user.source === "sqlite" ? "App SQLite" : "Store"}
-                        </Tag>
+                        <Tag tone="info">{formatSource(user.source)}</Tag>
                       </td>
                       <td className="px-4 py-3">
-                        <Tag tone={statusTone(user.currentStatus)}>{user.currentStatus}</Tag>
+                        <Tag tone={statusTone(user.currentStatus)}>{formatStatus(user.currentStatus)}</Tag>
                       </td>
-                      <td className="px-4 py-3">{Math.round(user.timerIntervalMinutes / 60)}h</td>
+                      <td className="px-4 py-3">{Math.round(user.timerIntervalMinutes / 60)} giờ</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatDateTime(user.updatedAt)}</td>
                     </tr>
                   ))}
@@ -156,16 +161,16 @@ function UsersPage() {
                   <div>
                     <h2 className="text-sm font-semibold">{selected.fullName}</h2>
                     <p className="text-[11px] text-muted-foreground">
-                      {selected.id} · {selected.role}
+                      {selected.id} · {formatRole(selected)}
                     </p>
                   </div>
-                  <Tag tone={statusTone(selected.currentStatus)}>{selected.currentStatus}</Tag>
+                  <Tag tone={statusTone(selected.currentStatus)}>{formatStatus(selected.currentStatus)}</Tag>
                 </div>
               </div>
 
               <div className="grid gap-3 p-4 md:grid-cols-2">
-                <InfoBox icon={Phone} label="So dien thoai" value={selected.phone || "Chua co"} />
-                <InfoBox icon={Clock3} label="Chu ky check-in" value={`${Math.round(selected.timerIntervalMinutes / 60)} gio`} />
+                <InfoBox icon={Phone} label="Số điện thoại" value={selected.phone || "Chưa có"} />
+                <InfoBox icon={Clock3} label="Chu kỳ check-in" value={`${Math.round(selected.timerIntervalMinutes / 60)} giờ`} />
                 <InfoBox
                   icon={Shield}
                   label="Quiet hours"
@@ -174,13 +179,13 @@ function UsersPage() {
                 <InfoBox
                   icon={MapPinned}
                   label="False alert grace"
-                  value={`${selected.falseAlertGraceMinutes} phut`}
+                  value={`${selected.falseAlertGraceMinutes} phút`}
                 />
               </div>
 
               <div className="border-t border-border px-4 py-4">
                 <div className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Guardian / lien he khan cap
+                  Guardian / liên hệ khẩn cấp
                 </div>
                 <div className="space-y-2">
                   {selected.emergencyContacts.length > 0 ? (
@@ -197,20 +202,20 @@ function UsersPage() {
                     ))
                   ) : (
                     <div className="rounded-lg border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-                      Chua co guardian nao tren ho so nay.
+                      Chưa có guardian nào trên hồ sơ này.
                     </div>
                   )}
                 </div>
 
                 <div className="mt-4 grid gap-2 text-xs text-muted-foreground">
-                  <div>Check-in cuoi: {formatDateTime(selected.lastCheckInAt)}</div>
-                  <div>Deadline tiep theo: {formatDateTime(selected.nextCheckinDeadline)}</div>
-                  <div>Tao luc: {formatDateTime(selected.createdAt)}</div>
+                  <div>Check-in cuối: {formatDateTime(selected.lastCheckInAt)}</div>
+                  <div>Deadline tiếp theo: {formatDateTime(selected.nextCheckinDeadline)}</div>
+                  <div>Tạo lúc: {formatDateTime(selected.createdAt)}</div>
                 </div>
               </div>
             </>
           ) : (
-            <div className="p-6 text-sm text-muted-foreground">Chua co nguoi dung de hien thi.</div>
+            <div className="p-6 text-sm text-muted-foreground">Chưa có người dùng để hiển thị.</div>
           )}
         </section>
       </div>
@@ -222,6 +227,26 @@ function statusTone(status: string) {
   if (status === "SOS") return "sos";
   if (status === "WARNING" || status === "REMINDER") return "warning";
   return "info";
+}
+
+function formatSource(source: AdminUser["source"]) {
+  if (source === "mongo") return "MongoDB";
+  if (source === "sqlite") return "SQLite";
+  return "Legacy Store";
+}
+
+function formatRole(user: AdminUser) {
+  if (user.role === "hero") return "Hiệp sĩ";
+  if (user.role === "admin") return "Quản trị viên";
+  return "Người dùng";
+}
+
+function formatStatus(status: string) {
+  if (status === "SAFE") return "An toàn";
+  if (status === "REMINDER") return "Nhắc nhở";
+  if (status === "WARNING") return "Cảnh báo";
+  if (status === "SOS") return "SOS";
+  return status;
 }
 
 function InfoBox({
@@ -244,6 +269,6 @@ function InfoBox({
 }
 
 function formatDateTime(value: string | null | undefined) {
-  if (!value) return "Khong co";
+  if (!value) return "Không có";
   return new Date(value).toLocaleString("vi-VN");
 }

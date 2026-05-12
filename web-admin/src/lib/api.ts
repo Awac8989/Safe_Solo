@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000/api";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -72,12 +73,16 @@ export type KycApplicant = {
   userId: string;
   name: string;
   applied: string;
-  status: "pending" | "review" | "flagged";
+  status: "pending" | "approved" | "rejected";
   match: number;
   region: string;
   phone: string;
+  selfieImageUrl: string;
   frontImageUrl: string;
   backImageUrl: string;
+  identityNumber: string;
+  identityAddress: string;
+  documentLabel: string;
   isKycVerified: boolean;
   liveness: string;
   trustScore: number;
@@ -116,7 +121,7 @@ export type AdminUser = {
   fullName: string;
   email: string;
   phone: string;
-  source: "sqlite" | "store";
+  source: "mongo" | "sqlite" | "store";
   role: string;
   currentStatus: string;
   timerIntervalMinutes: number;
@@ -185,3 +190,20 @@ export const fetchChannelHealth = async () => {
 export const fetchRevenueSummary = async () => {
   return request<{ success: true; data: RevenueSummary }>("/admin/revenue");
 };
+
+export function resolveAssetUrl(value: string) {
+  if (!value) {
+    return value;
+  }
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+  if (value.startsWith("/")) {
+    return `${API_ORIGIN}${value}`;
+  }
+  return `${API_ORIGIN}/${value}`;
+}

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -110,39 +110,39 @@ function DispatchCenter() {
   const handleExport = () => {
     exportWorkbook("safesolo-admin-dispatch.xlsx", [
       {
-        name: "Thong ke",
+        name: "Thống kê",
         rows: stats
           ? [{
-              Tong_nguoi_dung: stats.totalUsers,
-              Nguoi_dung_theo_doi: stats.monitoredUsers,
-              Su_co_dang_mo: stats.activeIncidents,
-              KYC_cho_duyet: stats.kycPending,
-              Heroes_xac_minh: stats.heroesVerified,
-              Canh_bao_hom_nay: stats.alertsToday,
+              "Tổng người dùng": stats.totalUsers,
+              "Người dùng theo dõi": stats.monitoredUsers,
+              "Sự cố đang mở": stats.activeIncidents,
+              "KYC chờ duyệt": stats.kycPending,
+              "Hiệp sĩ đã xác minh": stats.heroesVerified,
+              "Cảnh báo hôm nay": stats.alertsToday,
             }]
           : [],
       },
       {
-        name: "Su co",
+        name: "Sự cố",
         rows: incidents.map((incident) => ({
           ID: incident.id,
-          Loai: formatIncidentType(incident.type),
-          Muc_do: incident.severity,
-          Trang_thai: incident.status,
-          Nguoi_gap_su_co: incident.name,
-          Tuoi: incident.age,
-          Nhom_mau: incident.blood,
-          Di_ung: incident.allergies,
-          Dia_chi: incident.address,
-          Quan_huyen: incident.district,
-          Thanh_pho: incident.city,
-          Kenh: incident.channel,
-          SDT_user: incident.phoneNumber,
-          Lien_he_khan_cap: incident.emergencyContactName,
-          SDT_lien_he: incident.emergencyContactPhone,
-          Thoi_gian_nhan: incident.receivedAt,
-          Ban_do_X: incident.x,
-          Ban_do_Y: incident.y,
+          Loại: formatIncidentType(incident.type),
+          "Mức độ": incident.severity,
+          "Trạng thái": incident.status,
+          "Người gặp sự cố": incident.name,
+          Tuổi: incident.age,
+          "Nhóm máu": incident.blood,
+          "Dị ứng": incident.allergies,
+          "Địa chỉ": incident.address,
+          "Quận huyện": incident.district,
+          "Thành phố": incident.city,
+          Kênh: incident.channel,
+          "SĐT user": incident.phoneNumber,
+          "Liên hệ khẩn cấp": incident.emergencyContactName,
+          "SĐT liên hệ": incident.emergencyContactPhone,
+          "Thời gian nhận": incident.receivedAt,
+          "Bản đồ X": incident.x,
+          "Bản đồ Y": incident.y,
         })),
       },
     ]);
@@ -165,7 +165,7 @@ function DispatchCenter() {
         {stats && (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard icon={Users} label="Tổng người dùng" value={String(stats.totalUsers)} tone="info" />
-            <MetricCard icon={ShieldCheck} label="Heroes đã xác minh" value={String(stats.heroesVerified)} tone="success" />
+            <MetricCard icon={ShieldCheck} label="Hiệp sĩ đã xác minh" value={String(stats.heroesVerified)} tone="success" />
             <MetricCard icon={AlertTriangle} label="Sự cố đang mở" value={String(stats.activeIncidents)} tone="sos" />
             <MetricCard icon={BellRing} label="Cảnh báo hôm nay" value={String(stats.alertsToday)} tone="warning" />
           </div>

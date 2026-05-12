@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Download, Mail, MessageSquare, Phone, Send, Smartphone } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
@@ -42,22 +42,22 @@ function Page() {
   const handleExport = () => {
     exportWorkbook("safesolo-admin-channels.xlsx", [
       {
-        name: "Kenh",
+        name: "Kênh",
         rows: channels.map((channel) => ({
-          Ten: channelLabelMap[channel.name] || channel.name,
+          Tên: channelLabelMap[channel.name] || channel.name,
           Vendor: channel.vendor,
-          Han_muc: channel.quota,
-          Thanh_cong_phan_tram: channel.success,
-          On_dinh: channel.ok ? "Co" : "Khong",
-          Thu_tu_du_phong: channel.fallbackOrder,
-          Da_gui: channel.sent,
+          "Hạn mức": channel.quota,
+          "Thành công phần trăm": channel.success,
+          "Ổn định": channel.ok ? "Có" : "Không",
+          "Thứ tự dự phòng": channel.fallbackOrder,
+          "Đã gửi": channel.sent,
         })),
       },
       {
         name: "Policy",
         rows: policy.map((step) => ({
-          Buoc: step.step,
-          Kenh: channelLabelMap[step.name] || step.name,
+          Bước: step.step,
+          Kênh: channelLabelMap[step.name] || step.name,
           Tone: step.tone,
         })),
       },

@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+﻿import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Radio,
   Users,
@@ -23,12 +23,12 @@ import {
 } from "@/components/ui/sidebar";
 
 const items = [
-  { title: "Trung tam dieu phoi", url: "/", icon: Radio },
-  { title: "Nguoi dung ung dung", url: "/users", icon: Smartphone },
-  { title: "Nguoi dung va KYC", url: "/kyc", icon: Users },
-  { title: "Kenh lien lac", url: "/omnichannel", icon: Network },
-  { title: "Doanh thu va doi tac", url: "/revenue", icon: DollarSign },
-  { title: "Nhat ky he thong", url: "/audit", icon: ScrollText },
+  { title: "Trung tâm điều phối", url: "/", icon: Radio },
+  { title: "Người dùng ứng dụng", url: "/users", icon: Smartphone },
+  { title: "Người dùng và KYC", url: "/kyc", icon: Users },
+  { title: "Kênh liên lạc", url: "/omnichannel", icon: Network },
+  { title: "Doanh thu và đối tác", url: "/revenue", icon: DollarSign },
+  { title: "Nhật ký hệ thống", url: "/audit", icon: ScrollText },
 ];
 
 export function AppSidebar() {
@@ -47,7 +47,7 @@ export function AppSidebar() {
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-bold tracking-wide">Alive?</span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Dieu phoi khan cap
+                Điều phối khẩn cấp
               </span>
             </div>
           )}
@@ -55,7 +55,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dieu hanh</SidebarGroupLabel>
+          <SidebarGroupLabel>Điều hành</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
@@ -77,7 +77,7 @@ export function AppSidebar() {
           <div className="px-2 py-2 text-[10px] text-muted-foreground">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-success" />
-              Tat ca he thong dang hoat dong
+              Tất cả hệ thống đang hoạt động
             </div>
           </div>
         )}

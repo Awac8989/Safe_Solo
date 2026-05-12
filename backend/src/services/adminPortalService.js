@@ -12,6 +12,62 @@ const ThankYouNote = require('../models/ThankYouNote');
 const VolunteerResponse = require('../models/VolunteerResponse');
 const { mapUserDoc, toIso } = require('../lib/mongoCore');
 
+function svgDataUrl(markup) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`;
+}
+
+function buildHeroPortrait(name, label = 'KYC') {
+  const initial = String(name || 'H').trim().charAt(0).toUpperCase() || 'H';
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#2dd4bf"/>
+          <stop offset="100%" stop-color="#34d399"/>
+        </linearGradient>
+      </defs>
+      <rect width="720" height="960" rx="48" fill="url(#bg)"/>
+      <circle cx="360" cy="290" r="126" fill="#ecfeff" fill-opacity="0.95"/>
+      <circle cx="360" cy="255" r="72" fill="#99f6e4"/>
+      <path d="M230 470c28-88 95-132 130-132s102 44 130 132v76H230z" fill="#99f6e4"/>
+      <rect x="92" y="642" width="536" height="164" rx="28" fill="#ffffff" fill-opacity="0.92"/>
+      <text x="360" y="708" text-anchor="middle" font-size="46" font-family="Arial, sans-serif" font-weight="700" fill="#134e4a">${name}</text>
+      <text x="360" y="760" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" fill="#0f766e">Hồ sơ xác minh ${label}</text>
+      <circle cx="138" cy="138" r="62" fill="#ffffff" fill-opacity="0.2"/>
+      <text x="138" y="160" text-anchor="middle" font-size="72" font-family="Arial, sans-serif" font-weight="700" fill="#ffffff">${initial}</text>
+    </svg>
+  `);
+}
+
+function buildIdentityCardFace({ name, idNumber, side, address }) {
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
+      <defs>
+        <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#eef2ff"/>
+          <stop offset="100%" stop-color="#dbeafe"/>
+        </linearGradient>
+      </defs>
+      <rect width="960" height="600" rx="36" fill="url(#card)"/>
+      <rect x="38" y="38" width="884" height="524" rx="24" fill="#ffffff" fill-opacity="0.78" stroke="#bfdbfe" stroke-width="3"/>
+      <text x="70" y="94" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#1d4ed8">CĂN CƯỚC CÔNG DÂN</text>
+      <text x="70" y="134" font-size="20" font-family="Arial, sans-serif" fill="#475569">${side}</text>
+      <rect x="70" y="182" width="220" height="280" rx="24" fill="#dbeafe"/>
+      <circle cx="180" cy="268" r="54" fill="#93c5fd"/>
+      <path d="M108 386c18-60 58-90 72-90 15 0 55 30 72 90v34H108z" fill="#93c5fd"/>
+      <text x="340" y="230" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Họ và tên</text>
+      <text x="340" y="268" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#0f172a">${name}</text>
+      <text x="340" y="330" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Số định danh</text>
+      <text x="340" y="368" font-size="30" font-family="Courier New, monospace" font-weight="700" fill="#0f172a">${idNumber}</text>
+      <text x="340" y="430" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Địa chỉ</text>
+      <foreignObject x="340" y="446" width="520" height="80">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;font-size:24px;color:#0f172a;line-height:1.3;">${address}</div>
+      </foreignObject>
+      <text x="808" y="534" text-anchor="end" font-size="18" font-family="Arial, sans-serif" fill="#64748b">SafeSolo Demo</text>
+    </svg>
+  `);
+}
+
 function mapEmergencyDoc(log) {
   if (!log) {
     return null;
@@ -57,13 +113,14 @@ async function getMongoUsers() {
 }
 
 function unifyUser(mongoUser) {
+  const isHero = Boolean(mongoUser.isKycVerified) && Number(mongoUser.rescuesCount || 0) > 0;
   return {
     id: mongoUser._id,
     fullName: mongoUser.fullName,
-    email: '',
+    email: mongoUser.email || '',
     phone: mongoUser.phoneNumber,
     source: 'mongo',
-    role: mongoUser.role || 'user',
+    role: isHero ? 'hero' : mongoUser.role || 'user',
     currentStatus: mongoUser.currentStatus,
     timerIntervalMinutes: mongoUser.timerIntervalMinutes,
     nextCheckinDeadline: mongoUser.nextDeadline,
@@ -164,12 +221,17 @@ class AdminPortalService {
       .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
       .slice(0, 12);
 
+    const [kycPending, heroesVerified] = await Promise.all([
+      KYCDocument.countDocuments({ status: 'PENDING' }),
+      User.countDocuments({ isKycVerified: true, rescuesCount: { $gt: 0 } }),
+    ]);
+
     const stats = {
       totalUsers: mongoUsers.length,
       monitoredUsers: mongoUsers.length,
       activeIncidents: incidents.length,
-      kycPending: 0,
-      heroesVerified: 0,
+      kycPending,
+      heroesVerified,
       alertsToday: (await listAlertEvents({ page: 1, limit: 200 })).items.filter((item) =>
         String(item.createdAt).startsWith(new Date().toISOString().slice(0, 10)),
       ).length,
@@ -317,6 +379,9 @@ class AdminPortalService {
       const user = userMap.get(document.userId);
       const scoreBase = Number(user?.trustScore || 4.5);
       const match = Math.min(99, Math.max(60, Math.round(scoreBase * 20)));
+      const identityNumber = `0${String(user?.phoneNumber || '').replace(/\D/g, '').slice(-11).padEnd(11, '0')}`;
+      const identityAddress = user?.approxAddress || 'Chưa cập nhật địa chỉ thường trú';
+      const portrait = user?.avatar || buildHeroPortrait(user ? fullName(user) : 'Hiệp sĩ');
       return {
         id: document._id,
         userId: document.userId,
@@ -326,13 +391,31 @@ class AdminPortalService {
           document.status === 'PENDING'
             ? 'pending'
             : document.status === 'REJECTED'
-            ? 'flagged'
-            : 'review',
+            ? 'rejected'
+            : 'approved',
         region: user?.approxAddress || 'Unknown',
         match,
         phone: user?.phoneNumber || '',
-        frontImageUrl: document.frontImageUrl,
-        backImageUrl: document.backImageUrl,
+        frontImageUrl:
+          document.frontImageUrl ||
+          buildIdentityCardFace({
+            name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
+            idNumber: identityNumber,
+            side: 'Mặt trước',
+            address: identityAddress,
+          }),
+        backImageUrl:
+          document.backImageUrl ||
+          buildIdentityCardFace({
+            name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
+            idNumber: identityNumber,
+            side: 'Mặt sau',
+            address: identityAddress,
+          }),
+        selfieImageUrl: portrait,
+        identityNumber,
+        identityAddress,
+        documentLabel: 'Căn cước công dân',
         isKycVerified: Boolean(user?.isKycVerified),
         liveness: 'OK',
         trustScore: scoreBase,

@@ -6,6 +6,7 @@ const MedicalProfile = require('../src/models/MedicalProfile');
 const AutomationSetting = require('../src/models/AutomationSetting');
 const SecuritySetting = require('../src/models/SecuritySetting');
 const DailyStatus = require('../src/models/DailyStatus');
+const KYCDocument = require('../src/models/KYCDocument');
 
 const demoUsers = [
   ['Nguyen Minh Anh', '0909001001'],
@@ -28,7 +29,76 @@ const demoUsers = [
   ['Lam Tien Dung', '0909001018'],
   ['Ta Quynh Nhu', '0909001019'],
   ['Kieu Anh Thu', '0909001020'],
+  ['Doan Minh Quan', '0913843958'],
+  ['Minh Anh Hero', '0913843951'],
+  ['Bao An Hero', '0913843952'],
+  ['Le Huu Phuoc', '0913843953'],
+  ['Phan Thi Mai', '0913843954'],
 ];
+
+const verifiedHeroPhones = new Set([
+  '0913843958',
+  '0913843951',
+  '0913843952',
+  '0913843953',
+  '0913843954',
+]);
+
+function svgDataUrl(markup) {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`;
+}
+
+function buildPortraitSvg(name) {
+  const initial = String(name || 'H').trim().charAt(0).toUpperCase() || 'H';
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="720" height="960" viewBox="0 0 720 960">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="100%" stop-color="#0ea5e9"/>
+        </linearGradient>
+      </defs>
+      <rect width="720" height="960" rx="48" fill="url(#bg)"/>
+      <circle cx="360" cy="280" r="118" fill="#ecfeff"/>
+      <circle cx="360" cy="246" r="68" fill="#a7f3d0"/>
+      <path d="M232 450c24-76 88-118 128-118s104 42 128 118v72H232z" fill="#a7f3d0"/>
+      <rect x="92" y="630" width="536" height="176" rx="26" fill="#ffffff" fill-opacity="0.9"/>
+      <text x="360" y="704" text-anchor="middle" font-size="44" font-family="Arial, sans-serif" font-weight="700" fill="#0f172a">${name}</text>
+      <text x="360" y="758" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" fill="#0f766e">Hiệp sĩ đã xác minh</text>
+      <circle cx="128" cy="128" r="56" fill="#ffffff" fill-opacity="0.2"/>
+      <text x="128" y="148" text-anchor="middle" font-size="66" font-family="Arial, sans-serif" font-weight="700" fill="#ffffff">${initial}</text>
+    </svg>
+  `);
+}
+
+function buildIdentitySvg(name, idNumber, side, address) {
+  return svgDataUrl(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
+      <defs>
+        <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#ecfccb"/>
+          <stop offset="100%" stop-color="#dcfce7"/>
+        </linearGradient>
+      </defs>
+      <rect width="960" height="600" rx="36" fill="url(#card)"/>
+      <rect x="38" y="38" width="884" height="524" rx="24" fill="#ffffff" fill-opacity="0.85" stroke="#86efac" stroke-width="3"/>
+      <text x="70" y="92" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#166534">CĂN CƯỚC CÔNG DÂN</text>
+      <text x="70" y="130" font-size="20" font-family="Arial, sans-serif" fill="#166534">${side}</text>
+      <rect x="70" y="182" width="220" height="280" rx="24" fill="#dcfce7"/>
+      <circle cx="180" cy="268" r="54" fill="#86efac"/>
+      <path d="M108 386c18-60 58-90 72-90 15 0 55 30 72 90v34H108z" fill="#86efac"/>
+      <text x="340" y="230" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Họ và tên</text>
+      <text x="340" y="268" font-size="34" font-family="Arial, sans-serif" font-weight="700" fill="#0f172a">${name}</text>
+      <text x="340" y="330" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Số định danh</text>
+      <text x="340" y="368" font-size="30" font-family="Courier New, monospace" font-weight="700" fill="#0f172a">${idNumber}</text>
+      <text x="340" y="430" font-size="22" font-family="Arial, sans-serif" fill="#64748b">Địa chỉ</text>
+      <foreignObject x="340" y="444" width="520" height="88">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,sans-serif;font-size:24px;color:#0f172a;line-height:1.3;">${address}</div>
+      </foreignObject>
+      <text x="812" y="534" text-anchor="end" font-size="18" font-family="Arial, sans-serif" fill="#64748b">SafeSolo Demo</text>
+    </svg>
+  `);
+}
 
 function hoursAgo(hours) {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -64,6 +134,7 @@ function buildEmail(fullName, index) {
 }
 
 async function seedOne([fullName, phoneNumber], index) {
+  const isVerifiedHero = verifiedHeroPhones.has(phoneNumber);
   const timerIntervalMinutes = [180, 240, 360, 480, 720, 1440][index % 6];
   const quietHoursStart = index % 2 === 0 ? '22:00' : '23:00';
   const quietHoursEnd = index % 3 === 0 ? '06:00' : '07:00';
@@ -84,11 +155,14 @@ async function seedOne([fullName, phoneNumber], index) {
     existing.email = existing.email || buildEmail(fullName, index);
     existing.isActive = existing.isActive !== false;
     existing.isVerified = existing.isVerified !== false;
-    existing.isKycVerified = existing.isKycVerified || index % 4 === 0;
-    existing.trustScore = Math.max(Number(existing.trustScore || 0), index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0);
-    existing.rescuesCount = Math.max(Number(existing.rescuesCount || 0), index % 4 === 0 ? 2 + (index % 5) : 0);
+    existing.isKycVerified = existing.isKycVerified || isVerifiedHero || index % 4 === 0;
+    existing.trustScore = Math.max(Number(existing.trustScore || 0), isVerifiedHero ? 4.7 + ((index % 3) * 0.1) : index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0);
+    existing.rescuesCount = Math.max(Number(existing.rescuesCount || 0), isVerifiedHero ? 5 + (index % 8) : index % 4 === 0 ? 2 + (index % 5) : 0);
     existing.batteryLevel = existing.batteryLevel ?? (35 + ((index * 7) % 60));
-    existing.approxAddress = existing.approxAddress || `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`;
+    existing.approxAddress = existing.approxAddress || (isVerifiedHero ? `Thu Dau Mot, Bình Dương` : `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`);
+    if (isVerifiedHero) {
+      existing.avatar = existing.avatar || buildPortraitSvg(fullName);
+    }
     existing.emergencyContacts = Array.isArray(existing.emergencyContacts) && existing.emergencyContacts.length
       ? existing.emergencyContacts
       : contacts;
@@ -164,6 +238,32 @@ async function seedOne([fullName, phoneNumber], index) {
         },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       ),
+      ...(isVerifiedHero
+        ? [
+            KYCDocument.findOneAndUpdate(
+              { userId: existing._id },
+              {
+                userId: existing._id,
+                frontImageUrl: buildIdentitySvg(
+                  fullName,
+                  `07920${String(index + 1).padStart(6, '0')}`,
+                  'Mặt trước',
+                  existing.approxAddress || 'Thu Dau Mot, Bình Dương',
+                ),
+                backImageUrl: buildIdentitySvg(
+                  fullName,
+                  `07920${String(index + 1).padStart(6, '0')}`,
+                  'Mặt sau',
+                  existing.approxAddress || 'Thu Dau Mot, Bình Dương',
+                ),
+                status: 'APPROVED',
+                submittedAt: hoursAgo((index % 5) + 20),
+                reviewedAt: hoursAgo((index % 4) + 4),
+              },
+              { upsert: true, new: true, setDefaultsOnInsert: true },
+            ),
+          ]
+        : []),
     ]);
 
     return { created: false, id: existing._id, fullName, phoneNumber };
@@ -177,12 +277,13 @@ async function seedOne([fullName, phoneNumber], index) {
     avatar: null,
     isActive: true,
     isVerified: true,
-    isKycVerified: index % 4 === 0,
-    trustScore: index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0,
-    rescuesCount: index % 4 === 0 ? 2 + (index % 5) : 0,
+    isKycVerified: isVerifiedHero || index % 4 === 0,
+    trustScore: isVerifiedHero ? 4.7 + ((index % 3) * 0.1) : index % 4 === 0 ? 4.4 + ((index % 5) * 0.1) : 0,
+    rescuesCount: isVerifiedHero ? 5 + (index % 8) : index % 4 === 0 ? 2 + (index % 5) : 0,
     batteryLevel: 35 + ((index * 7) % 60),
-    approxAddress: `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`,
+    approxAddress: isVerifiedHero ? 'Thu Dau Mot, Bình Dương' : `Gan khu vuc Q.${(index % 12) + 1}, TP.HCM`,
     medicalNotes: index % 4 === 0 ? 'Hen suyen nhe' : '',
+    avatar: isVerifiedHero ? buildPortraitSvg(fullName) : null,
     emergencyContacts: contacts,
     timerIntervalMinutes,
     lastCheckinTime,
@@ -260,6 +361,30 @@ async function seedOne([fullName, phoneNumber], index) {
       createdAt,
       updatedAt,
     }),
+    ...(isVerifiedHero
+      ? [
+          KYCDocument.create({
+            userId: user._id,
+            frontImageUrl: buildIdentitySvg(
+              fullName,
+              `07920${String(index + 1).padStart(6, '0')}`,
+              'Mặt trước',
+              user.approxAddress || 'Thu Dau Mot, Bình Dương',
+            ),
+            backImageUrl: buildIdentitySvg(
+              fullName,
+              `07920${String(index + 1).padStart(6, '0')}`,
+              'Mặt sau',
+              user.approxAddress || 'Thu Dau Mot, Bình Dương',
+            ),
+            status: 'APPROVED',
+            submittedAt: hoursAgo((index % 5) + 20),
+            reviewedAt: hoursAgo((index % 4) + 4),
+            createdAt,
+            updatedAt,
+          }),
+        ]
+      : []),
   ]);
 
   return { created: true, id: user._id, fullName, phoneNumber };
