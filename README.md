@@ -390,9 +390,4 @@ SafeSolo hiện đã có:
 - backend MongoDB cho runtime chính
 - web-admin có dashboard, map và export Excel
 - tài liệu cơ bản và gallery giao diện
-
-Nếu muốn mở rộng tiếp, các hướng ưu tiên hợp lý là:
-
-- FCM push thật từ backend
-- background geofence bền hơn khi app bị kill
-- tối ưu đồng bộ chat/voice note qua backend và object storage
+-ReadMe được viết bằng gemini khi thêm bằng link nên có thể có sai sót
