@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -138,6 +139,24 @@ class NotificationService {
       body: isVietnamese
           ? 'SafeSolo đã gửi tín hiệu SOS khẩn cấp từ cảm biến thiết bị.'
           : 'SafeSolo sent an emergency SOS signal from the device sensor.',
+      channelId: _alertsChannel.id,
+      channelName: _alertsChannel.name,
+      channelDescription: _alertsChannel.description ?? '',
+    );
+  }
+
+  Future<void> showRemoteMessage(RemoteMessage message) async {
+    final notification = message.notification;
+    final title = notification?.title?.trim();
+    final body = notification?.body?.trim();
+    if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+      return;
+    }
+
+    await _show(
+      id: message.hashCode,
+      title: title?.isNotEmpty == true ? title! : 'SafeSolo',
+      body: body?.isNotEmpty == true ? body! : '',
       channelId: _alertsChannel.id,
       channelName: _alertsChannel.name,
       channelDescription: _alertsChannel.description ?? '',

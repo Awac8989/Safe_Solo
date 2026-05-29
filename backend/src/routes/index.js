@@ -24,6 +24,8 @@ const {
   updateSecuritySettings,
   listDeviceSignals,
   createDeviceSignal,
+  registerPushToken,
+  deletePushToken,
 } = require('../controllers/userController');
 const {
   listEmergencies,
@@ -80,6 +82,8 @@ apiRouter.get('/users/:id/security-settings', getSecuritySettings);
 apiRouter.patch('/users/:id/security-settings', updateSecuritySettings);
 apiRouter.get('/users/:id/device-signals', listDeviceSignals);
 apiRouter.post('/users/:id/device-signals', createDeviceSignal);
+apiRouter.post('/users/:id/push-tokens', registerPushToken);
+apiRouter.delete('/users/:id/push-tokens/:token', deletePushToken);
 
 apiRouter.get('/admin/emergencies', listEmergencies);
 apiRouter.patch('/admin/emergencies/:id/resolve', resolveEmergencyLog);

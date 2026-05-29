@@ -389,6 +389,34 @@ class ApiService {
     _throwIfFailed(response);
   }
 
+  Future<void> registerPushToken({
+    required String userId,
+    required String pushToken,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/push-tokens');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'pushToken': pushToken,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+  }
+
+  Future<void> removePushToken({
+    required String userId,
+    required String pushToken,
+  }) async {
+    final uri = Uri.parse(
+      '${AppConstants.backendBaseUrl}/users/$userId/push-tokens/${Uri.encodeComponent(pushToken)}',
+    );
+    final response = await _safeRequest(_client.delete(uri));
+    _throwIfFailed(response);
+  }
+
   void _throwIfFailed(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;

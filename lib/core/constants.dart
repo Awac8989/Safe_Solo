@@ -32,6 +32,45 @@ class AppConstants {
 
   static bool get hasMapTiler => mapTilerApiKey.isNotEmpty;
 
+  static String get firebaseApiKey {
+    const value = String.fromEnvironment('FIREBASE_API_KEY');
+    return value;
+  }
+
+  static String get firebaseAppId {
+    const value = String.fromEnvironment('FIREBASE_APP_ID');
+    return value;
+  }
+
+  static String get firebaseMessagingSenderId {
+    const value = String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
+    return value;
+  }
+
+  static String get firebaseProjectId {
+    const value = String.fromEnvironment('FIREBASE_PROJECT_ID');
+    return value;
+  }
+
+  static String get firebaseStorageBucket {
+    const value = String.fromEnvironment('FIREBASE_STORAGE_BUCKET');
+    return value;
+  }
+
+  static bool get hasFirebaseConfig =>
+      firebaseApiKey.isNotEmpty &&
+      firebaseAppId.isNotEmpty &&
+      firebaseMessagingSenderId.isNotEmpty &&
+      firebaseProjectId.isNotEmpty;
+
+  static bool get firebasePushEnabled {
+    const value = String.fromEnvironment('FIREBASE_PUSH_ENABLED');
+    if (value.isEmpty) {
+      return hasFirebaseConfig;
+    }
+    return value.toLowerCase() == 'true';
+  }
+
   static String? mapTilerRasterTileUrl(int x, int y, int zoom) {
     if (!hasMapTiler) {
       return null;

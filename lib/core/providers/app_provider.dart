@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,10 +15,12 @@ import '../../models/interaction_event_model.dart';
 import '../../models/medical_profile_model.dart';
 import '../../models/security_settings_model.dart';
 import '../../models/user_model.dart';
+import '../../services/background_safety_service.dart';
 import '../../services/api_service.dart';
 import '../../services/audio_note_service.dart';
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
+import '../../services/push_notification_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -673,8 +675,9 @@ class RadarIncident {
   final String status;
 }
 
-class AppProvider with ChangeNotifier {
+class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   AppProvider() {
+    WidgetsBinding.instance.addObserver(this);
     _bootstrap();
   }
 
@@ -683,6 +686,8 @@ class AppProvider with ChangeNotifier {
   final ApiService _api = ApiService();
   final LocationService _locationService = LocationService();
   final NotificationService _notifications = NotificationService.instance;
+  final PushNotificationService _pushNotifications =
+      PushNotificationService.instance;
 
   User? _user;
   bool _onboarded = false;
@@ -693,6 +698,9 @@ class AppProvider with ChangeNotifier {
   int _streak = 0;
   Mood? _mood = Mood.calm;
   bool _highContrast = false;
+  bool _fcmPushEnabled = true;
+  bool _backgroundMonitorEnabled = true;
+  bool _appIsVisible = true;
   AppLanguage _language = AppLanguage.vi;
   MedicalId _medical = MedicalId();
   Automation _automation = Automation();
@@ -729,6 +737,28 @@ class AppProvider with ChangeNotifier {
   String? _stepBaselineDayKey;
   int? _lastRawStepCount;
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isVisible = state == AppLifecycleState.resumed;
+    if (_appIsVisible == isVisible) {
+      return;
+    }
+    _appIsVisible = isVisible;
+    unawaited(_persistBackgroundSafetyConfig());
+    if (isVisible) {
+      unawaited(BackgroundSafetyService.instance.stop());
+    } else {
+      unawaited(_syncBackgroundSafetyService());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopRuntimeAutomation();
+    super.dispose();
+  }
+
   User? get user => _user;
   bool get onboarded => _onboarded;
   bool get permissionsGranted => _permissionsGranted;
@@ -738,6 +768,8 @@ class AppProvider with ChangeNotifier {
   int get streak => _streak;
   Mood? get mood => _mood;
   bool get highContrast => _highContrast;
+  bool get fcmPushEnabled => _fcmPushEnabled;
+  bool get backgroundMonitorEnabled => _backgroundMonitorEnabled;
   AppLanguage get language => _language;
   MedicalId get medical => _medical;
   Automation get automation => _automation;
@@ -786,6 +818,50 @@ class AppProvider with ChangeNotifier {
     return _chatThreads.where((thread) => thread.id == threadId).firstOrNull;
   }
 
+  Map<String, dynamic> _backgroundSafetyConfig() {
+    return {
+      'userId': _user?.id,
+      'permissionsGranted': _permissionsGranted,
+      'appVisible': _appIsVisible,
+      'enabled': _backgroundMonitorEnabled,
+      'automation': _automation.toJson(),
+      'homeAnchor': _homeAnchor?.toJson(),
+      'languageCode': _language.name,
+    };
+  }
+
+  Future<void> _persistBackgroundSafetyConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'safesolo_background_safety_config_v1',
+      jsonEncode(_backgroundSafetyConfig()),
+    );
+  }
+
+  Future<void> _syncPushTokenIfNeeded() async {
+    final user = _user;
+    if (user == null) {
+      return;
+    }
+    if (!_fcmPushEnabled) {
+      return;
+    }
+    await _pushNotifications.initialize();
+    await _pushNotifications.syncTokenForUser(user.id);
+  }
+
+  Future<void> _syncBackgroundSafetyService() async {
+    await BackgroundSafetyService.instance.updateFromState(
+      userId: _user?.id,
+      permissionsGranted: _permissionsGranted,
+      appVisible: _appIsVisible,
+      enabled: _backgroundMonitorEnabled,
+      automation: _automation.toJson(),
+      homeAnchor: _homeAnchor?.toJson(),
+      languageCode: _language.name,
+    );
+  }
+
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_storageKey);
@@ -800,6 +876,9 @@ class AppProvider with ChangeNotifier {
         _streak = data['streak'] as int? ?? 0;
         _mood = _decodeMood(data['mood'] as String?);
         _highContrast = data['highContrast'] as bool? ?? false;
+        _fcmPushEnabled = data['fcmPushEnabled'] as bool? ?? true;
+        _backgroundMonitorEnabled =
+            data['backgroundMonitorEnabled'] as bool? ?? true;
         _language = _decodeLanguage(data['language'] as String?);
         _medical = MedicalId.fromJson(
           Map<String, dynamic>.from(data['medical'] as Map? ?? const {}),
@@ -841,6 +920,8 @@ class AppProvider with ChangeNotifier {
       }
     }
 
+    _appIsVisible = true;
+
     _resetStepCountersIfNeeded();
 
     _seedDemoCollections();
@@ -856,6 +937,8 @@ class AppProvider with ChangeNotifier {
     await _evaluateSafetyAutomation();
     await _notifications.initialize();
     _restartRuntimeAutomation();
+    await _syncPushTokenIfNeeded();
+    await _syncBackgroundSafetyService();
 
     _isInitializing = false;
     notifyListeners();
@@ -867,9 +950,12 @@ class AppProvider with ChangeNotifier {
       'user': _user?.toJson(),
       'onboarded': _onboarded,
       'permissionsGranted': _permissionsGranted,
+      'appVisible': _appIsVisible,
       'streak': _streak,
       'mood': _mood?.name,
       'highContrast': _highContrast,
+      'fcmPushEnabled': _fcmPushEnabled,
+      'backgroundMonitorEnabled': _backgroundMonitorEnabled,
       'language': _language.name,
       'medical': _medical.toJson(),
       'automation': _automation.toJson(),
@@ -888,6 +974,7 @@ class AppProvider with ChangeNotifier {
       'lastRawStepCount': _lastRawStepCount,
     };
     await prefs.setString(_storageKey, jsonEncode(data));
+    await _persistBackgroundSafetyConfig();
   }
 
   Future<void> completeOnboarding() async {
@@ -900,6 +987,7 @@ class AppProvider with ChangeNotifier {
     _permissionsGranted = true;
     await _notifications.initialize();
     _restartRuntimeAutomation();
+    await _syncBackgroundSafetyService();
     notifyListeners();
     await _saveToStorage();
   }
@@ -953,6 +1041,8 @@ class AppProvider with ChangeNotifier {
       _updateBadges();
       await _saveToStorage();
       _restartRuntimeAutomation();
+      await _syncPushTokenIfNeeded();
+      await _syncBackgroundSafetyService();
     });
   }
 
@@ -983,20 +1073,28 @@ class AppProvider with ChangeNotifier {
     _updateBadges();
     await _evaluateSafetyAutomation();
     _restartRuntimeAutomation();
+    await _syncPushTokenIfNeeded();
+    await _syncBackgroundSafetyService();
     notifyListeners();
     await _saveToStorage();
   }
 
   Future<void> signOut() async {
+    final previousUserId = _user?.id;
     _stopRuntimeAutomation();
     _user = null;
     _lastError = null;
+    await _pushNotifications.removeTokenForUser(previousUserId);
+    await BackgroundSafetyService.instance.stop();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
+    await prefs.remove('safesolo_background_safety_config_v1');
     _onboarded = true;
     _permissionsGranted = false;
     _streak = 0;
     _mood = Mood.calm;
+    _fcmPushEnabled = true;
+    _backgroundMonitorEnabled = true;
     _medical = MedicalId();
     _automation = Automation();
     _security = Security();
@@ -1182,6 +1280,27 @@ class AppProvider with ChangeNotifier {
   Future<void> setHighContrast(bool enabled) async {
     _highContrast = enabled;
     await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> setFcmPushEnabled(bool enabled) async {
+    final current = _user;
+    _fcmPushEnabled = enabled;
+    if (current != null) {
+      if (enabled) {
+        await _syncPushTokenIfNeeded();
+      } else {
+        await _pushNotifications.removeTokenForUser(current.id);
+      }
+    }
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> setBackgroundMonitorEnabled(bool enabled) async {
+    _backgroundMonitorEnabled = enabled;
+    await _saveToStorage();
+    await _syncBackgroundSafetyService();
     notifyListeners();
   }
 
@@ -1859,12 +1978,6 @@ class AppProvider with ChangeNotifier {
         a.day == b.day &&
         a.hour == b.hour &&
         a.minute == b.minute;
-  }
-
-  @override
-  void dispose() {
-    _stopRuntimeAutomation();
-    super.dispose();
   }
 
   Future<void> _runBusy(Future<void> Function() action) async {

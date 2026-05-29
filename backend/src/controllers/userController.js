@@ -32,6 +32,10 @@ const {
   buildEncryptedUserSensitiveUpdate,
   decryptUserSensitivePayload,
 } = require('../lib/userSensitiveCodec');
+const {
+  registerPushToken: registerFcmPushToken,
+  removePushToken: removeFcmPushToken,
+} = require('../services/fcmService');
 
 function isValidHourMinute(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
@@ -811,6 +815,35 @@ async function createDeviceSignal(req, res) {
   return res.status(201).json({ message: 'Device signal recorded', action });
 }
 
+async function registerPushToken(req, res) {
+  const { id } = req.params;
+  const value = String(req.body?.pushToken || req.body?.token || '').trim();
+
+  if (!value) {
+    return res.status(400).json({ message: 'pushToken is required' });
+  }
+
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  await registerFcmPushToken(id, value);
+  return res.status(200).json({ message: 'Push token registered' });
+}
+
+async function deletePushToken(req, res) {
+  const { id, token } = req.params;
+
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  await removeFcmPushToken(id, token);
+  return res.status(200).json({ message: 'Push token removed' });
+}
+
 module.exports = {
   registerUser,
   checkin,
@@ -835,4 +868,6 @@ module.exports = {
   updateSecuritySettings,
   listDeviceSignals,
   createDeviceSignal,
+  registerPushToken,
+  deletePushToken,
 };

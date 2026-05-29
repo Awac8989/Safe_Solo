@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_theme.dart';
 import 'core/providers/app_provider.dart';
 import 'core/widgets/main_navigation.dart';
+import 'services/background_safety_service.dart';
+import 'services/push_notification_service.dart';
 import 'views/auth/auth_page.dart';
 import 'views/achievements/achievements_page.dart';
 import 'views/community_radar/community_radar_page.dart';
@@ -17,7 +20,10 @@ import 'views/sos_map/sos_map_page.dart';
 import 'views/stealth/stealth_page.dart';
 import 'views/vault/vault_page.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  await BackgroundSafetyService.instance.prepare();
   runApp(const SafeSoloApp());
 }
 

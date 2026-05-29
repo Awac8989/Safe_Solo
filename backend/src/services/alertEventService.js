@@ -1,6 +1,7 @@
 const AlertEvent = require('../models/AlertEvent');
 const User = require('../models/User');
 const { toIso } = require('../lib/mongoCore');
+const { sendAlertFanout } = require('./fcmService');
 
 function mapAlertEventDoc(doc, user = null) {
   if (!doc) {
@@ -49,7 +50,15 @@ async function createAlertEvent({ userId, level, status, source, title, message,
     metadata,
   });
 
-  return mapAlertEventDoc(event);
+  const mapped = mapAlertEventDoc(event);
+
+  try {
+    await sendAlertFanout(mapped);
+  } catch (error) {
+    console.warn('FCM alert dispatch skipped:', error.message);
+  }
+
+  return mapped;
 }
 
 async function listAlertEvents({ userId, page = 1, limit = 50 }) {

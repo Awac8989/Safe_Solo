@@ -39,6 +39,9 @@ dependencies:
   provider: ^6.1.5+1
   permission_handler: ^12.0.1
   url_launcher: ^6.3.2
+  firebase_core: ^4.9.0
+  firebase_messaging: ^16.2.2
+  flutter_background_service: ^5.1.0
   qr_flutter: ^4.1.0
   google_maps_flutter: ^2.12.3
   flutter_local_notifications: ^21.0.0

@@ -238,6 +238,30 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          const SizedBox(height: 22),
+          AppSectionLabel(strings.text('Thông báo & nền', 'Notifications & background')),
+          const SizedBox(height: 10),
+          _SectionCard(
+            children: [
+              _SwitchRow(
+                icon: Icons.notifications_active_outlined,
+                title: strings.text('FCM push thật', 'Real FCM push'),
+                value: provider.fcmPushEnabled,
+                onChanged: (value) => _runGuarded(
+                  () => context.read<AppProvider>().setFcmPushEnabled(value),
+                ),
+              ),
+              const _SectionDivider(),
+              _SwitchRow(
+                icon: Icons.layers_outlined,
+                title: strings.text('Giám sát nền', 'Background monitor'),
+                value: provider.backgroundMonitorEnabled,
+                onChanged: (value) => _runGuarded(
+                  () => context.read<AppProvider>().setBackgroundMonitorEnabled(value),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => context.read<AppProvider>().signOut(),

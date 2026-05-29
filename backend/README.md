@@ -249,3 +249,85 @@ Nhiệm vụ:
 - `src/services/emergencyService.js`
 - `src/services/adminPortalService.js`
 - `src/workers/deadmanWorker.js`
+
+## FCM push notifications
+
+SafeSolo can send real push notifications through Firebase Cloud Messaging when Firebase credentials are provided.
+
+Environment variables:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account", ...}
+# or
+FIREBASE_SERVICE_ACCOUNT_PATH=C:/secrets/safesolo-firebase-service-account.json
+```
+
+Flutter app environment:
+
+- `FIREBASE_API_KEY`
+- `FIREBASE_APP_ID`
+- `FIREBASE_MESSAGING_SENDER_ID`
+- `FIREBASE_PROJECT_ID`
+- optional: `FIREBASE_STORAGE_BUCKET`
+
+The app registers device tokens through:
+
+- `POST /api/users/:id/push-tokens`
+- `DELETE /api/users/:id/push-tokens/:token`
+
+Alert events are fanned out to:
+
+- the victim device
+- accepted guardians
+
+## Android background safety monitor
+
+On Android, SafeSolo keeps geofence and fall/shake detection alive in a foreground service when the app is backgrounded.
+
+Notes:
+
+- the service starts when the app goes to the background
+- the service stops when the app returns to the foreground
+- the existing in-app automation remains as a foreground fallback
+- for reliable long-running monitoring, disable battery optimization for SafeSolo on the device
+
+## FCM push notifications
+
+SafeSolo can send real push notifications through Firebase Cloud Messaging when Firebase credentials are provided.
+
+Environment variables:
+
+```env
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account", ...}
+# or
+FIREBASE_SERVICE_ACCOUNT_PATH=C:/secrets/safesolo-firebase-service-account.json
+```
+
+Flutter app environment:
+
+- `FIREBASE_API_KEY`
+- `FIREBASE_APP_ID`
+- `FIREBASE_MESSAGING_SENDER_ID`
+- `FIREBASE_PROJECT_ID`
+- optional: `FIREBASE_STORAGE_BUCKET`
+
+The app registers device tokens through:
+
+- `POST /api/users/:id/push-tokens`
+- `DELETE /api/users/:id/push-tokens/:token`
+
+Alert events are fanned out to:
+
+- the victim device
+- accepted guardians
+
+## Android background safety monitor
+
+On Android, SafeSolo keeps geofence and fall/shake detection alive in a foreground service when the app is backgrounded.
+
+Notes:
+
+- the service starts when the app goes to the background
+- the service stops when the app returns to the foreground
+- the existing in-app automation remains as a foreground fallback
+- for reliable long-running monitoring, disable battery optimization for SafeSolo on the device

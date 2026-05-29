@@ -27,6 +27,7 @@ const UserSchema = new mongoose.Schema(
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     email: { type: String, default: '', index: true },
     avatar: { type: String, default: null },
+    pushTokens: { type: [String], default: [] },
     firstName: { type: String, default: '' },
     lastName: { type: String, default: '' },
     dateOfBirth: { type: Date, default: null },
