@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { AppError } = require('../lib/errors');
 const { toIso } = require('../lib/mongoCore');
+const { buildEncryptedUserSensitiveUpdate, decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 class LocationService {
   async updateUserLocation(userId, lat, lng, extra = {}) {
@@ -15,16 +16,26 @@ class LocationService {
       updatedAt: new Date(),
     };
     user.batteryLevel = extra.batteryLevel ?? user.batteryLevel;
-    user.approxAddress = extra.approxAddress ?? user.approxAddress;
+    if (Object.prototype.hasOwnProperty.call(extra, 'approxAddress')) {
+      const sensitive = decryptUserSensitivePayload(user);
+      Object.assign(
+        user,
+        buildEncryptedUserSensitiveUpdate(userId, {
+          ...sensitive,
+          approxAddress: extra.approxAddress ?? sensitive.approxAddress,
+        }),
+      );
+    }
     await user.save();
 
+    const sensitive = decryptUserSensitivePayload(user);
     return {
       id: user._id,
       lastLat: user.lastKnownLocation.lat,
       lastLng: user.lastKnownLocation.lng,
       lastLocationTime: toIso(user.lastKnownLocation.updatedAt),
       batteryLevel: user.batteryLevel,
-      approxAddress: user.approxAddress,
+      approxAddress: sensitive.approxAddress,
     };
   }
 
@@ -34,13 +45,14 @@ class LocationService {
       throw new AppError('User not found', 404);
     }
 
+    const sensitive = decryptUserSensitivePayload(user);
     return {
       id: user._id,
       lastLat: user.lastKnownLocation?.lat ?? null,
       lastLng: user.lastKnownLocation?.lng ?? null,
       lastLocationTime: toIso(user.lastKnownLocation?.updatedAt),
       batteryLevel: user.batteryLevel,
-      approxAddress: user.approxAddress,
+      approxAddress: sensitive.approxAddress,
     };
   }
 }

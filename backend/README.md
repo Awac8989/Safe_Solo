@@ -1,98 +1,179 @@
 # SafeSolo Backend
 
-Backend của SafeSolo là API `Node.js + Express + MongoDB` phục vụ:
+Backend của SafeSolo dùng `Node.js + Express + MongoDB` để phục vụ:
 
 - ứng dụng Flutter cho người dùng cuối
-- web-admin điều phối
-- luồng an toàn như check-in, SOS, rescue, guardians, medical, chat, KYC
+- web admin điều phối
+- các worker an toàn như `dead-man switch`, SOS, rescue, KYC và chat
 
-## 1. Công nghệ sử dụng
+## Công nghệ
 
 - Node.js
 - Express
 - MongoDB + Mongoose
 - Socket.IO
-- BullMQ
-- ioredis
 - Joi
 - JWT
-- Multer
+- BullMQ / Redis (tùy chọn)
 
-## 2. Kết nối dữ liệu
+## Cách chạy
 
-Database mặc định:
+```powershell
+cd c:\Users\Admin\SafeSolo\backend
+npm install
+npm run dev
+```
+
+Health check:
+
+- [http://127.0.0.1:4000/api/health](http://127.0.0.1:4000/api/health)
+
+## Biến môi trường
+
+Ví dụ trong `.env`:
+
+```env
+PORT=4000
+NODE_ENV=development
+
+MONGODB_URI=mongodb://127.0.0.1:27017/Safesolo
+MONGODB_DB_NAME=Safesolo
+
+JWT_SECRET=change-me
+JWT_EXPIRE=7d
+
+DATA_ENCRYPTION_KEY_ID=primary
+DATA_ENCRYPTION_KEY=replace-with-a-long-random-secret
+# DATA_ENCRYPTION_KEYS=primary=current-secret;legacy-2025=older-secret
+
+CORS_ORIGIN=http://127.0.0.1:4173
+```
+
+## Cơ sở dữ liệu
+
+Database chính:
 
 ```text
 mongodb://127.0.0.1:27017/Safesolo
 ```
 
-Tên database mặc định:
+Collection chính:
 
-```text
-Safesolo
-```
+- `users`
+- `checkinhistories`
+- `alertpolicies`
+- `alertevents`
+- `interactionevents`
+- `medicalprofiles`
+- `automationsettings`
+- `securitysettings`
+- `devicesignals`
+- `emergencylogs`
+- `rescueincidents`
+- `volunteerresponses`
+- `chatrooms`
+- `messages`
+- `emergencymemos`
+- `smsdispatchlogs`
+- `systemlogs`
+- `kycdocuments`
+- `vaults`
+- `dailystatuses`
+- `thankyounotes`
 
-Biến môi trường hỗ trợ:
+## Kiến trúc mã hóa hiện tại
+
+Backend hiện có lớp mã hóa thật cho dữ liệu nhạy cảm. Cơ chế dùng:
+
+- `AES-256-GCM` cho payload nhạy cảm
+- `bcrypt` cho `realPin` và `duressPin`
+- `kid` (key id) để hỗ trợ rotate encryption key
+
+### Dữ liệu đang được mã hóa
+
+1. `medicalprofiles`
+- lưu payload nhạy cảm trong `encryptedProfile`
+- dữ liệu đọc ra API được tự giải mã
+
+2. `vaults`
+- `vault.content` được mã hóa bằng `AES-256-GCM`
+
+3. `users`
+- `medicalNotes`
+- `approxAddress`
+- `emergencyContacts`
+
+Các trường này được chuyển vào `users.encryptedSensitive`.  
+Để vẫn hỗ trợ truy vấn guardian/feed theo số điện thoại, hệ thống giữ thêm chỉ mục:
+
+- `users.emergencyContactPhones`
+
+4. `messages`
+- `content`
+- `metadata`
+
+Dữ liệu thật nằm trong `messages.encryptedPayload`.
+
+5. `emergencymemos`
+- `victimName`
+- `approxAddress`
+- `contentUrl`
+- `transcript`
+
+Dữ liệu thật nằm trong `emergencymemos.encryptedPayload`.
+
+6. `PIN`
+- `users.realPin`
+- `users.duressPin`
+
+Hai giá trị này được lưu dạng hash `bcrypt`, không trả ngược plaintext từ backend.
+
+## Rotate encryption key
+
+Backend hỗ trợ cơ chế rotate key bằng hai cách:
+
+### Cách đơn giản
 
 ```env
-PORT=4000
-MONGODB_URI=mongodb://127.0.0.1:27017/Safesolo
-MONGODB_DB_NAME=Safesolo
-JWT_SECRET=change-me
-MAPTILER_KEY=your-key
+DATA_ENCRYPTION_KEY_ID=primary
+DATA_ENCRYPTION_KEY=current-secret
 ```
 
-## 3. Cấu trúc thư mục
+### Cách có nhiều key
 
-```text
-backend/
-├─ scripts/               Seed và script hỗ trợ
-├─ src/
-│  ├─ config/             Mongo config, Redis config
-│  ├─ controllers/        HTTP controllers
-│  ├─ lib/                Helper và hạ tầng
-│  ├─ middleware/         Auth, validation, error handling
-│  ├─ models/             Mongoose models
-│  ├─ routes/             API routes
-│  ├─ services/           Business logic
-│  ├─ sockets/            Socket.IO
-│  └─ workers/            Dead-man worker, duress worker
-├─ package.json
-└─ server.js
+```env
+DATA_ENCRYPTION_KEYS=primary=current-secret;legacy-2025=older-secret
 ```
 
-## 4. Collections chính
+Quy tắc:
 
-| Collection | Vai trò |
-| --- | --- |
-| `users` | Hồ sơ người dùng và trạng thái check-in |
-| `checkinhistories` | Lịch sử điểm danh |
-| `alertevents` | Timeline cảnh báo theo cấp |
-| `alertpolicies` | Rule thời gian cho reminder, alarm, SOS |
-| `interactionevents` | Các tương tác như check-in, mood, status |
-| `guardianrelationships` | Liên hệ khẩn cấp / guardians |
-| `medicalprofiles` | Hồ sơ y tế và dữ liệu QR |
-| `automationsettings` | Reminder, fall detection, shake SOS, geofence |
-| `securitysettings` | Stealth, auto-wipe, encryption |
-| `devicesignals` | Tín hiệu từ cảm biến và vị trí |
-| `emergencylogs` | Nhật ký SOS và sự cố |
-| `rescueincidents` | Ca cứu hộ cộng đồng |
-| `volunteerresponses` | Người tình nguyện đã nhận ca |
-| `chatrooms` | Phòng chat gia đình, cộng đồng, cứu hộ |
-| `messages` | Tin nhắn văn bản và voice note |
-| `emergencymemos` | Memo khẩn cấp, voice note, toạ độ |
-| `smsdispatchlogs` | Nhật ký gửi SMS |
-| `systemlogs` | Audit log hệ thống |
-| `kycdocuments` | Dữ liệu KYC volunteer |
-| `vaults` | Két sinh tử |
-| `dailystatuses` | Status feed / Alive Circle |
-| `thankyounotes` | Lời cảm ơn gửi hiệp sĩ |
+- key đầu tiên là key hiện tại để mã hóa mới
+- payload đã mã hóa sẽ mang theo `kid`
+- khi giải mã, backend ưu tiên key theo `kid`, sau đó fallback sang key khác trong keyring
 
-## 5. Nhóm API
+## Script migrate dữ liệu nhạy cảm
 
-### Core / user
+Khi đổi key hoặc khi còn dữ liệu cũ chưa mã hóa, dùng:
 
-Tập trung trong `src/routes/index.js`:
+```powershell
+cd c:\Users\Admin\SafeSolo\backend
+npm run migrate:encrypt-sensitive
+```
+
+Script này sẽ:
+
+- mã hóa lại `medicalprofiles`
+- mã hóa lại `vaults`
+- hash lại PIN cũ nếu còn plaintext
+- mã hóa `users.encryptedSensitive`
+- mã hóa lại `messages.encryptedPayload`
+- mã hóa lại `emergencymemos.encryptedPayload`
+
+Script cũng dùng được để **re-encrypt sang key mới** sau khi đổi `DATA_ENCRYPTION_KEY_ID` hoặc `DATA_ENCRYPTION_KEYS`.
+
+## Nhóm API chính
+
+### Core user
 
 - `GET /api/health`
 - `GET /api/users`
@@ -110,169 +191,61 @@ Tập trung trong `src/routes/index.js`:
 - `GET /api/users/:id/device-signals`
 - `POST /api/users/:id/device-signals`
 
-### Auth
+### Rescue / community
 
-`src/routes/authRoutes.js`
-
-- đăng nhập
-- xác thực token
-- bootstrap session
-
-### Guardians / Medical / Location
-
-- `guardianRoutes.js`
-- `medicalRoutes.js`
-- `locationRoutes.js`
-
-### Emergency / Radar / Community
-
-- `emergencyRoutes.js`
-- `radarRoutes.js`
-- `communityRoutes.js`
-- `feedRoutes.js`
-
-Các nhóm này xử lý:
-
-- broadcast sự cố
-- rescue incident
-- volunteer response
-- feed cộng đồng
-- status nhanh
-- heroes / bảng xếp hạng hỗ trợ
+- `POST /api/radar/broadcast`
+- `GET /api/radar/nearby`
+- `POST /api/radar/:incidentId/accept`
+- `GET /api/radar/:incidentId`
+- `PATCH /api/radar/:incidentId/resolve`
 
 ### Chat
 
-`chatRoutes.js`
-
-- tạo phòng chat
-- đọc tin nhắn
-- gửi tin nhắn
-- gửi voice note
-
-### KYC
-
-`kycRoutes.js`
-
-- gửi hồ sơ KYC
-- duyệt / từ chối
-- phục vụ volunteer onboarding
+- `GET /api/chat/:roomId/messages`
+- `POST /api/chat/:roomId/messages`
 
 ### Admin
 
-`adminPortalRoutes.js`
+- `GET /api/admin/overview`
+- `GET /api/admin/users`
+- `GET /api/admin/incidents`
+- `GET /api/admin/alerts`
+- `GET /api/admin/incidents/:id/sms-logs`
 
-- overview
-- users
-- incidents
-- alerts
-- SMS logs
-- audit / admin timeline
-- export / dữ liệu điều phối
+## Worker nền
 
-## 6. Workers nền
+### `deadmanWorker`
 
-### Dead-man worker
+File:
 
-File: `src/workers/deadmanWorker.js`
+- `src/workers/deadmanWorker.js`
 
 Nhiệm vụ:
 
-- kiểm tra thời gian check-in của user
-- đánh dấu reminder / warning / SOS
+- kiểm tra check-in quá hạn
+- nâng cấp trạng thái `SAFE -> REMINDER -> WARNING -> SOS`
 - tạo `AlertEvent`
 - hỗ trợ auto-wipe theo policy
 
-### Duress worker
+### `duressWorker`
 
-File: `src/workers/duressWorker.js`
+File:
+
+- `src/workers/duressWorker.js`
 
 Nhiệm vụ:
 
-- xử lý luồng PIN giả / SOS ngầm
-- hỗ trợ escalation không hiển thị trên client
+- xử lý PIN giả / SOS ngầm
+- escalation kín
 
-## 7. Cài đặt và chạy
-
-### Cài dependency
-
-```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm install
-```
-
-### Chạy dev
-
-```powershell
-npm run dev
-```
-
-### Chạy production
-
-```powershell
-npm start
-```
-
-### Health check
-
-```text
-http://127.0.0.1:4000/api/health
-```
-
-## 8. Seed dữ liệu demo
-
-Tạo user demo:
-
-```powershell
-npm run seed:demo-users
-```
-
-Script này dùng để:
-
-- seed người dùng mẫu
-- tạo dữ liệu đủ cho app và admin test
-
-## 9. Socket và realtime
-
-Backend có hỗ trợ realtime qua Socket.IO cho:
-
-- timeline sự cố
-- thay đổi trạng thái rescue
-- cập nhật chat room
-- các tín hiệu admin dashboard
-
-## 10. Ghi chú vận hành
-
-- Redis không bắt buộc để `health` API hoạt động, nhưng một số queue/log realtime sẽ báo cảnh báo nếu Redis chưa bật
-- khi test máy thật Android, backend phải mở qua IP LAN thay vì `10.0.2.2`
-- key bản đồ không nên hardcode; dùng `.env` hoặc config local
-
-## 11. File quan trọng nên đọc đầu tiên
+## Tài liệu nên đọc trước
 
 - `server.js`
 - `src/config/database.js`
 - `src/routes/index.js`
 - `src/controllers/userController.js`
-- `src/services/adminPortalService.js`
-- `src/services/emergencyService.js`
+- `src/services/authService.js`
 - `src/services/chatService.js`
+- `src/services/emergencyService.js`
+- `src/services/adminPortalService.js`
 - `src/workers/deadmanWorker.js`
-
-## 12. Mục tiêu hiện tại của backend
-
-Backend được tổ chức để phục vụ 3 lớp:
-
-1. `Safety core`
-   - check-in
-   - alert policies
-   - escalation
-
-2. `Rescue & community`
-   - rescue incident
-   - volunteer response
-   - chat / feed / heroes
-
-3. `Admin orchestration`
-   - dashboard
-   - incident handling
-   - audit
-   - user management

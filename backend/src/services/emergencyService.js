@@ -10,24 +10,27 @@ const { AppError, ensure } = require('../lib/errors');
 const { fullName, sanitizeUser, haversineKm } = require('../lib/utils');
 const { sendEmergencySms } = require('./smsService');
 const { toIso } = require('../lib/mongoCore');
+const { decryptEmergencyMemoPayload, encryptEmergencyMemoPayload } = require('../lib/sensitivePayloadCodec');
+const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 function mapMemo(doc) {
   if (!doc) {
     return null;
   }
   const row = doc.toObject ? doc.toObject() : doc;
+  const sensitive = decryptEmergencyMemoPayload(row);
   return {
     id: row._id,
     incidentId: row.incidentId,
     victimId: row.victimId,
     createdAt: toIso(row.createdAt),
     duration: row.duration,
-    victimName: row.victimName,
+    victimName: sensitive.victimName,
     lat: row.lat,
     lng: row.lng,
-    approxAddress: row.approxAddress || null,
-    contentUrl: row.contentUrl || null,
-    transcript: row.transcript || '',
+    approxAddress: sensitive.approxAddress,
+    contentUrl: sensitive.contentUrl,
+    transcript: sensitive.transcript,
     isAnonymous: Boolean(row.isAnonymous),
   };
 }
@@ -46,7 +49,7 @@ class EmergencyService {
         severity: 3,
         source: 'SILENT_SOS',
         batteryLevel: user.batteryLevel,
-        approxAddress: user.approxAddress,
+        approxAddress: decryptUserSensitivePayload(user).approxAddress,
       },
     );
   }
@@ -55,7 +58,7 @@ class EmergencyService {
     const userDoc = await User.findById(userLike._id || userLike.id);
     ensure(userDoc, 'User not found', 404);
 
-    const contacts = Array.isArray(userDoc.emergencyContacts) ? userDoc.emergencyContacts : [];
+    const contacts = decryptUserSensitivePayload(userDoc).emergencyContacts;
     const user = sanitizeUser(userDoc);
     const results = await sendEmergencySms({
       emergencyLogId: null,
@@ -127,12 +130,20 @@ class EmergencyService {
       incidentId,
       victimId: userId,
       duration: payload.duration,
-      victimName: fullName(user),
+      victimName: '',
       lat: payload.lat,
       lng: payload.lng,
-      approxAddress: payload.approxAddress || user.approxAddress || null,
-      contentUrl: payload.contentUrl || null,
-      transcript: payload.transcript || '',
+      approxAddress: null,
+      contentUrl: null,
+      transcript: '',
+      encryptedPayload: encryptEmergencyMemoPayload({
+        incidentId,
+        victimName: fullName(user),
+        approxAddress: payload.approxAddress || decryptUserSensitivePayload(user).approxAddress || null,
+        contentUrl: payload.contentUrl || null,
+        transcript: payload.transcript || '',
+      }),
+      encryptionVersion: 1,
       isAnonymous: true,
     });
 

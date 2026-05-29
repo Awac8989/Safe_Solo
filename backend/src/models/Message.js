@@ -13,6 +13,8 @@ const MessageSchema = new mongoose.Schema(
     },
     content: { type: String, default: '' },
     metadata: { type: mongoose.Schema.Types.Mixed, default: null },
+    encryptedPayload: { type: mongoose.Schema.Types.Mixed, default: null },
+    encryptionVersion: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now, index: true },
   },
   {

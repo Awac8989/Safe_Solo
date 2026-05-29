@@ -10,6 +10,8 @@ const { getIo } = require('../sockets/socketServer');
 const { AppError, ensure } = require('../lib/errors');
 const { fuzzCoordinates, haversineKm, sanitizeUser } = require('../lib/utils');
 const { toIso } = require('../lib/mongoCore');
+const { decryptEmergencyMemoPayload } = require('../lib/sensitivePayloadCodec');
+const { decryptUserSensitivePayload, buildEncryptedUserSensitiveUpdate } = require('../lib/userSensitiveCodec');
 
 function mapIncident(doc) {
   if (!doc) {
@@ -55,25 +57,27 @@ function mapMemo(doc) {
     return null;
   }
   const row = doc.toObject ? doc.toObject() : doc;
+  const sensitive = decryptEmergencyMemoPayload(row);
   return {
     id: row._id,
     incidentId: row.incidentId,
     victimId: row.victimId,
     createdAt: toIso(row.createdAt),
     duration: row.duration,
-    victimName: row.victimName,
+    victimName: sensitive.victimName,
     lat: row.lat,
     lng: row.lng,
-    approxAddress: row.approxAddress,
-    contentUrl: row.contentUrl,
-    transcript: row.transcript,
+    approxAddress: sensitive.approxAddress,
+    contentUrl: sensitive.contentUrl,
+    transcript: sensitive.transcript,
     isAnonymous: Boolean(row.isAnonymous),
   };
 }
 
 class RadarService {
   async getGuardiansForVictim(victimDoc) {
-    const phones = [...new Set((victimDoc.emergencyContacts || []).map((item) => String(item?.phone || '').trim()).filter(Boolean))];
+    const sensitive = decryptUserSensitivePayload(victimDoc);
+    const phones = [...new Set((sensitive.emergencyContacts || []).map((item) => String(item?.phone || '').trim()).filter(Boolean))];
     if (!phones.length) {
       return [];
     }
@@ -109,14 +113,21 @@ class RadarService {
       exactLng,
       fuzzedLat,
       fuzzedLng,
-      approxAddress: options.approxAddress || victim.approxAddress || null,
+      approxAddress: options.approxAddress || decryptUserSensitivePayload(victim).approxAddress || null,
       batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
       communityRequestedAt: null,
       resolvedAt: null,
     });
 
     victim.lastKnownLocation = { lat: exactLat, lng: exactLng, updatedAt: new Date() };
-    victim.approxAddress = incident.approxAddress;
+    const victimSensitive = decryptUserSensitivePayload(victim);
+    Object.assign(
+      victim,
+      buildEncryptedUserSensitiveUpdate(victimId, {
+        ...victimSensitive,
+        approxAddress: incident.approxAddress,
+      }),
+    );
     victim.batteryLevel = incident.batteryLevel;
     await victim.save();
 

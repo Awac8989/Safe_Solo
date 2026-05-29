@@ -25,6 +25,13 @@ const {
   mapSecuritySettingDoc,
   toIso,
 } = require('../lib/mongoCore');
+const {
+  buildEncryptedMedicalUpdate,
+} = require('../lib/medicalProfileCodec');
+const {
+  buildEncryptedUserSensitiveUpdate,
+  decryptUserSensitivePayload,
+} = require('../lib/userSensitiveCodec');
 
 function isValidHourMinute(value) {
   return /^([01]\d|2[0-3]):([0-5]\d)$/.test(value);
@@ -57,15 +64,17 @@ async function ensureMedicalProfile(userId, fallback = {}) {
   if (!profile) {
     profile = await MedicalProfile.create({
       userId,
-      fullName: fallback.fullName || '',
-      birthYear: '',
-      bloodType: 'O+',
-      allergies: '',
-      conditions: '',
-      medications: '',
-      emergencyPhone: fallback.emergencyPhone || '',
-      insuranceProvider: '',
-      insuranceNumber: '',
+      ...buildEncryptedMedicalUpdate(userId, {
+        fullName: fallback.fullName || '',
+        birthYear: '',
+        bloodType: 'O+',
+        allergies: '',
+        conditions: '',
+        medications: '',
+        emergencyPhone: fallback.emergencyPhone || '',
+        insuranceProvider: '',
+        insuranceNumber: '',
+      }),
     });
   }
 
@@ -116,8 +125,6 @@ async function registerUser(req, res) {
     fullName: fullName.trim(),
     phoneNumber: phoneNumber.trim(),
     role: role === 'admin' ? 'admin' : 'user',
-    medicalNotes: medicalNotes || '',
-    emergencyContacts: normalizeContacts(Array.isArray(emergencyContacts) ? emergencyContacts : []),
     timerIntervalMinutes: interval,
     lastCheckinTime: now,
     nextDeadline: new Date(Date.now() + interval * 60 * 1000),
@@ -128,7 +135,22 @@ async function registerUser(req, res) {
     quietHoursStart: '23:00',
     quietHoursEnd: '06:00',
     falseAlertGraceMinutes: 3,
+    ...buildEncryptedUserSensitiveUpdate(phoneNumber.trim(), {
+      medicalNotes: medicalNotes || '',
+      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
+      approxAddress: null,
+    }),
   });
+
+  Object.assign(
+    userDoc,
+    buildEncryptedUserSensitiveUpdate(userDoc._id, {
+      medicalNotes: medicalNotes || '',
+      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
+      approxAddress: null,
+    }),
+  );
+  await userDoc.save();
 
   await Promise.all([
     ensureAlertPolicy(userDoc._id),
@@ -449,7 +471,7 @@ async function createGuardian(req, res) {
     return res.status(400).json({ message: 'name, phone, and relation are required' });
   }
 
-  const contacts = normalizeContacts(userDoc.emergencyContacts);
+  const contacts = decryptUserSensitivePayload(userDoc).emergencyContacts;
   if (contacts.some((item) => item.phone === guardian.phone)) {
     return res.status(409).json({ message: 'Guardian phone already exists' });
   }
@@ -457,7 +479,14 @@ async function createGuardian(req, res) {
     return res.status(400).json({ message: 'Maximum 3 guardians allowed' });
   }
 
-  userDoc.emergencyContacts = [...contacts, guardian];
+  const sensitive = decryptUserSensitivePayload(userDoc);
+  Object.assign(
+    userDoc,
+    buildEncryptedUserSensitiveUpdate(id, {
+      ...sensitive,
+      emergencyContacts: [...contacts, guardian],
+    }),
+  );
   await userDoc.save();
 
   await createAlertEvent({
@@ -470,7 +499,7 @@ async function createGuardian(req, res) {
     metadata: guardian,
   });
 
-  return res.status(201).json(normalizeContacts(userDoc.emergencyContacts));
+  return res.status(201).json(normalizeContacts(decryptUserSensitivePayload(userDoc).emergencyContacts));
 }
 
 async function deleteGuardian(req, res) {
@@ -481,13 +510,20 @@ async function deleteGuardian(req, res) {
   }
 
   const targetPhone = decodeURIComponent(phone);
-  const contacts = normalizeContacts(userDoc.emergencyContacts);
+  const contacts = decryptUserSensitivePayload(userDoc).emergencyContacts;
   const nextContacts = contacts.filter((item) => item.phone !== targetPhone);
   if (nextContacts.length === contacts.length) {
     return res.status(404).json({ message: 'Guardian not found' });
   }
 
-  userDoc.emergencyContacts = nextContacts;
+  const sensitive = decryptUserSensitivePayload(userDoc);
+  Object.assign(
+    userDoc,
+    buildEncryptedUserSensitiveUpdate(id, {
+      ...sensitive,
+      emergencyContacts: nextContacts,
+    }),
+  );
   await userDoc.save();
 
   await createAlertEvent({
@@ -511,7 +547,7 @@ async function getMedicalProfile(req, res) {
   }
   return res.json(await ensureMedicalProfile(id, {
     fullName: userDoc.fullName,
-    emergencyPhone: normalizeContacts(userDoc.emergencyContacts)[0]?.phone || '',
+    emergencyPhone: decryptUserSensitivePayload(userDoc).emergencyContacts[0]?.phone || '',
   }));
 }
 
@@ -526,15 +562,17 @@ async function updateMedicalProfile(req, res) {
     { userId: id },
     {
       userId: id,
-      fullName: String(req.body.fullName || '').trim(),
-      birthYear: String(req.body.birthYear || '').trim(),
-      bloodType: String(req.body.bloodType || 'O+').trim() || 'O+',
-      allergies: String(req.body.allergies || '').trim(),
-      conditions: String(req.body.conditions || '').trim(),
-      medications: String(req.body.medications || '').trim(),
-      emergencyPhone: String(req.body.emergencyPhone || '').trim(),
-      insuranceProvider: String(req.body.insuranceProvider || '').trim(),
-      insuranceNumber: String(req.body.insuranceNumber || '').trim(),
+      ...buildEncryptedMedicalUpdate(id, {
+        fullName: String(req.body.fullName || '').trim(),
+        birthYear: String(req.body.birthYear || '').trim(),
+        bloodType: String(req.body.bloodType || 'O+').trim() || 'O+',
+        allergies: String(req.body.allergies || '').trim(),
+        conditions: String(req.body.conditions || '').trim(),
+        medications: String(req.body.medications || '').trim(),
+        emergencyPhone: String(req.body.emergencyPhone || '').trim(),
+        insuranceProvider: String(req.body.insuranceProvider || '').trim(),
+        insuranceNumber: String(req.body.insuranceNumber || '').trim(),
+      }),
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );

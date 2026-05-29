@@ -10,6 +10,8 @@ const Vault = require('../models/Vault');
 const { AppError, ensure } = require('../lib/errors');
 const { normalizeEmail, sanitizeUser, fullName, splitFullName } = require('../lib/utils');
 const { createAlertEvent } = require('./alertEventService');
+const { hashPin, isHashedPin } = require('../lib/securityCrypto');
+const { buildEncryptedUserSensitiveUpdate, decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 class AuthService {
   generateToken(user) {
@@ -51,8 +53,10 @@ class AuthService {
     return {
       stealthMode: Boolean(settings?.stealthMode),
       highContrast: Boolean(user?.highContrast),
-      realPin: user?.realPin || '',
-      duressPin: user?.duressPin || '',
+      realPin:
+        user?.realPin && !isHashedPin(user.realPin) ? user.realPin : '',
+      duressPin:
+        user?.duressPin && !isHashedPin(user.duressPin) ? user.duressPin : '',
       autoWipeEnabled: Number(settings?.autoWipeDays || 0) > 0,
       autoWipeDays: Number(settings?.autoWipeDays || 0),
       quietHoursStart: user?.quietHoursStart || '23:00',
@@ -108,7 +112,6 @@ class AuthService {
           ? { lat: payload.lat, lng: payload.lng, updatedAt: new Date() }
           : null,
       batteryLevel: payload.batteryLevel ?? null,
-      approxAddress: payload.approxAddress || null,
       role: String(payload.role || 'USER').toLowerCase() === 'admin' ? 'admin' : 'user',
       quietHoursStart: '23:00',
       quietHoursEnd: '06:00',
@@ -118,7 +121,21 @@ class AuthService {
       pillTime: '08:00',
       realPin: '',
       duressPin: '',
+      ...buildEncryptedUserSensitiveUpdate(email || crypto.randomUUID(), {
+        approxAddress: payload.approxAddress || null,
+        medicalNotes: '',
+        emergencyContacts: [],
+      }),
     });
+
+    user.encryptedSensitive = buildEncryptedUserSensitiveUpdate(user._id, {
+      approxAddress: payload.approxAddress || null,
+      medicalNotes: '',
+      emergencyContacts: [],
+    }).encryptedSensitive;
+    user.encryptionVersion = 1;
+    user.encryptedAt = new Date();
+    await user.save();
 
     await this.ensureSecurity(user._id);
     await createAlertEvent({
@@ -267,11 +284,21 @@ class AuthService {
       throw new AppError('User not found', 404);
     }
 
-    const fields = ['firstName', 'lastName', 'dateOfBirth', 'gender', 'avatar', 'batteryLevel', 'approxAddress'];
+    const fields = ['firstName', 'lastName', 'dateOfBirth', 'gender', 'avatar', 'batteryLevel'];
     for (const field of fields) {
       if (Object.prototype.hasOwnProperty.call(updateData, field)) {
         user[field] = updateData[field];
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(updateData, 'approxAddress')) {
+      const currentSensitive = decryptUserSensitivePayload(user);
+      Object.assign(
+        user,
+        buildEncryptedUserSensitiveUpdate(userId, {
+          ...currentSensitive,
+          approxAddress: updateData.approxAddress || null,
+        }),
+      );
     }
     if (Object.prototype.hasOwnProperty.call(updateData, 'phone')) {
       user.phoneNumber = updateData.phone || '';
@@ -328,10 +355,10 @@ class AuthService {
       user.pillTime = payload.pillTime;
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'realPin')) {
-      user.realPin = payload.realPin || '';
+      user.realPin = await hashPin(payload.realPin || '');
     }
     if (Object.prototype.hasOwnProperty.call(payload, 'duressPin')) {
-      user.duressPin = payload.duressPin || '';
+      user.duressPin = await hashPin(payload.duressPin || '');
     }
 
     await Promise.all([user.save(), security.save()]);

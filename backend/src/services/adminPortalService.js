@@ -11,6 +11,7 @@ const KYCDocument = require('../models/KYCDocument');
 const ThankYouNote = require('../models/ThankYouNote');
 const VolunteerResponse = require('../models/VolunteerResponse');
 const { mapUserDoc, toIso } = require('../lib/mongoCore');
+const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 function svgDataUrl(markup) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`;
@@ -380,7 +381,8 @@ class AdminPortalService {
       const scoreBase = Number(user?.trustScore || 4.5);
       const match = Math.min(99, Math.max(60, Math.round(scoreBase * 20)));
       const identityNumber = `0${String(user?.phoneNumber || '').replace(/\D/g, '').slice(-11).padEnd(11, '0')}`;
-      const identityAddress = user?.approxAddress || 'Chưa cập nhật địa chỉ thường trú';
+      const sensitive = user ? decryptUserSensitivePayload(user) : { approxAddress: null };
+      const identityAddress = sensitive.approxAddress || 'Chưa cập nhật địa chỉ thường trú';
       const portrait = user?.avatar || buildHeroPortrait(user ? fullName(user) : 'Hiệp sĩ');
       return {
         id: document._id,
@@ -393,7 +395,7 @@ class AdminPortalService {
             : document.status === 'REJECTED'
             ? 'rejected'
             : 'approved',
-        region: user?.approxAddress || 'Unknown',
+        region: sensitive.approxAddress || 'Unknown',
         match,
         phone: user?.phoneNumber || '',
         frontImageUrl:

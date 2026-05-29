@@ -1,6 +1,7 @@
 const DailyStatus = require('../models/DailyStatus');
 const User = require('../models/User');
 const { sanitizeUser } = require('../lib/utils');
+const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 async function resolveCircleUserIds(user) {
   const myPhone = String(user.phone || '').trim();
@@ -15,7 +16,7 @@ async function resolveCircleUserIds(user) {
     : [];
 
   const reciprocalContacts = myPhone
-    ? await User.find({ 'emergencyContacts.phone': myPhone }).lean()
+    ? await User.find({ emergencyContactPhones: myPhone }).lean()
     : [];
 
   return [...new Set([user.id, ...directContacts.map((item) => item._id), ...reciprocalContacts.map((item) => item._id)])];
@@ -72,10 +73,11 @@ class FeedController {
         });
       }
 
+      const sensitive = decryptUserSensitivePayload(user);
       const visibleUserIds = await resolveCircleUserIds({
         id: user._id,
         phone: user.phoneNumber,
-        emergencyContacts: user.emergencyContacts,
+        emergencyContacts: sensitive.emergencyContacts,
       });
 
       const statuses = await DailyStatus.find({

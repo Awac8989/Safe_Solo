@@ -1,0 +1,753 @@
+SAFE SOLO - MO TA CHI TIET CAC CO SO DU LIEU
+Ngay cap nhat: 2026-05-12
+
+========================================================================
+1. TONG QUAN HE THONG DU LIEU
+========================================================================
+
+Hien tai SafeSolo su dung MongoDB la nguon du lieu chinh cho backend.
+
+Thong tin ket noi mac dinh:
+- He quan tri: MongoDB
+- Database name: Safesolo
+- Connection string mac dinh: mongodb://127.0.0.1:27017/Safesolo
+
+Ngoai MongoDB, he thong con co:
+- SharedPreferences tren app Flutter de luu session, ngon ngu, state cuc bo.
+- Thu muc uploads cua backend de luu tep tai len nhu giay to KYC hoac am thanh.
+- Cac file cau hinh .env / env local de luu khoa va URL, khong phai co so du lieu.
+
+MongoDB la noi luu tru nghiep vu chinh cho:
+- nguoi dung
+- check-in
+- canh bao SOS
+- guardians
+- ho so y te
+- KYC
+- chat
+- community feed
+- vault
+- dieu phoi admin
+
+========================================================================
+2. CAC NHOM DU LIEU CHINH
+========================================================================
+
+He thong co 7 nhom du lieu lon:
+
+2.1. Nguoi dung va danh tinh
+- users
+- guardianrelationships
+- kycdocuments
+
+2.2. An toan, check-in va canh bao
+- checkinhistories
+- alertpolicies
+- alertevents
+- interactionevents
+- emergencylogs
+- smsdispatchlogs
+- systemlogs
+
+2.3. Y te va bao ve sinh ton
+- medicalprofiles
+- vaults
+- securitysettings
+- automationsettings
+- devicesignals
+
+2.4. Cuu ho va dieu phoi cong dong
+- rescueincidents
+- volunteerresponses
+- emergencymemos
+
+2.5. Chat va giao tiep
+- chatrooms
+- messages
+
+2.6. Mang xa hoi noi bo / Alive Circle
+- dailystatuses
+- thankyounotes
+
+2.7. Cai dat runtime va thong tin bo tro
+- uploads KYC / voice / file media
+- SharedPreferences tren client
+
+========================================================================
+3. MO TA CHI TIET TUNG COLLECTION MONGODB
+========================================================================
+
+-----------------------------------------------------------------------
+3.1. Collection: users
+-----------------------------------------------------------------------
+Muc dich:
+- Luu ho so nguoi dung chinh cua he thong.
+- Day la collection trung tam lien ket den hau het collection khac.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- fullName: ho ten
+- phoneNumber: so dien thoai, unique
+- role: user hoac admin
+- email
+- avatar
+- firstName, lastName
+- dateOfBirth
+- gender
+- isActive
+- isVerified
+- isKycVerified
+- otpCode, otpExpiresAt
+- lastLoginAt
+- highContrast
+- pillReminder, pillTime
+- realPin, duressPin
+- trustScore
+- rescuesCount
+- batteryLevel
+- approxAddress
+- medicalNotes
+- emergencyContacts[]: danh sach lien he khan cap
+- timerIntervalMinutes: chu ky check-in
+- lastCheckinTime
+- nextDeadline
+- currentStatus: SAFE / REMINDER / WARNING / SOS
+- lastKnownLocation: lat / lng / updatedAt
+- lastReminderAt, lastWarningAt, lastSosAt
+- quietHoursStart, quietHoursEnd
+- sleepModeUntil
+- falseAlertGraceMinutes
+- deadmanStage
+- deadmanEscalationTriggeredAt
+- createdAt, updatedAt
+
+Quan he:
+- 1 user co the co 1 medicalprofiles
+- 1 user co the co 1 securitysettings
+- 1 user co the co 1 automationsettings
+- 1 user co the co 1 alertpolicies
+- 1 user co the co nhieu checkinhistories
+- 1 user co the co nhieu interactionevents
+- 1 user co the co nhieu alertevents
+- 1 user co the co nhieu devicesignals
+- 1 user co the co 1 vaults
+- 1 user co the co 1 kycdocuments
+- 1 user co the tao nhieu dailystatuses, messages, thankyounotes
+
+-----------------------------------------------------------------------
+3.2. Collection: guardianrelationships
+-----------------------------------------------------------------------
+Muc dich:
+- Luu quan he giua nguoi dung va guardian / trusted contact.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- requesterId: user can duoc bao ve
+- guardianId: user dong vai tro guardian
+- status: PENDING / ACCEPTED / REJECTED / BLOCKED
+- escalationLevel: cap thong bao
+- guardianConfirmedAt
+- lastNotifiedAt
+- message
+- createdAt, updatedAt
+
+Quan he:
+- requesterId -> users._id
+- guardianId -> users._id
+
+-----------------------------------------------------------------------
+3.3. Collection: kycdocuments
+-----------------------------------------------------------------------
+Muc dich:
+- Luu ho so KYC cho tinh nguyen vien / hiep si.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- frontImageUrl
+- backImageUrl
+- status: PENDING / APPROVED / REJECTED
+- submittedAt
+- reviewedAt
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+Ghi chu:
+- Admin doc collection nay de duyet volunteer.
+- Sau khi APPROVED, user co the tro thanh hiep si nhan ca cuu ho.
+
+-----------------------------------------------------------------------
+3.4. Collection: checkinhistories
+-----------------------------------------------------------------------
+Muc dich:
+- Luu lich su diem danh cua user.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- checkinTime
+- locationAtCheckin
+- isSystemAutoTriggered
+- createdAt
+
+Quan he:
+- userId -> users._id
+
+Vai tro nghiep vu:
+- phuc vu countdown check-in
+- lich su xem lai
+- dau vao cho dead-man worker
+
+-----------------------------------------------------------------------
+3.5. Collection: alertpolicies
+-----------------------------------------------------------------------
+Muc dich:
+- Cau hinh rule canh bao theo tung user.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- level1Minutes
+- level2Minutes
+- level3Minutes
+- level4Enabled
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+Vai tro nghiep vu:
+- quy dinh khi nao nhac, bao dong, SOS va rescue-call.
+
+-----------------------------------------------------------------------
+3.6. Collection: alertevents
+-----------------------------------------------------------------------
+Muc dich:
+- Timeline canh bao an toan cho web-admin va audit.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- level
+- status
+- source
+- title
+- message
+- metadata
+- createdAt
+
+Quan he:
+- userId -> users._id
+
+Vi du su kien:
+- LEVEL_1_REMINDER
+- LEVEL_2_ALARM
+- LEVEL_3_SOS
+- AUTO_WIPE_DUE
+
+-----------------------------------------------------------------------
+3.7. Collection: interactionevents
+-----------------------------------------------------------------------
+Muc dich:
+- Nhat ky tuong tac cua user trong app.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- type
+- source
+- metadata
+- createdAt
+
+Vi du:
+- CHECK_IN
+- MORNING_ACK
+- STATUS_POSTED
+- MOOD_SELECTED
+- CIRCLE_REPLY
+
+-----------------------------------------------------------------------
+3.8. Collection: emergencylogs
+-----------------------------------------------------------------------
+Muc dich:
+- Luu cac lan SOS / su co khan cap goc.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- triggeredAt
+- resolvedAt
+- isResolved
+- smsSentStatus
+- locationSnapshot
+- notes
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+-----------------------------------------------------------------------
+3.9. Collection: smsdispatchlogs
+-----------------------------------------------------------------------
+Muc dich:
+- Luu tung lan gui SMS de audit va retry.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- emergencyLogId
+- userId
+- toPhone
+- provider
+- attempt
+- success
+- providerMessageId
+- errorMessage
+- responseBody
+- createdAt
+
+Quan he:
+- emergencyLogId -> emergencylogs._id
+- userId -> users._id
+
+-----------------------------------------------------------------------
+3.10. Collection: systemlogs
+-----------------------------------------------------------------------
+Muc dich:
+- Audit log he thong cho admin, worker va dieu phoi.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- incidentId
+- actionType
+- description
+- metadata
+- createdAt
+
+Vi du:
+- volunteer da nhan ca
+- chat room dong read-only
+- auto wipe da kich hoat
+
+-----------------------------------------------------------------------
+3.11. Collection: medicalprofiles
+-----------------------------------------------------------------------
+Muc dich:
+- Luu ho so y te va du lieu de tao ma QR cap cuu.
+
+Khoa chinh:
+- Mongo _id mac dinh
+
+Truong quan trong:
+- userId
+- fullName
+- birthYear
+- bloodType
+- allergies
+- conditions
+- medications
+- emergencyPhone
+- insuranceProvider
+- insuranceNumber
+- allergiesList[]
+- medicationsList[]
+- medicalConditions[]
+- emergencyContact
+- insuranceInfo
+- doctor
+- qrCodeValue
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+Ghi chu:
+- Day la nguon du lieu de sinh the thong tin y te SOS.
+
+-----------------------------------------------------------------------
+3.12. Collection: automationsettings
+-----------------------------------------------------------------------
+Muc dich:
+- Luu cac cai dat tu dong hoa va cam bien.
+
+Truong quan trong:
+- userId
+- dailyReminderTime
+- shakeSos
+- shakeSensitivity
+- fallDetection
+- geofenceAutoCheckin
+- pillReminder
+- pillTime
+- homeLocation
+- lastGeofenceEventAt
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+-----------------------------------------------------------------------
+3.13. Collection: securitysettings
+-----------------------------------------------------------------------
+Muc dich:
+- Luu cai dat bao mat nang cao.
+
+Truong quan trong:
+- userId
+- stealthMode
+- autoWipeDays
+- encryptionEnabled
+- lastAutoWipeDueAt
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+-----------------------------------------------------------------------
+3.14. Collection: devicesignals
+-----------------------------------------------------------------------
+Muc dich:
+- Luu du lieu tu cam bien va su kien background.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- signalType
+- payload
+- createdAt
+
+Vi du signalType:
+- FALL_DETECTED
+- SHAKE_SOS
+- GEOFENCE_HOME_ARRIVAL
+- LOW_BATTERY
+
+-----------------------------------------------------------------------
+3.15. Collection: vaults
+-----------------------------------------------------------------------
+Muc dich:
+- Ket sinh tu luu thong tin nhay cam phuc vu dead-man switch.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- content
+- shreddedAt
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+Noi dung content thuong gom:
+- checklist cong viec
+- loi nhan
+- thong tin tai san
+- thong tin bao hiem
+- thong tin thu cung
+- ho so quan trong
+
+-----------------------------------------------------------------------
+3.16. Collection: rescueincidents
+-----------------------------------------------------------------------
+Muc dich:
+- Luu cac ca cuu ho cong dong / radar SOS.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- victimId
+- status: ACTIVE / RESOLVED
+- incidentType
+- severity
+- source
+- exactLat, exactLng
+- fuzzedLat, fuzzedLng
+- approxAddress
+- batteryLevel
+- communityRequestedAt
+- resolvedAt
+- createdAt, updatedAt
+
+Quan he:
+- victimId -> users._id
+
+Ghi chu:
+- exactLat/lng chi dung noi bo.
+- fuzzedLat/lng dung cho radar cong dong de bao ve quyen rieng tu.
+
+-----------------------------------------------------------------------
+3.17. Collection: volunteerresponses
+-----------------------------------------------------------------------
+Muc dich:
+- Luu ai da nhan ca cuu ho va trang thai di chuyen.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- incidentId
+- volunteerId
+- status: EN_ROUTE / ARRIVED
+- createdAt, updatedAt
+
+Quan he:
+- incidentId -> rescueincidents._id
+- volunteerId -> users._id
+
+-----------------------------------------------------------------------
+3.18. Collection: emergencymemos
+-----------------------------------------------------------------------
+Muc dich:
+- Ghi chu, voice note va thong tin am thanh khan cap.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- incidentId
+- victimId
+- duration
+- victimName
+- lat, lng
+- approxAddress
+- contentUrl
+- transcript
+- isAnonymous
+- createdAt
+
+Quan he:
+- incidentId -> rescueincidents._id
+- victimId -> users._id
+
+-----------------------------------------------------------------------
+3.19. Collection: chatrooms
+-----------------------------------------------------------------------
+Muc dich:
+- Quan ly phong chat gia dinh, nhom, hoac chat cuu ho.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- roomType: DIRECT / INCIDENT / GROUP
+- title
+- incidentId
+- participantIds[]
+- responderIds[]
+- status: ACTIVE / READ_ONLY
+- metadata
+- closedAt
+- createdAt, updatedAt
+
+Quan he:
+- incidentId -> rescueincidents._id
+- participantIds[] -> users._id
+- responderIds[] -> users._id
+
+-----------------------------------------------------------------------
+3.20. Collection: messages
+-----------------------------------------------------------------------
+Muc dich:
+- Luu tin nhan trong chat room.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- roomId
+- senderId
+- messageType: TEXT / AUDIO / SYSTEM / LOCATION / VOICE_NOTE
+- content
+- metadata
+- createdAt
+
+Quan he:
+- roomId -> chatrooms._id
+- senderId -> users._id
+
+Ghi chu:
+- metadata co the chua duration, file URL, waveform, vi tri.
+
+-----------------------------------------------------------------------
+3.21. Collection: dailystatuses
+-----------------------------------------------------------------------
+Muc dich:
+- Feed Alive Circle va trang thai nhanh trong ngay.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- userId
+- moodEmoji
+- text
+- audioUrl
+- visibility: FAMILY / COMMUNITY
+- batteryLevel
+- isCheckIn
+- createdAt, updatedAt
+
+Quan he:
+- userId -> users._id
+
+-----------------------------------------------------------------------
+3.22. Collection: thankyounotes
+-----------------------------------------------------------------------
+Muc dich:
+- Loi cam on gui den hiep si / volunteer sau ho tro.
+
+Khoa chinh:
+- _id: string UUID
+
+Truong quan trong:
+- volunteerId
+- authorId
+- content
+- rating
+- createdAt, updatedAt
+
+Quan he:
+- volunteerId -> users._id
+- authorId -> users._id
+
+========================================================================
+4. QUAN HE DU LIEU CHINH
+========================================================================
+
+So do logic tong quat:
+
+1 user
+- co 1 medicalprofiles
+- co 1 automationsettings
+- co 1 securitysettings
+- co 1 alertpolicies
+- co 1 vaults
+- co 0..1 kycdocuments
+- co nhieu guardianrelationships
+- co nhieu checkinhistories
+- co nhieu interactionevents
+- co nhieu alertevents
+- co nhieu devicesignals
+- co nhieu dailystatuses
+- co nhieu messages
+- co nhieu emergencylogs
+- co nhieu rescueincidents neu la nan nhan
+- co nhieu volunteerresponses neu la hiep si
+
+1 rescueincidents
+- co nhieu volunteerresponses
+- co 1 chatrooms dang roomType = INCIDENT
+- co nhieu emergencymemos
+- co systemlogs lien quan
+
+1 emergencylogs
+- co nhieu smsdispatchlogs
+
+========================================================================
+5. CAC NGUON LUU TRU NGOAI MONGODB
+========================================================================
+
+5.1. SharedPreferences trong Flutter
+Duoc dung de luu:
+- session user
+- ngon ngu
+- theme / high contrast
+- mot so cache UI cuc bo
+
+5.2. Uploads tren backend
+Thu muc uploads duoc dung cho:
+- anh KYC
+- giay to mat truoc / mat sau
+- tep ghi am hoac media neu backend luu file
+
+5.3. Env config
+Khong phai co so du lieu, nhung la noi luu:
+- MONGODB_URI
+- MONGODB_DB_NAME
+- JWT_SECRET
+- MAPTILER_KEY
+
+========================================================================
+6. DONG DU LIEU NGHIEP VU QUAN TRONG
+========================================================================
+
+6.1. Check-in
+- App Flutter gui check-in
+- users.lastCheckinTime duoc cap nhat
+- users.nextDeadline duoc tinh lai
+- checkinhistories them ban ghi moi
+- interactionevents ghi log CHECK_IN
+
+6.2. Dead-man switch
+- Worker doc users + alertpolicies + securitysettings
+- Neu qua han se tao alertevents
+- Neu can se tao emergencylogs va smsdispatchlogs
+
+6.3. SOS cong dong
+- Tao rescueincidents
+- Volunteer nhan ca -> volunteerresponses
+- He thong tao / dong bo chatrooms
+- Tin nhan vao messages
+- Voice memo vao emergencymemos
+
+6.4. KYC
+- User nop giay to -> kycdocuments
+- Admin duyet -> users.isKycVerified = true
+- Sau do volunteer moi duoc nhan ca cuu ho
+
+========================================================================
+7. CAC DIEM CAN CHU Y KHI PHAT TRIEN TIEP
+========================================================================
+
+- Nen giu userId dang string UUID de khong gay API Flutter va web-admin.
+- Cac collection lien quan safety can uu tien index theo:
+  userId, incidentId, createdAt, status.
+- Cac URL file trong KYC va voice note nen tach ro:
+  local uploads / cloud object storage.
+- Neu mo rong analytics, nen them collection tong hop hoac worker summary rieng,
+  khong query truc tiep cac collection lon qua nhieu tren dashboard.
+
+========================================================================
+8. KET LUAN
+========================================================================
+
+Co so du lieu hien tai cua SafeSolo xoay quanh MongoDB database "Safesolo".
+Collection trung tam la users. Tu day he thong mo rong ra:
+- an toan va check-in
+- canh bao va SOS
+- y te va bao mat
+- KYC va hiep si
+- chat va cong dong
+- dieu phoi admin
+
+File nay duoc tao de phuc vu:
+- tai lieu du an
+- onboarding lap trinh vien
+- nghiep vu cho admin va product
+- tham chieu khi mo rong backend, app va web-admin

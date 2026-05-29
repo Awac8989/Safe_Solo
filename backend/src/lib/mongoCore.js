@@ -1,3 +1,6 @@
+const { decryptMedicalPayload } = require('./medicalProfileCodec');
+const { mergeUserSensitivePayload } = require('./userSensitiveCodec');
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -33,7 +36,7 @@ function mapUserDoc(doc) {
     return null;
   }
 
-  const row = doc.toObject ? doc.toObject() : doc;
+  const row = mergeUserSensitivePayload(doc.toObject ? doc.toObject() : doc);
   return {
     _id: row._id,
     fullName: row.fullName,
@@ -95,17 +98,18 @@ function mapMedicalProfileDoc(doc) {
     return null;
   }
   const row = doc.toObject ? doc.toObject() : doc;
+  const payload = decryptMedicalPayload(row);
   return {
     userId: row.userId,
-    fullName: row.fullName || '',
-    birthYear: row.birthYear || '',
-    bloodType: row.bloodType || 'O+',
-    allergies: row.allergies || '',
-    conditions: row.conditions || '',
-    medications: row.medications || '',
-    emergencyPhone: row.emergencyPhone || '',
-    insuranceProvider: row.insuranceProvider || '',
-    insuranceNumber: row.insuranceNumber || '',
+    fullName: payload?.fullName || '',
+    birthYear: payload?.birthYear || '',
+    bloodType: payload?.bloodType || row.bloodType || 'O+',
+    allergies: payload?.allergies || '',
+    conditions: payload?.conditions || '',
+    medications: payload?.medications || '',
+    emergencyPhone: payload?.emergencyPhone || '',
+    insuranceProvider: payload?.insuranceProvider || '',
+    insuranceNumber: payload?.insuranceNumber || '',
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };

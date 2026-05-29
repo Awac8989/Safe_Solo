@@ -13,6 +13,8 @@ const EmergencyMemoSchema = new mongoose.Schema(
     approxAddress: { type: String, default: null },
     contentUrl: { type: String, default: null },
     transcript: { type: String, default: '' },
+    encryptedPayload: { type: mongoose.Schema.Types.Mixed, default: null },
+    encryptionVersion: { type: Number, default: 0 },
     isAnonymous: { type: Boolean, default: true },
   },
   {

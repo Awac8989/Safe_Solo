@@ -147,7 +147,7 @@
       "otpExpiresAt": null,
       "lastLoginAt": "2026-05-09T13:55:57.566Z",
       "createdAt": "2026-05-09T13:55:57.566Z",
-      "updatedAt": "2026-05-10T01:03:20.744Z",
+      "updatedAt": "2026-05-11T04:35:57.408Z",
       "trustScore": 4.9,
       "rescuesCount": 12,
       "isKycVerified": true,
@@ -412,7 +412,7 @@
       "backImageUrl": "/uploads/kyc/back-demo.png",
       "status": "APPROVED",
       "submittedAt": "2026-05-09T13:55:57.566Z",
-      "reviewedAt": "2026-05-10T01:03:20.744Z"
+      "reviewedAt": "2026-05-11T04:35:57.408Z"
     }
   ],
   "vaults": [
@@ -519,6 +519,127 @@
         "userId": "user-volunteer"
       },
       "createdAt": "2026-05-10T01:03:20.744Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778473635555",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:27:15.555Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778473636122",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:27:16.122Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474148493",
+      "incidentId": null,
+      "actionType": "REJECT_KYC",
+      "description": "REJECT KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:48.493Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474149484",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:49.484Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474150325",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:50.325Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474151500",
+      "incidentId": null,
+      "actionType": "REJECT_KYC",
+      "description": "REJECT KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:51.500Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474151922",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:51.922Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474153958",
+      "incidentId": null,
+      "actionType": "REJECT_KYC",
+      "description": "REJECT KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:53.958Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474154580",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:54.580Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474156850",
+      "incidentId": null,
+      "actionType": "REJECT_KYC",
+      "description": "REJECT KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:56.850Z"
+    },
+    {
+      "id": "kyc_kyc-demo_1778474157408",
+      "incidentId": null,
+      "actionType": "APPROVE_KYC",
+      "description": "APPROVE KYC for user-volunteer",
+      "metadata": {
+        "documentId": "kyc-demo",
+        "userId": "user-volunteer"
+      },
+      "createdAt": "2026-05-11T04:35:57.408Z"
     }
   ],
   "alertEvents": [
@@ -2123,6 +2244,426 @@
         }
       },
       "createdAt": "2026-05-10T09:26:02.757Z"
+    },
+    {
+      "id": "alert_2313ebbc-c995-4bc3-a228-b4043c1aee82",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 720 phut",
+      "metadata": {
+        "timerIntervalMinutes": 720
+      },
+      "createdAt": "2026-05-10T12:07:19.470Z"
+    },
+    {
+      "id": "alert_69030fbf-5548-4f55-b9ab-1ca9fec0e85d",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 60 phut",
+      "metadata": {
+        "timerIntervalMinutes": 60
+      },
+      "createdAt": "2026-05-10T12:07:20.876Z"
+    },
+    {
+      "id": "alert_07170c9a-9ce2-4ce4-a42b-5535a28a6ece",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 4320 phut",
+      "metadata": {
+        "timerIntervalMinutes": 4320
+      },
+      "createdAt": "2026-05-10T12:27:05.271Z"
+    },
+    {
+      "id": "alert_39fc326e-d86a-4141-8ed7-92bbf9c234af",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 60 phut",
+      "metadata": {
+        "timerIntervalMinutes": 60
+      },
+      "createdAt": "2026-05-10T12:27:10.358Z"
+    },
+    {
+      "id": "alert_516341a3-af28-49de-9c63-f36da2317ca9",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 960 phut",
+      "metadata": {
+        "timerIntervalMinutes": 960
+      },
+      "createdAt": "2026-05-10T12:27:19.362Z"
+    },
+    {
+      "id": "alert_7814b1a6-3e0d-48c3-8a4e-2d92535686c2",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 60 phut",
+      "metadata": {
+        "timerIntervalMinutes": 60
+      },
+      "createdAt": "2026-05-10T12:28:42.629Z"
+    },
+    {
+      "id": "alert_56df0329-0807-491c-a312-665c40977a21",
+      "userId": "83d1f1d6-e258-4840-bf57-7b749c439ab6",
+      "level": "INFO",
+      "status": "EMERGENCY_RESOLVED",
+      "source": "ADMIN",
+      "title": "Da xu ly su co",
+      "message": "Su co SOS da duoc danh dau xu ly",
+      "metadata": {
+        "emergencyLogId": "1ed4ce98-f185-4f7a-b7ec-0b50d2e1bcd4",
+        "notes": "Đã xử lý từ trung tâm điều phối"
+      },
+      "createdAt": "2026-05-10T12:34:57.259Z"
+    },
+    {
+      "id": "alert_bdd334c3-fad6-457e-abb9-c95f01483e95",
+      "userId": "83d1f1d6-e258-4840-bf57-7b749c439ab6",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "d0850b62-8f38-4bcf-849b-e844d077bdd0",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7836,
+          "lng": 106.6832,
+          "updatedAt": "2026-05-09T19:36:44.349Z"
+        }
+      },
+      "createdAt": "2026-05-10T12:35:57.572Z"
+    },
+    {
+      "id": "alert_8ec50f6f-c38b-41f7-a9ed-57ee5c5883cd",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T02:50:08.417Z"
+    },
+    {
+      "id": "alert_989492d2-7bba-4a5a-a407-3aa5c8ba6d6a",
+      "userId": "de9a4ed0-856f-4470-8525-789375b1d10f",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "4c7ddc4a-a988-4ccd-9b1d-5fa2714343c3",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7605,
+          "lng": 106.6535,
+          "updatedAt": "2026-05-09T18:36:43.981Z"
+        }
+      },
+      "createdAt": "2026-05-11T02:50:57.102Z"
+    },
+    {
+      "id": "alert_5af7733f-13a6-45c1-9a3b-74bc90d982c1",
+      "userId": "de9a4ed0-856f-4470-8525-789375b1d10f",
+      "level": "LEVEL_4_RESCUE_CALL",
+      "status": "RESCUE_CALL_QUEUED",
+      "source": "SYSTEM",
+      "title": "Kich hoat goi cuu ho",
+      "message": "Vuot nguong SOS, da dua vao hang doi auto-call",
+      "metadata": {
+        "overdueMinutes": 254,
+        "policy": {
+          "_id": "82a36403-d297-43c6-a52e-997ffadbfed3",
+          "userId": "de9a4ed0-856f-4470-8525-789375b1d10f",
+          "level1Minutes": 30,
+          "level2Minutes": 15,
+          "level3Minutes": 20,
+          "level4Enabled": true,
+          "createdAt": "2026-05-03T23:36:43.981Z",
+          "updatedAt": "2026-05-09T18:36:43.981Z"
+        }
+      },
+      "createdAt": "2026-05-11T02:50:57.103Z"
+    },
+    {
+      "id": "alert_0ade6a31-8d6b-49b7-91bb-cc25a16a3512",
+      "userId": "c75dbc6b-87b4-40e1-8aab-40d038d75409",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "def97492-30a8-4dc0-ade8-6a79a5b923cf",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7731,
+          "lng": 106.6697,
+          "updatedAt": "2026-05-09T12:36:44.193Z"
+        }
+      },
+      "createdAt": "2026-05-11T02:50:57.121Z"
+    },
+    {
+      "id": "alert_52cc7b1c-0127-4299-add1-ee3ad4325674",
+      "userId": "454e91be-b787-400f-ba89-83d268d33a23",
+      "level": "LEVEL_3_SOS",
+      "status": "SOS_DISPATCHED",
+      "source": "SYSTEM",
+      "title": "Kich hoat SOS",
+      "message": "He thong da gui canh bao khan cap den danh ba tin cay",
+      "metadata": {
+        "emergencyLogId": "c5e63078-ca28-4443-8d5d-733ceb70fa6d",
+        "smsSent": 2,
+        "smsAttempted": 2,
+        "smsFailed": 0,
+        "location": {
+          "lat": 10.7857,
+          "lng": 106.6859,
+          "updatedAt": "2026-05-09T18:36:44.383Z"
+        }
+      },
+      "createdAt": "2026-05-11T02:50:57.136Z"
+    },
+    {
+      "id": "alert_1166f322-071e-4f95-8d17-e9246158ecd2",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T02:51:36.010Z"
+    },
+    {
+      "id": "alert_922f83cb-8b61-4094-bbf4-c468ec47079d",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 2040 phut",
+      "metadata": {
+        "timerIntervalMinutes": 2040
+      },
+      "createdAt": "2026-05-11T02:51:42.328Z"
+    },
+    {
+      "id": "alert_c3c677b6-7fc7-4860-b765-7114d2bead05",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T02:51:51.222Z"
+    },
+    {
+      "id": "alert_eaedbfeb-191e-4b7a-9533-fc8ec39b3162",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T03:01:43.597Z"
+    },
+    {
+      "id": "alert_05817c6b-04b5-4785-af41-3d9eac895432",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T03:01:58.616Z"
+    },
+    {
+      "id": "alert_c7f0d889-95ab-4988-8127-36acd980f40a",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 60 phut",
+      "metadata": {
+        "timerIntervalMinutes": 60
+      },
+      "createdAt": "2026-05-11T03:09:42.820Z"
+    },
+    {
+      "id": "alert_4495d26c-fb59-4419-9411-c85ac1b0841e",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "CHECKIN_OK",
+      "source": "USER",
+      "title": "Check-in thanh cong",
+      "message": "Nguoi dung da xac nhan an toan",
+      "metadata": {
+        "location": {
+          "lat": 10.7765,
+          "lng": 106.7009
+        }
+      },
+      "createdAt": "2026-05-11T03:33:39.757Z"
+    },
+    {
+      "id": "alert_6e123d16-9f41-4b49-acaa-d1786c223ae8",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "SLEEP_MODE_ON",
+      "source": "USER",
+      "title": "Bat sleep mode",
+      "message": "Tam dung canh bao trong 720 phut",
+      "metadata": {
+        "minutes": 720,
+        "sleepModeUntil": "2026-05-11T15:34:22.260Z"
+      },
+      "createdAt": "2026-05-11T03:34:22.265Z"
+    },
+    {
+      "id": "alert_9b7f9e6a-558e-46ca-a90c-9147fd74470a",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "AUTOMATION_UPDATED",
+      "source": "USER",
+      "title": "Cap nhat tu dong hoa",
+      "message": "Cac quy tac daily reminder, geofence va sensor da duoc cap nhat",
+      "metadata": {
+        "dailyReminderTime": "08:01",
+        "pillTime": "08:00",
+        "geofenceAutoCheckin": true,
+        "fallDetection": true,
+        "shakeSos": true
+      },
+      "createdAt": "2026-05-11T03:34:29.974Z"
+    },
+    {
+      "id": "alert_515e7a0d-d6e4-4c6f-b0f8-cc29f73737d1",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "SLEEP_MODE_OFF",
+      "source": "USER",
+      "title": "Tat sleep mode",
+      "message": "Da tat che do tam dung canh bao",
+      "metadata": {
+        "minutes": 0,
+        "sleepModeUntil": null
+      },
+      "createdAt": "2026-05-11T03:43:34.525Z"
+    },
+    {
+      "id": "alert_dd4a4e04-82ca-4bbd-98a0-0d69d823af4b",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "SLEEP_MODE_ON",
+      "source": "USER",
+      "title": "Bat sleep mode",
+      "message": "Tam dung canh bao trong 720 phut",
+      "metadata": {
+        "minutes": 720,
+        "sleepModeUntil": "2026-05-11T15:43:39.777Z"
+      },
+      "createdAt": "2026-05-11T03:43:39.781Z"
+    },
+    {
+      "id": "alert_c50090d2-d867-4f41-b62b-bc91ccb56847",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "SLEEP_MODE_OFF",
+      "source": "USER",
+      "title": "Tat sleep mode",
+      "message": "Da tat che do tam dung canh bao",
+      "metadata": {
+        "minutes": 0,
+        "sleepModeUntil": null
+      },
+      "createdAt": "2026-05-11T03:43:47.239Z"
+    },
+    {
+      "id": "alert_b71aa7f1-e230-4c09-922b-914edba4aef7",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 4320 phut",
+      "metadata": {
+        "timerIntervalMinutes": 4320
+      },
+      "createdAt": "2026-05-11T03:43:53.632Z"
+    },
+    {
+      "id": "alert_af0d1903-8a12-4f2b-9887-c80bad3d97d0",
+      "userId": "44734b73-0ed1-4e7b-bb24-f924898d5a56",
+      "level": "INFO",
+      "status": "TIMER_UPDATED",
+      "source": "SYSTEM",
+      "title": "Cap nhat chu ky check-in",
+      "message": "Chu ky moi: 60 phut",
+      "metadata": {
+        "timerIntervalMinutes": 60
+      },
+      "createdAt": "2026-05-11T03:43:54.755Z"
     }
   ],
   "emergencyMemos": [

@@ -1,3 +1,5 @@
+const { mergeUserSensitivePayload } = require('./userSensitiveCodec');
+
 function splitFullName(value) {
   const text = String(value || '').trim();
   if (!text) {
@@ -27,6 +29,8 @@ function normalizeEmail(email) {
 }
 
 function sanitizeUser(user) {
+  const merged = mergeUserSensitivePayload(user);
+  user = merged;
   const name = fullName(user);
   const parsedName = splitFullName(name);
   const lastKnownLocation = user.lastKnownLocation || null;

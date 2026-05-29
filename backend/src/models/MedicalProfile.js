@@ -19,6 +19,8 @@ const MedicalProfileSchema = new mongoose.Schema(
     insuranceInfo: { type: mongoose.Schema.Types.Mixed, default: null },
     doctor: { type: String, default: null },
     qrCodeValue: { type: String, default: '' },
+    encryptedProfile: { type: mongoose.Schema.Types.Mixed, default: null },
+    encryptionVersion: { type: Number, default: 0 },
   },
   {
     timestamps: true,

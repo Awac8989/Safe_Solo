@@ -1,19 +1,36 @@
 const MedicalProfile = require('../models/MedicalProfile');
 const User = require('../models/User');
 const { AppError } = require('../lib/errors');
+const {
+  buildEncryptedMedicalUpdate,
+  decryptMedicalPayload,
+} = require('../lib/medicalProfileCodec');
 
 function toLegacyProfile(profile, userId) {
+  const payload = decryptMedicalPayload(profile);
   return {
     id: profile._id || `med-${userId}`,
     userId,
-    bloodType: profile.bloodType || null,
-    allergies: profile.allergiesList?.length ? profile.allergiesList : profile.allergies ? [profile.allergies] : [],
-    medications: profile.medicationsList?.length ? profile.medicationsList : profile.medications ? [profile.medications] : [],
-    medicalConditions: profile.medicalConditions?.length ? profile.medicalConditions : profile.conditions ? [profile.conditions] : [],
-    emergencyContact: profile.emergencyContact || null,
-    insuranceInfo: profile.insuranceInfo || null,
-    doctor: profile.doctor || null,
-    qrCodeValue: profile.qrCodeValue || `SAFE-MED-${userId}`,
+    bloodType: payload?.bloodType || profile.bloodType || null,
+    allergies: payload?.allergiesList?.length
+      ? payload.allergiesList
+      : payload?.allergies
+        ? [payload.allergies]
+        : [],
+    medications: payload?.medicationsList?.length
+      ? payload.medicationsList
+      : payload?.medications
+        ? [payload.medications]
+        : [],
+    medicalConditions: payload?.medicalConditions?.length
+      ? payload.medicalConditions
+      : payload?.conditions
+        ? [payload.conditions]
+        : [],
+    emergencyContact: payload?.emergencyContact || null,
+    insuranceInfo: payload?.insuranceInfo || null,
+    doctor: payload?.doctor || null,
+    qrCodeValue: payload?.qrCodeValue || `SAFE-MED-${userId}`,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   };
@@ -28,20 +45,24 @@ class MedicalService {
 
     const profile = await MedicalProfile.create({
       userId,
-      bloodType: profileData.bloodType || null,
-      allergies: Array.isArray(profileData.allergies) ? profileData.allergies.join(', ') : '',
-      medications: Array.isArray(profileData.medications) ? profileData.medications.join(', ') : '',
-      conditions: Array.isArray(profileData.medicalConditions) ? profileData.medicalConditions.join(', ') : '',
-      allergiesList: profileData.allergies || [],
-      medicationsList: profileData.medications || [],
-      medicalConditions: profileData.medicalConditions || [],
-      emergencyContact: profileData.emergencyContact || null,
-      insuranceInfo: profileData.insuranceInfo || null,
-      doctor: profileData.doctor || null,
-      emergencyPhone: profileData.emergencyContact?.phone || '',
-      insuranceProvider: profileData.insuranceInfo?.provider || '',
-      insuranceNumber: profileData.insuranceInfo?.number || '',
-      qrCodeValue: `SAFE-MED-${userId}`,
+      ...buildEncryptedMedicalUpdate(userId, {
+        bloodType: profileData.bloodType || null,
+        allergies: Array.isArray(profileData.allergies) ? profileData.allergies.join(', ') : '',
+        medications: Array.isArray(profileData.medications) ? profileData.medications.join(', ') : '',
+        conditions: Array.isArray(profileData.medicalConditions)
+          ? profileData.medicalConditions.join(', ')
+          : '',
+        allergiesList: profileData.allergies || [],
+        medicationsList: profileData.medications || [],
+        medicalConditions: profileData.medicalConditions || [],
+        emergencyContact: profileData.emergencyContact || null,
+        insuranceInfo: profileData.insuranceInfo || null,
+        doctor: profileData.doctor || null,
+        emergencyPhone: profileData.emergencyContact?.phone || '',
+        insuranceProvider: profileData.insuranceInfo?.provider || '',
+        insuranceNumber: profileData.insuranceInfo?.number || '',
+        qrCodeValue: `SAFE-MED-${userId}`,
+      }),
     });
 
     return toLegacyProfile(profile, userId);
@@ -61,22 +82,26 @@ class MedicalService {
       throw new AppError('Medical profile not found', 404);
     }
 
-    profile.bloodType = updateData.bloodType ?? profile.bloodType;
-    profile.allergiesList = updateData.allergies ?? profile.allergiesList ?? [];
-    profile.medicationsList = updateData.medications ?? profile.medicationsList ?? [];
-    profile.medicalConditions = updateData.medicalConditions ?? profile.medicalConditions ?? [];
-    profile.allergies = profile.allergiesList.join(', ');
-    profile.medications = profile.medicationsList.join(', ');
-    profile.conditions = profile.medicalConditions.join(', ');
-    profile.emergencyContact = updateData.emergencyContact ?? profile.emergencyContact;
-    profile.insuranceInfo = updateData.insuranceInfo ?? profile.insuranceInfo;
-    profile.doctor = updateData.doctor ?? profile.doctor;
-    profile.emergencyPhone = profile.emergencyContact?.phone || profile.emergencyPhone;
-    profile.insuranceProvider = profile.insuranceInfo?.provider || profile.insuranceProvider;
-    profile.insuranceNumber = profile.insuranceInfo?.number || profile.insuranceNumber;
-    if (!profile.qrCodeValue) {
-      profile.qrCodeValue = `SAFE-MED-${userId}`;
-    }
+    const existing = decryptMedicalPayload(profile) || {};
+    const merged = {
+      ...existing,
+      bloodType: updateData.bloodType ?? existing.bloodType ?? profile.bloodType,
+      allergiesList: updateData.allergies ?? existing.allergiesList ?? [],
+      medicationsList: updateData.medications ?? existing.medicationsList ?? [],
+      medicalConditions: updateData.medicalConditions ?? existing.medicalConditions ?? [],
+      emergencyContact: updateData.emergencyContact ?? existing.emergencyContact ?? null,
+      insuranceInfo: updateData.insuranceInfo ?? existing.insuranceInfo ?? null,
+      doctor: updateData.doctor ?? existing.doctor ?? null,
+    };
+    merged.allergies = merged.allergiesList.join(', ');
+    merged.medications = merged.medicationsList.join(', ');
+    merged.conditions = merged.medicalConditions.join(', ');
+    merged.emergencyPhone = merged.emergencyContact?.phone || existing.emergencyPhone || '';
+    merged.insuranceProvider = merged.insuranceInfo?.provider || existing.insuranceProvider || '';
+    merged.insuranceNumber = merged.insuranceInfo?.number || existing.insuranceNumber || '';
+    merged.qrCodeValue = existing.qrCodeValue || `SAFE-MED-${userId}`;
+
+    Object.assign(profile, buildEncryptedMedicalUpdate(userId, merged));
     await profile.save();
 
     return toLegacyProfile(profile, userId);
@@ -98,20 +123,33 @@ class MedicalService {
     if (!profile) {
       throw new AppError('Medical profile not found', 404);
     }
+    const payload = decryptMedicalPayload(profile) || {};
 
     return {
-      bloodType: profile.bloodType,
-      allergies: profile.allergiesList?.length ? profile.allergiesList : profile.allergies ? [profile.allergies] : [],
-      medications: profile.medicationsList?.length ? profile.medicationsList : profile.medications ? [profile.medications] : [],
-      medicalConditions: profile.medicalConditions?.length ? profile.medicalConditions : profile.conditions ? [profile.conditions] : [],
-      emergencyContact: profile.emergencyContact || {
+      bloodType: payload?.bloodType || profile.bloodType,
+      allergies: payload?.allergiesList?.length
+        ? payload.allergiesList
+        : payload?.allergies
+          ? [payload.allergies]
+          : [],
+      medications: payload?.medicationsList?.length
+        ? payload.medicationsList
+        : payload?.medications
+          ? [payload.medications]
+          : [],
+      medicalConditions: payload?.medicalConditions?.length
+        ? payload.medicalConditions
+        : payload?.conditions
+          ? [payload.conditions]
+          : [],
+      emergencyContact: payload?.emergencyContact || {
         name: user?.fullName || '',
-        phone: profile.emergencyPhone || user?.phoneNumber || '',
+        phone: payload?.emergencyPhone || user?.phoneNumber || '',
         relationship: 'Emergency',
       },
-      insuranceInfo: profile.insuranceInfo || null,
-      doctor: profile.doctor,
-      qrCodeValue: profile.qrCodeValue || `SAFE-MED-${userId}`,
+      insuranceInfo: payload?.insuranceInfo || null,
+      doctor: payload?.doctor || null,
+      qrCodeValue: payload?.qrCodeValue || `SAFE-MED-${userId}`,
     };
   }
 }

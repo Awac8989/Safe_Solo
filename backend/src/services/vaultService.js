@@ -1,5 +1,14 @@
 const Vault = require('../models/Vault');
 const { AppError } = require('../lib/errors');
+const { decryptJson, encryptJson } = require('../lib/securityCrypto');
+
+function defaultVaultContent() {
+  return {
+    documents: [],
+    encrypted: true,
+    lastEncryptedAt: new Date().toISOString(),
+  };
+}
 
 class VaultService {
   async getVault(userId) {
@@ -7,27 +16,37 @@ class VaultService {
     if (!vault) {
       vault = await Vault.create({
         userId,
-        content: { documents: [], encrypted: true, lastEncryptedAt: new Date().toISOString() },
+        content: encryptJson(defaultVaultContent(), `vault:${userId}`),
+        encryptedAt: new Date(),
         shreddedAt: null,
       });
     }
-    return vault;
+    return {
+      ...vault.toObject(),
+      content: decryptJson(vault.content, `vault:${userId}`),
+    };
   }
 
   async upsertVault(userId, content) {
     let vault = await Vault.findOne({ userId });
+    const encryptedContent = encryptJson(content, `vault:${userId}`);
     if (!vault) {
       vault = await Vault.create({
         userId,
-        content,
+        content: encryptedContent,
+        encryptedAt: new Date(),
         shreddedAt: null,
       });
     } else {
-      vault.content = content;
+      vault.content = encryptedContent;
+      vault.encryptedAt = new Date();
       vault.shreddedAt = null;
       await vault.save();
     }
-    return vault;
+    return {
+      ...vault.toObject(),
+      content,
+    };
   }
 
   async shredVaultForUser(userId) {
@@ -35,13 +54,18 @@ class VaultService {
     if (!vault) {
       throw new AppError('Vault not found', 404);
     }
-    vault.content = {
+    const shreddedContent = {
       shredded: true,
       lastEncryptedAt: new Date().toISOString(),
     };
+    vault.content = encryptJson(shreddedContent, `vault:${userId}`);
+    vault.encryptedAt = new Date();
     vault.shreddedAt = new Date();
     await vault.save();
-    return vault;
+    return {
+      ...vault.toObject(),
+      content: shreddedContent,
+    };
   }
 }
 

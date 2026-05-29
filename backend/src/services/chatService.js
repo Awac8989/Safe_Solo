@@ -7,6 +7,8 @@ const RescueIncident = require('../models/RescueIncident');
 const User = require('../models/User');
 const { AppError } = require('../lib/errors');
 const { sanitizeUser } = require('../lib/utils');
+const { decryptMessagePayload, encryptMessagePayload } = require('../lib/sensitivePayloadCodec');
+const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 class ChatService {
   async getAccessibleIncidentUserIds(victimId) {
@@ -14,9 +16,10 @@ class ChatService {
     if (!victim) {
       throw new AppError('Victim not found', 404);
     }
+    const sensitive = decryptUserSensitivePayload(victim);
 
     const phones = new Set(
-      (victim.emergencyContacts || [])
+      (sensitive.emergencyContacts || [])
         .map((item) => String(item?.phone || '').trim())
         .filter(Boolean),
     );
@@ -136,9 +139,12 @@ class ChatService {
   async enrichMessage(message) {
     const sender = message.senderId ? await User.findById(message.senderId).lean() : null;
     const payload = message.toObject ? message.toObject() : message;
+    const sensitive = decryptMessagePayload(payload);
     return {
       ...payload,
       id: payload._id,
+      content: sensitive.content,
+      metadata: sensitive.metadata,
       sender: sender ? sanitizeUser(sender) : null,
     };
   }
@@ -152,8 +158,14 @@ class ChatService {
       roomId,
       senderId: senderId || null,
       messageType,
-      content,
-      metadata: metadata || null,
+      content: '',
+      metadata: null,
+      encryptedPayload: encryptMessagePayload({
+        roomId,
+        content,
+        metadata: metadata || null,
+      }),
+      encryptionVersion: 1,
       createdAt: new Date(),
     });
 
@@ -175,6 +187,7 @@ class ChatService {
     return messages.map((message) => ({
       ...message,
       id: message._id,
+      ...decryptMessagePayload(message),
       sender: message.senderId ? senderMap.get(message.senderId) || null : null,
     }));
   }
@@ -188,14 +201,13 @@ class ChatService {
     room.closedAt = new Date();
     await room.save();
 
-    await Message.create({
-      roomId: room._id,
-      senderId: null,
-      messageType: 'SYSTEM',
-      content: 'Chat khan cap da duoc dong vi su co da ket thuc.',
-      metadata: { incidentId },
-      createdAt: new Date(),
-    });
+    await this.createMessage(
+      room._id,
+      null,
+      'SYSTEM',
+      'Chat khan cap da duoc dong vi su co da ket thuc.',
+      { incidentId },
+    );
 
     return room;
   }
