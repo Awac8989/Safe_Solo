@@ -7,6 +7,7 @@ import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import '../health/health_history_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -146,6 +147,19 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.favorite_border_rounded,
                 title: strings.text('Hồ sơ y tế khẩn cấp', 'Emergency medical profile'),
                 onTap: () => Navigator.pushNamed(context, '/medical'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.query_stats_rounded,
+                title: strings.text('Lịch sử sức khỏe', 'Health history'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HealthHistoryPage(),
+                    ),
+                  );
+                },
               ),
               const _SectionDivider(),
               _ActionRow(

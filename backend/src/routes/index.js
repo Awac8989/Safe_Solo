@@ -13,6 +13,7 @@ const {
   updateAlertPolicyByUser,
   listUserInteractions,
   createUserInteraction,
+  getHealthReport,
   listGuardians,
   createGuardian,
   deleteGuardian,
@@ -71,6 +72,7 @@ apiRouter.get('/users/:id/alert-policy', getAlertPolicy);
 apiRouter.patch('/users/:id/alert-policy', updateAlertPolicyByUser);
 apiRouter.get('/users/:id/interactions', listUserInteractions);
 apiRouter.post('/users/:id/interactions', createUserInteraction);
+apiRouter.get('/users/:id/health-report', getHealthReport);
 apiRouter.get('/users/:id/guardians', listGuardians);
 apiRouter.post('/users/:id/guardians', createGuardian);
 apiRouter.delete('/users/:id/guardians/:phone', deleteGuardian);

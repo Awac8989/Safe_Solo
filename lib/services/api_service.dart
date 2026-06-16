@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/alert_policy_model.dart';
 import '../models/automation_settings_model.dart';
+import '../models/health_report_model.dart';
 import '../models/interaction_event_model.dart';
 import '../core/constants.dart';
 import '../models/medical_profile_model.dart';
@@ -415,6 +416,20 @@ class ApiService {
     );
     final response = await _safeRequest(_client.delete(uri));
     _throwIfFailed(response);
+  }
+
+  Future<HealthReportModel> getHealthReport(
+    String userId, {
+    String period = 'month',
+  }) async {
+    final uri = Uri.parse(
+      '${AppConstants.backendBaseUrl}/users/$userId/health-report?period=$period',
+    );
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return HealthReportModel.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   void _throwIfFailed(http.Response response) {

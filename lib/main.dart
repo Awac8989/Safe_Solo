@@ -1,29 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_theme.dart';
 import 'core/providers/app_provider.dart';
-import 'core/widgets/main_navigation.dart';
-import 'services/background_safety_service.dart';
-import 'services/push_notification_service.dart';
-import 'views/auth/auth_page.dart';
 import 'views/achievements/achievements_page.dart';
-import 'views/community_radar/community_radar_page.dart';
+import 'views/auth/auth_page.dart';
 import 'views/medical/medical_page.dart';
 import 'views/network/network_page.dart';
 import 'views/onboarding/onboarding_page.dart';
 import 'views/permissions/permissions_page.dart';
 import 'views/security/security_page.dart';
 import 'views/settings/settings_page.dart';
-import 'views/sos_map/sos_map_page.dart';
-import 'views/stealth/stealth_page.dart';
 import 'views/vault/vault_page.dart';
+import 'core/widgets/app_shell.dart';
+import 'core/widgets/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  await BackgroundSafetyService.instance.prepare();
   runApp(const SafeSoloApp());
 }
 
@@ -32,43 +25,31 @@ class SafeSoloApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AppProvider())],
+    return ChangeNotifierProvider(
+      create: (_) => AppProvider(),
       child: Consumer<AppProvider>(
-        builder: (context, appProvider, _) {
-          final app = MaterialApp(
-            title: 'SafeSolo',
+        builder: (context, provider, _) {
+          return MaterialApp(
             debugShowCheckedModeBanner: false,
-            theme: appProvider.highContrast ? AppTheme.highContrast : AppTheme.light,
-            home: const AppRoot(),
+            title: 'SafeSolo',
+            theme: provider.highContrast ? AppTheme.highContrast : AppTheme.light,
+            darkTheme: provider.highContrast ? AppTheme.highContrast : AppTheme.light,
+            themeMode: ThemeMode.light,
+            home: const _AppGate(),
             routes: {
-              '/onboarding': (_) => const OnboardingPage(),
               '/auth': (_) => const AuthPage(),
+              '/onboarding': (_) => const OnboardingPage(),
               '/permissions': (_) => const PermissionsPage(),
-              '/settings': (_) => const SettingsPage(),
               '/medical': (_) => const MedicalPage(),
-              '/security': (_) => const SecurityPage(),
               '/network': (_) => const NetworkPage(),
+              '/security': (_) => const SecurityPage(),
               '/vault': (_) => const VaultPage(),
               '/achievements': (_) => const AchievementsPage(),
-              '/sos-map': (_) => const SosMapPage(),
-              '/community-radar': (_) => const CommunityRadarPage(),
-              '/stealth': (_) => const StealthPage(),
+              '/settings': (_) => const SettingsPage(),
             },
-          );
-
-          if (!appProvider.highContrast) {
-            return app;
-          }
-
-          return ColorFiltered(
-            colorFilter: const ColorFilter.matrix([
-              0.2126, 0.7152, 0.0722, 0, 0,
-              0.2126, 0.7152, 0.0722, 0, 0,
-              0.2126, 0.7152, 0.0722, 0, 0,
-              0, 0, 0, 1, 0,
-            ]),
-            child: app,
+            onUnknownRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => const _AppGate(),
+            ),
           );
         },
       ),
@@ -76,32 +57,46 @@ class SafeSoloApp extends StatelessWidget {
   }
 }
 
-class AppRoot extends StatelessWidget {
-  const AppRoot({super.key});
+class _AppGate extends StatelessWidget {
+  const _AppGate();
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AppProvider>(
-      builder: (context, appProvider, child) {
-        if (appProvider.isInitializing) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (appProvider.security.stealthMode) {
-          return const StealthPage();
-        }
-        if (!appProvider.onboarded) {
-          return const OnboardingPage();
-        }
-        if (appProvider.user == null) {
-          return const AuthPage();
-        }
-        if (!appProvider.permissionsGranted) {
-          return const PermissionsPage();
-        }
-        return const MainNavigation();
-      },
+    final provider = context.watch<AppProvider>();
+
+    if (provider.isInitializing) {
+      return const _SplashScreen();
+    }
+
+    if (!provider.onboarded) {
+      return const OnboardingPage();
+    }
+
+    if (!provider.permissionsGranted) {
+      return const PermissionsPage();
+    }
+
+    if (provider.user == null) {
+      return const AuthPage();
+    }
+
+    return const MainNavigation();
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppPage(
+      child: Center(
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      ),
     );
   }
 }

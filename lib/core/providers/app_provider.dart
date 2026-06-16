@@ -1139,6 +1139,18 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       _lastOverdueNotificationAt = null;
       _mood = mood ?? _mood ?? Mood.calm;
       _streak += 1;
+      await _api.createInteraction(
+        userId: current.id,
+        type: 'CHECKIN_COMPLETED',
+        source: 'MOBILE_APP',
+        metadata: {
+          'mood': (_mood ?? Mood.calm).name,
+          'location': {
+            'lat': position.lat,
+            'lng': position.lng,
+          },
+        },
+      );
       _prependOwnPost(
         message: 'Tôi vừa check-in an toàn. Nếu cần, mọi người có thể xem vị trí cập nhật mới nhất của tôi.',
         moodLabel: _labelForMood(_mood ?? Mood.calm),

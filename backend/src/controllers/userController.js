@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const CheckInHistory = require('../models/CheckInHistory');
+const AlertEvent = require('../models/AlertEvent');
 const MedicalProfile = require('../models/MedicalProfile');
 const AutomationSetting = require('../models/AutomationSetting');
 const SecuritySetting = require('../models/SecuritySetting');
@@ -61,6 +62,215 @@ function mapDeviceSignalDoc(doc) {
     payload: row.payload || {},
     createdAt: toIso(row.createdAt),
   };
+}
+
+function normalizePeriod(period) {
+  const value = String(period || 'month').toLowerCase();
+  return ['day', 'week', 'month'].includes(value) ? value : 'month';
+}
+
+function buildPeriodRange(period) {
+  const now = new Date();
+  const end = new Date(now);
+  const start = new Date(now);
+  if (period === 'day') {
+    start.setHours(0, 0, 0, 0);
+  } else if (period === 'week') {
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+  } else {
+    start.setDate(start.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+  }
+  return { start, end };
+}
+
+function formatBucketLabel(date, period) {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  if (period === 'day') {
+    return `${String(date.getHours()).padStart(2, '0')}:00`;
+  }
+  if (period === 'week') {
+    return `${day}/${month}`;
+  }
+  return `${day}/${month}`;
+}
+
+function bucketKey(date, period) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  if (period === 'day') {
+    const hour = String(date.getHours()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}`;
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function moodKeyFromMetadata(metadata = {}) {
+  const value = String(metadata.mood || metadata.moodLabel || metadata.mood_key || '').toLowerCase();
+  if (['calm', 'safe', 'binh an', 'bình an'].includes(value)) {
+    return 'calm';
+  }
+  if (['happy', 'positive', 'tich cuc', 'tích cực'].includes(value)) {
+    return 'happy';
+  }
+  if (['tired', 'fatigued', 'hoi met', 'hơi mệt'].includes(value)) {
+    return 'tired';
+  }
+  if (['sick', 'ill', 'can luu y', 'cần lưu ý'].includes(value)) {
+    return 'sick';
+  }
+  if (['focused', 'dang tap trung', 'đang tập trung'].includes(value)) {
+    return 'focused';
+  }
+  return 'calm';
+}
+
+async function getHealthReport(req, res) {
+  const { id } = req.params;
+  const period = normalizePeriod(req.query.period);
+  const { start, end } = buildPeriodRange(period);
+
+  const userDoc = await ensureUserById(id);
+  if (!userDoc) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const [checkins, alerts, interactions] = await Promise.all([
+    CheckInHistory.find({
+      userId: id,
+      checkinTime: { $gte: start, $lte: end },
+    }).sort({ checkinTime: 1 }).lean(),
+    AlertEvent.find({
+      userId: id,
+      createdAt: { $gte: start, $lte: end },
+    }).sort({ createdAt: 1 }).lean(),
+    listInteractionEvents(id, 500),
+  ]);
+
+  const filteredInteractions = interactions.filter((item) => {
+    const createdAt = item.createdAt ? new Date(item.createdAt) : null;
+    return createdAt && createdAt >= start && createdAt <= end;
+  });
+
+  const seriesMap = new Map();
+  const ensureBucket = (date) => {
+    const key = bucketKey(date, period);
+    if (!seriesMap.has(key)) {
+      seriesMap.set(key, {
+        key,
+        label: formatBucketLabel(date, period),
+        checkIns: 0,
+        autoCheckIns: 0,
+        alertCount: 0,
+        sosCount: 0,
+        moodCounts: {
+          calm: 0,
+          happy: 0,
+          tired: 0,
+          sick: 0,
+          focused: 0,
+        },
+      });
+    }
+    return seriesMap.get(key);
+  };
+
+  const moodCounts = {
+    calm: 0,
+    happy: 0,
+    tired: 0,
+    sick: 0,
+    focused: 0,
+  };
+  let totalCheckIns = 0;
+  let autoCheckIns = 0;
+
+  checkins.forEach((item) => {
+    const createdAt = new Date(item.checkinTime || item.createdAt || Date.now());
+    const bucket = ensureBucket(createdAt);
+    bucket.checkIns += 1;
+    totalCheckIns += 1;
+    if (item.isSystemAutoTriggered) {
+      bucket.autoCheckIns += 1;
+      autoCheckIns += 1;
+    }
+  });
+
+  alerts.forEach((item) => {
+    const createdAt = new Date(item.createdAt || Date.now());
+    const bucket = ensureBucket(createdAt);
+    bucket.alertCount += 1;
+    const status = String(item.status || '').toUpperCase();
+    const level = String(item.level || '').toUpperCase();
+    if (status.includes('SOS') || level === 'SOS') {
+      bucket.sosCount += 1;
+    }
+  });
+
+  filteredInteractions.forEach((item) => {
+    const createdAt = new Date(item.createdAt || Date.now());
+    const bucket = ensureBucket(createdAt);
+    const mood = moodKeyFromMetadata(item.metadata || {});
+    moodCounts[mood] += 1;
+    bucket.moodCounts[mood] += 1;
+  });
+
+  const overdueCount = alerts.filter((item) =>
+    new Set([
+      'REMINDER_SENT',
+      'WARNING_TRIGGERED',
+      'RESCUE_CALL_QUEUED',
+      'DEADMAN_LEVEL_1',
+      'DEADMAN_LEVEL_2',
+      'DEADMAN_LEVEL_3',
+      'CHECKIN_OVERDUE',
+    ]).has(String(item.status || '').toUpperCase()),
+  ).length;
+
+  const sosCount = alerts.filter((item) => {
+    const status = String(item.status || '').toUpperCase();
+    const level = String(item.level || '').toUpperCase();
+    return status.includes('SOS') || status === 'SILENT_DURESS' || level === 'SOS';
+  }).length;
+
+  const recentCheckins = checkins.slice(-10).reverse().map((item) => ({
+    id: item._id,
+    checkinTime: toIso(item.checkinTime || item.createdAt),
+    locationAtCheckin: item.locationAtCheckin || null,
+    isSystemAutoTriggered: Boolean(item.isSystemAutoTriggered),
+  }));
+
+  const recentAlerts = alerts.slice(-10).reverse().map((item) => ({
+    id: item._id,
+    level: item.level,
+    status: item.status,
+    title: item.title,
+    message: item.message,
+    createdAt: toIso(item.createdAt),
+  }));
+
+  const dailySeries = [...seriesMap.values()].sort((a, b) => a.key.localeCompare(b.key));
+
+  return res.json({
+    period,
+    range: {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    },
+    summary: {
+      totalCheckIns,
+      autoCheckIns,
+      overdueCount,
+      sosCount,
+      moodCounts,
+    },
+    dailySeries,
+    recentCheckins,
+    recentAlerts,
+  });
 }
 
 async function ensureMedicalProfile(userId, fallback = {}) {
@@ -857,6 +1067,7 @@ module.exports = {
   updateAlertPolicyByUser,
   listUserInteractions,
   createUserInteraction,
+  getHealthReport,
   listGuardians,
   createGuardian,
   deleteGuardian,
