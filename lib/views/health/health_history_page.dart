@@ -11,6 +11,7 @@ import '../../core/widgets/app_shell.dart';
 import '../../models/health_report_model.dart';
 import '../../services/api_service.dart';
 import '../../services/health_report_export_service.dart';
+import '../../services/pedometer_service.dart';
 
 class HealthHistoryPage extends StatefulWidget {
   const HealthHistoryPage({super.key});
@@ -32,6 +33,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
     super.initState();
     _period = 'month';
     _future = _load();
+    PedometerService.instance.initialize();
   }
 
   Future<HealthReportModel> _load() async {
@@ -159,6 +161,193 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                       onPressed: () => _exportExcel(report),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                AnimatedBuilder(
+                  animation: PedometerService.instance,
+                  builder: (context, _) {
+                    final pedometer = PedometerService.instance;
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      pedometer.watchModel,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      strings.text(
+                                        'Đã đồng bộ · Cảm biến BioActive & Pedometer',
+                                        'Synced · BioActive Sensor & Pedometer',
+                                      ),
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.circle, color: Color(0xFF10B981), size: 8),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      strings.text('Trực tuyến', 'Live'),
+                                      style: const TextStyle(
+                                        color: Color(0xFF10B981),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _WatchStatTile(
+                                  icon: Icons.directions_walk_rounded,
+                                  iconColor: const Color(0xFF38BDF8),
+                                  label: strings.text('Bước chân', 'Steps'),
+                                  value: '${pedometer.steps}',
+                                  unit: strings.text('bước', 'steps'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _WatchStatTile(
+                                  icon: Icons.local_fire_department_rounded,
+                                  iconColor: const Color(0xFFF97316),
+                                  label: strings.text('Tiêu thụ', 'Calories'),
+                                  value: '${pedometer.calories}',
+                                  unit: 'kcal',
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _WatchStatTile(
+                                  icon: Icons.bloodtype_rounded,
+                                  iconColor: const Color(0xFF06B6D4),
+                                  label: 'SpO2',
+                                  value: '${pedometer.spO2}%',
+                                  unit: 'Oxy máu',
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _WatchStatTile(
+                                  icon: Icons.favorite_rounded,
+                                  iconColor: const Color(0xFFF43F5E),
+                                  label: strings.text('Nhịp tim', 'BPM'),
+                                  value: '${pedometer.heartRate}',
+                                  unit: 'bpm',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '${strings.text("Trạng thái:", "Status:")} ${pedometer.status == "walking" ? strings.text("Đang đi bộ", "Walking") : strings.text("Nghỉ ngơi", "Resting")} · ${pedometer.distanceKm} km',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                  fontSize: 11,
+                                ),
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF38BDF8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    icon: const Icon(Icons.play_arrow_rounded, size: 16),
+                                    label: Text(
+                                      strings.text('Mô phỏng +25 bước', 'Simulate +25 steps'),
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    onPressed: () => pedometer.simulateWalking(),
+                                  ),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0284C7),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.watch_rounded, size: 14),
+                                    label: Text(
+                                      strings.text('Mở giả lập Watch 5', 'Open Watch 5 Simulator'),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    onPressed: () => Navigator.of(context).pushNamed('/watch-simulator'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 AppCard(
@@ -778,6 +967,64 @@ class _TimelineTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _WatchStatTile extends StatelessWidget {
+  const _WatchStatTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 16),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            unit,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.4),
+              fontSize: 9,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WatchSimulatorRouteImport } from './routes/watch-simulator'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as RevenueRouteImport } from './routes/revenue'
 import { Route as OmnichannelRouteImport } from './routes/omnichannel'
@@ -16,6 +17,11 @@ import { Route as KycRouteImport } from './routes/kyc'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 
+const WatchSimulatorRoute = WatchSimulatorRouteImport.update({
+  id: '/watch-simulator',
+  path: '/watch-simulator',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/watch-simulator': typeof WatchSimulatorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/watch-simulator': typeof WatchSimulatorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +79,27 @@ export interface FileRoutesById {
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/watch-simulator': typeof WatchSimulatorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
+  fullPaths:
+    | '/'
+    | '/audit'
+    | '/kyc'
+    | '/omnichannel'
+    | '/revenue'
+    | '/users'
+    | '/watch-simulator'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
+  to:
+    | '/'
+    | '/audit'
+    | '/kyc'
+    | '/omnichannel'
+    | '/revenue'
+    | '/users'
+    | '/watch-simulator'
   id:
     | '__root__'
     | '/'
@@ -85,6 +108,7 @@ export interface FileRouteTypes {
     | '/omnichannel'
     | '/revenue'
     | '/users'
+    | '/watch-simulator'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,10 +118,18 @@ export interface RootRouteChildren {
   OmnichannelRoute: typeof OmnichannelRoute
   RevenueRoute: typeof RevenueRoute
   UsersRoute: typeof UsersRoute
+  WatchSimulatorRoute: typeof WatchSimulatorRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/watch-simulator': {
+      id: '/watch-simulator'
+      path: '/watch-simulator'
+      fullPath: '/watch-simulator'
+      preLoaderRoute: typeof WatchSimulatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/users': {
       id: '/users'
       path: '/users'
@@ -150,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   OmnichannelRoute: OmnichannelRoute,
   RevenueRoute: RevenueRoute,
   UsersRoute: UsersRoute,
+  WatchSimulatorRoute: WatchSimulatorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

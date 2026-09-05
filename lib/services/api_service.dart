@@ -432,6 +432,30 @@ class ApiService {
     );
   }
 
+  Future<Map<String, dynamic>> uploadKycDocuments({
+    required String frontPath,
+    required String backPath,
+    String? userId,
+    String? token,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/kyc/upload');
+    final request = http.MultipartRequest('POST', uri);
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    if (userId != null && userId.isNotEmpty) {
+      request.headers['x-user-id'] = userId;
+      request.fields['userId'] = userId;
+    }
+    request.files.add(await http.MultipartFile.fromPath('front_image', frontPath));
+    request.files.add(await http.MultipartFile.fromPath('back_image', backPath));
+
+    final streamedResponse = await request.send().timeout(_timeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   void _throwIfFailed(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;

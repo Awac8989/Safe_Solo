@@ -3,19 +3,31 @@ class EmergencyContactModel {
     required this.name,
     required this.phone,
     required this.relation,
+    this.priority = 1,
   });
 
   final String name;
   final String phone;
   final String relation;
+  final int priority;
 
   factory EmergencyContactModel.fromJson(Map<String, dynamic> json) {
     return EmergencyContactModel(
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       relation: json['relation'] as String? ?? '',
+      priority: json['priority'] is int
+          ? json['priority'] as int
+          : int.tryParse('${json['priority']}') ?? 1,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'phone': phone,
+    'relation': relation,
+    'priority': priority,
+  };
 }
 
 class AppLocation {
@@ -61,6 +73,7 @@ class UserModel {
     this.sleepModeUntil,
     this.lastCheckinTime,
     this.lastKnownLocation,
+    this.isKycVerified = false,
   });
 
   final String id;
@@ -76,13 +89,15 @@ class UserModel {
   final DateTime? lastCheckinTime;
   final AppLocation? lastKnownLocation;
   final List<EmergencyContactModel> emergencyContacts;
+  final bool isKycVerified;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final rawContacts = json['emergencyContacts'] as List<dynamic>? ?? const [];
     final rawLocation = json['lastKnownLocation'];
 
     return UserModel(
-      id: json['_id'] as String? ?? '',
+      isKycVerified: json['isKycVerified'] as bool? ?? false,
+      id: json['_id'] as String? ?? json['id'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
       timerIntervalMinutes: json['timerIntervalMinutes'] as int? ?? 720,

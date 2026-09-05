@@ -53,6 +53,14 @@ export type AdminOverviewResponse = {
         lng: number;
         updatedAt?: string;
       } | null;
+      vitals?: {
+        spo2: number;
+        heartRate: number;
+        device: string;
+        battery?: number;
+        status?: string;
+        syncTime?: string;
+      } | null;
     }>;
   };
 };
@@ -207,3 +215,14 @@ export function resolveAssetUrl(value: string) {
   }
   return `${API_ORIGIN}/${value}`;
 }
+
+export const sendDeviceSignal = async (
+  userId: string,
+  signalType: string,
+  payload: Record<string, unknown>,
+) => {
+  return request<{ message: string; action: string }>(`/users/${userId}/device-signals`, {
+    method: "POST",
+    body: JSON.stringify({ signalType, payload }),
+  });
+};

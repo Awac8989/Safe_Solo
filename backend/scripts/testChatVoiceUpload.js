@@ -1,40 +1,48 @@
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const database = require('../src/config/database');
+const ChatRoom = require('../src/models/ChatRoom');
+const User = require('../src/models/User');
+
 const fetch = global.fetch;
 if (!fetch) {
   throw new Error('Global fetch is not available in this Node runtime. Use Node 18+ or install a polyfill.');
 }
 
 async function testChatVoiceUpload() {
-  // First, login to get JWT token
-  console.log('Logging in...');
-  const loginRes = await fetch('http://localhost:4000/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email: 'test@example.com' })
-  });
+  await database.$connect();
 
-  if (!loginRes.ok) {
-    console.error('Login failed:', loginRes.status, await loginRes.text());
-    return;
+  const user = await User.findOne({ isActive: true });
+  if (!user) {
+    throw new Error('No active user found in database');
   }
 
-  const loginData = await loginRes.json();
-  console.log('Login response:', loginData);
+  const userId = user._id;
+  const roomId = 'test-voice-chat-room';
 
-  // For testing, we'll assume we have a JWT token
-  // In real scenario, you'd get the token from login response or have a test user
-  const token = 'your-jwt-token-here'; // Replace with actual token
+  await ChatRoom.findOneAndUpdate(
+    { _id: roomId },
+    {
+      $set: {
+        roomType: 'GROUP',
+        title: 'Voice Test Room',
+        participantIds: [userId],
+        status: 'ACTIVE',
+      },
+    },
+    { upsert: true, new: true }
+  );
 
-  // Create a dummy audio file (in real test, you'd use a real file)
-  const dummyAudioBuffer = Buffer.from('dummy audio data'); // This is just for testing
+  const secret = process.env.JWT_SECRET || 'safesolo-dev-secret';
+  const token = jwt.sign({ id: userId, role: 'user' }, secret, { expiresIn: '1h' });
 
-  // Test voice upload
-  console.log('Testing voice upload...');
+  console.log('Testing voice upload for user:', userId, 'in room:', roomId);
+  const dummyAudioBuffer = Buffer.from('RIFF....WAVEfmt ....data....');
+
   const formData = new FormData();
-  formData.append('voice', new Blob([dummyAudioBuffer], { type: 'audio/mpeg' }), 'test.mp3');
+  formData.append('voice', new Blob([dummyAudioBuffer], { type: 'audio/wav' }), 'test.wav');
 
-  const uploadRes = await fetch('http://localhost:4000/api/chat/room123/upload-voice', {
+  const uploadRes = await fetch(`http://localhost:4000/api/chat/${roomId}/upload-voice`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`
@@ -45,6 +53,14 @@ async function testChatVoiceUpload() {
   console.log('Upload status:', uploadRes.status);
   const uploadBody = await uploadRes.text();
   console.log('Upload response:', uploadBody);
+
+  await database.$disconnect();
+
+  if (uploadRes.status === 200 || uploadRes.status === 201) {
+    console.log('✅ Voice upload test passed successfully!');
+  } else {
+    throw new Error(`Upload failed with status ${uploadRes.status}: ${uploadBody}`);
+  }
 }
 
 testChatVoiceUpload().catch(err => {

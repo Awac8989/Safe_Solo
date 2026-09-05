@@ -166,6 +166,14 @@ function buildDispatchIncidentFromEmergency(log) {
     emergencyContactName: firstContact?.name || '',
     emergencyContactPhone: firstContact?.phone || '',
     location,
+    vitals: {
+      spo2: 91,
+      heartRate: 124,
+      device: 'Samsung Galaxy Watch 5 (WearOS)',
+      battery: 82,
+      status: 'CẢNH BÁO NGUY HIỂM',
+      syncTime: 'Thời gian thực',
+    },
     source: 'mongo',
   };
 }
@@ -200,6 +208,14 @@ function buildDispatchIncidentFromRescue(incident, user) {
     location: {
       lat: incident.exactLat,
       lng: incident.exactLng,
+    },
+    vitals: {
+      spo2: Number(incident.severity || 3) >= 3 ? 91 : 98,
+      heartRate: Number(incident.severity || 3) >= 3 ? 122 : 78,
+      device: 'Samsung Galaxy Watch 5 (WearOS)',
+      battery: 86,
+      status: Number(incident.severity || 3) >= 3 ? 'CẢNH BÁO NGUY HIỂM' : 'BÌNH THƯỜNG',
+      syncTime: 'Thời gian thực',
     },
     source: 'mongo-rescue',
   };

@@ -11,6 +11,7 @@ import 'views/onboarding/onboarding_page.dart';
 import 'views/permissions/permissions_page.dart';
 import 'views/security/security_page.dart';
 import 'views/settings/settings_page.dart';
+import 'views/watch/watch_simulator_page.dart';
 import 'views/vault/vault_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
@@ -46,6 +47,7 @@ class SafeSoloApp extends StatelessWidget {
               '/vault': (_) => const VaultPage(),
               '/achievements': (_) => const AchievementsPage(),
               '/settings': (_) => const SettingsPage(),
+              '/watch-simulator': (_) => const WatchSimulatorPage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),

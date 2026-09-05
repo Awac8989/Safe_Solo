@@ -12,7 +12,7 @@ if (!fetch) {
   );
 }
 
-const baseUrl = 'http://localhost:4001';
+const baseUrl = `http://localhost:${process.env.PORT || 4000}`;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -27,6 +27,7 @@ async function ensureTestUser(email, fullName, phoneNumber, otp) {
         phoneNumber,
         isActive: true,
         isVerified: true,
+        isKycVerified: true,
         otpCode: otp,
         otpExpiresAt: expiresAt,
         nextDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),

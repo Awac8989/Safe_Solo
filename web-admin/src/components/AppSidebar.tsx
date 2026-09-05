@@ -7,6 +7,7 @@ import {
   ScrollText,
   ShieldAlert,
   Smartphone,
+  Watch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ const items = [
   { title: "Kênh liên lạc", url: "/omnichannel", icon: Network },
   { title: "Doanh thu và đối tác", url: "/revenue", icon: DollarSign },
   { title: "Nhật ký hệ thống", url: "/audit", icon: ScrollText },
+  { title: "Giả lập Galaxy Watch 5", url: "/watch-simulator", icon: Watch },
 ];
 
 export function AppSidebar() {

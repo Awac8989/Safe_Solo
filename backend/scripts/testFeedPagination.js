@@ -1,28 +1,18 @@
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+
 const fetch = global.fetch;
 if (!fetch) {
   throw new Error('Global fetch is not available in this Node runtime. Use Node 18+ or install a polyfill.');
 }
 
 async function testFeedPagination() {
-  // First, login to get JWT token
-  console.log('Logging in...');
-  const loginRes = await fetch('http://localhost:4000/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email: 'test@example.com' })
-  });
+  const usersRes = await fetch('http://localhost:4000/api/users');
+  const allUsers = await usersRes.json();
+  const currentUserId = allUsers[0]?._id || '44734b73-0ed1-4e7b-bb24-f924898d5a56';
 
-  if (!loginRes.ok) {
-    console.error('Login failed:', loginRes.status, await loginRes.text());
-    return;
-  }
-
-  const loginData = await loginRes.json();
-  console.log('Login response:', loginData);
-
-  const token = 'your-jwt-token-here'; // Replace with actual token
+  const secret = process.env.JWT_SECRET || 'safesolo-dev-secret';
+  const token = jwt.sign({ id: currentUserId, role: 'user' }, secret, { expiresIn: '1h' });
 
   // Test create status
   console.log('Creating status...');
@@ -51,9 +41,9 @@ async function testFeedPagination() {
   const feedData = await feedRes.text();
   console.log('Feed response:', feedData);
 
-  // Check if pagination is implemented (look for skip and take in the response or error)
-  if (feedData.includes('skip') || feedData.includes('take')) {
-    console.log('✅ Pagination implemented correctly with skip() and take()');
+  // Check if pagination is implemented
+  if (feedData.includes('limit') && (feedData.includes('offset') || feedData.includes('skip'))) {
+    console.log('✅ Pagination implemented correctly with limit and offset');
   } else {
     console.log('❌ Pagination may not be implemented correctly');
   }

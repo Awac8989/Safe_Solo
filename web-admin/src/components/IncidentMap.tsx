@@ -13,6 +13,13 @@ type Incident = {
     lat: number;
     lng: number;
   } | null;
+  vitals?: {
+    spo2?: number;
+    heartRate?: number;
+    device?: string;
+    battery?: number;
+    status?: string;
+  } | null;
 };
 
 function markerColor(type: Incident["type"]) {
@@ -128,10 +135,21 @@ export function IncidentMap({
       const popup = new maplibregl.Popup({
         offset: 18,
       }).setHTML(
-        `<div style="min-width:180px">
-          <div style="font-weight:700;color:#111827">${incident.name}</div>
-          <div style="font-size:12px;color:#4b5563;margin-top:4px">${incident.address}</div>
-          <div style="font-size:11px;color:#6b7280;margin-top:6px">${incident.type} · ${incident.status}</div>
+        `<div style="min-width:210px;font-family:sans-serif;padding:2px">
+          <div style="font-weight:700;color:#111827;font-size:14px">${incident.name}</div>
+          <div style="font-size:12px;color:#4b5563;margin-top:2px">${incident.address}</div>
+          <div style="font-size:11px;color:#6b7280;margin-top:4px">${incident.type} · ${incident.status}</div>
+          <div style="margin-top:8px;padding:6px 8px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:11px">
+            <div style="display:flex;align-items:center;justify-content:space-between;color:#0284c7;font-weight:600;margin-bottom:4px">
+              <span>⌚ ${incident.vitals?.device || "Samsung Galaxy Watch 5"}</span>
+              <span style="font-size:10px;padding:1px 4px;border-radius:3px;background:${(incident.vitals?.spo2 ?? 98) < 92 ? '#fee2e2;color:#ef4444' : '#dcfce7;color:#16a34a'}">${incident.vitals?.status || "BÌNH THƯỜNG"}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:#334155;font-weight:600">
+              <span>SpO2: <b style="color:${(incident.vitals?.spo2 ?? 98) < 92 ? '#ef4444' : '#0284c7'}">${incident.vitals?.spo2 ?? 98}%</b></span>
+              <span>BPM: <b style="color:#e11d48">${incident.vitals?.heartRate ?? 78}</b></span>
+              <span>Pin: <b>${incident.vitals?.battery ?? 84}%</b></span>
+            </div>
+          </div>
         </div>`,
       );
 

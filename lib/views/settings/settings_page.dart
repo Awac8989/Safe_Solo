@@ -96,6 +96,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 onTap: () => _showVacationDialog(context),
               ),
               const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.bedtime_outlined,
+                title: strings.text('Khung giờ yên tĩnh (Bắt đầu)', 'Quiet hours start'),
+                valueText: provider.user?.quietHoursStart ?? '23:00',
+                onTap: () => _pickQuietHours(context, isStart: true),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.wb_sunny_outlined,
+                title: strings.text('Khung giờ yên tĩnh (Kết thúc)', 'Quiet hours end'),
+                valueText: provider.user?.quietHoursEnd ?? '06:00',
+                onTap: () => _pickQuietHours(context, isStart: false),
+              ),
+              const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.directions_walk_rounded,
                 title: strings.text('Đếm bước chân & calo', 'Steps & calories'),
@@ -160,6 +174,13 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   );
                 },
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.watch_rounded,
+                title: strings.text('Giả lập Samsung Galaxy Watch 5', 'Samsung Galaxy Watch 5 Simulator'),
+                valueText: 'WearOS · BioActive',
+                onTap: () => Navigator.pushNamed(context, '/watch-simulator'),
               ),
               const _SectionDivider(),
               _ActionRow(
@@ -291,6 +312,39 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _pickQuietHours(BuildContext context, {required bool isStart}) async {
+    final provider = context.read<AppProvider>();
+    final currentStr = isStart
+        ? (provider.user?.quietHoursStart ?? '23:00')
+        : (provider.user?.quietHoursEnd ?? '06:00');
+    final current = _parseTimeOfDay(currentStr);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (picked == null) {
+      return;
+    }
+
+    final formatted = _formatTimeOfDay(picked);
+    final newStart = isStart ? formatted : (provider.user?.quietHoursStart ?? '23:00');
+    final newEnd = isStart ? (provider.user?.quietHoursEnd ?? '06:00') : formatted;
+
+    await _runGuarded(
+      () => provider.setQuietHours(
+        start: newStart,
+        end: newEnd,
+        falseAlertGraceMinutes: provider.user?.falseAlertGraceMinutes ?? 3,
       ),
     );
   }

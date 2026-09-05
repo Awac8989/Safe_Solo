@@ -13,6 +13,8 @@ app.use(
   }),
 );
 app.use(express.json());
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'safesolo-backend' });

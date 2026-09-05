@@ -3,3 +3,9 @@ node_modules
 .env
 
 /src/generated/prisma
+
+uploads/*
+!uploads/.gitkeep
+!uploads/kyc/.gitkeep
+!uploads/voices/.gitkeep
+*.log

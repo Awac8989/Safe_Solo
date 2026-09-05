@@ -31,16 +31,19 @@ class EmergencyContact {
     required this.name,
     required this.phone,
     required this.relation,
+    this.priority = 1,
   });
 
   final String name;
   final String phone;
   final String relation;
+  final int priority;
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'phone': phone,
     'relation': relation,
+    'priority': priority,
   };
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) {
@@ -48,6 +51,9 @@ class EmergencyContact {
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       relation: json['relation'] as String? ?? '',
+      priority: json['priority'] is int
+          ? json['priority'] as int
+          : int.tryParse('${json['priority']}') ?? 1,
     );
   }
 }
@@ -1737,19 +1743,23 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
 
     if (_automation.fallDetection || _automation.shakeSos) {
-      _accelerometerSubscription = userAccelerometerEventStream().listen(
-        (event) => unawaited(_handleMotionEvent(event)),
-        onError: (_) {},
-        cancelOnError: false,
-      );
+      try {
+        _accelerometerSubscription = userAccelerometerEventStream().listen(
+          (event) => unawaited(_handleMotionEvent(event)),
+          onError: (_) {},
+          cancelOnError: false,
+        );
+      } catch (_) {}
     }
 
     if (_automation.stepTrackingEnabled) {
-      _stepCountSubscription = Pedometer.stepCountStream.listen(
-        (event) => unawaited(_handleStepCountEvent(event)),
-        onError: (_) {},
-        cancelOnError: false,
-      );
+      try {
+        _stepCountSubscription = Pedometer.stepCountStream.listen(
+          (event) => unawaited(_handleStepCountEvent(event)),
+          onError: (_) {},
+          cancelOnError: false,
+        );
+      } catch (_) {}
     }
   }
 
@@ -1758,9 +1768,13 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     _automationTimer = null;
     _positionSubscription?.cancel();
     _positionSubscription = null;
-    _accelerometerSubscription?.cancel();
+    try {
+      _accelerometerSubscription?.cancel();
+    } catch (_) {}
     _accelerometerSubscription = null;
-    _stepCountSubscription?.cancel();
+    try {
+      _stepCountSubscription?.cancel();
+    } catch (_) {}
     _stepCountSubscription = null;
   }
 

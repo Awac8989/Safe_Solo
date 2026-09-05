@@ -60,6 +60,16 @@ Ghi chú triển khai:
 - Last known location bắt buộc gửi khi pin thấp nghiêm trọng.
 - Cho phép người thân xem vị trí theo điều kiện (conditional sharing).
 
+### 4.5 Thiết bị đeo thông minh: Samsung Galaxy Watch 5 (WearOS)
+
+- **Chuyển đổi chuẩn hóa**: Thay thế phần cứng rời tự chế (STM32/MAX30102) sang hệ sinh thái đồng hồ thông minh thương mại **Samsung Galaxy Watch 5**, mang lại độ chính xác lâm sàng, chống nước 5ATM và trải nghiệm đeo hàng ngày thực tế.
+- **Cảm biến BioActive 3-in-1**:
+  - Đo lường nồng độ Oxy trong máu thời gian thực (`SpO2 %`) và Tần số nhịp tim (`Heart Rate BPM`).
+  - Cảm biến gia tốc 3 trục & con quay hồi chuyển phục vụ phát hiện té ngã tự động (`Fall Detection`).
+  - Cảm biến tiếp xúc cổ tay (`Off-wrist Detection`) chống báo động nhầm khi tháo sạc.
+  - Cảm biến bước chân (`Pedometer`) & đo lượng calo đốt cháy hàng ngày.
+- **Tích hợp thời gian thực**: Đồng bộ dữ liệu sinh tồn tức thời qua Bluetooth BLE / Wear OS Companion service sang SafeSolo Mobile App, đồng thời truyền phát trực tiếp lên bản đồ Live Map MapTiler của Cổng Điều phối Trung tâm (Web Admin) khi phát hiện dấu hiệu nguy hiểm (SpO2 < 90%).
+
 ## 5) Kiến trúc kỹ thuật đề xuất
 
 ### Mobile (Flutter)

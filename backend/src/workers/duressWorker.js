@@ -10,15 +10,25 @@ const systemLogService = require('../services/systemLogService');
 
 const queueName = 'duress';
 
-const duressQueue = new Queue(queueName, { connection: redis });
-new JobScheduler(queueName, { connection: redis });
+let duressQueue = null;
+let jobScheduler = null;
 
 async function acquireLock(lockKey, ttl = 240000) {
-  const result = await redis.set(lockKey, 'locked', 'NX', 'PX', ttl);
-  return result === 'OK';
+  if (!redis) {
+    return true;
+  }
+  try {
+    const result = await redis.set(lockKey, 'locked', 'NX', 'PX', ttl);
+    return result === 'OK';
+  } catch (_err) {
+    return true;
+  }
 }
 
 async function releaseLock(lockKey) {
+  if (!redis) {
+    return;
+  }
   try {
     await redis.del(lockKey);
   } catch (_error) {
@@ -59,16 +69,18 @@ async function monitorCheckinsJob() {
       user.deadmanEscalationTriggeredAt = new Date();
       await user.save();
 
-      await duressQueue.add(
-        'escalate-user',
-        { userId: user._id },
-        {
-          delay: 5 * 60 * 1000,
-          jobId: `deadman-escalate-${user._id}`,
-          removeOnComplete: true,
-          removeOnFail: false,
-        },
-      );
+      if (duressQueue) {
+        await duressQueue.add(
+          'escalate-user',
+          { userId: user._id },
+          {
+            delay: 5 * 60 * 1000,
+            jobId: `deadman-escalate-${user._id}`,
+            removeOnComplete: true,
+            removeOnFail: false,
+          },
+        );
+      }
 
       await systemLogService.createLog({
         actionType: 'DEADMAN_LEVEL_1_SENT',
@@ -166,54 +178,68 @@ async function autoWipeJob() {
 }
 
 function startDuressWorkers() {
-  const oneMinuteMonitor = {
-    repeat: { cron: '*/1 * * * *' },
-    jobId: 'deadman-monitor-checkins',
-    removeOnComplete: true,
-    removeOnFail: false,
-  };
-
-  const dailyAutoWipe = {
-    repeat: { cron: '0 0 * * *' },
-    jobId: 'deadman-auto-wipe',
-    removeOnComplete: true,
-    removeOnFail: false,
-  };
-
-  Promise.all([
-    duressQueue.add('monitor-checkins', {}, oneMinuteMonitor),
-    duressQueue.add('auto-wipe', {}, dailyAutoWipe),
-  ]).catch((error) => {
+  if (!redis) {
     // eslint-disable-next-line no-console
-    console.error('Failed to add repeatable duress jobs:', error.message);
-  });
+    console.log('[SafeSolo] Duress BullMQ workers skipped (Redis not configured, DeadMan worker active via native timer)');
+    return;
+  }
 
-  new Worker(
-    queueName,
-    async (job) => {
-      switch (job.name) {
-        case 'monitor-checkins':
-          await monitorCheckinsJob();
-          break;
-        case 'escalate-user':
-          await escalateUserJob(job.data);
-          break;
-        case 'auto-wipe':
-          await autoWipeJob();
-          break;
-        default:
-          break;
-      }
-    },
-    {
-      connection: redis,
-      lockDuration: 300000,
-      concurrency: 1,
-    },
-  );
+  try {
+    duressQueue = new Queue(queueName, { connection: redis });
+    jobScheduler = new JobScheduler(queueName, { connection: redis });
 
-  // eslint-disable-next-line no-console
-  console.log('Duress workers started: deadman monitor and auto-wipe');
+    const oneMinuteMonitor = {
+      repeat: { cron: '*/1 * * * *' },
+      jobId: 'deadman-monitor-checkins',
+      removeOnComplete: true,
+      removeOnFail: false,
+    };
+
+    const dailyAutoWipe = {
+      repeat: { cron: '0 0 * * *' },
+      jobId: 'deadman-auto-wipe',
+      removeOnComplete: true,
+      removeOnFail: false,
+    };
+
+    Promise.all([
+      duressQueue.add('monitor-checkins', {}, oneMinuteMonitor),
+      duressQueue.add('auto-wipe', {}, dailyAutoWipe),
+    ]).catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to add repeatable duress jobs:', error.message);
+    });
+
+    new Worker(
+      queueName,
+      async (job) => {
+        switch (job.name) {
+          case 'monitor-checkins':
+            await monitorCheckinsJob();
+            break;
+          case 'escalate-user':
+            await escalateUserJob(job.data);
+            break;
+          case 'auto-wipe':
+            await autoWipeJob();
+            break;
+          default:
+            break;
+        }
+      },
+      {
+        connection: redis,
+        lockDuration: 300000,
+        concurrency: 1,
+      },
+    );
+
+    // eslint-disable-next-line no-console
+    console.log('Duress workers started: deadman monitor and auto-wipe');
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to start duress BullMQ workers:', error.message);
+  }
 }
 
 module.exports = { startDuressWorkers };

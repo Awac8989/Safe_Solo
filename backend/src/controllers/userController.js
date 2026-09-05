@@ -957,6 +957,22 @@ async function createDeviceSignal(req, res) {
     metadata: payload,
   });
 
+  let io = null;
+  try {
+    io = getIo();
+  } catch (_) {
+    io = { emit() {} };
+  }
+
+  // Real-time broadcast to Web Admin Dispatch and Knights
+  io.emit('DEVICE_SIGNAL_UPDATE', {
+    userId: id,
+    userName: userDoc.name,
+    signalType,
+    payload,
+    timestamp: new Date(),
+  });
+
   const automation = await ensureAutomationSettings(id);
   let action = 'RECORDED';
 
@@ -999,24 +1015,31 @@ async function createDeviceSignal(req, res) {
     }
   } else if (
     (signalType === 'FALL_DETECTED' && automation.fallDetection) ||
+    (signalType === 'WATCH_FALL_DETECTED') ||
+    (signalType === 'WATCH_EMERGENCY_SOS') ||
+    (signalType === 'WATCH_CRITICAL_SPO2') ||
     (signalType === 'SHAKE_SOS' && automation.shakeSos)
   ) {
-    let io = null;
-    try {
-      io = getIo();
-    } catch (_) {
-      io = { emit() {} };
-    }
     await triggerSosForUser(io, mapUserDoc(userDoc));
     await createAlertEvent({
       userId: id,
-      level: signalType === 'FALL_DETECTED' ? 'LEVEL_2_ALARM' : 'LEVEL_3_SOS',
+      level: (signalType === 'WATCH_EMERGENCY_SOS' || signalType === 'SHAKE_SOS')
+        ? 'LEVEL_3_SOS'
+        : 'LEVEL_2_ALARM',
       status: signalType,
-      source: 'DEVICE_SIGNAL',
-      title: signalType === 'FALL_DETECTED' ? 'Phat hien te nga' : 'Lac may tao SOS',
-      message: signalType === 'FALL_DETECTED'
-        ? 'Backend da nhan te nga va kich hoat chuoi cuu ho'
-        : 'Backend da nhan lac may va kich hoat SOS',
+      source: signalType.startsWith('WATCH_') ? 'SAMSUNG_GALAXY_WATCH_5' : 'DEVICE_SIGNAL',
+      title: signalType === 'WATCH_FALL_DETECTED'
+        ? 'Samsung Watch 5: Phat hien te nga'
+        : signalType === 'WATCH_CRITICAL_SPO2'
+        ? 'Samsung Watch 5: SpO2 tut nguy cap'
+        : signalType === 'WATCH_EMERGENCY_SOS'
+        ? 'Samsung Watch 5: SOS Khan cap'
+        : (signalType === 'FALL_DETECTED' ? 'Phat hien te nga' : 'Lac may tao SOS'),
+      message: signalType.startsWith('WATCH_')
+        ? `Tin hieu tu Samsung Galaxy Watch 5 (BioActive). SpO2: ${payload.spO2 ?? 'N/A'}%, Tim: ${payload.heartRate ?? 'N/A'} BPM`
+        : (signalType === 'FALL_DETECTED'
+          ? 'Backend da nhan te nga va kich hoat chuoi cuu ho'
+          : 'Backend da nhan lac may va kich hoat SOS'),
       metadata: payload,
     });
     action = 'SOS_TRIGGERED';
