@@ -944,7 +944,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _notifications.initialize();
     _restartRuntimeAutomation();
     await _syncPushTokenIfNeeded();
-    await _syncBackgroundSafetyService();
+    if (_user != null && _permissionsGranted) {
+      await _syncBackgroundSafetyService();
+    }
 
     _isInitializing = false;
     notifyListeners();
