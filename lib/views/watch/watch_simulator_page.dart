@@ -108,6 +108,10 @@ class _WatchSimulatorPageState extends State<WatchSimulatorPage>
       _isSosActive = true;
     });
     _syncToPedometerService();
+    _pedometer.emitWatchEmergencyAlert(
+      type: 'WATCH_CRITICAL_SPO2',
+      message: 'Cảm biến BioActive trên Samsung Galaxy Watch 5 phát hiện SpO2 hạ còn 86%',
+    );
     _sendSignalToBackend(
       signalType: 'WATCH_CRITICAL_SPO2',
       payload: {'alert': 'SpO2 giảm thấp nguy kịch dưới 90% (86%)'},
@@ -126,6 +130,10 @@ class _WatchSimulatorPageState extends State<WatchSimulatorPage>
       _heartRate = 118;
     });
     _syncToPedometerService();
+    _pedometer.emitWatchEmergencyAlert(
+      type: 'WATCH_FALL_DETECTED',
+      message: 'Phát hiện gia tốc rơi tự do và va chạm mạnh (Hard Fall)',
+    );
     _sendSignalToBackend(
       signalType: 'WATCH_FALL_DETECTED',
       payload: {'alert': 'Phát hiện gia tốc rơi tự do và va chạm mạnh (Hard Fall)'},
@@ -140,6 +148,10 @@ class _WatchSimulatorPageState extends State<WatchSimulatorPage>
   void _triggerHardSos() {
     setState(() => _isSosActive = true);
     _syncToPedometerService();
+    _pedometer.emitWatchEmergencyAlert(
+      type: 'WATCH_EMERGENCY_SOS',
+      message: 'Người dùng nhấn phím SOS phần cứng trên Watch 5',
+    );
     _sendSignalToBackend(
       signalType: 'WATCH_EMERGENCY_SOS',
       payload: {'alert': 'Người dùng nhấn phím SOS phần cứng trên Watch 5'},
@@ -261,6 +273,11 @@ class _WatchSimulatorPageState extends State<WatchSimulatorPage>
       appBar: AppBar(
         title: const Text('Giả lập Samsung Galaxy Watch 5'),
         actions: [
+          IconButton(
+            tooltip: 'Mở Giao diện WearOS Thực tế',
+            icon: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8)),
+            onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
+          ),
           IconButton(
             tooltip: 'Đồng bộ lên Cloud',
             icon: _isSyncing

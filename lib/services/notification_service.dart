@@ -163,6 +163,21 @@ class NotificationService {
     );
   }
 
+  Future<void> showAlert({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _show(
+      id: id,
+      title: title,
+      body: body,
+      channelId: _alertsChannel.id,
+      channelName: _alertsChannel.name,
+      channelDescription: _alertsChannel.description ?? '',
+    );
+  }
+
   Future<void> _show({
     required int id,
     required String title,

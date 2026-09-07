@@ -21,6 +21,8 @@ import '../../services/audio_note_service.dart';
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/push_notification_service.dart';
+import '../../services/pedometer_service.dart';
+import '../../services/wear_os_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -725,6 +727,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<StepCount>? _stepCountSubscription;
+  StreamSubscription<Map<String, dynamic>>? _watchAlertSubscription;
   AppLocation? _homeAnchor;
   DateTime? _lastDailyReminderAt;
   DateTime? _lastMedicationReminderAt;
@@ -761,6 +764,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _watchAlertSubscription?.cancel();
     _stopRuntimeAutomation();
     super.dispose();
   }
@@ -943,6 +947,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _evaluateSafetyAutomation();
     await _notifications.initialize();
     _restartRuntimeAutomation();
+    _initWatchIntegration();
     await _syncPushTokenIfNeeded();
     if (_user != null && _permissionsGranted) {
       await _syncBackgroundSafetyService();
@@ -1484,6 +1489,51 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       payload: payload,
     );
     await refreshUser();
+  }
+
+  void _initWatchIntegration() {
+    _watchAlertSubscription?.cancel();
+    WearOsService.instance.initialize();
+    _watchAlertSubscription =
+        PedometerService.instance.watchAlertStream.listen(_handleWatchAlert);
+  }
+
+  Future<void> _handleWatchAlert(Map<String, dynamic> alert) async {
+    final type = alert['type'] as String? ?? 'WATCH_ALERT';
+    final message =
+        alert['message'] as String? ?? 'Tín hiệu từ Samsung Galaxy Watch 5';
+
+    final current = _user;
+    if (current != null) {
+      unawaited(
+        _api.createInteraction(
+          userId: current.id,
+          type: type,
+          source: 'SAMSUNG_GALAXY_WATCH_5',
+          metadata: alert,
+        ),
+      );
+    }
+
+    if (type == 'WATCH_FALL_DETECTED' ||
+        type == 'WATCH_EMERGENCY_SOS' ||
+        type == 'WATCH_CRITICAL_SPO2') {
+      if (current != null) {
+        _user = current.copyWith(
+          currentStatus: 'ALERT_TRIGGERED',
+        );
+        notifyListeners();
+        unawaited(_saveToStorage());
+      }
+
+      unawaited(
+        _notifications.showAlert(
+          id: 9088,
+          title: '🚨 CẢNH BÁO TỪ SAMSUNG GALAXY WATCH 5',
+          body: message,
+        ),
+      );
+    }
   }
 
   Future<void> triggerSilentSos() async {

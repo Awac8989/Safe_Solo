@@ -297,6 +297,26 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          const SizedBox(height: 22),
+          AppSectionLabel(strings.text('Thiết bị đeo thông minh', 'Wearable devices')),
+          const SizedBox(height: 10),
+          _SectionCard(
+            children: [
+              _ActionRow(
+                icon: Icons.watch_rounded,
+                title: strings.text('Mặt đồng hồ WearOS (Galaxy Watch 5)', 'WearOS Watch Face (Galaxy Watch 5)'),
+                valueText: strings.text('Xem ngay', 'Open'),
+                onTap: () => Navigator.pushNamed(context, '/wear-os'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.tune_rounded,
+                title: strings.text('Giả lập cảm biến Watch 5', 'Watch 5 Sensor Simulator'),
+                valueText: strings.text('Mở', 'Open'),
+                onTap: () => Navigator.pushNamed(context, '/watch-simulator'),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => context.read<AppProvider>().signOut(),

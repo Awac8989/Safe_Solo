@@ -322,6 +322,24 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                                     ),
                                     onPressed: () => pedometer.simulateWalking(),
                                   ),
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF38BDF8),
+                                      side: const BorderSide(color: Color(0xFF0284C7)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    icon: const Icon(Icons.watch_rounded, size: 14),
+                                    label: Text(
+                                      strings.text('Mặt WearOS', 'WearOS Face'),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                                    ),
+                                    onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
+                                  ),
                                   ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF0284C7),
@@ -333,7 +351,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
-                                    icon: const Icon(Icons.watch_rounded, size: 14),
+                                    icon: const Icon(Icons.tune_rounded, size: 14),
                                     label: Text(
                                       strings.text('Mở giả lập Watch 5', 'Open Watch 5 Simulator'),
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),

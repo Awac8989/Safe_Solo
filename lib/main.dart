@@ -12,6 +12,7 @@ import 'views/permissions/permissions_page.dart';
 import 'views/security/security_page.dart';
 import 'views/settings/settings_page.dart';
 import 'views/watch/watch_simulator_page.dart';
+import 'views/wear_os/wear_os_watch_page.dart';
 import 'views/vault/vault_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
@@ -48,6 +49,7 @@ class SafeSoloApp extends StatelessWidget {
               '/achievements': (_) => const AchievementsPage(),
               '/settings': (_) => const SettingsPage(),
               '/watch-simulator': (_) => const WatchSimulatorPage(),
+              '/wear-os': (_) => const WearOsWatchPage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),
@@ -65,6 +67,15 @@ class _AppGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
+    final media = MediaQuery.of(context);
+    final isWatchScreen =
+        media.size.shortestSide <= 480 && media.size.aspectRatio <= 1.25;
+    debugPrint('MAIN _AppGate: size=${media.size}, shortestSide=${media.size.shortestSide}, aspectRatio=${media.size.aspectRatio}, isWatchScreen=$isWatchScreen');
+
+    // Tự động chuyển thẳng vào Chế độ Đồng hồ WearOS nếu kích thước màn hình nhỏ tròn/vuông
+    if (isWatchScreen) {
+      return const WearOsWatchPage();
+    }
 
     if (provider.isInitializing) {
       return const _SplashScreen();
