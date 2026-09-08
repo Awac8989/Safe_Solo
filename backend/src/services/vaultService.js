@@ -1,4 +1,5 @@
 const Vault = require('../models/Vault');
+const User = require('../models/User');
 const { AppError } = require('../lib/errors');
 const { decryptJson, encryptJson } = require('../lib/securityCrypto');
 
@@ -65,6 +66,35 @@ class VaultService {
     return {
       ...vault.toObject(),
       content: shreddedContent,
+    };
+  }
+
+  async releaseVaultToGuardians(userId) {
+    const vault = await Vault.findOne({ userId });
+    if (!vault || vault.shreddedAt) {
+      return null;
+    }
+
+    let decryptedContent = null;
+    try {
+      decryptedContent = decryptJson(vault.content, `vault:${userId}`);
+    } catch (_e) {
+      decryptedContent = vault.content;
+    }
+
+    vault.releasedAt = new Date();
+    await vault.save();
+
+    const user = await User.findById(userId).lean();
+    const guardians = user?.emergencyContacts || [];
+
+    return {
+      vaultId: vault._id,
+      userId,
+      releasedAt: vault.releasedAt,
+      guardiansNotified: guardians.length,
+      guardians: guardians.map((g) => ({ name: g.name, phone: g.phone })),
+      content: decryptedContent,
     };
   }
 }

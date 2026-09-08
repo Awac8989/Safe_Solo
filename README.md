@@ -76,7 +76,7 @@ SafeSolo là giải pháp an toàn cá nhân toàn diện dành cho người s�
 
 ---
 
-### 2. Thiết bị Đeo Thông minh (Samsung Galaxy Watch 5 / WearOS Simulator)
+### 2. Thiết bị Đeo Thông minh (Samsung Galaxy Watch 5 / Wear OS 4.0)
 * **Đồng bộ Chỉ số Sinh tồn Thời gian thực:**
   - Nhịp tim ($BPM$): Tính toán liên tục qua cảm biến PPG với bộ lọc thông dải Butterworth và dò đỉnh thích nghi $V_{threshold}$.
   - Nồng độ Oxy hòa tan ($SpO_2$): Tính theo tỷ số $R$ định luật Beer-Lambert ($SpO_2 = 110 - 25R$).
@@ -84,9 +84,9 @@ SafeSolo là giải pháp an toàn cá nhân toàn diện dành cho người s�
   - Giám sát vector gia tốc $SVM = \sqrt{a_x^2 + a_y^2 + a_z^2}$.
   - Kích hoạt cảnh báo khi $SVM > 2.5g$ kết hợp góc nghiêng cơ thể $	heta > 60^\circ$.
 * **Đếm bước chân & Calo:** Tự động đồng bộ bước chân về trung tâm điều phối.
-* **Môi trường Giả lập Toàn diện (Watch Simulator):**
-  - **Trên Mobile App:** Truy cập qua Cài đặt hoặc Thẻ Samsung Watch 5 để thử nghiệm gửi xung nhịp, oxy tụt nguy cấp ($<90\%$) và va đập té ngã.
-  - **Trên Web Admin:** Module tương tác đồ họa tròn WearOS tại đường dẫn `/watch-simulator`.
+* **Kết nối & Giám sát Thiết bị Đeo Trực tiếp (Smartwatch Direct Telemetry):**
+  - **Trên Mobile App:** Màn hình kết nối & giám sát thông số đồng hồ trực tiếp qua BLE (Bluetooth Low Energy): kiểm tra trạng thái ghép nối, mức pin %, tín hiệu sóng RSSI, tình trạng đeo trên tay (On/Off-wrist), nhịp tim PPG BioActive, $SpO_2$, gia tốc kế IMU 3 trục và đo đạc tức thời.
+  - **Đồng hồ Wear OS độc lập:** Ứng dụng Wear OS 4.0 One UI Watch chạy trực tiếp trên thiết bị smartwatch thật (Samsung Galaxy Watch 5/6) hoặc Wear OS emulator (`/wear-os`).
 
 ---
 
@@ -202,13 +202,13 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 4. Giả lập Đồng hồ Samsung Galaxy Watch 5 trên App (WearOS BioActive)
-* **Tuyến đường:** `/watch-simulator`
-* **Mô tả:** Giao diện mặt đồng hồ tròn WearOS tương tác trực tiếp: hiển thị thời gian, nhịp tim ($BPM$), nồng độ oxy hòa tan ($SpO_2$), đếm bước chân và lượng calo đốt cháy. Nút **MÔ PHỎNG TÉ NGÃ** ($4.8g$) và **BẤM SOS KHẨN CẤP** kích hoạt báo động ngay lập tức.
+#### 4. Quản lý Kết nối & Thông số Đồng hồ Thông minh (Samsung Galaxy Watch 5)
+* **Tuyến đường:** `/smartwatch` (hoặc `/watch-details`)
+* **Mô tả:** Chức năng trực tiếp kết nối và hiển thị các thông số cụ thể từ đồng hồ qua Bluetooth LE: trạng thái ghép nối, mức pin %, cường độ sóng RSSI dBm, tình trạng đeo trên cổ tay (On-wrist / Off-wrist), nhịp tim PPG BioActive thời gian thực, nồng độ oxy hòa tan $SpO_2$, cảm biến gia tốc 3 trục IMU (SVM, trục X/Y/Z, góc nghiêng), phím rung tìm đồng hồ và nút phát tín hiệu SOS khẩn cấp trực tiếp.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/app_04_watch_simulator.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_04_watch_simulator.png)
 
 <p align="center">
-  <img src="./docs/screenshots/app_04_watch_simulator.png" alt="Watch Simulator App Screen" width="360px" style="border-radius: 16px; border: 2px solid #ef4444; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+  <img src="./docs/screenshots/app_04_watch_simulator.png" alt="Smartwatch Connection Screen" width="360px" style="border-radius: 16px; border: 2px solid #0284c7; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
 </p>
 
 ---
@@ -292,18 +292,7 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 2. Giả lập Đồng hồ Samsung Galaxy Watch 5 trên Web (WearOS Simulator)
-* **Tuyến đường:** `/watch-simulator` (Web Admin)
-* **Mô tả:** Bàn kiểm thử tín hiệu WearOS trên Web: đo nhịp tim PPG, $SpO_2$, đếm bước/calo và mô phỏng va chạm té ngã ($4.8g$).
-* 🔗 **Mở xem ảnh:** [docs/screenshots/02_galaxy_watch_simulator.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/02_galaxy_watch_simulator.png)
-
-<p align="center">
-  <img src="./docs/screenshots/02_galaxy_watch_simulator.png" alt="Samsung Galaxy Watch 5 Simulator" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
-</p>
-
----
-
-#### 3. Điều phối Cứu hộ Đa kênh (Omnichannel Emergency Dispatch)
+#### 2. Điều phối Cứu hộ Đa kênh (Omnichannel Emergency Dispatch)
 * **Tuyến đường:** `/omnichannel` (Web Admin)
 * **Mô tả:** Giám sát 4 luồng phát tin khẩn cấp đồng thời: Telegram Bot Webhook, Zalo ZNS, Twilio SMS và Voice Auto-Call Level 4.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/03_omnichannel_dispatch.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/03_omnichannel_dispatch.png)
@@ -314,7 +303,7 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 4. Quản lý & Phê duyệt Xác minh Danh tính CCCD (KYC Verification)
+#### 3. Quản lý & Phê duyệt Xác minh Danh tính CCCD (KYC Verification)
 * **Tuyến đường:** `/kyc` (Web Admin)
 * **Mô tả:** Tiếp nhận ảnh chụp 2 mặt Căn cước công dân do người dùng tải lên từ camera điện thoại, phê duyệt và cấp huy hiệu Hiệp sĩ tin cậy.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/04_kyc_verification.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/04_kyc_verification.png)
@@ -325,7 +314,7 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 5. Quản trị Người dùng & Mạng lưới Người bảo hộ (Users & Guardians)
+#### 4. Quản trị Người dùng & Mạng lưới Người bảo hộ (Users & Guardians)
 * **Tuyến đường:** `/users` (Web Admin)
 * **Mô tả:** Quản trị hồ sơ người dùng, phân cấp mức độ ưu tiên Người bảo hộ và kích hoạt chế độ gọi điện trực tiếp khi có sự cố.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/05_users_guardians.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/05_users_guardians.png)
@@ -336,7 +325,7 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 6. Thống kê Ca cứu hộ & Báo cáo Doanh thu (Analytics & Revenue)
+#### 5. Thống kê Ca cứu hộ & Báo cáo Doanh thu (Analytics & Revenue)
 * **Tuyến đường:** `/revenue` (Web Admin)
 * **Mô tả:** Biểu đồ trực quan thống kê số ca cứu hộ thành công, thời gian tiếp cứu trung bình và phân bổ địa bàn hoạt động.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/06_analytics_revenue.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/06_analytics_revenue.png)
@@ -347,7 +336,7 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
-#### 7. Nhật ký Kiểm toán Hệ thống & An toàn Dữ liệu (Audit Log)
+#### 6. Nhật ký Kiểm toán Hệ thống & An toàn Dữ liệu (Audit Log)
 * **Tuyến đường:** `/audit` (Web Admin)
 * **Mô tả:** Lưu vết không thể sửa xóa (audit trail) đối với mọi thao tác SOS, phân quyền và dữ liệu y tế theo chuẩn an toàn thông tin.
 * 🔗 **Mở xem ảnh:** [docs/screenshots/07_system_audit.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/07_system_audit.png)

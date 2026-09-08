@@ -456,6 +456,30 @@ class ApiService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> postThankYouNote({
+    required String heroId,
+    required int rating,
+    required String content,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/heroes/$heroId/thank-you');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'rating': rating,
+          'content': content,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   void _throwIfFailed(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;

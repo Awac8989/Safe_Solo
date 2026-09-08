@@ -76,6 +76,7 @@ class User {
     this.lastCheckinTime,
     this.lastKnownLocation,
     this.emergencyContacts = const [],
+    this.isKycVerified = false,
   });
 
   final String id;
@@ -92,6 +93,7 @@ class User {
   final DateTime? lastCheckinTime;
   final AppLocation? lastKnownLocation;
   final List<EmergencyContact> emergencyContacts;
+  final bool isKycVerified;
 
   int get graceHours => (timerIntervalMinutes / 60).round();
 
@@ -110,6 +112,7 @@ class User {
     DateTime? lastCheckinTime,
     AppLocation? lastKnownLocation,
     List<EmergencyContact>? emergencyContacts,
+    bool? isKycVerified,
   }) {
     return User(
       id: id ?? this.id,
@@ -127,6 +130,7 @@ class User {
       lastCheckinTime: lastCheckinTime ?? this.lastCheckinTime,
       lastKnownLocation: lastKnownLocation ?? this.lastKnownLocation,
       emergencyContacts: emergencyContacts ?? this.emergencyContacts,
+      isKycVerified: isKycVerified ?? this.isKycVerified,
     );
   }
 
@@ -145,6 +149,7 @@ class User {
     'lastCheckinTime': lastCheckinTime?.toIso8601String(),
     'lastKnownLocation': lastKnownLocation?.toJson(),
     'emergencyContacts': emergencyContacts.map((item) => item.toJson()).toList(),
+    'isKycVerified': isKycVerified,
   };
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -172,6 +177,7 @@ class User {
             ),
           )
           .toList(),
+      isKycVerified: json['isKycVerified'] as bool? ?? false,
     );
   }
 
@@ -199,6 +205,7 @@ class User {
             ),
           )
           .toList(),
+      isKycVerified: model.isKycVerified,
     );
   }
 }
@@ -647,6 +654,7 @@ class ChatMessage {
 
 class HeroProfile {
   const HeroProfile({
+    this.id = '',
     required this.name,
     required this.location,
     required this.rating,
@@ -655,12 +663,35 @@ class HeroProfile {
     required this.distanceKm,
   });
 
+  final String id;
   final String name;
   final String location;
   final double rating;
   final int rescues;
   final bool verified;
   final double distanceKm;
+
+  String get effectiveId => id.isNotEmpty ? id : name.toLowerCase().replaceAll(' ', '_');
+
+  HeroProfile copyWith({
+    String? id,
+    String? name,
+    String? location,
+    double? rating,
+    int? rescues,
+    bool? verified,
+    double? distanceKm,
+  }) {
+    return HeroProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      location: location ?? this.location,
+      rating: rating ?? this.rating,
+      rescues: rescues ?? this.rescues,
+      verified: verified ?? this.verified,
+      distanceKm: distanceKm ?? this.distanceKm,
+    );
+  }
 }
 
 class RadarIncident {
@@ -2460,6 +2491,67 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         return 'Cần lưu ý';
       case Mood.focused:
         return 'Đang tập trung';
+    }
+  }
+
+  /// Gửi hồ sơ định danh KYC (CCCD / Passport) để đăng ký làm Hiệp sĩ cứu hộ
+  Future<bool> submitKycDocuments({
+    required String frontPath,
+    required String backPath,
+  }) async {
+    try {
+      final res = await _api.uploadKycDocuments(
+        frontPath: frontPath,
+        backPath: backPath,
+        userId: _user?.id,
+      );
+      if (res['success'] == true) {
+        if (_user != null) {
+          _user = _user!.copyWith(isKycVerified: false);
+          await _saveToStorage();
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Submit KYC error: $e');
+      return false;
+    }
+  }
+
+  /// Gửi lời cảm ơn & Đánh giá chất lượng hỗ trợ (1-5 sao) cho Hiệp sĩ
+  Future<bool> sendHeroThankYou({
+    required String heroId,
+    required int rating,
+    required String message,
+  }) async {
+    try {
+      final res = await _api.postThankYouNote(
+        heroId: heroId,
+        rating: rating,
+        content: message,
+        userId: _user?.id,
+      );
+      final idx = _heroes.indexWhere((h) => h.effectiveId == heroId || h.id == heroId);
+      if (idx != -1) {
+        final current = _heroes[idx];
+        final newRescues = current.rescues + 1;
+        final newRating = double.parse(
+          (((current.rating * current.rescues) + rating) / newRescues).toStringAsFixed(1),
+        );
+        final updatedList = List<HeroProfile>.from(_heroes);
+        updatedList[idx] = current.copyWith(
+          rescues: newRescues,
+          rating: newRating,
+        );
+        _heroes = updatedList;
+      }
+      notifyListeners();
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('Send thank you error: $e');
+      return false;
     }
   }
 }

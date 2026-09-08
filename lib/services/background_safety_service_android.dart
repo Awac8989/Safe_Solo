@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,7 +51,7 @@ class BackgroundSafetyService {
   bool _configured = false;
 
   bool get _isSupportedPlatform =>
-      Platform.isAndroid || Platform.isIOS;
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
   Future<void> prepare({bool hasLocationPermission = false}) async {
     if (!_isSupportedPlatform) {

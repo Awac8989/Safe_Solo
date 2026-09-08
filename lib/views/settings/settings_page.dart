@@ -178,9 +178,9 @@ class _SettingsPageState extends State<SettingsPage> {
               const _SectionDivider(),
               _ActionRow(
                 icon: Icons.watch_rounded,
-                title: strings.text('Giả lập Samsung Galaxy Watch 5', 'Samsung Galaxy Watch 5 Simulator'),
-                valueText: 'WearOS · BioActive',
-                onTap: () => Navigator.pushNamed(context, '/watch-simulator'),
+                title: strings.text('Thiết bị đeo & Đồng hồ thông minh', 'Wearable & Smartwatch'),
+                valueText: 'Galaxy Watch 5 · Đã kết nối',
+                onTap: () => Navigator.pushNamed(context, '/smartwatch'),
               ),
               const _SectionDivider(),
               _ActionRow(
@@ -307,13 +307,6 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: strings.text('Mặt đồng hồ WearOS (Galaxy Watch 5)', 'WearOS Watch Face (Galaxy Watch 5)'),
                 valueText: strings.text('Xem ngay', 'Open'),
                 onTap: () => Navigator.pushNamed(context, '/wear-os'),
-              ),
-              const _SectionDivider(),
-              _ActionRow(
-                icon: Icons.tune_rounded,
-                title: strings.text('Giả lập cảm biến Watch 5', 'Watch 5 Sensor Simulator'),
-                valueText: strings.text('Mở', 'Open'),
-                onTap: () => Navigator.pushNamed(context, '/watch-simulator'),
               ),
             ],
           ),

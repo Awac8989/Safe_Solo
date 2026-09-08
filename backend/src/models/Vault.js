@@ -8,6 +8,7 @@ const VaultSchema = new mongoose.Schema(
     content: { type: mongoose.Schema.Types.Mixed, default: { documents: [], encrypted: true } },
     encryptedAt: { type: Date, default: null },
     shreddedAt: { type: Date, default: null },
+    releasedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

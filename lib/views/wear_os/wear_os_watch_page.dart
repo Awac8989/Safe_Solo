@@ -1,13 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/app_strings.dart';
 import '../../core/providers/app_provider.dart';
 import '../../services/wear_os_service.dart';
 
@@ -32,7 +28,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   DateTime _now = DateTime.now();
   late AnimationController _pulseController;
   double _dragDelta = 0;
-  final GlobalKey _watchBoundaryKey = GlobalKey();
 
   @override
   void initState() {
@@ -51,78 +46,10 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-
-    // Tự động chụp tuần tự các màn hình để kiểm tra pixel trực tiếp từ Flutter GPU canvas (chỉ khi chạy app thật)
-    if (!Platform.environment.containsKey('FLUTTER_TEST') &&
-        !WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
-      _startAutoCaptureSequence();
-    }
-  }
-
-  bool _forceShowEmergencyOverlay = false;
-  Timer? _autoCaptureTimer;
-
-  void _startAutoCaptureSequence() {
-    _autoCaptureTimer = Timer(const Duration(seconds: 5), () async {
-      if (!mounted) return;
-      debugPrint('AUTO_CAPTURE: Starting 6-screen capture sequence...');
-
-      for (int i = 0; i < 6; i++) {
-        if (!mounted) return;
-        setState(() => _currentPage = i);
-        await Future.delayed(const Duration(milliseconds: 1600));
-        final filename = (i == 5)
-            ? 'safesolo_watch_p6_emergency.png'
-            : 'safesolo_watch_p${i + 1}.png';
-        await _captureScreenToDisk(filename);
-      }
-
-      if (!mounted) return;
-      setState(() => _currentPage = 0);
-      debugPrint('AUTO_CAPTURE: All 6 screens captured successfully!');
-    });
-  }
-
-  Future<void> _captureScreenToDisk(String filename) async {
-    try {
-      if (!mounted) return;
-      final wasAnimating = _pulseController.isAnimating;
-      if (wasAnimating) {
-        _pulseController.stop();
-      }
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 300));
-      await WidgetsBinding.instance.endOfFrame;
-
-      final boundary = _watchBoundaryKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        debugPrint('CAPTURE_ERROR: boundary is null for $filename');
-        if (wasAnimating) _pulseController.repeat(reverse: true);
-        return;
-      }
-      final pr = (boundary.size.width <= 240) ? 2.0 : 1.0;
-      final image = await boundary.toImage(pixelRatio: pr);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData != null) {
-        final dir = Directory('/data/data/com.example.safesolo/cache');
-        if (!dir.existsSync()) {
-          dir.createSync(recursive: true);
-        }
-        final file = File('${dir.path}/$filename');
-        await file.writeAsBytes(byteData.buffer.asUint8List(), flush: true);
-        debugPrint('CAPTURED_WATCH_SCREEN: ${file.path} (${file.lengthSync()} bytes)');
-      }
-      if (wasAnimating && mounted) {
-        _pulseController.repeat(reverse: true);
-      }
-    } catch (e) {
-      debugPrint('CAPTURE_ERROR: $e');
-    }
   }
 
   @override
   void dispose() {
-    _autoCaptureTimer?.cancel();
     _clockTimer.cancel();
     _pulseController.dispose();
     _pageController.dispose();
@@ -134,7 +61,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
     final wearOs = WearOsService.instance;
     final provider = context.watch<AppProvider>();
     final user = provider.user;
-    final strings = AppStrings(provider.language);
     final screenSize = MediaQuery.of(context).size;
 
     // Tự động căn chỉnh kích thước nếu chạy trên đồng hồ Wear OS thật hoặc màn hình điện thoại
@@ -152,7 +78,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
           builder: (context, _) => _buildWatchDisplay(
             wearOs,
             user,
-            strings,
             provider,
             watchDiameter,
           ),
@@ -164,40 +89,40 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0F172A),
-              elevation: 0,
-              centerTitle: true,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                onPressed: () => Navigator.of(context).pop(),
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          children: [
+            const Text(
+              'SAMSUNG GALAXY WATCH 5',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
               ),
-              title: Column(
-                children: [
-                  const Text(
-                    'SAMSUNG GALAXY WATCH 5',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  Text(
-                    'WearOS 4.0 · One UI Watch · BioActive Sensor',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  tooltip: 'Chuyển sang giả lập đầy đủ',
-                  icon: const Icon(Icons.tune_rounded, color: Color(0xFF38BDF8), size: 20),
-                  onPressed: () => Navigator.of(context).pushReplacementNamed('/watch-simulator'),
-                ),
-              ],
             ),
+            Text(
+              'WearOS 4.0 · One UI Watch · BioActive Sensor',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Xem thông số trên điện thoại',
+            icon: const Icon(Icons.smartphone_rounded, color: Color(0xFF38BDF8), size: 20),
+            onPressed: () => Navigator.of(context).pushReplacementNamed('/smartwatch'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: AnimatedBuilder(
@@ -234,7 +159,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
 
                   // Màn hình cảm ứng tròn AMOLED Black (Circular Display)
                   ClipOval(
-                    child: _buildWatchDisplay(wearOs, user, strings, provider, watchDiameter),
+                    child: _buildWatchDisplay(wearOs, user, provider, watchDiameter),
                   ),
                 ],
               );
@@ -249,16 +174,15 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   Widget _buildWatchDisplay(
     WearOsService wearOs,
     User? user,
-    AppStrings strings,
     AppProvider provider,
     double watchDiameter,
   ) {
     final screens = [
-      _buildWatchFaceScreen(wearOs, user, strings, watchDiameter),
-      _buildBioActiveSensorScreen(wearOs, strings, watchDiameter),
-      _buildFallMotionScreen(wearOs, strings, watchDiameter),
-      _buildMedicalIdScreen(provider, strings, watchDiameter),
-      _buildDeviceSettingsScreen(wearOs, user, strings, watchDiameter),
+      _buildWatchFaceScreen(wearOs, user, watchDiameter),
+      _buildBioActiveSensorScreen(wearOs, watchDiameter),
+      _buildFallMotionScreen(wearOs, watchDiameter),
+      _buildMedicalIdScreen(provider, watchDiameter),
+      _buildDeviceSettingsScreen(wearOs, user, watchDiameter),
       _buildEmergencyCountdownOverlay(wearOs, user, watchDiameter),
     ];
 
@@ -270,73 +194,65 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
       width: watchDiameter,
       height: watchDiameter,
       color: Colors.black,
-      child: RepaintBoundary(
-        key: _watchBoundaryKey,
-        child: Container(
-          width: watchDiameter,
-          height: watchDiameter,
-          color: Colors.black,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Các trang chức năng điều hướng bằng vuốt ngang
-              Positioned.fill(
-                child: GestureDetector(
-                  key: const Key('watch_gesture_detector'),
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragStart: (_) => _dragDelta = 0,
-                  onHorizontalDragUpdate: (details) => _dragDelta += details.delta.dx,
-                  onHorizontalDragEnd: (details) {
-                    final vx = details.primaryVelocity ?? 0;
-                    if ((vx < -60 || _dragDelta < -40) && _currentPage < 4) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _currentPage++);
-                    } else if ((vx > 60 || _dragDelta > 40) && _currentPage > 0) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _currentPage--);
-                    }
-                    _dragDelta = 0;
-                  },
-                  child: screens[activeIndex],
-                ),
-              ),
-
-              // Chấm chỉ báo trang (Page Indicator Dots) ở cạnh dưới (chỉ hiện trên 5 trang chính)
-              if (!wearOs.isCountdownActive && activeIndex < 5)
-                Positioned(
-                  bottom: (watchDiameter <= 240) ? 6 : 12,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final isSelected = activeIndex == index;
-                      return GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          setState(() => _currentPage = index);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                          width: isSelected
-                              ? ((watchDiameter <= 240) ? 8 : 12)
-                              : ((watchDiameter <= 240) ? 4 : 5),
-                          height: (watchDiameter <= 240) ? 3 : 4,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFF38BDF8)
-                                : Colors.white.withValues(alpha: 0.25),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-            ],
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Các trang chức năng điều hướng bằng vuốt ngang
+          Positioned.fill(
+            child: GestureDetector(
+              key: const Key('watch_gesture_detector'),
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragStart: (_) => _dragDelta = 0,
+              onHorizontalDragUpdate: (details) => _dragDelta += details.delta.dx,
+              onHorizontalDragEnd: (details) {
+                final vx = details.primaryVelocity ?? 0;
+                if ((vx < -60 || _dragDelta < -40) && _currentPage < 4) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _currentPage++);
+                } else if ((vx > 60 || _dragDelta > 40) && _currentPage > 0) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _currentPage--);
+                }
+                _dragDelta = 0;
+              },
+              child: screens[activeIndex],
+            ),
           ),
-        ),
+
+          // Chấm chỉ báo trang (Page Indicator Dots) ở cạnh dưới (chỉ hiện trên 5 trang chính)
+          if (!wearOs.isCountdownActive && activeIndex < 5)
+            Positioned(
+              bottom: (watchDiameter <= 240) ? 6 : 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final isSelected = activeIndex == index;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _currentPage = index);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                      width: isSelected
+                          ? ((watchDiameter <= 240) ? 8 : 12)
+                          : ((watchDiameter <= 240) ? 4 : 5),
+                      height: (watchDiameter <= 240) ? 3 : 4,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF38BDF8)
+                            : Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -347,7 +263,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   Widget _buildWatchFaceScreen(
     WearOsService wearOs,
     User? user,
-    AppStrings strings,
     double d,
   ) {
     final isSmall = d <= 240;
@@ -506,15 +421,14 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
                 onPressed: () async {
                   if (user != null) {
                     final ok = await wearOs.performDeadmanCheckin(userId: user.id);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
-                          content: Text(ok ? 'Đã điểm danh an toàn!' : 'Lỗi kết nối điểm danh.'),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
+                        content: Text(ok ? 'Đã điểm danh an toàn!' : 'Lỗi kết nối điểm danh.'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
                   } else {
                     wearOs.measureVitalsNow();
                   }
@@ -553,7 +467,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   // ===========================================================================
   Widget _buildBioActiveSensorScreen(
     WearOsService wearOs,
-    AppStrings strings,
     double d,
   ) {
     final isSmall = d <= 240;
@@ -694,8 +607,8 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
                     visualDensity: VisualDensity.compact,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: Text('HẠ SpO2 86%', style: TextStyle(fontSize: isSmall ? 7.0 : 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                   onPressed: wearOs.simulateCriticalSpO2,
+                  child: Text('HẠ SpO2 86%', style: TextStyle(fontSize: isSmall ? 7.0 : 10, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
@@ -710,7 +623,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   // ===========================================================================
   Widget _buildFallMotionScreen(
     WearOsService wearOs,
-    AppStrings strings,
     double d,
   ) {
     final isSmall = d <= 240;
@@ -862,7 +774,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   // ===========================================================================
   Widget _buildMedicalIdScreen(
     AppProvider provider,
-    AppStrings strings,
     double d,
   ) {
     final isSmall = d <= 240;
@@ -1013,7 +924,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage>
   Widget _buildDeviceSettingsScreen(
     WearOsService wearOs,
     User? user,
-    AppStrings strings,
     double d,
   ) {
     final isSmall = d <= 240;

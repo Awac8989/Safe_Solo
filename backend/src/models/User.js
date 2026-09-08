@@ -71,6 +71,7 @@ const UserSchema = new mongoose.Schema(
     falseAlertGraceMinutes: { type: Number, default: 3, min: 0, max: 30 },
     deadmanStage: { type: Number, default: 0 },
     deadmanEscalationTriggeredAt: { type: Date, default: null },
+    vaultReleasedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

@@ -180,7 +180,7 @@ class WearOsService extends ChangeNotifier {
     _startEmergencyCountdown(
       title: 'PHÁT HIỆN TÉ NGÃ TỪ GALAXY WATCH 5',
       message:
-          'Cảm biến BioActive & IMU phát hiện va chạm mạnh (${svm}g) và góc nghiêng ${tilt}°. Hệ thống đang đếm ngược 30 giây trước khi điều phối cấp cứu.',
+          'Cảm biến BioActive & IMU phát hiện va chạm mạnh (${svm}g) và góc nghiêng $tilt°. Hệ thống đang đếm ngược 30 giây trước khi điều phối cấp cứu.',
       signalType: 'WATCH_FALL_DETECTED',
       extraPayload: {
         'svm': svm,
@@ -390,8 +390,8 @@ class WearOsService extends ChangeNotifier {
   void measureVitalsNow() {
     HapticFeedback.lightImpact();
     // Tạo biến thiên tự nhiên nhẹ
-    _heartRate = (72 + (DateTime.now().second % 15));
-    _spO2 = (97 + (DateTime.now().second % 3));
+    _heartRate = 72 + (DateTime.now().second % 15);
+    _spO2 = 97 + (DateTime.now().second % 3);
     _steps += 12;
     _syncToPedometer();
     notifyListeners();
