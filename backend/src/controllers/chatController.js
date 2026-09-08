@@ -1,11 +1,20 @@
-const chatService = require('../services/chatService');
-const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
+const chatService = require('../services/chatService');
+
+const voiceUploadDir = path.join(__dirname, '../../uploads/voices');
+if (!fs.existsSync(voiceUploadDir)) {
+  fs.mkdirSync(voiceUploadDir, { recursive: true });
+}
 
 // Configure multer for voice uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../uploads/voices'));
+    if (!fs.existsSync(voiceUploadDir)) {
+      fs.mkdirSync(voiceUploadDir, { recursive: true });
+    }
+    cb(null, voiceUploadDir);
   },
   filename: (req, file, cb) => {
     // Generate unique filename with timestamp

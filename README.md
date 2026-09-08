@@ -1,247 +1,493 @@
-# SafeSolo
+# 🛡️ SAFESOLO - HỆ THỐNG CẢNH BÁO KHẨN CẤP TỰ ĐỘNG & ĐIỀU PHỐI CỨU HỘ THỜI GIAN THỰC
+> **Hệ sinh thái Cứu hộ Đa nền tảng:** Flutter Mobile (Android/iOS) • Samsung Galaxy Watch 5 (WearOS) • Web Admin Dispatch Portal • Backend Node.js / MongoDB • AI & DSP Engine
 
-SafeSolo là hệ thống hỗ trợ an toàn cá nhân theo mô hình:
+---
 
-- ứng dụng Flutter cho người dùng
-- backend Node.js + Express + MongoDB
-- web admin điều phối
+## 📌 THÔNG TIN ĐỀ TÀI ĐỒ ÁN TỐT NGHIỆP
+* **Tên đề tài:** Thiết kế và xây dựng hệ thống cảnh báo khẩn cấp tự động và điều phối cứu hộ thời gian thực - SafeSolo
+* **Sinh viên thực hiện:** **Đoàn Minh Quân**
+* **Mã số sinh viên:** **2224801030137**
+* **Lớp:** **KTPM03**
+* **Chuyên ngành:** Kỹ thuật Phần mềm (Software Engineering)
 
-Mục tiêu của dự án là giúp người dùng:
+---
 
-- điểm danh an toàn theo chu kỳ
-- tự động phát hiện mất liên lạc theo cơ chế dead-man switch
-- kích hoạt SOS thủ công hoặc ngầm
-- chia sẻ tín hiệu khẩn cấp cho người thân, cộng đồng và admin
-- lưu hồ sơ y tế, vault và cấu hình bảo mật nâng cao
+## 🌟 TỔNG QUAN HỆ THỐNG
+SafeSolo là giải pháp an toàn cá nhân toàn diện dành cho người sống độc thân, người cao tuổi, người làm việc trong môi trường rủi ro cao hoặc di chuyển ban đêm. Hệ thống hoạt động theo nguyên lý **Edge-First Resilience** (Chủ động phát hiện tại thiết bị biên) kết hợp **Cloud Realtime Dispatch** (Điều phối cứu hộ thông minh thời gian thực):
+1. **Theo dõi sinh tồn & Nhận diện bất thường:** Tự động phát hiện té ngã, nhịp tim bất thường ($BPM < 45$ hoặc $> 130$), thiếu oxy máu ($SpO_2 < 90\%$) thông qua cảm biến quang học PPG và gia tốc kế IMU.
+2. **Cơ chế Điểm danh Sinh tồn (Dead-man's Switch):** Nhắc nhở người dùng check-in an toàn theo chu kỳ hẹn trước; tự động chuyển sang trạng thái báo động khẩn cấp nếu người dùng bất tỉnh hoặc mất liên lạc.
+3. **Kích hoạt Khẩn cấp Đa phương thức:** Nhấn SOS tức thời, lắc mạnh điện thoại khi bị khống chế (*Shake-to-SOS*), ra lệnh bằng giọng nói (*Keyword Spotting*), hoặc nhập mã giả vờ phục tùng (*Duress PIN / Fake Calculator*).
+4. **Mạng lưới Cứu hộ Hiệp sĩ (Community Radar):** Kết nối các tình nguyện viên đã xác minh CCCD/KYC trong bán kính $1 - 5	ext{ km}$ bằng thuật toán trắc địa Haversine.
+5. **Điều phối Cứu hộ Đa kênh (Omnichannel Dispatch):** Tự động phát tin cứu hộ đồng thời qua 4 kênh: Telegram Bot Webhook, Zalo ZNS Template, Twilio SMS và Cuộc gọi khẩn cấp tự động (Voice Auto-Call Level 4).
 
-## Thành phần chính
+---
 
-### Flutter app
+## 🏗️ KIẾN TRÚC TỔNG THỂ HỆ THỐNG (SYSTEM ARCHITECTURE)
 
-Thư mục:
-
-- `lib/`
-- `android/`
-- `windows/`
-- `web/`
-
-Chức năng nổi bật:
-
-- onboarding, auth, permissions
-- Home check-in với vòng tròn trạng thái và đếm ngược
-- mood prompt khi check-in
-- Alive Circle
-- Messenger, ghi âm thật, gọi điện
-- SOS Map và Community Radar
-- Heroes / Hiệp sĩ
-- Settings, Medical ID, Network, Security, Vault, Achievements
-- Stealth mode dạng máy tính
-- đếm bước chân và calo
-- song ngữ Việt / Anh
-
-### Backend
-
-Thư mục:
-
-- `backend/`
-
-Chức năng:
-
-- quản lý user
-- check-in, interaction events, alert policies
-- dead-man worker
-- medical, security, automation, device signals
-- rescue incidents, volunteer response, community radar
-- chat rooms, messages, emergency memos
-- KYC
-- vault
-- admin APIs
-
-### Web admin
-
-Thư mục:
-
-- `web-admin/`
-
-Chức năng:
-
-- dashboard điều phối
-- danh sách user
-- KYC queue
-- sự cố đang xử lý
-- alert timeline
-- SMS logs
-- export Excel
-- bản đồ điều phối bằng MapTiler
-
-## Cấu trúc repo
-
-```text
-SafeSolo/
-├─ android/
-├─ backend/
-├─ docs/
-├─ lib/
-├─ test/
-├─ web/
-├─ web-admin/
-├─ windows/
-├─ flutter.env.example.json
-└─ README.md
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        THIẾT BỊ BIÊN (EDGE DEVICES)                    │
+├─────────────────────────────────────┬──────────────────────────────────┤
+│ 📱 FLUTTER MOBILE APP (Android/iOS) │ ⌚ SAMSUNG GALAXY WATCH 5 (WearOS)│
+│ • Dead-man's Switch & Check-in Loop │ • PPG Optical BioActive Sensor   │
+│ • Stealth Mode (Fake Calculator)    │ • 3-Axis IMU (Gia tốc & Con quay)│
+│ • KYC CCCD Upload & Trắc địa Waze   │ • Thuật toán té ngã (SVM & Tilt) │
+│ • Lọc Butterworth & Dò đỉnh R (BPM) │ • Đồng bộ Bluetooth / Wi-Fi / API│
+└──────────────────┬──────────────────┴─────────────────┬────────────────┘
+                   │                                    │
+                   │ RESTful API (HTTPS) / Socket.IO    │ POST /api/users/device-signal
+                   ▼                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│               BACKEND SERVER (Node.js • Express • MongoDB)             │
+├────────────────────────────────────────────────────────────────────────┤
+│ • Authentication & JWT / OTP Xác minh số điện thoại                    │
+│ • Deadman Background Worker (Quét trễ hạn check-in tự động)           │
+│ • Duress & Stealth Worker (Giải mã mã ngụy trang)                      │
+│ • Omnichannel Dispatch Engine (Telegram Bot, Zalo ZNS, SMS, Voice Call)│
+│ • Radar Spatial Query (Tìm Hiệp sĩ gần nhất theo Haversine)           │
+│ • AES-256 GCM Encryption (Bảo mật tuyệt đối hồ sơ CCCD & Y tế)         │
+└──────────────────┬─────────────────────────────────────────────────────┘
+                   │ Socket.IO Realtime Events / GeoJSON
+                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│             WEB ADMIN DISPATCH PORTAL (React • Vite • TanStack)         │
+├────────────────────────────────────────────────────────────────────────┤
+│ 🗺️ Live Map Cứu hộ: Giám sát tọa độ nạn nhân & Điều phối Hiệp sĩ      │
+│ 🪪 KYC Management: Duyệt và xác thực căn cước công dân 2 mặt          │
+│ 📡 Omnichannel Console: Giám sát trạng thái truyền tin đa kênh         │
+│ ⌚ Galaxy Watch Simulator: Bàn thử nghiệm phát tín hiệu WearOS          │
+│ 📈 Analytics & Revenue: Thống kê ca cứu hộ và phân tích rủi ro         │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Cách chạy nhanh
+---
 
-### Backend
+## 📱 CHI TIẾT CÁC PHÂN HỆ VÀ CHỨC NĂNG
 
-```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm install
-npm run dev
-```
+### 1. Ứng dụng Di động SafeSolo (Flutter Android / iOS)
+* **Vòng tròn Điểm danh Sinh tồn (Home Screen & Check-in Circle):** Hiển thị trực quan thời gian còn lại trước hạn chót điểm danh, đo mức pin, tâm trạng (Mood Prompt) và ghi chú hoạt động.
+* **Chế độ Khung giờ Yên tĩnh (Quiet Hours):** Tùy chỉnh khung giờ nghỉ ngơi (mặc định 23:00 - 06:00), tự động hạ mức báo động tránh làm phiền giấc ngủ nhưng vẫn duy trì giám sát ngầm.
+* **Xác thực Danh tính Hiệp sĩ (KYC Upload CCCD):** Cho phép chụp/chọn 2 mặt ảnh Căn cước công dân từ camera/thư viện, mã hóa gửi lên máy chủ để được cấp huy hiệu Hiệp sĩ tin cậy (*Trust Score*).
+* **Điều hướng Khẩn cấp 1-Chạm:** Tích hợp trực tiếp nút mở nhanh ứng dụng bản đồ **Waze Navigation** và **Google Maps** để Hiệp sĩ tới hiện trường với lộ trình ngắn nhất.
+* **Chế độ Ngụy trang Bảo mật (Stealth Calculator):** Màn hình máy tính bỏ túi hoạt động bình thường; khi gõ mật khẩu ngụy trang (*Duress PIN*) hệ thống sẽ âm thầm phát báo động câm và truyền tọa độ mà kẻ xấu không hay biết.
+* **Mạng lưới Người bảo hộ Phân cấp (Guardian Network):** Cấu hình người thân với 3 mức ưu tiên rõ ràng (Ưu tiên 1 - Người liên hệ chính, Ưu tiên 2, Ưu tiên 3) kèm tính năng gọi điện thoại khẩn cấp trực tiếp.
+* **Hồ sơ Y tế Khẩn cấp (Medical ID & QR Code):** Nhóm máu, tiền sử dị ứng, liên hệ bác sĩ gia đình hiển thị trên màn hình khóa phục vụ sơ cứu viên.
+* **Đếm bước chân & Lượng calo tiêu thụ (Pedometer Service):** Thu thập dữ liệu vận động thực tế, tự động tính calo đốt cháy ($Calo = Steps 	imes 0.04	ext{ kcal}$).
 
-Health check:
+---
 
-- [http://127.0.0.1:4000/api/health](http://127.0.0.1:4000/api/health)
+### 2. Thiết bị Đeo Thông minh (Samsung Galaxy Watch 5 / Wear OS 4.0)
+* **Đồng bộ Chỉ số Sinh tồn Thời gian thực:**
+  - Nhịp tim ($BPM$): Tính toán liên tục qua cảm biến PPG với bộ lọc thông dải Butterworth và dò đỉnh thích nghi $V_{threshold}$.
+  - Nồng độ Oxy hòa tan ($SpO_2$): Tính theo tỷ số $R$ định luật Beer-Lambert ($SpO_2 = 110 - 25R$).
+* **Phát hiện Té ngã Tự động (Kinematic Fall Detection):**
+  - Giám sát vector gia tốc $SVM = \sqrt{a_x^2 + a_y^2 + a_z^2}$.
+  - Kích hoạt cảnh báo khi $SVM > 2.5g$ kết hợp góc nghiêng cơ thể $	heta > 60^\circ$.
+* **Đếm bước chân & Calo:** Tự động đồng bộ bước chân về trung tâm điều phối.
+* **Kết nối & Giám sát Thiết bị Đeo Trực tiếp (Smartwatch Direct Telemetry):**
+  - **Trên Mobile App:** Màn hình kết nối & giám sát thông số đồng hồ trực tiếp qua BLE (Bluetooth Low Energy): kiểm tra trạng thái ghép nối, mức pin %, tín hiệu sóng RSSI, tình trạng đeo trên tay (On/Off-wrist), nhịp tim PPG BioActive, $SpO_2$, gia tốc kế IMU 3 trục và đo đạc tức thời.
+  - **Đồng hồ Wear OS độc lập:** Ứng dụng Wear OS 4.0 One UI Watch chạy trực tiếp trên thiết bị smartwatch thật (Samsung Galaxy Watch 5/6) hoặc Wear OS emulator (`/wear-os`).
 
-### Web admin
+---
 
-```powershell
-cd c:\Users\Admin\SafeSolo\web-admin
-npm install
-npm run dev -- --host 0.0.0.0 --port 4173
-```
+### 3. Trung tâm Điều phối Web Admin (Web Admin Dispatch Portal)
+* **Bản đồ Giám sát Cứu hộ Thời gian thực (Live Map Dispatch):**
+  - Hiển thị trực quan vị trí nạn nhân, bán kính ảnh hưởng, trạng thái ca cứu hộ.
+  - Thẻ thông tin nạn nhân tích hợp chỉ số sinh tồn ($SpO_2$, $BPM$), mức pin, thời gian phát tín hiệu.
+* **Quản lý & Duyệt Hồ sơ KYC (KYC Management):**
+  - So sánh ảnh chân dung và 2 mặt CCCD, xác thực thông tin và cấp chứng nhận Hiệp sĩ cộng đồng.
+* **Điều phối Đa kênh Khẩn cấp (Omnichannel Monitoring):**
+  - Theo dõi trạng thái phát tin tức thời qua Telegram Bot, Zalo ZNS, Twilio SMS và Voice Call.
+* **Báo cáo Thống kê & Doanh thu (Analytics & Revenue):**
+  - Biểu đồ thống kê số ca cứu hộ thành công, thời gian đáp ứng trung bình, phân bổ địa lý.
+* **Nhật ký Hệ thống (Audit Log & Telemetry):**
+  - Ghi nhận toàn bộ thao tác hệ thống theo chuẩn an ninh bảo mật.
 
-Mở:
+---
 
-- [http://127.0.0.1:4173](http://127.0.0.1:4173)
+## 🧮 12 THUẬT TOÁN AI, DSP & TOÁN HỌC CỐT LÕI
 
-### Flutter app
+| STT | Thuật toán | Vị trí cài đặt | Mục đích & Nguyên lý | Công thức / Ngưỡng |
+| :---: | :--- | :--- | :--- | :--- |
+| **1** | **Bộ lọc thông dải Butterworth (Bậc 2)** | `AiSignalProcessor.aiFilterPPG` | Khử trôi đường nền và nhiễu điện lưới trên tín hiệu PPG | Dải tần $0.5 - 5.0	ext{ Hz}$ ($30 - 300	ext{ BPM}$) |
+| **2** | **Bộ lọc trung bình trượt (Moving Average)** | `AiSignalProcessor.smoothPPG` | Làm mượt dao động ngẫu nhiên | Cửa sổ trượt $N = 5$ điểm |
+| **3** | **Dò đỉnh thích nghi động học (Dynamic Peak Detect)** | `AiSignalProcessor.detectHeartRate` | Tính nhịp tim BPM, chống đếm trùng sóng T | $V_{th} = \mu + 0.6\sigma$, Thời gian trơ $320	ext{ms}$ |
+| **4** | **Tỷ số quang học Beer-Lambert (Ratio-of-Ratios)** | `AiSignalProcessor.calculateSpO2` | Đo nồng độ oxy trong máu không xâm lấn | $R = rac{AC_{red}/DC_{red}}{AC_{ir}/DC_{ir}}$, $SpO_2 = 110 - 25R$ |
+| **5** | **Vector gia tốc tổng hợp (Kinematic SVM)** | `AiSignalProcessor.calculateSVM` | Bất biến với góc đặt máy, phát hiện va đập | $SVM = \sqrt{a_x^2 + a_y^2 + a_z^2} > 2.5g$ |
+| **6** | **Góc nghiêng cơ thể (Body Tilt Angle)** | `AiSignalProcessor.calculateTiltAngle` | Phát hiện tư thế nằm bất động sau chấn thương | $	heta = rccos(a_z / SVM) 	imes rac{180}{\pi} > 60^\circ$ |
+| **7** | **Bộ phân loại SVM (Linear SVM Classifier)** | `AiSignalProcessor.classifyFallSVM` | Phân biệt ngã thật với sinh hoạt thông thường (ADL) | $f(ec{x}) = 	ext{sign}(\mathbf{w}^T ec{x} + b)$ |
+| **8** | **Chuỗi thời gian Rung lắc khẩn cấp (Shake-to-SOS)** | `AiSignalProcessor.detectShakeGesture` | Kích hoạt SOS ngầm khi bị đe dọa / giật máy | Cửa sổ 2s, $\ge 4$ lần đảo chiều gia tốc $> 18	ext{ m/s}^2$ |
+| **9** | **Điểm rủi ro sinh tồn đa biến (Survival Risk Score)** | `AiSignalProcessor.calculateSurvivalRiskScore` | Ưu tiên điều phối xe cấp cứu theo mức nguy kịch | Thang điểm phi tuyến tính $0 - 100$ |
+| **10** | **Khoảng cách trắc địa Haversine** | `backend/src/lib/utils.js` | Tìm Hiệp sĩ cứu hộ gần nạn nhân nhất | $d = 2R rcsin\left(\sqrt{\sin^2(\Delta\phi/2) + \cos\phi_1\cos\phi_2\sin^2(\Delta\lambda/2)}
+ight)$ |
+| **11** | **Nhận diện giọng nói khẩn cấp (Keyword Spotting)** | `AiSignalProcessor.evaluateVoiceDistress` | Kêu cứu rảnh tay khi bị trói hoặc kẹt tay | Trích xuất MFCC 13 dải, Tiny-CNN on-device |
+| **12** | **Bộ lọc áp suất khí áp (Barometer Altitude)** | Sensor Fusion Engine | Phát hiện rơi tự do từ nhà cao tầng hoặc vách đá | $v_z = rac{dh}{dt} > 5	ext{ m/s}$ kết hợp $SVM > 3.0g$ |
 
-Tạo file local:
+---
 
-```powershell
-Copy-Item flutter.env.example.json flutter.env.json
-```
+## 📡 CƠ CHẾ ĐIỀU PHỐI CỨU HỘ ĐA KÊNH (OMNICHANNEL DISPATCH)
 
-Ví dụ:
+Khi kích hoạt SOS, hệ thống đồng thời kích hoạt 4 kênh cứu hộ độc lập:
+1. **Telegram Emergency Bot Webhook:** Bắn bản tin khẩn cấp định dạng Markdown kèm tọa độ Google Maps và thông số sinh tồn nạn nhân vào Group Cứu hộ tác chiến.
+2. **Zalo ZNS (Zalo Notification Service):** Gửi thông điệp chăm sóc khẩn cấp có bản quyền qua số điện thoại Zalo của Người bảo hộ.
+3. **Twilio SMS Gateway:** Phát tin nhắn văn bản truyền thống đến toàn bộ số điện thoại trong danh bạ bảo hộ.
+4. **Voice Auto-Call Level 4 (Tổng đài gọi khẩn cấp tự động):** Gọi trực tiếp đến máy người bảo hộ ưu tiên 1 và phát giọng đọc Text-to-Speech (TTS) đọc vị trí và tình trạng nguy cấp của nạn nhân.
 
-```json
-{
-  "API_BASE_URL": "http://127.0.0.1:4000/api",
-  "MAPTILER_KEY": "your-key",
-  "MAPTILER_STYLE": "streets-v2"
-}
-```
+---
 
-Chạy:
+## 🗄️ CẤU TRÚC CƠ SỞ DỮ LIỆU (MONGODB COLLECTIONS)
 
-```powershell
-flutter pub get
-flutter run --dart-define-from-file=flutter.env.json
-```
+* **`users`:** Thông tin tài khoản, tọa độ mới nhất, trạng thái KYC, danh bạ bảo hộ, cấu hình Khung giờ yên tĩnh (*quietHoursStart/End*).
+* **`emergencylogs`:** Nhật ký các ca SOS, mức độ nghiêm trọng, kinh độ/vĩ độ, trạng thái tiếp nhận, hiệp sĩ tiếp cứu.
+* **`devicesignals`:** Lưu trữ lịch sử dữ liệu cảm biến từ Samsung Galaxy Watch 5 ($SpO_2$, $BPM$, $SVM$, gia tốc 3 trục).
+* **`alertevents`:** Sự kiện cảnh báo phát sinh (té ngã, trễ check-in, còi hú, báo động mức 1/2).
+* **`checkins`:** Lịch sử các lần điểm danh, ghi chú tâm trạng, trạng thái an toàn.
+* **`chats` & `messages`:** Tin nhắn trao đổi, hình ảnh, file ghi âm giọng nói giữa nạn nhân và người cứu trợ.
+* **`kycrequests`:** Dữ liệu duyệt thẻ Căn cước công dân (CCCD mặt trước, mặt sau, trạng thái duyệt).
+* **`auditlogs`:** Dấu vết kiểm toán an toàn thông tin toàn hệ thống.
 
-Nếu chạy trên máy thật Android, thay `127.0.0.1` bằng IP LAN của máy tính.
+---
 
-## Giao diện chính
 
-Ảnh minh họa:
+---
 
-- ![Home](docs/screenshots/home_final.png)
-- ![Circle](docs/screenshots/circle_final2.png)
-- ![Messages](docs/screenshots/messages_final2.png)
-- ![Heroes](docs/screenshots/heroes_final2.png)
-- ![Settings](docs/screenshots/settings_final2.png)
-- ![Medical](docs/screenshots/medical.png)
 
-## Bảo mật và mã hóa dữ liệu
+---
 
-Backend hiện đã có lớp mã hóa thật cho dữ liệu nhạy cảm.
 
-### Thuật toán
+---
 
-- `AES-256-GCM` cho payload nhạy cảm
-- `bcrypt` cho `realPin` và `duressPin`
-- hỗ trợ `kid` để rotate encryption key
+## 📸 HÌNH ẢNH THỰC TẾ & KẾT QUẢ KIỂM THỬ TỪNG CHỨC NĂNG (DEMO SCREENSHOTS)
 
-### Dữ liệu đang được bảo vệ
+> 💡 **Mẹo xem ảnh trực tiếp trên VS Code:**
+> - Nhấn tổ hợp phím **`Ctrl + Shift + V`** (hoặc nhấn nút **Open Preview to the Side** 📖 ở góc phải trên cùng của VS Code) để xem giao diện ảnh trực quan.
+> - Hoặc bấm chuột trực tiếp vào các đường link **`[Mở xem ảnh]`** dưới mỗi mục để mở trực tiếp file ảnh trong tab mới của VS Code.
 
-- `medicalprofiles.encryptedProfile`
-- `vaults.content`
-- `users.encryptedSensitive`
-  - `medicalNotes`
-  - `approxAddress`
-  - `emergencyContacts`
-- `messages.encryptedPayload`
-  - `content`
-  - `metadata`
-- `emergencymemos.encryptedPayload`
-  - `victimName`
-  - `approxAddress`
-  - `contentUrl`
-  - `transcript`
-- `users.realPin`
-- `users.duressPin`
+---
 
-Để vẫn hỗ trợ tra cứu theo guardian, backend giữ thêm:
+### A. GIAO DIỆN ỨNG DỤNG DI ĐỘNG FLUTTER (ANDROID APP)
 
-- `users.emergencyContactPhones`
+Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chức năng của ứng dụng di động SafeSolo chạy trên Android (chuẩn Pixel 7):
 
-Đây là trường chỉ mục phục vụ truy vấn, còn nội dung liên hệ đầy đủ vẫn nằm trong payload đã mã hóa.
+#### 1. Màn hình Giới thiệu & Điểm danh Bình an (Onboarding Screen)
+* **Tuyến đường:** `/onboarding`
+* **Mô tả:** Giới thiệu triết lý cốt lõi của SafeSolo - Chạm 1 nút mỗi ngày để báo an toàn cho gia đình, tự động bảo vệ khi sống độc thân hoặc di chuyển một mình.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_01_onboarding.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_01_onboarding.png)
 
-### Rotate encryption key
+<p align="center">
+  <img src="./docs/screenshots/app_01_onboarding.png" alt="Onboarding Screen" width="360px" style="border-radius: 16px; border: 2px solid #22c55e; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
 
-Trong `backend/.env` có thể dùng:
+---
 
-```env
-DATA_ENCRYPTION_KEY_ID=primary
-DATA_ENCRYPTION_KEY=current-secret
-```
+#### 2. Màn hình Cấp quyền Hệ thống (System Permissions)
+* **Tuyến đường:** `/permissions`
+* **Mô tả:** Xin cấp 4 quyền sống còn phục vụ cứu trợ khẩn cấp: Vị trí (GPS chính xác), Micro (Thu âm cầu cứu / ghi chú), Thông báo (Nhắc check-in & cảnh báo SOS lân cận) và Danh bạ (Thêm nhanh Người bảo hộ).
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_02_permissions.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_02_permissions.png)
 
-Hoặc keyring nhiều khóa:
+<p align="center">
+  <img src="./docs/screenshots/app_02_permissions.png" alt="Permissions Screen" width="360px" style="border-radius: 16px; border: 2px solid #0ea5e9; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
 
-```env
-DATA_ENCRYPTION_KEYS=primary=current-secret;legacy-2025=older-secret
-```
+---
 
-Sau khi đổi key, chạy:
+#### 3. Màn hình Đăng nhập & Tạo Hồ sơ Cá nhân (Auth & Profile Setup)
+* **Tuyến đường:** `/auth`
+* **Mô tả:** Xác thực số điện thoại, nhập thông tin liên hệ khẩn cấp và lựa chọn chu kỳ check-in mặc định (3h, 6h, 12h, 24h) phù hợp với nhịp sinh hoạt của từng người dùng.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_03_auth_login.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_03_auth_login.png)
 
-```powershell
-cd c:\Users\Admin\SafeSolo\backend
-npm run migrate:encrypt-sensitive
-```
+<p align="center">
+  <img src="./docs/screenshots/app_03_auth_login.png" alt="Auth Login Screen" width="360px" style="border-radius: 16px; border: 2px solid #10b981; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
 
-Script này sẽ re-encrypt dữ liệu cũ sang key hiện tại.
+---
 
-## Tài liệu backend
+#### 4. Quản lý Kết nối & Thông số Đồng hồ Thông minh (Samsung Galaxy Watch 5)
+* **Tuyến đường:** `/smartwatch` (hoặc `/watch-details`)
+* **Mô tả:** Chức năng trực tiếp kết nối và hiển thị các thông số cụ thể từ đồng hồ qua Bluetooth LE: trạng thái ghép nối, mức pin %, cường độ sóng RSSI dBm, tình trạng đeo trên cổ tay (On-wrist / Off-wrist), nhịp tim PPG BioActive thời gian thực, nồng độ oxy hòa tan $SpO_2$, cảm biến gia tốc 3 trục IMU (SVM, trục X/Y/Z, góc nghiêng), phím rung tìm đồng hồ và nút phát tín hiệu SOS khẩn cấp trực tiếp.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_04_watch_simulator.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_04_watch_simulator.png)
 
-Xem chi tiết hơn tại:
+<p align="center">
+  <img src="./docs/screenshots/app_04_watch_simulator.png" alt="Smartwatch Connection Screen" width="360px" style="border-radius: 16px; border: 2px solid #0284c7; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
 
-- [backend/README.md](backend/README.md)
+---
 
-## Lệnh hữu ích
+#### 5. Cài đặt Khung giờ Yên tĩnh (Quiet Hours 23:00 - 06:00)
+* **Tuyến đường:** `/settings`
+* **Mô tả:** Cho phép người dùng tùy chỉnh Khung giờ yên tĩnh (mặc định 23:00 đến 06:00 sáng hôm sau), cấu hình thời gian ân hạn điểm danh, kích hoạt tính năng đếm bước chân và tự động phát hiện té ngã.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_05_settings_quiet_hours.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_05_settings_quiet_hours.png)
 
-### Flutter
+<p align="center">
+  <img src="./docs/screenshots/app_05_settings_quiet_hours.png" alt="Settings Screen" width="360px" style="border-radius: 16px; border: 2px solid #6366f1; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
 
-```powershell
-flutter analyze
-flutter test
-flutter build apk --release --dart-define-from-file=flutter.env.json
-```
+---
 
-### Backend
+#### 6. Mạng lưới Người bảo hộ Phân cấp Ưu tiên (Guardian Network)
+* **Tuyến đường:** `/network`
+* **Mô tả:** Thiết lập tối đa 3 người bảo hộ được phân cấp ưu tiên (Cấp 1 là người liên hệ chính nhận SMS & Cuộc gọi khẩn cấp tự động đầu tiên, tiếp theo là Cấp 2 và Cấp 3).
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_06_guardian_network.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_06_guardian_network.png)
 
-```powershell
+<p align="center">
+  <img src="./docs/screenshots/app_06_guardian_network.png" alt="Guardian Network Screen" width="360px" style="border-radius: 16px; border: 2px solid #3b82f6; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 7. Hồ sơ Y tế Khẩn cấp & Nhóm máu (Medical ID & QR Code)
+* **Tuyến đường:** `/medical`
+* **Mô tả:** Lưu trữ nhóm máu (O+, A, B, AB), tiền sử dị ứng, bệnh nền và thông tin thẻ CCCD phục vụ sơ cứu khẩn cấp. Hỗ trợ tạo mã QR tiện dụng.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_07_medical_id.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_07_medical_id.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_07_medical_id.png" alt="Medical ID Screen" width="360px" style="border-radius: 16px; border: 2px solid #ec4899; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 8. Cài đặt Bảo mật & PIN giả Duress (Security & Stealth Mode)
+* **Tuyến đường:** `/security`
+* **Mô tả:** Cấu hình mật mã PIN thật và PIN giả (*Duress PIN*). Khi bị ép buộc mở ứng dụng, gõ PIN giả sẽ mở ra giao diện máy tính bỏ túi bình thường nhưng âm thầm phát báo động câm và tọa độ về trung tâm cứu hộ.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_08_security_stealth.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_08_security_stealth.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_08_security_stealth.png" alt="Security Screen" width="360px" style="border-radius: 16px; border: 2px solid #f59e0b; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 9. Két sắt Sinh tử (Safety Vault & Dead-man's Switch)
+* **Tuyến đường:** `/vault`
+* **Mô tả:** Két mã hóa AES-256 lưu trữ checklist công việc, mật khẩu khẩn cấp và lời dặn dò. Két tự động mở gửi nội dung cho Người bảo hộ sau 72 giờ mất liên lạc liên tiếp.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_09_safety_vault.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_09_safety_vault.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_09_safety_vault.png" alt="Safety Vault Screen" width="360px" style="border-radius: 16px; border: 2px solid #8b5cf6; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 10. Huy hiệu & Thành tích An toàn (Badges & Streaks)
+* **Tuyến đường:** `/achievements`
+* **Mô tả:** Hệ thống gamification khuyến khích duy trì thói quen điểm danh an toàn: Người cẩn thận, Đội trưởng bảo vệ, Kiên trì 100 ngày, Chiến binh y tế và Anh hùng cộng đồng.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_10_achievements.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_10_achievements.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_10_achievements.png" alt="Achievements Screen" width="360px" style="border-radius: 16px; border: 2px solid #14b8a6; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+### B. GIAO DIỆN TRUNG TÂM ĐIỀU PHỐI CỨU HỘ (WEB ADMIN PORTAL)
+
+#### 1. Bản đồ Cứu hộ Thời gian thực (Live Map SOS Dispatch)
+* **Tuyến đường:** `/` (Web Admin)
+* **Mô tả:** Giám sát trực quan tọa độ các ca SOS khẩn cấp, hiển thị bán kính cảnh báo 5km, chỉ số sinh tồn ($SpO_2$, $BPM$, pin thiết bị) và các Hiệp sĩ cứu hộ lân cận.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/01_live_map_dispatch.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/01_live_map_dispatch.png)
+
+<p align="center">
+  <img src="./docs/screenshots/01_live_map_dispatch.png" alt="Live Map SOS Dispatch" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+#### 2. Điều phối Cứu hộ Đa kênh (Omnichannel Emergency Dispatch)
+* **Tuyến đường:** `/omnichannel` (Web Admin)
+* **Mô tả:** Giám sát 4 luồng phát tin khẩn cấp đồng thời: Telegram Bot Webhook, Zalo ZNS, Twilio SMS và Voice Auto-Call Level 4.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/03_omnichannel_dispatch.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/03_omnichannel_dispatch.png)
+
+<p align="center">
+  <img src="./docs/screenshots/03_omnichannel_dispatch.png" alt="Omnichannel Dispatch" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+#### 3. Quản lý & Phê duyệt Xác minh Danh tính CCCD (KYC Verification)
+* **Tuyến đường:** `/kyc` (Web Admin)
+* **Mô tả:** Tiếp nhận ảnh chụp 2 mặt Căn cước công dân do người dùng tải lên từ camera điện thoại, phê duyệt và cấp huy hiệu Hiệp sĩ tin cậy.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/04_kyc_verification.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/04_kyc_verification.png)
+
+<p align="center">
+  <img src="./docs/screenshots/04_kyc_verification.png" alt="KYC Verification" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+#### 4. Quản trị Người dùng & Mạng lưới Người bảo hộ (Users & Guardians)
+* **Tuyến đường:** `/users` (Web Admin)
+* **Mô tả:** Quản trị hồ sơ người dùng, phân cấp mức độ ưu tiên Người bảo hộ và kích hoạt chế độ gọi điện trực tiếp khi có sự cố.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/05_users_guardians.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/05_users_guardians.png)
+
+<p align="center">
+  <img src="./docs/screenshots/05_users_guardians.png" alt="Users and Guardians" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+#### 5. Thống kê Ca cứu hộ & Báo cáo Doanh thu (Analytics & Revenue)
+* **Tuyến đường:** `/revenue` (Web Admin)
+* **Mô tả:** Biểu đồ trực quan thống kê số ca cứu hộ thành công, thời gian tiếp cứu trung bình và phân bổ địa bàn hoạt động.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/06_analytics_revenue.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/06_analytics_revenue.png)
+
+<p align="center">
+  <img src="./docs/screenshots/06_analytics_revenue.png" alt="Analytics and Revenue" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+#### 6. Nhật ký Kiểm toán Hệ thống & An toàn Dữ liệu (Audit Log)
+* **Tuyến đường:** `/audit` (Web Admin)
+* **Mô tả:** Lưu vết không thể sửa xóa (audit trail) đối với mọi thao tác SOS, phân quyền và dữ liệu y tế theo chuẩn an toàn thông tin.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/07_system_audit.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/07_system_audit.png)
+
+<p align="center">
+  <img src="./docs/screenshots/07_system_audit.png" alt="System Audit Log" width="100%" style="border-radius: 8px; border: 1px solid #334155;" />
+</p>
+
+---
+
+## 🚀 HƯỚNG DẪN CÀI ĐẶT & VẬN HÀNH TỪNG BƯỚC
+
+### 1. Chuẩn bị Môi trường
+* **Flutter SDK:** Version $\ge 3.24.0$
+* **Node.js:** Version $\ge 18.x$
+* **MongoDB:** Bản local hoặc MongoDB Atlas URI
+* **Android Studio:** Android SDK Platform API 34+
+
+---
+
+### 2. Cài đặt & Khởi chạy Backend Server
+```bash
+# Di chuyển vào thư mục backend
 cd backend
+
+# Cài đặt thư viện phụ thuộc
+npm install
+
+# Cấu hình file môi trường .env (sao chép từ .env.example)
+cp .env.example .env
+
+# Khởi động Backend Server
 npm run dev
-npm run seed:demo-users
-npm run migrate:encrypt-sensitive
+# Server lắng nghe tại: http://localhost:4000
 ```
 
-### Web admin
+---
 
-```powershell
+### 3. Cài đặt & Khởi chạy Web Admin Portal
+```bash
+# Di chuyển vào thư mục web-admin
 cd web-admin
-npm run dev -- --host 0.0.0.0 --port 4173
-npm run build
+
+# Cài đặt dependencies
+npm install
+
+# Khởi chạy máy chủ phát triển
+npm run dev
+# Web Admin truy cập tại: http://localhost:8080
 ```
+
+---
+
+### 4. Chạy Ứng dụng Mobile App (Flutter Android)
+* **Khởi chạy trên Thiết bị Android / Máy ảo Pixel:**
+  ```bash
+  # Khởi chạy emulator có sẵn
+  flutter emulators --launch Pixel_6_API_34
+
+  # Chạy app SafeSolo
+  flutter run -d android
+  ```
+* **Hoặc sử dụng các file script tiện ích có sẵn trong thư mục gốc:**
+  - `run_safesolo_android.bat` : Tự động khởi chạy trên thiết bị Android
+
+---
+
+## 🧪 HƯỚNG DẪN KIỂM THỬ TOÀN BỘ HỆ THỐNG (TEST SUITE)
+
+Dự án đã được tích hợp quy trình kiểm thử tự động toàn diện từ Unit Test, Static Analysis đến API Integration Test:
+
+### 1. Kiểm thử Thuật toán AI & Mobile App (Flutter Test)
+```bash
+# Chạy toàn bộ 10 bài test đơn vị (AI/DSP, Watch Simulator, Auth Widget)
+flutter test
+
+# Kiểm tra cú pháp và chất lượng mã nguồn (Static Analysis)
+flutter analyze lib/
+# Kết quả: No issues found!
+```
+
+### 2. Kiểm thử Tích hợp Backend & Tín hiệu Đồng hồ Galaxy Watch 5
+```bash
+cd backend
+
+# Test xác thực và phân quyền
+node scripts/testAuthEndpoint.js
+
+# Test toàn diện API tín hiệu Samsung Galaxy Watch 5 (BPM, SpO2 < 90%, Fall 4.8g)
+node scripts/testWatchSimulatorEndpoint.js
+
+# Test Điều phối Cứu hộ Đa kênh (Telegram, Zalo, SMS, Voice Call)
+node scripts/testOmnichannelSos.js
+
+# Test Radar Cứu hộ và Quyền riêng tư của Hiệp sĩ
+node scripts/testHeroProfilePrivacy.js
+node scripts/testRadarHttp.js
+```
+
+### 3. Kiểm thử Biên dịch Web Admin
+```bash
+cd web-admin
+npm run build
+# Kết quả: 2004 modules transformed, Vite build thành công 100%!
+```
+
+---
+
+## 📂 CẤU TRÚC MÃ NGUỒN DỰ ÁN
+
+```
+SafeSolo/
+├── android/                         # Cấu hình Gradle và mã nguồn gốc Android
+├── assets/                          # Âm thanh còi hú, icon, hình ảnh minh họa
+├── backend/                         # Backend Node.js Express REST & Socket.IO
+│   ├── scripts/                     # Kịch bản kiểm thử API tự động
+│   ├── src/
+│   │   ├── controllers/             # Bộ điều khiển SOS, Auth, User, KYC
+│   │   ├── models/                  # Mongoose Schemas (User, EmergencyLog, ...)
+│   │   ├── routes/                  # Định tuyến REST APIs
+│   │   ├── services/                # sosService, notificationService, ...
+│   │   └── workers/                 # deadmanWorker, duressWorker
+│   └── server.js                    # File khởi chạy máy chủ Backend
+├── docs/                            # Tài liệu học thuật & Đặc tả kỹ thuật đồ án
+│   ├── co-so-du-lieu-chi-tiet.txt   # Chi tiết thiết kế Cơ sở dữ liệu
+│   └── thuat-toan-ai-chi-tiet.md    # Chuyên sâu 12 thuật toán AI & DSP
+├── lib/                             # Toàn bộ mã nguồn ứng dụng Flutter
+│   ├── core/                        # Theme, hằng số, AppProvider
+│   ├── models/                      # User, Contact, EmergencyEvent, ...
+│   ├── services/                    # ai_signal_processor, api_service, pedometer
+│   └── views/                       # Màn hình chức năng (Home, Radar, Health, ...)
+│       ├── auth/                    # Đăng nhập, Đăng ký, Quên mật khẩu
+│       ├── community_radar/         # Radar bản đồ, Duyệt KYC CCCD, Waze/Maps
+│       ├── health/                  # Lịch sử sinh tồn, Galaxy Watch 5 Simulator
+│       ├── network/                 # Quản lý người bảo hộ phân cấp ưu tiên
+│       └── settings/                # Khung giờ yên tĩnh (Quiet Hours), Bảo mật
+├── test/                            # Bộ kiểm thử đơn vị tự động Flutter
+│   ├── ai_signal_processor_test.dart# Test bộ lọc Butterworth, SVM, SpO2, Peak Detect
+│   ├── watch_simulator_test.dart    # Test giao diện đồng hồ Galaxy Watch 5
+│   └── widget_test.dart             # Test luồng giao diện khởi động
+├── web-admin/                       # Trung tâm điều phối Web Admin (React + Vite)
+│   ├── src/
+│   │   ├── pages/                   # LiveMap, KYC, Omnichannel, WatchSimulator
+│   │   └── routes/                  # Định tuyến TanStack Router
+└── README.md                        # Tài liệu hướng dẫn đồ án (File này)
+```
+
+---
+
+## 👨‍💻 TÁC GIẢ & BẢN QUYỀN
+* **Tác giả:** Đoàn Minh Quân (MSSV: 2224801030137 - Lớp KTPM03)
+* **Đơn vị:** Khoa Công nghệ Thông tin - Chuyên ngành Kỹ thuật Phần mềm
+* **Phiên bản:** 1.0.0 (Release Candidate - Phục vụ Hội đồng Đồ án Tốt nghiệp)
+* **Năm thực hiện:** 2026

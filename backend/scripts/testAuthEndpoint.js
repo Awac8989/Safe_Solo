@@ -4,14 +4,14 @@ if (!fetch) {
 }
 
 async function main() {
-  const url = 'http://localhost:4001/api/auth/login';
+  const url = 'http://localhost:4000/api/auth/login';
   console.log('Calling', url);
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ email: 'test-lookup@example.com' })
+    body: JSON.stringify({ email: 'cao.ngoc.tram@safesolo.local' })
   });
   const body = await res.text();
   console.log('Status:', res.status);

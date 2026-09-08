@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,33 +51,38 @@ class BackgroundSafetyService {
   bool _configured = false;
 
   bool get _isSupportedPlatform =>
-      Platform.isAndroid || Platform.isIOS;
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
-  Future<void> prepare() async {
+  Future<void> prepare({bool hasLocationPermission = false}) async {
     if (!_isSupportedPlatform) {
       return;
     }
     if (_configured) {
       return;
     }
-    await _service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: _onStart,
-        autoStart: false,
-        isForegroundMode: true,
-        notificationChannelId: 'safesolo_background_safety',
-        initialNotificationTitle: 'SafeSolo đang bảo vệ nền',
-        initialNotificationContent: 'Đang theo dõi geofence và tín hiệu an toàn',
-        foregroundServiceNotificationId: 9071,
-        foregroundServiceTypes: [AndroidForegroundType.location],
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: false,
-        onForeground: _onIosForeground,
-        onBackground: _onIosBackground,
-      ),
-    );
-    _configured = true;
+    try {
+      await _service.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: _onStart,
+          autoStart: false,
+          isForegroundMode: true,
+          notificationChannelId: 'safesolo_background_safety',
+          initialNotificationTitle: 'SafeSolo đang bảo vệ nền',
+          initialNotificationContent: 'Đang theo dõi geofence và tín hiệu an toàn',
+          foregroundServiceNotificationId: 9071,
+          foregroundServiceTypes: [
+            AndroidForegroundType.dataSync,
+            if (hasLocationPermission) AndroidForegroundType.location,
+          ],
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: false,
+          onForeground: _onIosForeground,
+          onBackground: _onIosBackground,
+        ),
+      );
+      _configured = true;
+    } catch (_) {}
   }
 
   Future<void> updateFromState({
@@ -91,20 +97,19 @@ class BackgroundSafetyService {
     if (!_isSupportedPlatform) {
       return;
     }
-    await prepare();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
       _backgroundSafetyConfigKey,
-        jsonEncode({
-          'userId': userId,
-          'permissionsGranted': permissionsGranted,
-          'appVisible': appVisible,
-          'enabled': enabled,
-          'automation': automation,
-          'homeAnchor': homeAnchor,
-          'languageCode': languageCode,
-        }),
+      jsonEncode({
+        'userId': userId,
+        'permissionsGranted': permissionsGranted,
+        'appVisible': appVisible,
+        'enabled': enabled,
+        'automation': automation,
+        'homeAnchor': homeAnchor,
+        'languageCode': languageCode,
+      }),
     );
 
     final shouldRun =
@@ -115,26 +120,38 @@ class BackgroundSafetyService {
         !appVisible &&
         _automationEnabled(automation);
 
-    final running = await _service.isRunning();
-    if (shouldRun) {
+    if (!shouldRun) {
+      try {
+        final running = await _service.isRunning();
+        if (running) {
+          _service.invoke('stopService');
+        }
+      } catch (_) {}
+      return;
+    }
+
+    await prepare(hasLocationPermission: permissionsGranted);
+
+    try {
+      final running = await _service.isRunning();
       if (running) {
         _service.invoke('syncConfig');
       } else {
         await _service.startService();
       }
-    } else if (running) {
-      _service.invoke('stopService');
-    }
+    } catch (_) {}
   }
 
   Future<void> stop() async {
     if (!_isSupportedPlatform) {
       return;
     }
-    final running = await _service.isRunning();
-    if (running) {
-      _service.invoke('stopService');
-    }
+    try {
+      final running = await _service.isRunning();
+      if (running) {
+        _service.invoke('stopService');
+      }
+    } catch (_) {}
   }
 }
 

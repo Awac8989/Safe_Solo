@@ -21,6 +21,8 @@ import '../../services/audio_note_service.dart';
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/push_notification_service.dart';
+import '../../services/pedometer_service.dart';
+import '../../services/wear_os_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -31,16 +33,19 @@ class EmergencyContact {
     required this.name,
     required this.phone,
     required this.relation,
+    this.priority = 1,
   });
 
   final String name;
   final String phone;
   final String relation;
+  final int priority;
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'phone': phone,
     'relation': relation,
+    'priority': priority,
   };
 
   factory EmergencyContact.fromJson(Map<String, dynamic> json) {
@@ -48,6 +53,9 @@ class EmergencyContact {
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       relation: json['relation'] as String? ?? '',
+      priority: json['priority'] is int
+          ? json['priority'] as int
+          : int.tryParse('${json['priority']}') ?? 1,
     );
   }
 }
@@ -68,6 +76,7 @@ class User {
     this.lastCheckinTime,
     this.lastKnownLocation,
     this.emergencyContacts = const [],
+    this.isKycVerified = false,
   });
 
   final String id;
@@ -84,6 +93,7 @@ class User {
   final DateTime? lastCheckinTime;
   final AppLocation? lastKnownLocation;
   final List<EmergencyContact> emergencyContacts;
+  final bool isKycVerified;
 
   int get graceHours => (timerIntervalMinutes / 60).round();
 
@@ -102,6 +112,7 @@ class User {
     DateTime? lastCheckinTime,
     AppLocation? lastKnownLocation,
     List<EmergencyContact>? emergencyContacts,
+    bool? isKycVerified,
   }) {
     return User(
       id: id ?? this.id,
@@ -119,6 +130,7 @@ class User {
       lastCheckinTime: lastCheckinTime ?? this.lastCheckinTime,
       lastKnownLocation: lastKnownLocation ?? this.lastKnownLocation,
       emergencyContacts: emergencyContacts ?? this.emergencyContacts,
+      isKycVerified: isKycVerified ?? this.isKycVerified,
     );
   }
 
@@ -137,6 +149,7 @@ class User {
     'lastCheckinTime': lastCheckinTime?.toIso8601String(),
     'lastKnownLocation': lastKnownLocation?.toJson(),
     'emergencyContacts': emergencyContacts.map((item) => item.toJson()).toList(),
+    'isKycVerified': isKycVerified,
   };
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -164,6 +177,7 @@ class User {
             ),
           )
           .toList(),
+      isKycVerified: json['isKycVerified'] as bool? ?? false,
     );
   }
 
@@ -191,6 +205,7 @@ class User {
             ),
           )
           .toList(),
+      isKycVerified: model.isKycVerified,
     );
   }
 }
@@ -639,6 +654,7 @@ class ChatMessage {
 
 class HeroProfile {
   const HeroProfile({
+    this.id = '',
     required this.name,
     required this.location,
     required this.rating,
@@ -647,12 +663,35 @@ class HeroProfile {
     required this.distanceKm,
   });
 
+  final String id;
   final String name;
   final String location;
   final double rating;
   final int rescues;
   final bool verified;
   final double distanceKm;
+
+  String get effectiveId => id.isNotEmpty ? id : name.toLowerCase().replaceAll(' ', '_');
+
+  HeroProfile copyWith({
+    String? id,
+    String? name,
+    String? location,
+    double? rating,
+    int? rescues,
+    bool? verified,
+    double? distanceKm,
+  }) {
+    return HeroProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      location: location ?? this.location,
+      rating: rating ?? this.rating,
+      rescues: rescues ?? this.rescues,
+      verified: verified ?? this.verified,
+      distanceKm: distanceKm ?? this.distanceKm,
+    );
+  }
 }
 
 class RadarIncident {
@@ -719,6 +758,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<StepCount>? _stepCountSubscription;
+  StreamSubscription<Map<String, dynamic>>? _watchAlertSubscription;
   AppLocation? _homeAnchor;
   DateTime? _lastDailyReminderAt;
   DateTime? _lastMedicationReminderAt;
@@ -755,6 +795,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _watchAlertSubscription?.cancel();
     _stopRuntimeAutomation();
     super.dispose();
   }
@@ -937,8 +978,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _evaluateSafetyAutomation();
     await _notifications.initialize();
     _restartRuntimeAutomation();
+    _initWatchIntegration();
     await _syncPushTokenIfNeeded();
-    await _syncBackgroundSafetyService();
+    if (_user != null && _permissionsGranted) {
+      await _syncBackgroundSafetyService();
+    }
 
     _isInitializing = false;
     notifyListeners();
@@ -1478,6 +1522,51 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await refreshUser();
   }
 
+  void _initWatchIntegration() {
+    _watchAlertSubscription?.cancel();
+    WearOsService.instance.initialize();
+    _watchAlertSubscription =
+        PedometerService.instance.watchAlertStream.listen(_handleWatchAlert);
+  }
+
+  Future<void> _handleWatchAlert(Map<String, dynamic> alert) async {
+    final type = alert['type'] as String? ?? 'WATCH_ALERT';
+    final message =
+        alert['message'] as String? ?? 'Tín hiệu từ Samsung Galaxy Watch 5';
+
+    final current = _user;
+    if (current != null) {
+      unawaited(
+        _api.createInteraction(
+          userId: current.id,
+          type: type,
+          source: 'SAMSUNG_GALAXY_WATCH_5',
+          metadata: alert,
+        ),
+      );
+    }
+
+    if (type == 'WATCH_FALL_DETECTED' ||
+        type == 'WATCH_EMERGENCY_SOS' ||
+        type == 'WATCH_CRITICAL_SPO2') {
+      if (current != null) {
+        _user = current.copyWith(
+          currentStatus: 'ALERT_TRIGGERED',
+        );
+        notifyListeners();
+        unawaited(_saveToStorage());
+      }
+
+      unawaited(
+        _notifications.showAlert(
+          id: 9088,
+          title: '🚨 CẢNH BÁO TỪ SAMSUNG GALAXY WATCH 5',
+          body: message,
+        ),
+      );
+    }
+  }
+
   Future<void> triggerSilentSos() async {
     final current = _user;
     if (current == null) {
@@ -1737,19 +1826,23 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
 
     if (_automation.fallDetection || _automation.shakeSos) {
-      _accelerometerSubscription = userAccelerometerEventStream().listen(
-        (event) => unawaited(_handleMotionEvent(event)),
-        onError: (_) {},
-        cancelOnError: false,
-      );
+      try {
+        _accelerometerSubscription = userAccelerometerEventStream().listen(
+          (event) => unawaited(_handleMotionEvent(event)),
+          onError: (_) {},
+          cancelOnError: false,
+        );
+      } catch (_) {}
     }
 
     if (_automation.stepTrackingEnabled) {
-      _stepCountSubscription = Pedometer.stepCountStream.listen(
-        (event) => unawaited(_handleStepCountEvent(event)),
-        onError: (_) {},
-        cancelOnError: false,
-      );
+      try {
+        _stepCountSubscription = Pedometer.stepCountStream.listen(
+          (event) => unawaited(_handleStepCountEvent(event)),
+          onError: (_) {},
+          cancelOnError: false,
+        );
+      } catch (_) {}
     }
   }
 
@@ -1758,9 +1851,13 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     _automationTimer = null;
     _positionSubscription?.cancel();
     _positionSubscription = null;
-    _accelerometerSubscription?.cancel();
+    try {
+      _accelerometerSubscription?.cancel();
+    } catch (_) {}
     _accelerometerSubscription = null;
-    _stepCountSubscription?.cancel();
+    try {
+      _stepCountSubscription?.cancel();
+    } catch (_) {}
     _stepCountSubscription = null;
   }
 
@@ -2394,6 +2491,67 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         return 'Cần lưu ý';
       case Mood.focused:
         return 'Đang tập trung';
+    }
+  }
+
+  /// Gửi hồ sơ định danh KYC (CCCD / Passport) để đăng ký làm Hiệp sĩ cứu hộ
+  Future<bool> submitKycDocuments({
+    required String frontPath,
+    required String backPath,
+  }) async {
+    try {
+      final res = await _api.uploadKycDocuments(
+        frontPath: frontPath,
+        backPath: backPath,
+        userId: _user?.id,
+      );
+      if (res['success'] == true) {
+        if (_user != null) {
+          _user = _user!.copyWith(isKycVerified: false);
+          await _saveToStorage();
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Submit KYC error: $e');
+      return false;
+    }
+  }
+
+  /// Gửi lời cảm ơn & Đánh giá chất lượng hỗ trợ (1-5 sao) cho Hiệp sĩ
+  Future<bool> sendHeroThankYou({
+    required String heroId,
+    required int rating,
+    required String message,
+  }) async {
+    try {
+      final res = await _api.postThankYouNote(
+        heroId: heroId,
+        rating: rating,
+        content: message,
+        userId: _user?.id,
+      );
+      final idx = _heroes.indexWhere((h) => h.effectiveId == heroId || h.id == heroId);
+      if (idx != -1) {
+        final current = _heroes[idx];
+        final newRescues = current.rescues + 1;
+        final newRating = double.parse(
+          (((current.rating * current.rescues) + rating) / newRescues).toStringAsFixed(1),
+        );
+        final updatedList = List<HeroProfile>.from(_heroes);
+        updatedList[idx] = current.copyWith(
+          rescues: newRescues,
+          rating: newRating,
+        );
+        _heroes = updatedList;
+      }
+      notifyListeners();
+      return res['success'] == true;
+    } catch (e) {
+      debugPrint('Send thank you error: $e');
+      return false;
     }
   }
 }

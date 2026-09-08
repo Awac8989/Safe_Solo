@@ -1,14 +1,35 @@
 const Redis = require('ioredis');
 
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const redisClient = new Redis(redisUrl, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
+const redisUrl = process.env.REDIS_URL;
+let redisClient = null;
+let warnedOnce = false;
 
-redisClient.on('error', (error) => {
-  // eslint-disable-next-line no-console
-  console.error('Redis connection error:', error.message);
-});
+if (redisUrl) {
+  redisClient = new Redis(redisUrl, {
+    maxRetriesPerRequest: 1,
+    enableReadyCheck: false,
+    lazyConnect: true,
+    retryStrategy(times) {
+      if (times > 2) {
+        if (!warnedOnce) {
+          warnedOnce = true;
+          // eslint-disable-next-line no-console
+          console.log('[SafeSolo] Redis connection unavailable. Background queue disabled.');
+        }
+        return null;
+      }
+      return 1000;
+    },
+  });
+
+  redisClient.on('error', (error) => {
+    if (!warnedOnce) {
+      warnedOnce = true;
+      // eslint-disable-next-line no-console
+      console.log('[SafeSolo] Redis error (optional):', error.message);
+    }
+  });
+}
 
 module.exports = redisClient;
+

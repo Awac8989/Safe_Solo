@@ -16,7 +16,7 @@ if (!fetch) {
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
 process.env.PORT = process.env.PORT || '4000';
-process.env.TEST_PORT = process.env.TEST_PORT || '4001';
+process.env.TEST_PORT = process.env.TEST_PORT || process.env.PORT || '4000';
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 const baseUrl = `http://localhost:${process.env.TEST_PORT}`;

@@ -43,27 +43,29 @@ function buildEncryptedUserSensitiveUpdate(userId, source = {}) {
 }
 
 function decryptUserSensitivePayload(row) {
-  const payload = decryptJson(row?.encryptedSensitive, `user:${row?._id}:sensitive`) || {};
+  const raw = row && typeof row.toObject === 'function' ? row.toObject() : row;
+  const payload = decryptJson(raw?.encryptedSensitive, `user:${raw?._id}:sensitive`) || {};
   return {
-    approxAddress: payload.approxAddress || row?.approxAddress || null,
-    medicalNotes: payload.medicalNotes || row?.medicalNotes || '',
+    approxAddress: payload.approxAddress || raw?.approxAddress || null,
+    medicalNotes: payload.medicalNotes || raw?.medicalNotes || '',
     emergencyContacts:
       normalizeContacts(payload.emergencyContacts).length
         ? normalizeContacts(payload.emergencyContacts)
-        : normalizeContacts(row?.emergencyContacts),
+        : normalizeContacts(raw?.emergencyContacts),
   };
 }
 
 function mergeUserSensitivePayload(row) {
-  const sensitive = decryptUserSensitivePayload(row);
+  const raw = row && typeof row.toObject === 'function' ? row.toObject() : row;
+  const sensitive = decryptUserSensitivePayload(raw);
   return {
-    ...row,
+    ...raw,
     approxAddress: sensitive.approxAddress,
     medicalNotes: sensitive.medicalNotes,
     emergencyContacts: sensitive.emergencyContacts,
     emergencyContactPhones:
-      Array.isArray(row?.emergencyContactPhones) && row.emergencyContactPhones.length
-        ? row.emergencyContactPhones
+      Array.isArray(raw?.emergencyContactPhones) && raw.emergencyContactPhones.length
+        ? raw.emergencyContactPhones
         : buildEmergencyContactPhones(sensitive.emergencyContacts),
   };
 }

@@ -3,6 +3,18 @@ const ThankYouNote = require('../models/ThankYouNote');
 const trustService = require('../services/trustService');
 const { sanitizeUser } = require('../lib/utils');
 
+function sanitizeHeroPublicProfile(user) {
+  const sanitized = sanitizeUser(user);
+  delete sanitized.email;
+  delete sanitized.phone;
+  return {
+    ...sanitized,
+    trust_score: sanitized.trustScore,
+    rescues_count: sanitized.rescuesCount,
+    is_kyc_verified: sanitized.isKycVerified,
+  };
+}
+
 class CommunityController {
   async listHeroes(_req, res, next) {
     try {
@@ -20,7 +32,7 @@ class CommunityController {
 
       res.json({
         success: true,
-        data: heroes.map((hero) => sanitizeUser(hero)),
+        data: heroes.map((hero) => sanitizeHeroPublicProfile(hero)),
       });
     } catch (error) {
       next(error);
@@ -45,12 +57,12 @@ class CommunityController {
         .lean();
       const authorIds = [...new Set(notes.map((item) => item.authorId).filter(Boolean))];
       const authors = authorIds.length ? await User.find({ _id: { $in: authorIds } }).lean() : [];
-      const authorMap = new Map(authors.map((item) => [item._id, sanitizeUser(item)]));
+      const authorMap = new Map(authors.map((item) => [item._id, sanitizeHeroPublicProfile(item)]));
 
       res.json({
         success: true,
         data: {
-          ...sanitizeUser(hero),
+          ...sanitizeHeroPublicProfile(hero),
           receivedThankYouNotes: notes.map((note) => ({
             ...note,
             id: note._id,

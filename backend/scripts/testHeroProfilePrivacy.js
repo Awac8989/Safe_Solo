@@ -1,35 +1,41 @@
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+
 const fetch = global.fetch;
 if (!fetch) {
   throw new Error('Global fetch is not available in this Node runtime. Use Node 18+ or install a polyfill.');
 }
 
 async function testHeroProfilePrivacy() {
-  // First, login to get JWT token
-  console.log('Logging in...');
-  const loginRes = await fetch('http://localhost:4000/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email: 'test@example.com' })
+  const usersRes = await fetch('http://localhost:4000/api/users');
+  const allUsers = await usersRes.json();
+  const currentUserId = allUsers[0]?._id || '44734b73-0ed1-4e7b-bb24-f924898d5a56';
+
+  const secret = process.env.JWT_SECRET || 'safesolo-dev-secret';
+  const token = jwt.sign({ id: currentUserId, role: 'user' }, secret, { expiresIn: '1h' });
+
+  console.log('Fetching hero list...');
+  const listRes = await fetch('http://localhost:4000/api/community/heroes', {
+    headers: { 'Authorization': `Bearer ${token}` }
   });
 
-  if (!loginRes.ok) {
-    console.error('Login failed:', loginRes.status, await loginRes.text());
+  if (!listRes.ok) {
+    console.error('Failed to list heroes:', listRes.status, await listRes.text());
     return;
   }
 
-  const loginData = await loginRes.json();
-  console.log('Login response:', loginData);
+  const listData = await listRes.json();
+  const heroes = listData.data || [];
+  if (heroes.length === 0) {
+    console.log('No heroes found to test privacy.');
+    return;
+  }
 
-  const token = 'your-jwt-token-here'; // Replace with actual token
+  const testHero = heroes[0];
+  console.log(`Testing privacy for hero: ${testHero.fullName || testHero.firstName} (ID: ${testHero.id || testHero._id})`);
 
-  // Test get hero profile
-  console.log('Getting hero profile...');
-  const heroRes = await fetch('http://localhost:4000/api/community/heroes/hero-id-here', {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
+  const heroRes = await fetch(`http://localhost:4000/api/community/heroes/${testHero.id || testHero._id}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
   });
 
   console.log('Hero profile status:', heroRes.status);

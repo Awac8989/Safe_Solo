@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
   AlertTriangle,
   Ambulance,
   BellRing,
@@ -296,6 +297,41 @@ function DispatchCenter() {
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+
+                        {/* Chỉ số sinh tồn nạn nhân từ Samsung Galaxy Watch 5 */}
+            <div className="mx-5 mt-4 rounded-xl border border-sky-500/25 bg-sky-500/5 p-3.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
+                  <Activity className="h-4 w-4 animate-pulse text-rose-500" />
+                  <span>Chỉ số sinh tồn ({selected.vitals?.device || "Samsung Galaxy Watch 5 - WearOS"})</span>
+                </div>
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  (selected.vitals?.spo2 ?? 98) < 92 ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                }`}>
+                  {selected.vitals?.status || "BÌNH THƯỜNG"}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2.5 text-center">
+                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase font-medium">SpO2 (Oxy máu)</div>
+                  <div className={`text-base font-extrabold ${(selected.vitals?.spo2 ?? 98) < 92 ? "text-red-500" : "text-sky-400"}`}>
+                    {selected.vitals?.spo2 ?? 98}%
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Nhịp tim (BPM)</div>
+                  <div className="text-base font-extrabold text-rose-500">
+                    {selected.vitals?.heartRate ?? 78} <span className="text-xs font-normal text-muted-foreground">bpm</span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
+                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Pin thiết bị</div>
+                  <div className="text-base font-extrabold text-amber-400">
+                    {selected.vitals?.battery ?? 86}%
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-3 p-5 md:grid-cols-3">

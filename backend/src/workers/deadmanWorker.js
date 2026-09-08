@@ -3,6 +3,7 @@ const SecuritySetting = require('../models/SecuritySetting');
 const { triggerSosForUser } = require('../services/sosService');
 const { createAlertEvent } = require('../services/alertEventService');
 const { ensureAlertPolicy } = require('../services/alertPolicyService');
+const vaultService = require('../services/vaultService');
 const { mapUserDoc } = require('../lib/mongoCore');
 
 function toMinutes(ms) {
@@ -158,6 +159,30 @@ function startDeadManWorker(io) {
             });
             io.emit('ALERT_EVENT', event);
           }
+        }
+
+        // MỤC 6.3: Tự động mở Két sinh tử & gửi cho Người bảo hộ khi mất liên lạc 72h (72 * 60 = 4320 phút)
+        const vaultThresholdMinutes = 72 * 60;
+        if (overdueMinutes >= vaultThresholdMinutes && !userDoc.vaultReleasedAt) {
+          userDoc.vaultReleasedAt = now;
+          await userDoc.save();
+
+          const releaseResult = await vaultService.releaseVaultToGuardians(user._id);
+          const vaultEvent = await createAlertEvent({
+            userId: user._id,
+            level: 'VAULT_72H_RELEASE',
+            status: 'VAULT_UNLOCKED_SENT_TO_GUARDIANS',
+            source: 'SYSTEM',
+            title: 'Tự động mở Két sinh tử sau 72h mất liên lạc',
+            message: `Người dùng mất liên lạc quá 72 giờ (${overdueMinutes} phút). Hệ thống đã tự động mở Két sinh tử và gửi thông báo khẩn cấp tới danh sách Người bảo hộ.`,
+            metadata: { overdueMinutes, releaseResult },
+          });
+          io.emit('ALERT_EVENT', vaultEvent);
+          io.emit('VAULT_EMERGENCY_RELEASED', {
+            userId: user._id,
+            releasedAt: now,
+            overdueMinutes,
+          });
         }
       }
     } catch (error) {
