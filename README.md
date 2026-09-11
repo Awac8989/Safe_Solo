@@ -66,13 +66,17 @@ SafeSolo là giải pháp an toàn cá nhân toàn diện dành cho người s�
 
 ### 1. Ứng dụng Di động SafeSolo (Flutter Android / iOS)
 * **Vòng tròn Điểm danh Sinh tồn (Home Screen & Check-in Circle):** Hiển thị trực quan thời gian còn lại trước hạn chót điểm danh, đo mức pin, tâm trạng (Mood Prompt) và ghi chú hoạt động.
+* **Thanh Tóm tắt Sức khỏe & Trực thám Đồng hồ Trực tiếp (Home Live Health Glance):** Tích hợp ngay dưới lời chào trang chủ, hiển thị thời gian thực nhịp tim, SpO2, bước chân, pin Galaxy Watch và trạng thái giám sát té ngã IMU.
+* **Trung tâm Sức khỏe & Sinh tồn Toàn diện (Health & Vitals Dashboard):**
+  - **Vòng tròn Hoạt động 3 Lớp Đồng tâm (Concentric Activity Rings):** Trực quan hóa tiến độ Bước chân (Cyan), Tiêu hao Calo (Vivid Orange) và Quãng đường (Neon Green) lấy cảm hứng từ Apple Fitness & Samsung Health.
+  - **Ma trận Sinh tồn (Biometrics Matrix):** Điểm số An toàn SafeSolo Health & Safety Score (0-100), đồ thị ECG nhịp tim thời gian thực, đồng hồ bão hòa oxy $SpO_2$, và cảm biến chống té ngã IMU.
 * **Chế độ Khung giờ Yên tĩnh (Quiet Hours):** Tùy chỉnh khung giờ nghỉ ngơi (mặc định 23:00 - 06:00), tự động hạ mức báo động tránh làm phiền giấc ngủ nhưng vẫn duy trì giám sát ngầm.
 * **Xác thực Danh tính Hiệp sĩ (KYC Upload CCCD):** Cho phép chụp/chọn 2 mặt ảnh Căn cước công dân từ camera/thư viện, mã hóa gửi lên máy chủ để được cấp huy hiệu Hiệp sĩ tin cậy (*Trust Score*).
 * **Điều hướng Khẩn cấp 1-Chạm:** Tích hợp trực tiếp nút mở nhanh ứng dụng bản đồ **Waze Navigation** và **Google Maps** để Hiệp sĩ tới hiện trường với lộ trình ngắn nhất.
 * **Chế độ Ngụy trang Bảo mật (Stealth Calculator):** Màn hình máy tính bỏ túi hoạt động bình thường; khi gõ mật khẩu ngụy trang (*Duress PIN*) hệ thống sẽ âm thầm phát báo động câm và truyền tọa độ mà kẻ xấu không hay biết.
 * **Mạng lưới Người bảo hộ Phân cấp (Guardian Network):** Cấu hình người thân với 3 mức ưu tiên rõ ràng (Ưu tiên 1 - Người liên hệ chính, Ưu tiên 2, Ưu tiên 3) kèm tính năng gọi điện thoại khẩn cấp trực tiếp.
 * **Hồ sơ Y tế Khẩn cấp (Medical ID & QR Code):** Nhóm máu, tiền sử dị ứng, liên hệ bác sĩ gia đình hiển thị trên màn hình khóa phục vụ sơ cứu viên.
-* **Đếm bước chân & Lượng calo tiêu thụ (Pedometer Service):** Thu thập dữ liệu vận động thực tế, tự động tính calo đốt cháy ($Calo = Steps 	imes 0.04	ext{ kcal}$).
+* **Đếm bước chân & Lượng calo tiêu thụ (Pedometer Service):** Thu thập dữ liệu vận động thực tế, tự động tính calo đốt cháy ($Calo = Steps \times 0.04\text{ kcal}$).
 
 ---
 
@@ -82,11 +86,13 @@ SafeSolo là giải pháp an toàn cá nhân toàn diện dành cho người s�
   - Nồng độ Oxy hòa tan ($SpO_2$): Tính theo tỷ số $R$ định luật Beer-Lambert ($SpO_2 = 110 - 25R$).
 * **Phát hiện Té ngã Tự động (Kinematic Fall Detection):**
   - Giám sát vector gia tốc $SVM = \sqrt{a_x^2 + a_y^2 + a_z^2}$.
-  - Kích hoạt cảnh báo khi $SVM > 2.5g$ kết hợp góc nghiêng cơ thể $	heta > 60^\circ$.
+  - Kích hoạt cảnh báo khi $SVM > 2.5g$ kết hợp góc nghiêng cơ thể $\theta > 60^\circ$.
 * **Đếm bước chân & Calo:** Tự động đồng bộ bước chân về trung tâm điều phối.
-* **Kết nối & Giám sát Thiết bị Đeo Trực tiếp (Smartwatch Direct Telemetry):**
-  - **Trên Mobile App:** Màn hình kết nối & giám sát thông số đồng hồ trực tiếp qua BLE (Bluetooth Low Energy): kiểm tra trạng thái ghép nối, mức pin %, tín hiệu sóng RSSI, tình trạng đeo trên tay (On/Off-wrist), nhịp tim PPG BioActive, $SpO_2$, gia tốc kế IMU 3 trục và đo đạc tức thời.
-  - **Đồng hồ Wear OS độc lập:** Ứng dụng Wear OS 4.0 One UI Watch chạy trực tiếp trên thiết bị smartwatch thật (Samsung Galaxy Watch 5/6) hoặc Wear OS emulator (`/wear-os`).
+* **Quản lý Thiết bị Đeo 3 Phân hệ Chuyên nghiệp (Smartwatch Companion 3-Tab):**
+  - **Tab 1 - Sinh tồn:** Giám sát nhanh nhịp tim PPG BioActive, nồng độ oxy $SpO_2$, đếm bước chân, trạng thái đeo trên tay và phím kích hoạt SOS khẩn cấp trực tiếp.
+  - **Tab 2 - Cảm biến & Ngã:** Phân tích dữ liệu gia tốc kế IMU 3 trục (X/Y/Z), độ lớn vector SVM (g), góc nghiêng cơ thể, độ nhạy chống té ngã và kiểm thử rung xúc giác đồng hồ.
+  - **Tab 3 - Đồng bộ & SSWP:** Giao thức chuẩn hóa SafeSolo Smartwatch Protocol (SSWP v1.0), kiểm tra độ trễ Cloud Sync, mã hóa đường truyền E2E và trạng thái socket trực tiếp.
+* **Đồng hồ Wear OS độc lập:** Ứng dụng Wear OS 4.0 One UI Watch chạy trực tiếp trên thiết bị smartwatch thật (Samsung Galaxy Watch 5/6) hoặc Wear OS emulator (`/wear-os`).
 
 ---
 
@@ -279,6 +285,47 @@ Dưới đây là bộ ảnh chụp thực tế toàn bộ các màn hình chứ
 
 ---
 
+#### 11. Trung tâm Sức khỏe & Chỉ số Sinh tồn Toàn diện (Health & Vitals Hub)
+* **Tuyến đường:** `/health-history`
+* **Mô tả:** Giao diện trung tâm sức khỏe hoàn chỉnh lấy cảm hứng từ Apple Fitness & Samsung Health:
+  - **Vòng tròn hoạt động 3 lớp đồng tâm (Concentric Activity Rings):** Trực quan hóa tiến độ Bước chân (Cyan), Tiêu hao Calo (Vivid Orange), và Quãng đường di chuyển (Emerald Green) thời gian thực cùng nút mô phỏng vận động nhanh.
+  - **Ma trận Sinh tồn (Biometrics Matrix):** Thang điểm An toàn & Sức khỏe SafeSolo Score (0-100), Biểu đồ sóng điện tim nhịp tim thực PPG với hiệu ứng ECG Waveform, Đồng hồ đo bão hòa Oxy trong máu $SpO_2$, và Giám sát cảm biến IMU gia tốc chống ngã chủ động.
+  - **Bộ lọc chu kỳ linh hoạt & Nhật ký:** Chuyển đổi Hôm nay / 7 ngày / 30 ngày, thống kê tuân thủ điểm danh và dòng thời gian sức khỏe.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_11_health_vitals_hub.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_11_health_vitals_hub.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_11_health_vitals_hub.png" alt="Health & Vitals Hub Screen" width="360px" style="border-radius: 16px; border: 2px solid #06b6d4; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 12. Quản lý Thiết bị đeo 3 Phân hệ Chuyên nghiệp (Smartwatch Companion 3-Tab)
+* **Tuyến đường:** `/smartwatch` (hoặc `/watch-details`)
+* **Mô tả:** Nâng cấp cấu trúc điều khiển đồng hồ Samsung Galaxy Watch / Wear OS thành 3 Tab chuyên sâu:
+  - **Tab 1 - Sinh tồn:** Giám sát nhanh nhịp tim PPG BioActive, nồng độ oxy $SpO_2$, đếm bước chân, trạng thái đeo trên tay và phím kích hoạt SOS khẩn cấp trực tiếp.
+  - **Tab 2 - Cảm biến & Ngã:** Phân tích sâu dữ liệu gia tốc kế IMU 3 trục (X/Y/Z), độ lớn vector SVM (g), góc nghiêng cơ thể, độ nhạy chống té ngã và kiểm thử rung xúc giác đồng hồ.
+  - **Tab 3 - Đồng bộ & SSWP:** Giao thức chuẩn hóa SafeSolo Smartwatch Protocol (SSWP v1.0), kiểm tra độ trễ Cloud Sync, mã hóa đường truyền E2E và trạng thái socket trực tiếp.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_12_smartwatch_companion.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_12_smartwatch_companion.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_12_smartwatch_companion.png" alt="Smartwatch Companion Screen" width="360px" style="border-radius: 16px; border: 2px solid #38bdf8; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
+#### 13. Thẻ Tóm tắt Sức khỏe & Trực thám Đồng hồ tại Trang chủ (Home Live Health Glance)
+* **Tuyến đường:** `/home`
+* **Mô tả:** Thẻ trạng thái nổi bật ngay dưới lời chào đầu ngày trên màn hình chính:
+  - Hiển thị nhịp đập chỉ số đồng hồ trực tiếp: Trực tuyến / Ngoại tuyến, mức pin %, nhịp tim BPM, $SpO_2$, bước chân và trạng thái cảm biến té ngã IMU.
+  - Chạm 1 chạm dẫn thẳng vào Trung tâm Sức khỏe hoặc Quản lý Smartwatch.
+* 🔗 **Mở xem ảnh:** [docs/screenshots/app_13_home_health_glance.png](file:///C:/Users/Admin/SafeSolo/docs/screenshots/app_13_home_health_glance.png)
+
+<p align="center">
+  <img src="./docs/screenshots/app_13_home_health_glance.png" alt="Home Live Health Glance Screen" width="360px" style="border-radius: 16px; border: 2px solid #10b981; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
+</p>
+
+---
+
 ### B. GIAO DIỆN TRUNG TÂM ĐIỀU PHỐI CỨU HỘ (WEB ADMIN PORTAL)
 
 #### 1. Bản đồ Cứu hộ Thời gian thực (Live Map SOS Dispatch)
@@ -445,6 +492,35 @@ npm run build
 
 ---
 
+## 🧪 HỆ THỐNG KIỂM THỬ & MA TRẬN TEST CASES TOÀN DIỆN
+
+Hệ thống SafeSolo được bảo chứng chất lượng với bộ **97 Test Cases** đặc tả chi tiết toàn bộ các kịch bản kiểm thử chức năng và phi chức năng cho cả 3 phân hệ:
+
+| Phân hệ kiểm thử | Số lượng TCs | P1 (Critical - Sinh tử) | P2 (High - Nghiệp vụ chính) | P3 (Medium - Tiện ích) |
+| :--- | :---: | :---: | :---: | :---: |
+| **1. Trung tâm điều phối Web Admin** | **38** | 17 | 16 | 5 |
+| **2. Ứng dụng di động Mobile App** | **39** | 25 | 11 | 3 |
+| **3. Đồng hồ Samsung Galaxy Watch 5** | **20** | 16 | 4 | 0 |
+| **TỔNG CỘNG** | **97** | **58 (59.8%)** | **31 (32.0%)** | **8 (8.2%)** |
+
+> 📖 **Xem toàn văn 97 Test Cases chi tiết tại:** [docs/TEST_CASES.md](file:///C:/Users/Admin/SafeSolo/docs/TEST_CASES.md)
+
+### Các kịch bản kiểm thử tự động nổi bật:
+1. **Kiểm thử Giao diện 7 Màn hình Galaxy Watch 5 (Wear OS):**
+   ```bash
+   flutter test test/galaxy_watch5_interface_test.dart
+   ```
+2. **Kiểm thử Giao thức SSWP & Đồng bộ Smartwatch (WatchSyncManager):**
+   ```bash
+   flutter test test/watch_sync_manager_test.dart
+   ```
+3. **Kiểm thử Bộ lọc Butterworth & Thuật toán Xử lý Tín hiệu AI:**
+   ```bash
+   flutter test test/ai_signal_processor_test.dart
+   ```
+
+---
+
 ## 📂 CẤU TRÚC MÃ NGUỒN DỰ ÁN
 
 ```
@@ -461,25 +537,29 @@ SafeSolo/
 │   │   └── workers/                 # deadmanWorker, duressWorker
 │   └── server.js                    # File khởi chạy máy chủ Backend
 ├── docs/                            # Tài liệu học thuật & Đặc tả kỹ thuật đồ án
+│   ├── TEST_CASES.md                # Bộ tài liệu 97 Test Cases toàn diện hệ thống
 │   ├── co-so-du-lieu-chi-tiet.txt   # Chi tiết thiết kế Cơ sở dữ liệu
 │   └── thuat-toan-ai-chi-tiet.md    # Chuyên sâu 12 thuật toán AI & DSP
 ├── lib/                             # Toàn bộ mã nguồn ứng dụng Flutter
 │   ├── core/                        # Theme, hằng số, AppProvider
-│   ├── models/                      # User, Contact, EmergencyEvent, ...
-│   ├── services/                    # ai_signal_processor, api_service, pedometer
+│   ├── models/                      # User, Contact, EmergencyEvent, watch_protocol
+│   ├── services/                    # ai_signal_processor, api_service, watch_sync_manager
 │   └── views/                       # Màn hình chức năng (Home, Radar, Health, ...)
 │       ├── auth/                    # Đăng nhập, Đăng ký, Quên mật khẩu
 │       ├── community_radar/         # Radar bản đồ, Duyệt KYC CCCD, Waze/Maps
-│       ├── health/                  # Lịch sử sinh tồn, Galaxy Watch 5 Simulator
+│       ├── health/                  # Lịch sử sinh tồn, Concentric Activity Rings
+│       ├── watch/                   # Smartwatch Companion 3-tab
+│       ├── wear_os/                 # 7 màn hình Wear OS Galaxy Watch 5
 │       ├── network/                 # Quản lý người bảo hộ phân cấp ưu tiên
 │       └── settings/                # Khung giờ yên tĩnh (Quiet Hours), Bảo mật
 ├── test/                            # Bộ kiểm thử đơn vị tự động Flutter
 │   ├── ai_signal_processor_test.dart# Test bộ lọc Butterworth, SVM, SpO2, Peak Detect
-│   ├── watch_simulator_test.dart    # Test giao diện đồng hồ Galaxy Watch 5
+│   ├── galaxy_watch5_interface_test.dart # Test 7 màn hình tròn Galaxy Watch 5
+│   ├── watch_sync_manager_test.dart # Test giao thức SSWP & Đồng bộ Smartwatch
 │   └── widget_test.dart             # Test luồng giao diện khởi động
 ├── web-admin/                       # Trung tâm điều phối Web Admin (React + Vite)
 │   ├── src/
-│   │   ├── pages/                   # LiveMap, KYC, Omnichannel, WatchSimulator
+│   │   ├── components/              # IncidentMap, AppSidebar, Topbar
 │   │   └── routes/                  # Định tuyến TanStack Router
 └── README.md                        # Tài liệu hướng dẫn đồ án (File này)
 ```

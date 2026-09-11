@@ -10,7 +10,10 @@ import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/top_toast.dart';
+import '../../services/pedometer_service.dart';
+import '../../services/wear_os_service.dart';
 import '../community_radar/community_radar_page.dart';
+import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -36,6 +39,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
+    PedometerService.instance.initialize();
+    WearOsService.instance.initialize();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _now = DateTime.now());
@@ -220,6 +225,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ],
           ),
           const SizedBox(height: 18),
+          _buildWatchHealthGlanceCard(context, strings),
           if (appProvider.isVacation) ...[
             MaterialBanner(
               backgroundColor: const Color(0xFFE8F1FF),
@@ -525,9 +531,36 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         color: AppColors.primary,
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        strings.text('Vận động hôm nay', 'Today’s activity'),
-                        style: AppTextStyles.title,
+                      Expanded(
+                        child: Text(
+                          strings.text('Vận động hôm nay', 'Today’s activity'),
+                          style: AppTextStyles.title,
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HealthHistoryPage()),
+                          );
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              strings.text('Chi tiết', 'Details'),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 10),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -637,6 +670,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _scheduleDemoPush() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     if (prefs.getBool(_demoPushKey) == true) {
       return;
     }
@@ -829,6 +863,191 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     }
     return '$buffer ${_snapshotStrings().text('bước', 'steps')}';
+  }
+
+  /// Thanh tóm tắt sức khỏe & đồng hồ thông minh thời gian thực (Live Health & Watch Glance)
+  Widget _buildWatchHealthGlanceCard(BuildContext context, AppStrings strings) {
+    final pedometer = PedometerService.instance;
+    final wearOs = WearOsService.instance;
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([pedometer, wearOs]),
+      builder: (context, _) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HealthHistoryPage()),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF38BDF8).withValues(alpha: 0.18),
+                              ),
+                              child: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 22),
+                            ),
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: Container(
+                                width: 9,
+                                height: 9,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    pedometer.watchModel,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.bluetooth_connected_rounded, size: 14, color: Color(0xFF38BDF8)),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                strings.text(
+                                  'Đã đồng bộ · Chạm xem Trung tâm Sức khỏe',
+                                  'Synced · Tap for Health & Vitals Hub',
+                                ),
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.65),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    const Divider(color: Colors.white12, height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildGlanceMetric(
+                          icon: Icons.favorite_rounded,
+                          color: const Color(0xFFF43F5E),
+                          value: '${wearOs.heartRate}',
+                          unit: 'BPM',
+                        ),
+                        _buildGlanceMetric(
+                          icon: Icons.bloodtype_rounded,
+                          color: const Color(0xFF06B6D4),
+                          value: '${wearOs.spO2}%',
+                          unit: 'SpO2',
+                        ),
+                        _buildGlanceMetric(
+                          icon: Icons.directions_walk_rounded,
+                          color: const Color(0xFF10B981),
+                          value: '${wearOs.steps}',
+                          unit: strings.text('bước', 'steps'),
+                        ),
+                        _buildGlanceMetric(
+                          icon: Icons.battery_charging_full_rounded,
+                          color: const Color(0xFF38BDF8),
+                          value: '${wearOs.battery}%',
+                          unit: 'PIN',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlanceMetric({
+    required IconData icon,
+    required Color color,
+    required String value,
+    required String unit,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 14),
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          unit,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
   }
 }
 

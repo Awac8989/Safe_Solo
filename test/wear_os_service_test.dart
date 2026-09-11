@@ -176,37 +176,50 @@ void main() {
       expect(find.text('SAFE-SOLO'), findsOneWidget);
 
       // Page 1: Watch Face Home
-      expect(find.text('ĐIỂM DANH'), findsOneWidget);
-      expect(find.text('SOS'), findsOneWidget);
+      expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
+      expect(find.text('14:32 đến hạn'), findsOneWidget);
 
-      // Swipe to Page 2: BioActive PPG
+      // Swipe to Page 2: Dashboard
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('CẢM BIẾN BIOACTIVE PPG'), findsOneWidget);
-      expect(find.text('ĐO NGAY'), findsOneWidget);
+      expect(find.text('ĐẾN HẠN ĐIỂM DANH'), findsOneWidget);
+      expect(find.text('SOS KHẨN'), findsOneWidget);
 
-      // Swipe to Page 3: Kinematic Fall & Motion
+      // Swipe to Page 3: Mood Check-in
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.textContaining('GIÁM SÁT'), findsOneWidget);
-      expect(find.text('MÔ PHỎNG NGÃ 4.8G'), findsOneWidget);
+      expect(find.text('CẢM XÚC HÔM NAY?'), findsOneWidget);
+      expect(find.text('Tuyệt vời'), findsOneWidget);
 
-      // Swipe to Page 4: Medical ID
+      // Swipe to Page 4: Alert Warning
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('HỒ SƠ Y TẾ KHẨN CẤP'), findsOneWidget);
+      expect(find.text('⚠ CẢNH BÁO KHẨN CẤP'), findsOneWidget);
+      expect(find.text('GỬI SOS NGAY'), findsOneWidget);
 
-      // Swipe to Page 5: Device Settings
+      // Swipe to Page 5: Active SOS
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('THIẾT BỊ WEAR OS'), findsOneWidget);
-      expect(find.text('ĐỒNG BỘ ĐÁM MÂY'), findsOneWidget);
+      expect(find.text('🆘 SOS ĐANG HOẠT ĐỘNG'), findsOneWidget);
+      expect(find.text('📍 Đã chốt tọa độ GPS'), findsOneWidget);
+
+      // Swipe to Page 6: Health Monitor
+      await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('SỨC KHỎE SINH TỒN'), findsOneWidget);
+      expect(find.text('♥ NHỊP TIM'), findsOneWidget);
+
+      // Swipe to Page 7: Medical ID
+      await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('THẺ Y TẾ KHẨN CẤP'), findsOneWidget);
+      expect(find.text('Nhóm máu'), findsOneWidget);
 
       // Test Emergency Countdown Overlay on 384x384
       WearOsService.instance.simulateFall();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('TÔI ỔN (HỦY)'), findsOneWidget);
-      expect(find.text('CỨU HỘ NGAY'), findsOneWidget);
+      expect(find.text('← Vuốt: Tôi an toàn'), findsOneWidget);
+      expect(find.text('GỬI SOS NGAY'), findsOneWidget);
       WearOsService.instance.cancelEmergency();
       await tester.pump(const Duration(milliseconds: 300));
     });

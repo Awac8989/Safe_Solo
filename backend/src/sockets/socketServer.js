@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const { initializeChatSocket } = require('./chatSocket');
+const { initializeWatchSocket } = require('./watchSocket');
 
 let ioInstance;
 
@@ -13,6 +14,9 @@ function initializeSocket(server) {
 
   // Initialize chat socket functionality
   initializeChatSocket(ioInstance);
+
+  // Initialize smartwatch real-time synchronization
+  initializeWatchSocket(ioInstance);
 
   ioInstance.on('connection', (socket) => {
     // eslint-disable-next-line no-console

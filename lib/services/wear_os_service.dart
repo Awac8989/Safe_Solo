@@ -6,6 +6,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'ai_signal_processor.dart';
 import 'api_service.dart';
 import 'pedometer_service.dart';
+import 'watch_sync_manager.dart';
 
 /// ============================================================================
 /// SAFESOLO - DỊCH VỤ THIẾT BỊ ĐEO THÔNG MINH SAMSUNG GALAXY WATCH 5 (WEAR OS)
@@ -85,6 +86,7 @@ class WearOsService extends ChangeNotifier {
     _isOffWrist = _pedometer.isOffWrist;
     _isPaired = _pedometer.isPaired;
 
+    WatchSyncManager.instance.initialize();
     startMotionMonitoring();
   }
 
@@ -98,8 +100,10 @@ class WearOsService extends ChangeNotifier {
         _onAccelerometerData,
         onError: (err) {
           debugPrint('WearOsService Accelerometer error: $err');
+          _accelerometerSub?.cancel();
+          _accelerometerSub = null;
         },
-        cancelOnError: false,
+        cancelOnError: true,
       );
     } catch (e) {
       debugPrint('Accelerometer stream not supported on this platform: $e');
@@ -177,6 +181,11 @@ class WearOsService extends ChangeNotifier {
     _heartRate = 118; // Tim đập nhanh sau va chạm
 
     _syncToPedometer();
+    WatchSyncManager.instance.emitFallAlert(
+      svm: svm,
+      tilt: tilt,
+      isSimulated: isSimulated,
+    );
     _startEmergencyCountdown(
       title: 'PHÁT HIỆN TÉ NGÃ TỪ GALAXY WATCH 5',
       message:
@@ -219,6 +228,7 @@ class WearOsService extends ChangeNotifier {
   /// Nhấn phím SOS khẩn cấp phần cứng/màn hình trên đồng hồ
   void triggerHardwareSos({String? userId}) {
     HapticFeedback.heavyImpact();
+    WatchSyncManager.instance.emitHardwareSos(userId: userId);
     _pedometer.emitWatchEmergencyAlert(
       type: 'WATCH_EMERGENCY_SOS',
       message: 'Người dùng kích hoạt SOS khẩn cấp tức thời từ Samsung Galaxy Watch 5!',
@@ -421,6 +431,15 @@ class WearOsService extends ChangeNotifier {
       spO2: _spO2,
       battery: _battery,
       isOffWrist: _isOffWrist,
+    );
+    WatchSyncManager.instance.emitVitalsTelemetry(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      steps: _steps,
+      battery: _battery,
+      isOffWrist: _isOffWrist,
+      svmG: _currentSvmG,
+      tiltAngle: _currentTiltAngle,
     );
   }
 

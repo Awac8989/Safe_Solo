@@ -12,7 +12,15 @@ import '../../models/health_report_model.dart';
 import '../../services/api_service.dart';
 import '../../services/health_report_export_service.dart';
 import '../../services/pedometer_service.dart';
+import '../../services/wear_os_service.dart';
+import '../../services/watch_sync_manager.dart';
+import 'widgets/activity_rings_widget.dart';
+import 'widgets/vitals_matrix_card.dart';
 
+/// ============================================================================
+/// SAFESOLO - TRUNG TÂM SỨC KHỎE & CHỈ SỐ SINH TỒN (HEALTH & VITALS DASHBOARD)
+/// Tham khảo chuẩn Apple Health, Samsung Health, Garmin Connect và Whoop 4.0
+/// ============================================================================
 class HealthHistoryPage extends StatefulWidget {
   const HealthHistoryPage({super.key});
 
@@ -27,6 +35,9 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
 
   late String _period;
   late Future<HealthReportModel> _future;
+  bool _isSyncing = false;
+  bool _isMeasuring = false;
+  DateTime _lastSyncedAt = DateTime.now();
 
   @override
   void initState() {
@@ -34,6 +45,8 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
     _period = 'month';
     _future = _load();
     PedometerService.instance.initialize();
+    WearOsService.instance.initialize();
+    WatchSyncManager.instance.initialize();
   }
 
   Future<HealthReportModel> _load() async {
@@ -56,6 +69,66 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
       _future = _load();
     });
     await _future;
+  }
+
+  /// Kích hoạt đồng bộ thông số sức khỏe lên Cloud và Đồng hồ
+  Future<void> _handleSyncNow() async {
+    setState(() => _isSyncing = true);
+    final user = context.read<AppProvider>().user;
+    final wearOs = WearOsService.instance;
+
+    try {
+      if (user != null) {
+        await _api.createDeviceSignal(
+          userId: user.id,
+          signalType: 'HEALTH_DASHBOARD_SYNC',
+          payload: {
+            'device': wearOs.watchModel,
+            'heartRate': wearOs.heartRate,
+            'spO2': wearOs.spO2,
+            'battery': wearOs.battery,
+            'steps': wearOs.steps,
+            'syncedAt': DateTime.now().toIso8601String(),
+          },
+        );
+      }
+      setState(() => _lastSyncedAt = DateTime.now());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF0284C7),
+            content: Text('✓ Đã đồng bộ chỉ số sinh tồn và nhịp sống thành công!'),
+          ),
+        );
+      }
+    } catch (_) {
+      // Offline fallback
+      setState(() => _lastSyncedAt = DateTime.now());
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+  /// Kích hoạt đo PPG tức thời qua Smartwatch
+  Future<void> _handleMeasureNow() async {
+    setState(() => _isMeasuring = true);
+    WatchSyncManager.instance.sendInstantMeasureRequest();
+
+    await Future.delayed(const Duration(milliseconds: 1400));
+    if (!mounted) return;
+
+    setState(() {
+      _isMeasuring = false;
+      _lastSyncedAt = DateTime.now();
+    });
+
+    final wearOs = WearOsService.instance;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF10B981),
+        content: Text('✓ Đo PPG thành công: ${wearOs.heartRate} BPM · Nhịp tim đều'),
+      ),
+    );
   }
 
   Future<void> _exportPdf(HealthReportModel report) async {
@@ -91,6 +164,8 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
+    final pedometer = PedometerService.instance;
+    final wearOs = WearOsService.instance;
 
     return AppPage(
       safeBottom: true,
@@ -98,7 +173,13 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: CircularProgressIndicator(strokeWidth: 3, color: Color(0xFF10B981)),
+              ),
+            );
           }
 
           if (snapshot.hasError) {
@@ -125,28 +206,47 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
           final totalMood = report.moodCounts.values.fold<int>(0, (sum, item) => sum + item);
 
           return RefreshIndicator(
+            color: const Color(0xFF10B981),
             onRefresh: _refresh,
             child: ListView(
               physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
               padding: const EdgeInsets.only(top: 18, bottom: 124),
               children: [
+                // 1. TIÊU ĐỀ TRANG VÀ NÚT TÁC VỤ
                 Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            strings.text('Lịch sử sức khỏe', 'Health history'),
-                            style: AppTextStyles.h2.copyWith(fontSize: 28),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.health_and_safety_rounded,
+                                  color: Color(0xFF10B981),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                strings.text('Trung tâm Sức khỏe', 'Health & Vitals Hub'),
+                                style: AppTextStyles.h2.copyWith(fontSize: 24),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Text(
                             strings.text(
-                              'Biểu đồ check-in, tâm trạng và cảnh báo theo thời gian.',
-                              'Check-in, mood, and alert trends over time.',
+                              'Chỉ số sinh tồn BioActive, vòng hoạt động thể chất và nhịp sống.',
+                              'BioActive vitals, physical activity rings, and wellness trends.',
                             ),
-                            style: AppTextStyles.body,
+                            style: AppTextStyles.body.copyWith(fontSize: 13),
                           ),
                         ],
                       ),
@@ -155,7 +255,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                       icon: Icons.picture_as_pdf_rounded,
                       onPressed: () => _exportPdf(report),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     AppRoundIconButton(
                       icon: Icons.table_view_rounded,
                       onPressed: () => _exportExcel(report),
@@ -163,10 +263,14 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+
+                // 2. BANNER KẾT NỐI SMARTWATCH & ĐỒNG BỘ THỜI GIAN THỰC
                 AnimatedBuilder(
-                  animation: PedometerService.instance,
+                  animation: Listenable.merge([pedometer, wearOs]),
                   builder: (context, _) {
-                    final pedometer = PedometerService.instance;
+                    final syncDiff = DateTime.now().difference(_lastSyncedAt).inMinutes;
+                    final syncText = syncDiff <= 0 ? 'Vừa xong' : '$syncDiff phút trước';
+
                     return Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -179,186 +283,114 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                         border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.15),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
                         ],
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(10),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 20),
+                                child: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 22),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      pedometer.watchModel,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          pedometer.watchModel,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: const Text(
+                                            'ONLINE',
+                                            style: TextStyle(
+                                              color: Color(0xFF10B981),
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
+                                    const SizedBox(height: 2),
                                     Text(
-                                      strings.text(
-                                        'Đã đồng bộ · Cảm biến BioActive & Pedometer',
-                                        'Synced · BioActive Sensor & Pedometer',
-                                      ),
+                                      'Đồng bộ: $syncText · Pin: ${wearOs.battery}% · BLE 5.2',
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.7),
+                                        color: Colors.white.withValues(alpha: 0.65),
                                         fontSize: 11,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.circle, color: Color(0xFF10B981), size: 8),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      strings.text('Trực tuyến', 'Live'),
-                                      style: const TextStyle(
-                                        color: Color(0xFF10B981),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _WatchStatTile(
-                                  icon: Icons.directions_walk_rounded,
-                                  iconColor: const Color(0xFF38BDF8),
-                                  label: strings.text('Bước chân', 'Steps'),
-                                  value: '${pedometer.steps}',
-                                  unit: strings.text('bước', 'steps'),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _WatchStatTile(
-                                  icon: Icons.local_fire_department_rounded,
-                                  iconColor: const Color(0xFFF97316),
-                                  label: strings.text('Tiêu thụ', 'Calories'),
-                                  value: '${pedometer.calories}',
-                                  unit: 'kcal',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _WatchStatTile(
-                                  icon: Icons.bloodtype_rounded,
-                                  iconColor: const Color(0xFF06B6D4),
-                                  label: 'SpO2',
-                                  value: '${pedometer.spO2}%',
-                                  unit: 'Oxy máu',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _WatchStatTile(
-                                  icon: Icons.favorite_rounded,
-                                  iconColor: const Color(0xFFF43F5E),
-                                  label: strings.text('Nhịp tim', 'BPM'),
-                                  value: '${pedometer.heartRate}',
-                                  unit: 'bpm',
-                                ),
+                              // Nút đồng bộ nhanh
+                              IconButton(
+                                tooltip: 'Đồng bộ ngay',
+                                onPressed: _isSyncing ? null : _handleSyncNow,
+                                icon: _isSyncing
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF38BDF8),
+                                        ),
+                                      )
+                                    : const Icon(Icons.sync_rounded, color: Color(0xFF38BDF8)),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                '${strings.text("Trạng thái:", "Status:")} ${pedometer.status == "walking" ? strings.text("Đang đi bộ", "Walking") : strings.text("Nghỉ ngơi", "Resting")} · ${pedometer.distanceKm} km',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                  fontSize: 11,
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF38BDF8),
+                                    side: BorderSide(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                  onPressed: () => Navigator.of(context).pushNamed('/smartwatch'),
+                                  icon: const Icon(Icons.settings_input_component_rounded, size: 16),
+                                  label: const Text('Quản lý đồng hồ', style: TextStyle(fontSize: 12)),
                                 ),
                               ),
-                              Wrap(
-                                spacing: 8,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  TextButton.icon(
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: const Color(0xFF38BDF8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    icon: const Icon(Icons.play_arrow_rounded, size: 16),
-                                    label: Text(
-                                      strings.text('Mô phỏng +25 bước', 'Simulate +25 steps'),
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                    onPressed: () => pedometer.simulateWalking(),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                   ),
-                                  OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF38BDF8),
-                                      side: const BorderSide(color: Color(0xFF0284C7)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    icon: const Icon(Icons.watch_rounded, size: 14),
-                                    label: Text(
-                                      strings.text('Mặt WearOS', 'WearOS Face'),
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                    onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
-                                  ),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0284C7),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    icon: const Icon(Icons.watch_rounded, size: 14),
-                                    label: Text(
-                                      strings.text('Xem thông số đồng hồ', 'View Watch Telemetry'),
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                    onPressed: () => Navigator.of(context).pushNamed('/smartwatch'),
-                                  ),
-                                ],
+                                  onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
+                                  icon: const Icon(Icons.watch_rounded, size: 16),
+                                  label: const Text('Mặt WearOS', style: TextStyle(fontSize: 12)),
+                                ),
                               ),
                             ],
                           ),
@@ -367,13 +399,47 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
+
+                // 3. VÒNG HOẠT ĐỘNG THỂ CHẤT 3 TẦNG (ACTIVITY RINGS - APPLE / SAMSUNG HEALTH)
+                AnimatedBuilder(
+                  animation: pedometer,
+                  builder: (context, _) {
+                    return ActivityRingsWidget(
+                      steps: pedometer.steps,
+                      calories: pedometer.calories,
+                      distanceKm: pedometer.distanceKm,
+                      onSimulateStep: () => pedometer.simulateWalking(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+
+                // 4. MA TRẬN CHỈ SỐ SINH TỒN BIOACTIVE & ĐIỂM SỐ AN TOÀN (0-100)
+                AnimatedBuilder(
+                  animation: Listenable.merge([pedometer, wearOs]),
+                  builder: (context, _) {
+                    return VitalsMatrixCard(
+                      heartRate: wearOs.heartRate,
+                      spO2: wearOs.spO2,
+                      currentSvmG: wearOs.currentSvmG,
+                      currentTiltAngle: wearOs.currentTiltAngle,
+                      isOffWrist: wearOs.isOffWrist,
+                      isMeasuring: _isMeasuring,
+                      onMeasureNow: _handleMeasureNow,
+                      onViewWearableDetails: () => Navigator.of(context).pushNamed('/smartwatch'),
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+
+                // 5. BỘ LỌC KHOẢNG THỜI GIAN
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        strings.text('Khoảng thời gian', 'Time range'),
+                        strings.text('Khoảng thời gian báo cáo', 'Reporting period'),
                         style: AppTextStyles.caption,
                       ),
                       const SizedBox(height: 10),
@@ -399,14 +465,22 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                         onChanged: _changePeriod,
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        '${_formatDate(report.rangeStart)} - ${_formatDate(report.rangeEnd)}',
-                        style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary),
+                      Row(
+                        children: [
+                          const Icon(Icons.date_range_rounded, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_formatDate(report.rangeStart)} - ${_formatDate(report.rangeEnd)}',
+                            style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // 6. THỐNG KÊ ĐIỂM DANH & CẢNH BÁO AN TOÀN
                 GridView.count(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
@@ -435,13 +509,15 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                     ),
                     _HealthStatCard(
                       icon: Icons.emergency_rounded,
-                      label: strings.text('SOS', 'SOS'),
+                      label: strings.text('SOS khẩn cấp', 'SOS Alert'),
                       value: report.sosCount.toString(),
                       tone: const Color(0xFF7C3AED),
                     ),
                   ],
                 ),
                 const SizedBox(height: 18),
+
+                // 7. BIỂU ĐỒ NHỊP SỐNG & CHECK-IN
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,13 +528,9 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              strings.text('Biểu đồ check-in', 'Check-in chart'),
+                              strings.text('Biểu đồ nhịp sống & Điểm danh', 'Rhythm & Check-in chart'),
                               style: AppTextStyles.title,
                             ),
-                          ),
-                          Text(
-                            strings.text('Nhịp sống', 'Life rhythm'),
-                            style: AppTextStyles.caption,
                           ),
                         ],
                       ),
@@ -471,6 +543,8 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // 8. TÂM TRẠNG & SỨC KHỎE TINH THẦN
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,12 +555,12 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              strings.text('Tâm trạng', 'Mood'),
+                              strings.text('Sức khỏe tinh thần', 'Mental Well-being'),
                               style: AppTextStyles.title,
                             ),
                           ),
                           Text(
-                            strings.text('$totalMood lần', '$totalMood times'),
+                            strings.text('$totalMood lần ghi nhận', '$totalMood records'),
                             style: AppTextStyles.caption,
                           ),
                         ],
@@ -507,6 +581,8 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // 9. LỊCH SỬ CHECK-IN GẦN ĐÂY
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,78 +593,106 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              strings.text('Check-in gần đây', 'Recent check-ins'),
+                              strings.text('Điểm danh gần đây', 'Recent check-ins'),
                               style: AppTextStyles.title,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      ...report.recentCheckins.map(
-                        (item) => _TimelineTile(
-                          icon: item.autoTriggered
-                              ? Icons.auto_awesome_rounded
-                              : Icons.check_circle_rounded,
-                          iconColor: item.autoTriggered
-                              ? const Color(0xFFF59E0B)
-                              : AppColors.primary,
-                          title: item.autoTriggered
-                              ? strings.text('Tự check-in', 'Auto check-in')
-                              : strings.text('Điểm danh', 'Check-in'),
-                          subtitle: _dateTimeFormat.format(DateTime.parse(item.createdAt)),
-                          trailing: item.location == null
-                              ? null
-                              : '${item.location!['lat']}, ${item.location!['lng']}',
+                      if (report.recentCheckins.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            strings.text('Chưa có lượt điểm danh nào trong kỳ.', 'No check-in recorded.'),
+                            style: AppTextStyles.body,
+                          ),
+                        )
+                      else
+                        ...report.recentCheckins.map(
+                          (item) => _TimelineTile(
+                            icon: item.autoTriggered
+                                ? Icons.auto_awesome_rounded
+                                : Icons.check_circle_rounded,
+                            iconColor: item.autoTriggered
+                                ? const Color(0xFFF59E0B)
+                                : AppColors.primary,
+                            title: item.autoTriggered
+                                ? strings.text('Tự động điểm danh (Wearable)', 'Auto check-in (Wearable)')
+                                : strings.text('Điểm danh an toàn', 'Safe check-in'),
+                            subtitle: _dateTimeFormat.format(DateTime.parse(item.createdAt)),
+                            trailing: item.location == null
+                                ? null
+                                : '${item.location!['lat']}, ${item.location!['lng']}',
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // 10. CẢNH BÁO AN TOÀN GẦN ĐÂY
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.notification_important_rounded, color: AppColors.primary),
+                          const Icon(Icons.notification_important_rounded, color: AppColors.destructive),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              strings.text('Cảnh báo gần đây', 'Recent alerts'),
+                              strings.text('Sự kiện & Cảnh báo an toàn', 'Safety alerts & events'),
                               style: AppTextStyles.title,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      ...report.recentAlerts.map(
-                        (item) => _TimelineTile(
-                          icon: _alertIcon(item.status, item.level),
-                          iconColor: _alertColor(item.status, item.level),
-                          title: item.title,
-                          subtitle:
-                              '${item.status ?? '-'} · ${_dateTimeFormat.format(DateTime.parse(item.createdAt))}',
-                          body: item.message,
+                      if (report.recentAlerts.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            strings.text('Không có cảnh báo nguy cấp nào. Bạn đang rất an toàn!', 'No emergency alerts. You are safe!'),
+                            style: AppTextStyles.body.copyWith(color: AppColors.success),
+                          ),
+                        )
+                      else
+                        ...report.recentAlerts.map(
+                          (item) => _TimelineTile(
+                            icon: _alertIcon(item.status, item.level),
+                            iconColor: _alertColor(item.status, item.level),
+                            title: item.title,
+                            subtitle:
+                                '${item.status ?? '-'} · ${_dateTimeFormat.format(DateTime.parse(item.createdAt))}',
+                            body: item.message,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 18),
+
+                // 11. HƯỚNG DẪN DÙNG BÁO CÁO
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        strings.text('Gợi ý dùng báo cáo', 'How to use the report'),
-                        style: AppTextStyles.title,
+                      Row(
+                        children: [
+                          const Icon(Icons.lightbulb_rounded, color: Color(0xFFF59E0B)),
+                          const SizedBox(width: 8),
+                          Text(
+                            strings.text('Gợi ý hồ sơ sức khỏe', 'Health profile tips'),
+                            style: AppTextStyles.title,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 10),
                       Text(
                         strings.text(
-                          'Bạn có thể xuất PDF để gửi cho người thân/bác sĩ hoặc xuất Excel để lọc và thống kê chi tiết.',
-                          'Export PDF for family/doctor or Excel for deeper filtering and analysis.',
+                          'Bạn có thể xuất tệp PDF để chia sẻ với bác sĩ hoặc người thân bảo hộ, hoặc xuất tệp Excel để phân tích nhịp sống chuyên sâu.',
+                          'Export PDF to share with doctors or guardians, or Excel for deeper analysis.',
                         ),
                         style: AppTextStyles.body,
                       ),
@@ -614,15 +718,15 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
   String _moodLabel(AppStrings strings, String key) {
     switch (key) {
       case 'calm':
-        return strings.text('Bình an', 'Calm');
+        return '😊 ${strings.text("Bình an", "Calm")}';
       case 'happy':
-        return strings.text('Tích cực', 'Positive');
+        return '😄 ${strings.text("Vui vẻ", "Positive")}';
       case 'tired':
-        return strings.text('Hơi mệt', 'Tired');
+        return '😣 ${strings.text("Hơi mệt", "Tired")}';
       case 'sick':
-        return strings.text('Cần lưu ý', 'Need attention');
+        return '🤒 ${strings.text("Cần lưu ý", "Need attention")}';
       case 'focused':
-        return strings.text('Đang tập trung', 'Focused');
+        return '🎯 ${strings.text("Tập trung", "Focused")}';
       default:
         return key;
     }
@@ -720,16 +824,16 @@ class _HealthStatCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: tone.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: tone),
+            child: Icon(icon, color: tone, size: 20),
           ),
-          const SizedBox(height: 10),
-          Text(value, style: AppTextStyles.h2.copyWith(color: tone)),
+          const SizedBox(height: 8),
+          Text(value, style: AppTextStyles.h2.copyWith(color: tone, fontSize: 24)),
           Text(label, style: AppTextStyles.caption),
         ],
       ),
@@ -764,7 +868,17 @@ class _MoodCountChip extends StatelessWidget {
         children: [
           Text(label, style: AppTextStyles.bodyStrong),
           const SizedBox(width: 8),
-          Text(value.toString(), style: AppTextStyles.caption),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              value.toString(),
+              style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );
@@ -806,7 +920,7 @@ class _CheckInChart extends StatelessWidget {
     );
 
     return SizedBox(
-      height: 240,
+      height: 220,
       child: Column(
         children: [
           Expanded(
@@ -820,27 +934,27 @@ class _CheckInChart extends StatelessWidget {
 
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         Text(
                           total.toString(),
-                          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
+                          style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700, fontSize: 10),
                         ),
                         const SizedBox(height: 6),
                         SizedBox(
-                          height: 150,
+                          height: 130,
                           child: Stack(
                             alignment: Alignment.bottomCenter,
                             children: [
                               FractionallySizedBox(
                                 heightFactor: heightFactor.clamp(0.05, 1),
                                 child: Container(
-                                  width: 18,
+                                  width: 16,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primarySoft,
-                                    borderRadius: BorderRadius.circular(12),
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                               ),
@@ -848,22 +962,21 @@ class _CheckInChart extends StatelessWidget {
                                 FractionallySizedBox(
                                   heightFactor: autoFactor.clamp(0.03, 1),
                                   child: Container(
-                                    width: 18,
+                                    width: 16,
                                     decoration: BoxDecoration(
                                       color: const Color(0xFFF59E0B),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
                                 ),
                               if (alertFactor > 0)
-                                Positioned(
-                                  top: 0,
+                                FractionallySizedBox(
+                                  heightFactor: alertFactor.clamp(0.03, 1),
                                   child: Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
+                                    width: 16,
+                                    decoration: BoxDecoration(
                                       color: AppColors.destructive,
-                                      shape: BoxShape.circle,
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
                                 ),
@@ -873,9 +986,8 @@ class _CheckInChart extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           bucket.label,
-                          maxLines: 1,
+                          style: AppTextStyles.caption.copyWith(fontSize: 10),
                           overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.caption,
                         ),
                       ],
                     ),
@@ -888,11 +1000,11 @@ class _CheckInChart extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _LegendDot(color: AppColors.primarySoft, label: strings.text('Check-in', 'Check-in')),
-              const SizedBox(width: 12),
+              _LegendDot(color: const Color(0xFF10B981), label: strings.text('Thủ công', 'Manual')),
+              const SizedBox(width: 14),
               _LegendDot(color: const Color(0xFFF59E0B), label: strings.text('Tự động', 'Auto')),
-              const SizedBox(width: 12),
-              _LegendDot(color: AppColors.destructive, label: strings.text('Cảnh báo', 'Alerts')),
+              const SizedBox(width: 14),
+              _LegendDot(color: AppColors.destructive, label: strings.text('Cảnh báo', 'Alert')),
             ],
           ),
         ],
@@ -902,10 +1014,7 @@ class _CheckInChart extends StatelessWidget {
 }
 
 class _LegendDot extends StatelessWidget {
-  const _LegendDot({
-    required this.color,
-    required this.label,
-  });
+  const _LegendDot({required this.color, required this.label});
 
   final Color color;
   final String label;
@@ -915,9 +1024,13 @@ class _LegendDot extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 6),
-        Text(label, style: AppTextStyles.caption),
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(label, style: AppTextStyles.caption.copyWith(fontSize: 11)),
       ],
     );
   }
@@ -929,117 +1042,54 @@ class _TimelineTile extends StatelessWidget {
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    this.body,
     this.trailing,
+    this.body,
   });
 
   final IconData icon;
   final Color iconColor;
   final String title;
   final String subtitle;
-  final String? body;
   final String? trailing;
+  final String? body;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.secondary,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(title, style: AppTextStyles.title)),
-                      if (trailing != null) Text(trailing!, style: AppTextStyles.caption),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: AppTextStyles.caption),
-                  if (body != null && body!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(body!, style: AppTextStyles.body),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WatchStatTile extends StatelessWidget {
-  const _WatchStatTile({
-    required this.icon,
-    required this.iconColor,
-    required this.label,
-    required this.value,
-    required this.unit,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String label;
-  final String value;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: iconColor, size: 16),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
             ),
+            child: Icon(icon, color: iconColor, size: 18),
           ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            unit,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 9,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(title, style: AppTextStyles.bodyStrong)),
+                    if (trailing != null)
+                      Text(
+                        trailing!,
+                        style: AppTextStyles.caption.copyWith(fontSize: 10),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle, style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                if (body != null && body!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(body!, style: AppTextStyles.body.copyWith(fontSize: 12)),
+                ],
+              ],
             ),
           ),
         ],

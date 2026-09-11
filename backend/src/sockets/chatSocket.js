@@ -5,6 +5,13 @@ function initializeChatSocket(io) {
   // JWT authentication middleware for sockets
   io.use(async (socket, next) => {
     try {
+      // Cho phép kết nối chuyên biệt cho smartwatch đồng bộ qua SafeSolo Watch Protocol
+      const authType = socket.handshake.auth?.type || socket.handshake.query?.type;
+      if (authType === 'watch_sync') {
+        socket.isWatchSync = true;
+        return next();
+      }
+
       const token = socket.handshake.auth.token || socket.handshake.query.token;
 
       if (!token) {
