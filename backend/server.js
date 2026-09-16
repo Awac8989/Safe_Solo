@@ -102,7 +102,7 @@ server.listen(port, async () => {
   }
 
   try {
-    startDeadManWorker();
+    startDeadManWorker(io);
   } catch (e) {
     console.warn('DeadMan worker init warning:', e.message);
   }
