@@ -110,8 +110,8 @@ void main() {
       expect(find.text('Cảm biến & Ngã'), findsOneWidget);
       expect(find.text('Đồng bộ & SSWP'), findsOneWidget);
 
-      // Check Tab 1 elements
-      expect(find.text('ĐÃ KẾT NỐI'), findsOneWidget);
+      // Check Tab 1 elements (Mặc định khi chưa kết nối)
+      expect(find.text('CHƯA KẾT NỐI'), findsOneWidget);
       expect(find.text('THÔNG SỐ SINH TỒN BIOACTIVE TRỰC TIẾP'), findsOneWidget);
 
       // Switch to Tab 2 (Cảm biến & Ngã)
@@ -154,13 +154,23 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Check Live Watch Health Glance card
-      expect(find.text('Đã đồng bộ · Chạm xem Trung tâm Sức khỏe'), findsOneWidget);
+      // 1. Khi chưa kết nối: Phải hiển thị thẻ "Chưa kết nối đồng hồ thông minh" và nút Thêm
+      expect(find.text('Chưa kết nối đồng hồ thông minh'), findsOneWidget);
+      expect(find.text('Thêm'), findsOneWidget);
+      expect(find.text('BPM'), findsNothing);
+
+      // 2. Khi đã kết nối thành công: Phải hiển thị thẻ trực tiếp và các chỉ số sinh tồn
+      await WatchSyncManager.instance.quickPairDevice(userId: 'test_user');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Đã kết nối · Đang đồng bộ thời gian thực'), findsOneWidget);
       expect(find.text('BPM'), findsWidgets);
       expect(find.text('SpO2'), findsWidgets);
 
       WatchSyncManager.instance.stopPeriodicChecks();
       await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
   });
 }

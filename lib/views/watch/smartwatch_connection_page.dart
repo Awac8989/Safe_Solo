@@ -10,6 +10,7 @@ import '../../services/api_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
+import 'widgets/add_smartwatch_sheet.dart';
 
 /// ============================================================================
 /// SAFESOLO - QUẢN LÝ THIẾT BỊ ĐEO & ĐỒNG BỘ ĐỒNG HỒ THÔNG MINH (WEAR OS)
@@ -418,7 +419,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       body: AnimatedBuilder(
         animation: Listenable.merge([_wearOs, _pedometer, _syncManager]),
         builder: (context, _) {
-          final isConnected = _pedometer.isPaired;
+          final isConnected = _syncManager.isPaired;
           final isOffWrist = _wearOs.isOffWrist;
 
           return TabBarView(
@@ -637,7 +638,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                             ),
                           ),
                           child: Text(
-                            isConnected ? 'ĐÃ KẾT NỐI' : 'NGẮT KẾT NỐI',
+                            isConnected ? 'ĐÃ KẾT NỐI' : 'CHƯA KẾT NỐI',
                             style: TextStyle(
                               color: isConnected ? const Color(0xFF34D399) : const Color(0xFFF87171),
                               fontSize: 10,
@@ -840,6 +841,50 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        if (!_syncManager.isPaired)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => AddSmartwatchSheet.show(context),
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text(
+                'Thêm & Ghép Nối Đồng Hồ (Add Watch)',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          )
+        else
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFF87171),
+                side: const BorderSide(color: Color(0xFFEF4444)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () async {
+                await _syncManager.unpairDevice();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã ngắt kết nối đồng hồ thành công.')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.link_off_rounded, size: 18),
+              label: const Text(
+                'Ngắt Kết Nối Galaxy Watch 5',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,

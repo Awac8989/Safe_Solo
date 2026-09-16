@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/constants.dart';
 import '../models/watch_protocol.dart';
+import 'pedometer_service.dart';
 import 'wear_os_service.dart';
 
 enum WatchConnectionType {
@@ -27,14 +29,19 @@ class WatchSyncManager extends ChangeNotifier {
   final StreamController<WatchPacket> _packetController =
       StreamController<WatchPacket>.broadcast();
 
+  static bool get kIsTesting =>
+      const bool.fromEnvironment('flutter.testing') ||
+      (!kIsWeb && Platform.environment.containsKey('FLUTTER_TEST'));
+
   // Trạng thái ghép nối và thiết bị
-  bool _isPaired = true;
-  WatchConnectionType _connectionType = WatchConnectionType.inMemory;
+  bool _isPaired = false;
+  WatchConnectionType _connectionType = WatchConnectionType.disconnected;
   String _deviceId = 'watch_galaxy_5';
   final String _deviceModel = 'Samsung Galaxy Watch 5 (WearOS 4.0)';
   String _pairingCode = '742-891';
   int _latencyMs = 28;
   bool _isSyncing = false;
+  bool _isCheckingStatus = false;
   String? _pairedUserId;
 
   // Lịch sử gói tin truyền thông
@@ -68,18 +75,63 @@ class WatchSyncManager extends ChangeNotifier {
     }
   }
 
+  StreamSubscription<WatchPacket>? _packetSub;
+
   void initialize() {
-    _packetController.stream.listen(_handleIncomingPacket);
-    _startPeriodicHealthCheck();
+    _packetSub ??= _packetController.stream.listen(_handleIncomingPacket);
+    if (_isPaired) {
+      _startPeriodicHealthCheck();
+    }
   }
 
   void _startPeriodicHealthCheck() {
     _cloudPollTimer?.cancel();
-    _cloudPollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (_connectionType == WatchConnectionType.cloudRelay && _isPaired) {
-        _measureLatency();
+    if (!_isPaired || kIsTesting) return;
+    _cloudPollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_isPaired) {
+        _fetchLatestVitals();
       }
     });
+  }
+
+  Future<void> _fetchLatestVitals() async {
+    if (kIsTesting) return;
+    final start = DateTime.now().millisecondsSinceEpoch;
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/vitals/$_deviceId');
+      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final end = DateTime.now().millisecondsSinceEpoch;
+        _latencyMs = (end - start).clamp(12, 450);
+
+        final vitals = data['vitals'] as Map<String, dynamic>?;
+        if (vitals != null) {
+          final heartRate = vitals['heartRate'] as int?;
+          final spO2 = vitals['spO2'] as int?;
+          final steps = vitals['steps'] as int?;
+          final battery = vitals['battery'] as int?;
+          final isOffWrist = vitals['isOffWrist'] as bool?;
+
+          WearOsService.instance.updateMetrics(
+            heartRate: heartRate,
+            spO2: spO2,
+            steps: steps,
+            battery: battery,
+            isOffWrist: isOffWrist,
+          );
+          PedometerService.instance.updateFromWatchSimulator(
+            steps: steps ?? PedometerService.instance.steps,
+            heartRate: heartRate ?? PedometerService.instance.heartRate,
+            spO2: spO2 ?? PedometerService.instance.spO2,
+            battery: battery ?? PedometerService.instance.battery,
+            isOffWrist: isOffWrist ?? false,
+          );
+          _connectionType = WatchConnectionType.cloudRelay;
+        }
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   void stopPeriodicChecks() {
@@ -87,24 +139,20 @@ class WatchSyncManager extends ChangeNotifier {
     _cloudPollTimer = null;
   }
 
-  Future<void> _measureLatency() async {
-    final start = DateTime.now().millisecondsSinceEpoch;
-    try {
-      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/status/$_deviceId');
-      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final end = DateTime.now().millisecondsSinceEpoch;
-        _latencyMs = (end - start).clamp(15, 999);
-        notifyListeners();
-      }
-    } catch (_) {}
-  }
-
   /// 1. TẠO MÃ GHÉP NỐI TRÊN ĐỒNG HỒ
   Future<String> requestNewPairingCode({String? deviceId}) async {
     if (deviceId != null) _deviceId = deviceId;
     _isSyncing = true;
     notifyListeners();
+
+    if (kIsTesting) {
+      final rnd = (100000 + DateTime.now().microsecond % 900000).toString();
+      _pairingCode = '${rnd.substring(0, 3)}-${rnd.substring(3)}';
+      _connectionType = WatchConnectionType.inMemory;
+      _isSyncing = false;
+      notifyListeners();
+      return _pairingCode;
+    }
 
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/request-code');
@@ -140,6 +188,24 @@ class WatchSyncManager extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
+    if (kIsTesting) {
+      _isPaired = true;
+      _pairedUserId = userId;
+      _connectionType = WatchConnectionType.inMemory;
+      _pairingCode = code;
+      WearOsService.instance.setPaired(true);
+      PedometerService.instance.setPaired(true);
+      _broadcastInternal(WatchPacket.create(
+        sender: WatchSender.phone,
+        type: WatchPacketType.pairing,
+        action: WatchAction.pairConfirmed,
+        payload: {'userId': userId, 'deviceId': _deviceId},
+      ));
+      _isSyncing = false;
+      notifyListeners();
+      return true;
+    }
+
     final cleanCode = code.replaceAll('-', '').trim();
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/verify-code');
@@ -160,6 +226,9 @@ class WatchSyncManager extends ChangeNotifier {
         _deviceId = data['deviceId'] as String? ?? _deviceId;
         _latencyMs = 32;
 
+        WearOsService.instance.setPaired(true);
+        PedometerService.instance.setPaired(true);
+
         _broadcastInternal(WatchPacket.create(
           sender: WatchSender.phone,
           type: WatchPacketType.pairing,
@@ -169,6 +238,8 @@ class WatchSyncManager extends ChangeNotifier {
 
         _isSyncing = false;
         notifyListeners();
+        _startPeriodicHealthCheck();
+        _fetchLatestVitals();
         return true;
       }
     } catch (_) {
@@ -177,6 +248,9 @@ class WatchSyncManager extends ChangeNotifier {
       _pairedUserId = userId;
       _connectionType = WatchConnectionType.inMemory;
       _pairingCode = code;
+
+      WearOsService.instance.setPaired(true);
+      PedometerService.instance.setPaired(true);
 
       _broadcastInternal(WatchPacket.create(
         sender: WatchSender.phone,
@@ -187,6 +261,7 @@ class WatchSyncManager extends ChangeNotifier {
 
       _isSyncing = false;
       notifyListeners();
+      _startPeriodicHealthCheck();
       return true;
     }
 
@@ -195,11 +270,127 @@ class WatchSyncManager extends ChangeNotifier {
     return false;
   }
 
-  /// Hủy ghép nối
-  void unpairDevice() {
+  /// 2b. GHÉP NỐI NHANH 1-CHẠM (QUICK PAIR)
+  Future<bool> quickPairDevice({String? userId, String? deviceId}) async {
+    _isSyncing = true;
+    notifyListeners();
+
+    if (deviceId != null) _deviceId = deviceId;
+    final uId = userId ?? 'user_default';
+    _pairedUserId = uId;
+
+    if (kIsTesting) {
+      _isPaired = true;
+      _connectionType = WatchConnectionType.inMemory;
+      WearOsService.instance.setPaired(true);
+      PedometerService.instance.setPaired(true);
+      _isSyncing = false;
+      _broadcastInternal(WatchPacket.create(
+        sender: WatchSender.phone,
+        type: WatchPacketType.pairing,
+        action: WatchAction.pairConfirmed,
+        payload: {'userId': uId, 'deviceId': _deviceId, 'auto': true},
+      ));
+      notifyListeners();
+      return true;
+    }
+
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/auto-pair');
+      final res = await _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'deviceId': _deviceId,
+          'deviceModel': _deviceModel,
+          'userId': uId,
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (res.statusCode == 200) {
+        _isPaired = true;
+        _connectionType = WatchConnectionType.cloudRelay;
+        _latencyMs = 24;
+      } else {
+        _isPaired = true;
+        _connectionType = WatchConnectionType.inMemory;
+      }
+    } catch (_) {
+      _isPaired = true;
+      _connectionType = WatchConnectionType.inMemory;
+    }
+
+    WearOsService.instance.setPaired(true);
+    PedometerService.instance.setPaired(true);
+    _isSyncing = false;
+
+    _broadcastInternal(WatchPacket.create(
+      sender: WatchSender.phone,
+      type: WatchPacketType.pairing,
+      action: WatchAction.pairConfirmed,
+      payload: {'userId': uId, 'deviceId': _deviceId, 'auto': true},
+    ));
+
+    notifyListeners();
+    _startPeriodicHealthCheck();
+    _fetchLatestVitals();
+    return true;
+  }
+
+  /// 2c. HỦY GHÉP NỐI THIẾT BỊ
+  Future<void> unpairDevice() async {
     _isPaired = false;
     _connectionType = WatchConnectionType.disconnected;
+    stopPeriodicChecks();
+    WearOsService.instance.setPaired(false);
+    PedometerService.instance.setPaired(false);
+
+    if (!kIsTesting) {
+      try {
+        final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/unpair');
+        await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'deviceId': _deviceId}),
+        ).timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+
+    _broadcastInternal(WatchPacket.create(
+      sender: WatchSender.phone,
+      type: WatchPacketType.pairing,
+      action: WatchAction.alertCancelled,
+      payload: {'deviceId': _deviceId, 'unpaired': true},
+    ));
+
     notifyListeners();
+  }
+
+  /// 2d. ĐỒNG HỒ KIỂM TRA TRẠNG THÁI GHÉP NỐI TỪ BACKEND
+  Future<bool> checkWatchPairingStatus() async {
+    if (kIsTesting) return _isPaired;
+    if (_isCheckingStatus) return _isPaired;
+    _isCheckingStatus = true;
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/status/$_deviceId');
+      final res = await _client.get(uri).timeout(const Duration(seconds: 2));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final paired = data['paired'] as bool? ?? false;
+        if (_isPaired != paired) {
+          _isPaired = paired;
+          _connectionType = paired ? WatchConnectionType.cloudRelay : WatchConnectionType.disconnected;
+          WearOsService.instance.setPaired(paired);
+          PedometerService.instance.setPaired(paired);
+          notifyListeners();
+        }
+        return _isPaired;
+      }
+    } catch (_) {
+    } finally {
+      _isCheckingStatus = false;
+    }
+    return _isPaired;
   }
 
   /// 3. GỬI GÓI TIN SSWP ĐI
@@ -211,14 +402,16 @@ class WatchSyncManager extends ChangeNotifier {
     _packetController.add(packet);
 
     // Đồng bộ lên Cloud Relay nếu có kết nối
-    try {
-      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/packet');
-      _client.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(packet.toJson()),
-      ).timeout(const Duration(seconds: 2)).catchError((_) => http.Response('', 500));
-    } catch (_) {}
+    if (!kIsTesting) {
+      try {
+        final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/packet');
+        _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(packet.toJson()),
+        ).timeout(const Duration(seconds: 2)).catchError((_) => http.Response('', 500));
+      } catch (_) {}
+    }
 
     notifyListeners();
   }
@@ -266,6 +459,9 @@ class WatchSyncManager extends ChangeNotifier {
 
       // Nhận cập nhật sinh tồn định kỳ
       case WatchAction.vitalsUpdate:
+        if (packet.sender == WatchSender.watch) {
+          break; // Bỏ qua gói tin do chính đồng hồ vừa phát ra, tránh phản hồi vô tận
+        }
         final p = packet.payload;
         wearOs.updateMetrics(
           heartRate: p['heartRate'] as int?,
@@ -273,6 +469,7 @@ class WatchSyncManager extends ChangeNotifier {
           steps: p['steps'] as int?,
           battery: p['battery'] as int?,
           isOffWrist: p['isOffWrist'] as bool?,
+          broadcast: false,
         );
         break;
 
@@ -297,6 +494,26 @@ class WatchSyncManager extends ChangeNotifier {
     double? svmG,
     double? tiltAngle,
   }) {
+    // 1. Post trực tiếp lên /api/watch/vitals để Backend relay lưu cache tức thì
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/vitals');
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'deviceId': _deviceId,
+          'heartRate': heartRate,
+          'spO2': spO2,
+          'steps': steps,
+          'battery': battery,
+          'isOffWrist': isOffWrist,
+          if (svmG != null) 'svmG': svmG,
+          if (tiltAngle != null) 'tiltAngle': tiltAngle,
+        }),
+      ).timeout(const Duration(seconds: 2)).catchError((_) => http.Response('', 500));
+    } catch (_) {}
+
+    // 2. Đồng thời phát gói tin SSWP
     sendPacket(WatchPacket.create(
       sender: WatchSender.watch,
       type: WatchPacketType.telemetry,

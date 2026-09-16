@@ -31,7 +31,7 @@ class WearOsService extends ChangeNotifier {
   int _heartRate = 78;
   int _spO2 = 98;
   int _battery = 88;
-  bool _isPaired = true;
+  bool _isPaired = false;
   bool _isOffWrist = false;
   bool _isSyncing = false;
 
@@ -62,6 +62,22 @@ class WearOsService extends ChangeNotifier {
   bool get isOffWrist => _isOffWrist;
   bool get isSyncing => _isSyncing;
 
+  void setPaired(bool val) {
+    if (_isPaired != val) {
+      _isPaired = val;
+      _pedometer.setPaired(val);
+      notifyListeners();
+    }
+  }
+
+  void resetVitals() {
+    _heartRate = 0;
+    _spO2 = 0;
+    _battery = 0;
+    _steps = 0;
+    notifyListeners();
+  }
+
   bool get isFallMonitoringActive => _isFallMonitoringActive;
   double get fallSensitivityG => _fallSensitivityG;
   double get currentSvmG => _currentSvmG;
@@ -79,15 +95,18 @@ class WearOsService extends ChangeNotifier {
 
   /// Khởi tạo dịch vụ, kết nối dữ liệu ban đầu từ PedometerService và bật lắng nghe gia tốc
   void initialize() {
+    _isPaired = WatchSyncManager.instance.isPaired;
+    _pedometer.setPaired(_isPaired);
     _steps = _pedometer.steps;
     _heartRate = _pedometer.heartRate;
     _spO2 = _pedometer.spO2;
     _battery = _pedometer.battery;
     _isOffWrist = _pedometer.isOffWrist;
-    _isPaired = _pedometer.isPaired;
 
     WatchSyncManager.instance.initialize();
-    startMotionMonitoring();
+    if (!WatchSyncManager.kIsTesting) {
+      startMotionMonitoring();
+    }
   }
 
   /// Bật giám sát liên tục cảm biến gia tốc MEMS 3 trục
@@ -414,13 +433,49 @@ class WearOsService extends ChangeNotifier {
     int? spO2,
     int? battery,
     bool? isOffWrist,
+    bool broadcast = true,
   }) {
-    if (steps != null) _steps = steps;
-    if (heartRate != null) _heartRate = heartRate;
-    if (spO2 != null) _spO2 = spO2;
-    if (battery != null) _battery = battery;
-    if (isOffWrist != null) _isOffWrist = isOffWrist;
-    _syncToPedometer();
+    bool changed = false;
+    if (steps != null && _steps != steps) {
+      _steps = steps;
+      changed = true;
+    }
+    if (heartRate != null && _heartRate != heartRate) {
+      _heartRate = heartRate;
+      changed = true;
+    }
+    if (spO2 != null && _spO2 != spO2) {
+      _spO2 = spO2;
+      changed = true;
+    }
+    if (battery != null && _battery != battery) {
+      _battery = battery;
+      changed = true;
+    }
+    if (isOffWrist != null && _isOffWrist != isOffWrist) {
+      _isOffWrist = isOffWrist;
+      changed = true;
+    }
+    if (!changed) return;
+
+    _pedometer.updateFromWatchSimulator(
+      steps: _steps,
+      heartRate: _heartRate,
+      spO2: _spO2,
+      battery: _battery,
+      isOffWrist: _isOffWrist,
+    );
+    if (broadcast) {
+      WatchSyncManager.instance.emitVitalsTelemetry(
+        heartRate: _heartRate,
+        spO2: _spO2,
+        steps: _steps,
+        battery: _battery,
+        isOffWrist: _isOffWrist,
+        svmG: _currentSvmG,
+        tiltAngle: _currentTiltAngle,
+      );
+    }
     notifyListeners();
   }
 

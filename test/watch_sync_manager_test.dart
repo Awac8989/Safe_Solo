@@ -3,6 +3,7 @@ import 'package:safesolo/models/watch_protocol.dart';
 import 'package:safesolo/services/watch_sync_manager.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('SafeSolo Watch Protocol (SSWP) & WatchSyncManager Tests', () {
     tearDown(() {
       WatchSyncManager.instance.stopPeriodicChecks();

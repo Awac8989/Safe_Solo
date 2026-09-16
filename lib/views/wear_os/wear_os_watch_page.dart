@@ -51,7 +51,7 @@ class WearOsWatchPage extends StatefulWidget {
 class _WearOsWatchPageState extends State<WearOsWatchPage> {
   WatchScreen _screen = WatchScreen.watchface;
   late final PageController _pageController;
-  late Timer _clockTimer;
+  Timer? _clockTimer;
   DateTime _now = DateTime.now();
   double _dragDelta = 0;
 
@@ -80,7 +80,10 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   // State cho Health Monitor
   int _healthBpm = 72;
   int _healthSpo2 = 98;
+  int _battery = 84;
+  int _steps = 4280;
   Timer? _healthTimer;
+  Timer? _telemetryTimer;
   final List<int> _bpmHistory = [68, 70, 72, 71, 73, 74, 72, 72, 75, 73, 72, 71, 70, 72, 73];
 
   final List<Map<String, dynamic>> _moods = [
@@ -98,57 +101,101 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     WearOsService.instance.addListener(_onWearOsChanged);
     WatchSyncManager.instance.addListener(_onSyncChanged);
 
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      final newNow = DateTime.now();
-      final minuteChanged = newNow.minute != _now.minute;
-      final isDashboard = _screen == WatchScreen.dashboard;
+    // Cập nhật thông số ban đầu của đồng hồ vào WearOsService
+    WearOsService.instance.updateMetrics(
+      heartRate: _healthBpm,
+      spO2: _healthSpo2,
+      battery: _battery,
+      steps: _steps,
+      isOffWrist: false,
+    );
 
-      if (isDashboard && _dashboardSeconds > 0) {
-        _dashboardSeconds--;
-      }
+    if (!WatchSyncManager.kIsTesting) {
+      _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        final newNow = DateTime.now();
+        final minuteChanged = newNow.minute != _now.minute;
+        final isDashboard = _screen == WatchScreen.dashboard;
 
-      if (minuteChanged || isDashboard) {
-        setState(() {
-          _now = newNow;
-        });
-      }
-    });
+        if (isDashboard && _dashboardSeconds > 0) {
+          _dashboardSeconds--;
+        }
 
-    _warningFlashTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-      if (mounted && _screen == WatchScreen.warning) {
-        setState(() => _warningFlash = !_warningFlash);
-      }
-    });
+        if (minuteChanged || isDashboard) {
+          setState(() {
+            _now = newNow;
+          });
+        }
+      });
 
-    _sosBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
-      if (mounted && _screen == WatchScreen.sos) {
-        setState(() => _sosBlink = !_sosBlink);
-      }
-    });
+      _warningFlashTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted && _screen == WatchScreen.warning) {
+          setState(() => _warningFlash = !_warningFlash);
+        }
+      });
 
-    _warningTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _screen == WatchScreen.warning && _graceSeconds > 0) {
-        setState(() {
-          _graceSeconds--;
-          if (_graceSeconds == 0) {
-            _nav(WatchScreen.sos);
-          }
-        });
-      }
-    });
+      _sosBlinkTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+        if (mounted && _screen == WatchScreen.sos) {
+          setState(() => _sosBlink = !_sosBlink);
+        }
+      });
 
-    _healthTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
-      if (mounted && _screen == WatchScreen.health) {
+      _warningTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted && _screen == WatchScreen.warning && _graceSeconds > 0) {
+          setState(() {
+            _graceSeconds--;
+            if (_graceSeconds == 0) {
+              _nav(WatchScreen.sos);
+            }
+          });
+        }
+      });
+
+      _healthTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+        if (mounted && _screen == WatchScreen.health) {
+          final rnd = math.Random();
+          setState(() {
+            _healthBpm = (_healthBpm + (rnd.nextInt(5) - 2)).clamp(55, 120);
+            _healthSpo2 = (_healthSpo2 + (rnd.nextInt(3) - 1)).clamp(92, 100);
+            _bpmHistory.removeAt(0);
+            _bpmHistory.add(_healthBpm);
+          });
+        }
+      });
+
+      // Luồng phát dữ liệu sinh tồn tự động từ đồng hồ lên Backend và Sync Manager
+      _telemetryTimer = Timer.periodic(const Duration(milliseconds: 2500), (_) {
+        if (!mounted) return;
         final rnd = math.Random();
-        setState(() {
-          _healthBpm = (_healthBpm + (rnd.nextInt(5) - 2)).clamp(55, 120);
-          _healthSpo2 = (_healthSpo2 + (rnd.nextInt(3) - 1)).clamp(92, 100);
-          _bpmHistory.removeAt(0);
-          _bpmHistory.add(_healthBpm);
-        });
-      }
-    });
+        if (_screen != WatchScreen.health) {
+          _healthBpm = (_healthBpm + (rnd.nextInt(3) - 1)).clamp(68, 86);
+        }
+        _steps += rnd.nextInt(3);
+        if (_steps % 600 == 0 && _battery > 5) {
+          _battery--;
+        }
+
+        WearOsService.instance.updateMetrics(
+          heartRate: _healthBpm,
+          spO2: _healthSpo2,
+          battery: _battery,
+          steps: _steps,
+          isOffWrist: false,
+        );
+
+        WatchSyncManager.instance.emitVitalsTelemetry(
+          heartRate: _healthBpm,
+          spO2: _healthSpo2,
+          steps: _steps,
+          battery: _battery,
+          isOffWrist: false,
+        );
+
+        WatchSyncManager.instance.checkWatchPairingStatus();
+
+        setState(() {});
+      });
+    }
   }
 
   void _onSyncChanged() {
@@ -168,12 +215,14 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   void dispose() {
     WatchSyncManager.instance.removeListener(_onSyncChanged);
     WearOsService.instance.removeListener(_onWearOsChanged);
+    WearOsService.instance.stopMotionMonitoring();
     _pageController.dispose();
-    _clockTimer.cancel();
+    _clockTimer?.cancel();
     _warningTimer?.cancel();
     _warningFlashTimer?.cancel();
     _sosBlinkTimer?.cancel();
     _healthTimer?.cancel();
+    _telemetryTimer?.cancel();
     _checkinTimer1?.cancel();
     _checkinTimer2?.cancel();
     super.dispose();
@@ -864,17 +913,17 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
           ],
         ),
 
-        // Thanh trạng thái dưới đáy: ♥ 72   SpO₂ 98%   🔋 84%
+        // Thanh trạng thái dưới đáy: ♥ $_healthBpm   SpO₂ $_healthSpo2%   🔋 $_battery%
         Positioned(
           bottom: bottomOffset,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('♥ 72', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
+              Text('♥ $_healthBpm', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
               SizedBox(width: isNativeWatch ? 8 : 12),
-              Text('SpO₂ 98%', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
+              Text('SpO₂ $_healthSpo2%', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
               SizedBox(width: isNativeWatch ? 8 : 12),
-              Text('🔋 84%', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
+              Text('🔋 $_battery%', style: TextStyle(fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 10, color: const Color(0xFF666666), fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -1010,11 +1059,18 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('⟳ BT', style: TextStyle(fontSize: isNativeWatch ? 8 : 9, color: const Color(0xFF555555), fontWeight: FontWeight.w500)),
+                Text(
+                  '⟳ BT',
+                  style: TextStyle(
+                    fontSize: isNativeWatch ? 8 : 9,
+                    color: WatchSyncManager.instance.isPaired ? const Color(0xFF00C853) : const Color(0xFF888888),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 SizedBox(width: isNativeWatch ? 6 : 8),
                 Text('📍 GPS', style: TextStyle(fontSize: isNativeWatch ? 8 : 9, color: const Color(0xFF00C853), fontWeight: FontWeight.bold)),
                 SizedBox(width: isNativeWatch ? 6 : 8),
-                Text('🔋 84%', style: TextStyle(fontSize: isNativeWatch ? 8 : 9, color: const Color(0xFF555555), fontWeight: FontWeight.w500)),
+                Text('🔋 $_battery%', style: TextStyle(fontSize: isNativeWatch ? 8 : 9, color: const Color(0xFF555555), fontWeight: FontWeight.w500)),
               ],
             ),
 
@@ -1054,9 +1110,9 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('♥ 72 BPM', style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFFF87171), fontWeight: FontWeight.bold)),
+                Text('♥ $_healthBpm BPM', style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFFF87171), fontWeight: FontWeight.bold)),
                 SizedBox(width: isNativeWatch ? 8 : 10),
-                Text('SpO₂ 98%', style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
+                Text('SpO₂ $_healthSpo2%', style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
               ],
             ),
 

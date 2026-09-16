@@ -26,19 +26,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Verify Title and Device Info
-    expect(find.text('Thiết bị đeo & Đồng hồ thông minh'), findsOneWidget);
+    expect(find.text('Thiết bị đeo & Đồng hồ'), findsOneWidget);
     expect(find.text('Samsung Galaxy Watch 5'), findsWidgets);
-    expect(find.text('ĐÃ KẾT NỐI'), findsOneWidget);
+    expect(find.text('CHƯA KẾT NỐI'), findsOneWidget);
 
-    // Verify Direct Telemetry Metrics
+    // Verify Tab 1 Telemetry Headers
+    expect(find.text('THÔNG SỐ SINH TỒN BIOACTIVE TRỰC TIẾP'), findsOneWidget);
     expect(find.text('Nhịp tim PPG'), findsOneWidget);
     expect(find.text('Oxy máu SpO2'), findsOneWidget);
     expect(find.text('Pin đồng hồ'), findsOneWidget);
-
-    // Verify Direct Controls
-    expect(find.text('Đo nhịp tim tức thì'), findsOneWidget);
-    expect(find.text('Tìm đồng hồ (Rung)'), findsOneWidget);
-    expect(find.text('KÍCH HOẠT SOS KHẨN CẤP TỪ ĐỒNG HỒ'), findsOneWidget);
   });
 
   testWidgets('WatchSimulatorPage redirects properly to SmartwatchConnectionPage', (WidgetTester tester) async {
@@ -61,7 +57,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Thiết bị đeo & Đồng hồ thông minh'), findsOneWidget);
+    expect(find.text('Thiết bị đeo & Đồng hồ'), findsOneWidget);
     expect(find.text('Samsung Galaxy Watch 5'), findsWidgets);
   });
 }

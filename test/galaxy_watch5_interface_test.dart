@@ -2,10 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:safesolo/core/providers/app_provider.dart';
+import 'package:safesolo/services/watch_sync_manager.dart';
 import 'package:safesolo/views/wear_os/wear_os_watch_page.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('Samsung Galaxy Watch 5 Interface Comprehensive Tests', () {
+    setUp(() {
+      WatchSyncManager.instance.unpairDevice();
+    });
+
+    tearDown(() {
+      WatchSyncManager.instance.stopPeriodicChecks();
+    });
+
     testWidgets('Watch Face renders athletic clock, TÔI AN TOÀN button and SafeSolo pill',
         (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1080, 1920);
@@ -33,6 +44,9 @@ void main() {
       expect(find.text('14:32 đến hạn'), findsOneWidget);
       expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
       expect(find.text('WATCH FACE'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
 
     testWidgets('Quick jump chip navigates to Dashboard screen', (WidgetTester tester) async {
@@ -63,6 +77,9 @@ void main() {
       expect(find.text('Hạn chót: 14:00'), findsOneWidget);
       expect(find.text('ĐIỂM DANH'), findsOneWidget);
       expect(find.text('SOS KHẨN'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
 
     testWidgets('Mood Check-in screen renders 4 emotional choices and completes check-in',
@@ -105,6 +122,9 @@ void main() {
 
       // Drain checkin return timer
       await tester.pump(const Duration(milliseconds: 1500));
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
 
     testWidgets('Active SOS screen renders GPS lock, dispatch checklist and PIN pad overlay',
@@ -154,6 +174,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       await tester.tap(find.text('4'));
       await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
 
     testWidgets('Medical ID screen renders QR code and emergency contact',
@@ -184,6 +207,9 @@ void main() {
       expect(find.text('THẺ Y TẾ KHẨN CẤP'), findsOneWidget);
       expect(find.text('Nhóm máu'), findsOneWidget);
       expect(find.textContaining('Gọi người bảo hộ'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
     });
   });
 }

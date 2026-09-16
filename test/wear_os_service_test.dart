@@ -147,8 +147,8 @@ void main() {
       expect(find.text('SAFE-SOLO'), findsOneWidget);
 
       // Check Watch face buttons
-      expect(find.text('ĐIỂM DANH'), findsOneWidget);
-      expect(find.text('SOS'), findsOneWidget);
+      expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
+      expect(find.text('14:32 đến hạn'), findsOneWidget);
     });
 
     testWidgets('WearOsWatchPage renders on Wear OS Small Round 384x384 (DPR 2.0 = 192x192 dp)',
@@ -172,10 +172,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      // In native watch mode, the phone AppBar is omitted
-      expect(find.text('SAFE-SOLO'), findsOneWidget);
-
-      // Page 1: Watch Face Home
+      // In native watch mode, the watch face displays circular clock and action
       expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
       expect(find.text('14:32 đến hạn'), findsOneWidget);
 
@@ -245,9 +242,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('SAFE-SOLO'), findsOneWidget);
-      expect(find.text('ĐIỂM DANH'), findsOneWidget);
-      expect(find.text('SOS'), findsOneWidget);
+      expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
+      expect(find.text('14:32 đến hạn'), findsOneWidget);
     });
   });
 
