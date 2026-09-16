@@ -32,6 +32,7 @@ const port = process.env.PORT || 4000;
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
+  skip: (req) => req.path.startsWith('/api/watch') || req.path.startsWith('/watch') || req.path.includes('/health'),
   message: {
     success: false,
     error: 'Too many requests from this IP, please try again later.',
@@ -100,15 +101,25 @@ server.listen(port, async () => {
     process.exit(1);
   }
 
-  startDeadManWorker(io);
+  try {
+    startDeadManWorker();
+  } catch (e) {
+    console.warn('DeadMan worker init warning:', e.message);
+  }
+
   try {
     startDuressWorkers();
-  } catch (error) {
-    console.error('Duress workers disabled:', error.message);
+  } catch (e) {
+    console.warn('Duress worker init warning:', e.message);
+  }
+
+  try {
+    const telegramBotService = require('./src/services/telegramBotService');
+    telegramBotService.startPolling();
+  } catch (e) {
+    console.warn('Telegram bot init warning:', e.message);
   }
 
   console.log(`SafeSolo Backend running at http://localhost:${port}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
-
-module.exports = app;

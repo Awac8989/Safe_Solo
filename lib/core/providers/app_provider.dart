@@ -15,6 +15,7 @@ import '../../models/interaction_event_model.dart';
 import '../../models/medical_profile_model.dart';
 import '../../models/security_settings_model.dart';
 import '../../models/user_model.dart';
+import '../../models/live_journey_model.dart';
 import '../../services/background_safety_service.dart';
 import '../../services/api_service.dart';
 import '../../services/audio_note_service.dart';
@@ -23,6 +24,8 @@ import '../../services/notification_service.dart';
 import '../../services/push_notification_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
+import '../../services/blackbox_service.dart';
+import '../../services/offline_sos_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -754,6 +757,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   List<RadarIncident> _radarIncidents = const [];
   AlertPolicyModel? _alertPolicy;
   List<InteractionEventModel> _interactionEvents = const [];
+  LiveJourneyModel? _activeJourney;
   Timer? _automationTimer;
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<UserAccelerometerEvent>? _accelerometerSubscription;
@@ -830,6 +834,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   AlertPolicyModel? get alertPolicy => _alertPolicy;
   List<InteractionEventModel> get interactionEvents =>
       List.unmodifiable(_interactionEvents);
+  LiveJourneyModel? get activeJourney => _activeJourney;
   int get lastCheckIn => (_user?.lastCheckinTime ?? DateTime.now()).millisecondsSinceEpoch;
   int get graceHours => _user?.graceHours ?? 12;
   int? get vacationUntil => _user?.sleepModeUntil?.millisecondsSinceEpoch;
@@ -956,6 +961,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         _stepBaseline = data['stepBaseline'] as int?;
         _stepBaselineDayKey = data['stepBaselineDayKey'] as String?;
         _lastRawStepCount = data['lastRawStepCount'] as int?;
+        if (data['activeJourney'] is Map<String, dynamic>) {
+          _activeJourney = LiveJourneyModel.fromJson(
+            Map<String, dynamic>.from(data['activeJourney'] as Map),
+          );
+        }
       } catch (error) {
         debugPrint('Failed to restore SafeSolo state: $error');
       }
@@ -1016,6 +1026,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       'stepBaseline': _stepBaseline,
       'stepBaselineDayKey': _stepBaselineDayKey,
       'lastRawStepCount': _lastRawStepCount,
+      'activeJourney': _activeJourney?.toJson(),
     };
     await prefs.setString(_storageKey, jsonEncode(data));
     await _persistBackgroundSafetyConfig();
@@ -1087,6 +1098,168 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       _restartRuntimeAutomation();
       await _syncPushTokenIfNeeded();
       await _syncBackgroundSafetyService();
+    });
+  }
+
+  Future<void> authenticateWithGoogle({
+    required String email,
+    String? name,
+    String? avatar,
+  }) async {
+    await _runBusy(() async {
+      try {
+        final result = await _api.loginWithGoogle(
+          email: email,
+          name: name,
+          avatar: avatar,
+        );
+        final data = result['data'] as Map<String, dynamic>?;
+        final userData = data?['user'] as Map<String, dynamic>?;
+        if (userData != null) {
+          final userModel = UserModel.fromJson(userData);
+          _user = User.fromUserModel(userModel, email: email);
+        } else {
+          _user = User(
+            id: 'google_${email.hashCode.abs()}',
+            name: name ?? email.split('@').first,
+            email: email,
+            phoneNumber: '',
+            timerIntervalMinutes: 720,
+            currentStatus: 'SAFE',
+            quietHoursStart: '23:00',
+            quietHoursEnd: '06:00',
+            falseAlertGraceMinutes: 7,
+            nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+          );
+        }
+      } catch (_) {
+        _user = User(
+          id: 'google_${email.hashCode.abs()}',
+          name: name ?? email.split('@').first,
+          email: email,
+          phoneNumber: '',
+          timerIntervalMinutes: 720,
+          currentStatus: 'SAFE',
+          quietHoursStart: '23:00',
+          quietHoursEnd: '06:00',
+          falseAlertGraceMinutes: 7,
+          nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+        );
+      }
+      _medical.fullName = _user!.name;
+      _streak = (_streak == 0) ? 1 : _streak;
+      _seedDemoCollections();
+      _updateBadges();
+      await _saveToStorage();
+      _restartRuntimeAutomation();
+    });
+  }
+
+  Future<Map<String, dynamic>> sendTelegramOtp(String identifier) async {
+    return _api.sendTelegramOtp(identifier: identifier);
+  }
+
+  Future<void> verifyTelegramOtp({
+    required String identifier,
+    required String otp,
+    String? name,
+  }) async {
+    await _runBusy(() async {
+      try {
+        final result = await _api.verifyTelegramOtp(identifier: identifier, otp: otp);
+        final data = result['data'] as Map<String, dynamic>?;
+        final userData = data?['user'] as Map<String, dynamic>?;
+        if (userData != null) {
+          final userModel = UserModel.fromJson(userData);
+          _user = User.fromUserModel(userModel, email: userData['email'] as String? ?? '');
+        } else {
+          _user = User(
+            id: 'tele_${identifier.hashCode.abs()}',
+            name: name ?? 'Telegram User',
+            email: '',
+            phoneNumber: identifier.startsWith('+') ? identifier : '',
+            timerIntervalMinutes: 720,
+            currentStatus: 'SAFE',
+            quietHoursStart: '23:00',
+            quietHoursEnd: '06:00',
+            falseAlertGraceMinutes: 7,
+            nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+          );
+        }
+      } catch (_) {
+        _user = User(
+          id: 'tele_${identifier.hashCode.abs()}',
+          name: name ?? 'Telegram User',
+          email: '',
+          phoneNumber: identifier.startsWith('+') ? identifier : '',
+          timerIntervalMinutes: 720,
+          currentStatus: 'SAFE',
+          quietHoursStart: '23:00',
+          quietHoursEnd: '06:00',
+          falseAlertGraceMinutes: 7,
+          nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+        );
+      }
+      _medical.fullName = _user!.name;
+      _streak = (_streak == 0) ? 1 : _streak;
+      _seedDemoCollections();
+      _updateBadges();
+      await _saveToStorage();
+      _restartRuntimeAutomation();
+    });
+  }
+
+  Future<Map<String, dynamic>> sendGmailOtp(String email) async {
+    return _api.sendGmailOtp(email: email);
+  }
+
+  Future<void> verifyGmailOtp({
+    required String email,
+    required String otp,
+    String? name,
+  }) async {
+    await _runBusy(() async {
+      try {
+        final result = await _api.verifyGmailOtp(email: email, otp: otp);
+        final data = result['data'] as Map<String, dynamic>?;
+        final userData = data?['user'] as Map<String, dynamic>?;
+        if (userData != null) {
+          final userModel = UserModel.fromJson(userData);
+          _user = User.fromUserModel(userModel, email: email);
+        } else {
+          _user = User(
+            id: 'gmail_${email.hashCode.abs()}',
+            name: name ?? email.split('@').first,
+            email: email,
+            phoneNumber: '',
+            timerIntervalMinutes: 720,
+            currentStatus: 'SAFE',
+            quietHoursStart: '23:00',
+            quietHoursEnd: '06:00',
+            falseAlertGraceMinutes: 7,
+            nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+          );
+        }
+      } catch (_) {
+        _user = User(
+          id: 'gmail_${email.hashCode.abs()}',
+          name: name ?? email.split('@').first,
+          email: email,
+          phoneNumber: '',
+          timerIntervalMinutes: 720,
+          currentStatus: 'SAFE',
+          quietHoursStart: '23:00',
+          quietHoursEnd: '06:00',
+          falseAlertGraceMinutes: 7,
+          nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+        );
+      }
+      _medical.fullName = _user!.name;
+      _streak = (_streak == 0) ? 1 : _streak;
+      _seedDemoCollections();
+      _updateBadges();
+      await _saveToStorage();
+      _restartRuntimeAutomation();
     });
   }
 
@@ -1616,9 +1789,185 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       await _saveToStorage();
       notifyListeners();
+
+      // Hộp đen Bằng chứng Đám mây: Tự động ghi nhận bằng chứng ngầm
+      unawaited(
+        BlackboxService.instance.captureAndUploadEvidence(
+          userId: current.id,
+          triggerSource: 'DURESS_PIN',
+          position: Position(
+            latitude: position.lat,
+            longitude: position.lng,
+            timestamp: DateTime.now(),
+            accuracy: 10,
+            altitude: 0,
+            heading: 0,
+            speed: 0,
+            speedAccuracy: 0,
+            altitudeAccuracy: 0,
+            headingAccuracy: 0,
+          ),
+        ),
+      );
     } catch (_) {
       // Silent by design.
     }
+  }
+
+  Future<LiveJourneyModel?> startLiveJourney({
+    required String destination,
+    required int durationMinutes,
+    double? destinationLat,
+    double? destinationLng,
+  }) async {
+    final current = _user;
+    final now = DateTime.now();
+    final expectedArrival = now.add(Duration(minutes: durationMinutes));
+    final loc = current?.lastKnownLocation;
+
+    try {
+      if (current != null) {
+        final journey = await _api.startJourney(
+          userId: current.id,
+          destinationLabel: destination,
+          durationMinutes: durationMinutes,
+          destinationLat: destinationLat,
+          destinationLng: destinationLng,
+          startLat: loc?.lat,
+          startLng: loc?.lng,
+        );
+        _activeJourney = journey;
+      } else {
+        _activeJourney = LiveJourneyModel(
+          id: 'local_journey_${now.millisecondsSinceEpoch}',
+          destinationLabel: destination,
+          durationMinutes: durationMinutes,
+          startedAt: now,
+          expectedArrivalAt: expectedArrival,
+          status: 'IN_TRANSIT',
+          shareToken: 'demo_${now.millisecondsSinceEpoch}',
+          currentLat: loc?.lat,
+          currentLng: loc?.lng,
+        );
+      }
+    } catch (_) {
+      // Fallback offline
+      _activeJourney = LiveJourneyModel(
+        id: 'local_journey_${now.millisecondsSinceEpoch}',
+        destinationLabel: destination,
+        durationMinutes: durationMinutes,
+        startedAt: now,
+        expectedArrivalAt: expectedArrival,
+        status: 'IN_TRANSIT',
+        shareToken: 'local_${now.millisecondsSinceEpoch}',
+        currentLat: loc?.lat,
+        currentLng: loc?.lng,
+      );
+    }
+    await _saveToStorage();
+    notifyListeners();
+    return _activeJourney;
+  }
+
+  Future<void> finishLiveJourney() async {
+    final journey = _activeJourney;
+    if (journey == null) return;
+
+    final current = _user;
+    try {
+      if (current != null) {
+        await _api.finishJourney(journeyId: journey.id, userId: current.id);
+      }
+    } catch (_) {}
+
+    _activeJourney = journey.copyWith(status: 'ARRIVED_SAFE');
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> extendLiveJourney({int minutes = 10}) async {
+    final journey = _activeJourney;
+    if (journey == null) return;
+
+    final current = _user;
+    try {
+      if (current != null) {
+        final updated = await _api.extendJourney(
+          journeyId: journey.id,
+          userId: current.id,
+          minutes: minutes,
+        );
+        _activeJourney = updated;
+      } else {
+        final base = journey.expectedArrivalAt.isAfter(DateTime.now())
+            ? journey.expectedArrivalAt
+            : DateTime.now();
+        _activeJourney = journey.copyWith(
+          expectedArrivalAt: base.add(Duration(minutes: minutes)),
+          status: 'IN_TRANSIT',
+        );
+      }
+    } catch (_) {
+      final base = journey.expectedArrivalAt.isAfter(DateTime.now())
+          ? journey.expectedArrivalAt
+          : DateTime.now();
+      _activeJourney = journey.copyWith(
+        expectedArrivalAt: base.add(Duration(minutes: minutes)),
+        status: 'IN_TRANSIT',
+      );
+    }
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> cancelLiveJourney() async {
+    final journey = _activeJourney;
+    if (journey == null) return;
+
+    final current = _user;
+    try {
+      if (current != null) {
+        await _api.cancelJourney(journeyId: journey.id, userId: current.id);
+      }
+    } catch (_) {}
+
+    _activeJourney = null;
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> pingLiveJourney(double lat, double lng) async {
+    final journey = _activeJourney;
+    if (journey == null || !journey.isInTransit) return;
+
+    final current = _user;
+    final now = DateTime.now();
+    final isOverdue = now.isAfter(journey.expectedArrivalAt);
+
+    try {
+      if (current != null) {
+        final updated = await _api.pingJourney(
+          journeyId: journey.id,
+          userId: current.id,
+          lat: lat,
+          lng: lng,
+        );
+        _activeJourney = updated;
+      } else {
+        _activeJourney = journey.copyWith(
+          currentLat: lat,
+          currentLng: lng,
+          status: isOverdue ? 'OVERDUE_ALARM' : 'IN_TRANSIT',
+        );
+      }
+    } catch (_) {
+      _activeJourney = journey.copyWith(
+        currentLat: lat,
+        currentLng: lng,
+        status: isOverdue ? 'OVERDUE_ALARM' : 'IN_TRANSIT',
+      );
+    }
+    notifyListeners();
   }
 
   Future<void> createCirclePost({

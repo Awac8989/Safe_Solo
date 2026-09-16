@@ -15,11 +15,35 @@ import 'views/stealth/stealth_page.dart';
 import 'views/watch/smartwatch_connection_page.dart';
 import 'views/wear_os/wear_os_watch_page.dart';
 import 'views/vault/vault_page.dart';
+import 'views/emergency/first_aid_guide_page.dart';
+import 'views/journey/active_journey_page.dart';
+import 'views/community/hazard_feed_page.dart';
+import 'views/community/safety_guides_page.dart';
+import 'views/audio/fake_call_screen.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FLUTTER GLOBAL ERROR: ${details.exceptionAsString()}');
+  };
+  ErrorWidget.builder = (details) {
+    debugPrint('FLUTTER BUILD ERROR: ${details.exceptionAsString()}');
+    return Material(
+      color: Colors.red.shade900,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Text(
+            'Lỗi giao diện:\n${details.exceptionAsString()}\n\n${details.stack}',
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+          ),
+        ),
+      ),
+    );
+  };
   runApp(const SafeSoloApp());
 }
 
@@ -54,6 +78,11 @@ class SafeSoloApp extends StatelessWidget {
               '/watch-details': (_) => const SmartwatchConnectionPage(),
               '/watch-simulator': (_) => const WearOsWatchPage(),
               '/wear-os': (_) => const WearOsWatchPage(),
+              '/first-aid': (_) => const FirstAidGuidePage(),
+              '/live-journey': (_) => const ActiveJourneyPage(),
+              '/hazard-feed': (_) => const HazardFeedPage(),
+              '/safety-guides': (_) => const SafetyGuidesPage(),
+              '/fake-call': (_) => const FakeCallScreen(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),

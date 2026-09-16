@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
@@ -11,8 +12,12 @@ class AppConstants {
       return overridden;
     }
 
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return _androidEmulatorBaseUrl;
+    if (!kIsWeb) {
+      try {
+        if (Platform.isAndroid) {
+          return _androidEmulatorBaseUrl;
+        }
+      } catch (_) {}
     }
 
     return _localhostBaseUrl;

@@ -14,6 +14,8 @@ import '../../core/widgets/push_to_talk_button.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
 import '../../services/audio_note_service.dart';
+import '../audio/fake_call_setup_sheet.dart';
+import '../audio/walkie_talkie_dialog.dart';
 
 class MessengerPage extends StatelessWidget {
   const MessengerPage({super.key});
@@ -48,7 +50,115 @@ class MessengerPage extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 20),
+          // Audio & Voice Communication Tools
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const WalkieTalkieDialog(),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF161B22),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF30363D)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF238636),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.radio_rounded, color: Colors.white, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                strings.text('Bộ đàm PTT', 'Walkie-Talkie'),
+                                style: AppTextStyles.title.copyWith(color: Colors.white, fontSize: 13),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                strings.text('Kênh thoại tức thì', 'Live voice'),
+                                style: AppTextStyles.caption.copyWith(color: Colors.white60, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: AppColors.surface,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (_) => const FakeCallSetupSheet(),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primarySoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.phone_in_talk_rounded, color: AppColors.primary, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                strings.text('Gọi thoát hiểm', 'Fake Call'),
+                                style: AppTextStyles.title.copyWith(fontSize: 13),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                strings.text('Ngụy trang cứu nguy', 'Escape tool'),
+                                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
           for (final entry in grouped.entries) ...[
             AppSectionLabel(entry.key),
             const SizedBox(height: 12),

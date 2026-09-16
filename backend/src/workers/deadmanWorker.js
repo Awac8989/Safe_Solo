@@ -113,6 +113,15 @@ function startDeadManWorker(io) {
             metadata: { nextDeadline: user.nextDeadline },
           });
           io.emit('ALERT_EVENT', event);
+
+          // Gửi thông báo Telegram Bot có nút bấm Inline 1-tap Check-in
+          try {
+            const telegramBotService = require('../services/telegramBotService');
+            await telegramBotService.sendCheckinReminder(userDoc, minutesUntilDeadline);
+          } catch (teleErr) {
+            console.warn('[DeadManWorker] Telegram reminder notification error:', teleErr.message);
+          }
+
           continue;
         }
 
@@ -142,6 +151,15 @@ function startDeadManWorker(io) {
             metadata: { overdueMinutes },
           });
           io.emit('ALERT_EVENT', event);
+
+          // Gửi cảnh báo khẩn cấp Telegram Bot có nút bấm Inline 1-tap Check-in / SOS
+          try {
+            const telegramBotService = require('../services/telegramBotService');
+            await telegramBotService.sendCheckinWarning(userDoc, overdueMinutes);
+          } catch (teleErr) {
+            console.warn('[DeadManWorker] Telegram warning notification error:', teleErr.message);
+          }
+
           continue;
         }
 

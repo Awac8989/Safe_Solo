@@ -12,6 +12,8 @@ import '../../core/widgets/push_to_talk_button.dart';
 import '../../core/widgets/voice_waveform.dart';
 import '../../services/audio_note_service.dart';
 import '../community_radar/community_radar_page.dart';
+import '../emergency/first_aid_guide_page.dart';
+import '../emergency/offline_emergency_sheet.dart';
 
 class SosMapPage extends StatefulWidget {
   const SosMapPage({
@@ -105,6 +107,21 @@ class _SosMapPageState extends State<SosMapPage>
                           ),
                         ],
                       ),
+                    ),
+                    IconButton(
+                      tooltip: 'Cẩm nang Sơ cứu CPR & FAST',
+                      icon: const Icon(Icons.medical_services_outlined, color: Colors.white),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(builder: (_) => const FirstAidGuidePage()),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Cứu hộ Ngoại tuyến (0-Internet & 0-GPS)',
+                      icon: const Icon(Icons.wifi_off_rounded, color: Colors.amber),
+                      onPressed: () => OfflineEmergencySheet.show(context),
                     ),
                     IconButton(
                       onPressed: () => Navigator.pop(context),
