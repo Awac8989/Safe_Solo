@@ -12,6 +12,7 @@ const { normalizeEmail, sanitizeUser, fullName, splitFullName } = require('../li
 const { createAlertEvent } = require('./alertEventService');
 const { hashPin, isHashedPin } = require('../lib/securityCrypto');
 const { buildEncryptedUserSensitiveUpdate, decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
+const telegramBotService = require('./telegramBotService');
 
 class AuthService {
   generateToken(user) {
@@ -91,7 +92,7 @@ class AuthService {
       firstName,
       lastName,
       email,
-      phoneNumber: payload.phone || '',
+      phoneNumber: payload.phone || null,
       dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth) : null,
       gender: payload.gender || 'PREFER_NOT_TO_SAY',
       avatar: null,
@@ -220,7 +221,7 @@ class AuthService {
         firstName: firstName || 'Google',
         lastName: lastName || 'User',
         email,
-        phoneNumber: '',
+        phoneNumber: null,
         avatar: payload.avatar || null,
         isActive: true,
         isVerified: true,
@@ -252,6 +253,143 @@ class AuthService {
         security: this.mergeSecurity(user, await this.ensureSecurity(user._id)),
       },
       token: this.generateToken(user),
+    };
+  }
+
+  async googleAuth(payload) {
+    return this.googleMock(payload);
+  }
+
+  async telegramSendOtp(identifier) {
+    ensure(identifier, 'Telegram Chat ID, Phone or Email is required');
+    const cleanId = String(identifier).trim();
+
+    let user = await User.findOne({
+      $or: [
+        { telegramChatId: cleanId },
+        { phoneNumber: cleanId },
+        { email: cleanId.toLowerCase() },
+        { telegramUsername: cleanId.replace(/^@/, '') },
+      ],
+    });
+
+    const otp = this.generateOTP();
+
+    if (!user) {
+      user = await User.create({
+        fullName: `Telegram User (${cleanId})`,
+        phoneNumber: cleanId.startsWith('+') || /^\d+$/.test(cleanId) ? cleanId : null,
+        telegramChatId: cleanId,
+        authProvider: 'telegram',
+        isActive: true,
+        isVerified: false,
+        otpCode: otp,
+        otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
+        trustScore: 5,
+        rescuesCount: 0,
+        role: 'user',
+        nextDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      await this.ensureSecurity(user._id);
+    } else {
+      user.otpCode = otp;
+      user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000);
+      if (!user.telegramChatId) {
+        user.telegramChatId = cleanId;
+      }
+      await user.save();
+    }
+
+    const teleResult = await telegramBotService.sendOtp(
+      user.telegramChatId || cleanId,
+      otp,
+      user.fullName || 'Bạn',
+    );
+
+    return {
+      success: true,
+      identifier: cleanId,
+      otpPreview: otp,
+      message: 'Mã xác thực OTP đã được gửi đến Telegram của bạn.',
+      telegram: teleResult,
+    };
+  }
+
+  async telegramVerifyOtp(identifier, otp) {
+    ensure(identifier, 'Identifier is required');
+    ensure(otp, 'OTP code is required');
+    const cleanId = String(identifier).trim();
+
+    const user = await User.findOne({
+      $or: [
+        { telegramChatId: cleanId },
+        { phoneNumber: cleanId },
+        { email: cleanId.toLowerCase() },
+        { telegramUsername: cleanId.replace(/^@/, '') },
+      ],
+    });
+
+    if (!user) {
+      throw new AppError('Không tìm thấy tài khoản Telegram tương ứng', 404);
+    }
+
+    ensure(user.otpCode, 'Chưa yêu cầu mã OTP. Vui lòng gửi lại yêu cầu.');
+    ensure(new Date(user.otpExpiresAt).getTime() >= Date.now(), 'Mã OTP đã hết hạn (5 phút). Vui lòng lấy mã mới.');
+    ensure(String(user.otpCode).trim() === String(otp).trim(), 'Mã OTP không chính xác', 401);
+
+    user.otpCode = null;
+    user.otpExpiresAt = null;
+    user.isVerified = true;
+    user.lastLoginAt = new Date();
+    await user.save();
+
+    return {
+      success: true,
+      user: {
+        ...sanitizeUser(user),
+        security: this.mergeSecurity(user, await this.ensureSecurity(user._id)),
+      },
+      token: this.generateToken(user),
+      message: 'Đăng nhập qua Telegram thành công!',
+    };
+  }
+
+  async gmailSendOtp(email) {
+    const normalizedEmail = normalizeEmail(email);
+    ensure(normalizedEmail, 'Gmail address is required');
+
+    let user = await User.findOne({ email: normalizedEmail });
+    const otp = this.generateOTP();
+
+    if (!user) {
+      const { firstName, lastName } = splitFullName(email.split('@')[0]);
+      user = await User.create({
+        fullName: email.split('@')[0],
+        firstName: firstName || 'Gmail',
+        lastName: lastName || 'User',
+        email: normalizedEmail,
+        phoneNumber: null,
+        authProvider: 'email',
+        isActive: true,
+        isVerified: false,
+        otpCode: otp,
+        otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        trustScore: 5,
+        role: 'user',
+        nextDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      });
+      await this.ensureSecurity(user._id);
+    } else {
+      user.otpCode = otp;
+      user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await user.save();
+    }
+
+    return {
+      success: true,
+      email: normalizedEmail,
+      otpPreview: otp,
+      message: `Đã gửi mã xác minh OTP đến địa chỉ Gmail: ${normalizedEmail}`,
     };
   }
 

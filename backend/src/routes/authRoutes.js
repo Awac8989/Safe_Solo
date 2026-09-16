@@ -10,6 +10,11 @@ router.post('/register', validate(userSchemas.register), authController.register
 router.post('/login', validate(userSchemas.login), authController.login);
 router.post('/verify-otp', validate(userSchemas.verifyOtp), authController.verifyOTP);
 router.post('/google-mock', validate(userSchemas.googleMock), authController.googleMock);
+router.post('/google', authController.googleAuth);
+router.post('/gmail/send-otp', authController.gmailSendOtp);
+router.post('/telegram/send-otp', authController.telegramSendOtp);
+router.post('/telegram/verify-otp', authController.telegramVerifyOtp);
+router.post('/telegram/webhook', authController.telegramWebhook);
 
 // Protected routes
 router.use(auth); // All routes below require authentication

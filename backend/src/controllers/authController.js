@@ -37,6 +37,55 @@ class AuthController {
     }
   }
 
+  async googleAuth(req, res, next) {
+    try {
+      const result = await authService.googleAuth(req.body);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async telegramSendOtp(req, res, next) {
+    try {
+      const result = await authService.telegramSendOtp(req.body.identifier || req.body.chatId || req.body.phone || req.body.email);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async telegramVerifyOtp(req, res, next) {
+    try {
+      const result = await authService.telegramVerifyOtp(
+        req.body.identifier || req.body.chatId || req.body.phone || req.body.email,
+        req.body.otp,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async telegramWebhook(req, res, next) {
+    try {
+      const telegramBotService = require('../services/telegramBotService');
+      const result = await telegramBotService.handleWebhook(req.body);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async gmailSendOtp(req, res, next) {
+    try {
+      const result = await authService.gmailSendOtp(req.body.email);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getProfile(req, res, next) {
     try {
       const profile = await authService.getProfile(req.user.id);
