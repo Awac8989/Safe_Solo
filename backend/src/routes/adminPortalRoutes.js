@@ -8,6 +8,7 @@ router.get('/overview', controller.getOverview);
 router.get('/users', controller.listUsers);
 router.get('/incidents', controller.listIncidents);
 router.patch('/incidents/:id/resolve', controller.resolveIncident);
+router.post('/incidents/:id/hitl-action', controller.handleHitlAction);
 router.get('/incidents/:id/sms-logs', controller.listSmsLogs);
 router.get('/audit', controller.listAuditLogs);
 router.get('/kyc', controller.listKycQueue);

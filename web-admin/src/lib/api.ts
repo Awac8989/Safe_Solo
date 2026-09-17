@@ -60,9 +60,64 @@ export type AdminOverviewResponse = {
         battery?: number;
         status?: string;
         syncTime?: string;
+        hrvRmssd?: number;
+        strokeRisk?: string;
       } | null;
+      hitl?: HitlTriage;
+      nearbyHeroes?: NearbyHero[];
+      nearestHospital?: NearestHospital;
     }>;
   };
+};
+
+export type HitlTriage = {
+  priority: "P1_CRITICAL" | "P2_URGENT" | "P3_MONITORING";
+  priorityScore: number;
+  confidence: string;
+  aiSummary: string;
+  recommendedAction: string;
+  countdownSeconds: number;
+  autoDispatchThreshold: number;
+  state: "COUNTDOWN_ACTIVE" | "DISPATCHED" | "CANCELLED_FALSE_ALARM" | "PAUSED" | "AMBULANCE_DISPATCHED";
+  supervisorAction?: {
+    name: string;
+    id: string;
+    reason?: string;
+    hash: string;
+    tier: number;
+  } | null;
+  tier1Status: "COMPLETED" | "PENDING";
+  tier2Status: "COMPLETED" | "PENDING_COUNTDOWN" | "CANCELLED" | "MANUAL_ONLY";
+  tier3Status: "COMPLETED" | "STRICT_GATE_LOCKED";
+};
+
+export type NearbyHero = {
+  name: string;
+  distance: string;
+  phone: string;
+  trustScore: number;
+  eta: string;
+};
+
+export type NearestHospital = {
+  name: string;
+  distance: string;
+  phone: string;
+  eta: string;
+};
+
+export type HitlActionPayload = {
+  action:
+    | "INSTANT_DISPATCH"
+    | "CANCEL_FALSE_ALARM"
+    | "PAUSE_COUNTDOWN"
+    | "RESUME_COUNTDOWN"
+    | "AUTO_DISPATCH_TIMEOUT"
+    | "TIER3_AMBULANCE_DISPATCH";
+  reason?: string;
+  supervisorName?: string;
+  supervisorId?: string;
+  tier?: number;
 };
 
 export type AuditLog = {
@@ -161,6 +216,24 @@ export const resolveIncident = async (incidentId: string, notes = "") => {
   return request<{ success: true; data: unknown }>(`/admin/incidents/${incidentId}/resolve`, {
     method: "PATCH",
     body: JSON.stringify({ notes }),
+  });
+};
+
+export const submitHitlAction = async (incidentId: string, payload: HitlActionPayload) => {
+  return request<{
+    success: true;
+    data: {
+      incidentId: string;
+      state: string;
+      action: string;
+      supervisorName: string;
+      hash: string;
+      timestamp: string;
+      actionDescription: string;
+    };
+  }>(`/admin/incidents/${incidentId}/hitl-action`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 };
 

@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,9 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
+import { HitlDispatchPanel } from "@/components/HitlDispatchPanel";
 import { IncidentMap } from "@/components/IncidentMap";
 import { Topbar } from "@/components/Topbar";
-import { fetchAdminOverview, resolveIncident } from "@/lib/api";
+import { fetchAdminOverview, resolveIncident, submitHitlAction } from "@/lib/api";
+import type { HitlActionPayload } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/")({
@@ -96,6 +98,15 @@ function DispatchCenter() {
     onSuccess: async () => {
       setIsDetailOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    },
+  });
+
+  const hitlMutation = useMutation({
+    mutationFn: ({ incidentId, payload }: { incidentId: string; payload: HitlActionPayload }) =>
+      submitHitlAction(incidentId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
     },
   });
 
@@ -240,9 +251,16 @@ function DispatchCenter() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Tag tone={incident.type === "DURESS" ? "duress" : incident.type === "SOS" ? "sos" : "warning"}>
-                          {formatIncidentType(incident.type)}
-                        </Tag>
+                        <div className="flex items-center gap-1.5">
+                          <Tag tone={incident.type === "DURESS" ? "duress" : incident.type === "SOS" ? "sos" : "warning"}>
+                            {formatIncidentType(incident.type)}
+                          </Tag>
+                          {incident.hitl?.priority === "P1_CRITICAL" && (
+                            <span className="inline-flex items-center rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-extrabold text-rose-400 animate-pulse">
+                              ⚡ HITL 30s
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-mono text-muted-foreground">{timeAgo(incident.receivedAt)}</span>
                       </div>
                       <div className="mt-2 text-sm font-semibold">{incident.name}</div>
@@ -262,10 +280,10 @@ function DispatchCenter() {
       </div>
 
       {isDetailOpen && selected && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-          <div className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center p-4">
+          <div className="pointer-events-auto max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
             <div
-              className={`flex items-center justify-between rounded-t-2xl border-b border-border px-5 py-3 ${
+              className={`sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-border px-5 py-3 backdrop-blur-md ${
                 selected.type === "DURESS" ? "bg-duress/10" : selected.type === "SOS" ? "bg-sos/10" : "bg-warning/10"
               }`}
             >
@@ -299,60 +317,31 @@ function DispatchCenter() {
               </button>
             </div>
 
-                        {/* Chỉ số sinh tồn nạn nhân từ Samsung Galaxy Watch 5 */}
-            <div className="mx-5 mt-4 rounded-xl border border-sky-500/25 bg-sky-500/5 p-3.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
-                  <Activity className="h-4 w-4 animate-pulse text-rose-500" />
-                  <span>Chỉ số sinh tồn ({selected.vitals?.device || "Samsung Galaxy Watch 5 - WearOS"})</span>
-                </div>
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                  (selected.vitals?.spo2 ?? 98) < 92 ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                }`}>
-                  {selected.vitals?.status || "BÌNH THƯỜNG"}
-                </span>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2.5 text-center">
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">SpO2 (Oxy máu)</div>
-                  <div className={`text-base font-extrabold ${(selected.vitals?.spo2 ?? 98) < 92 ? "text-red-500" : "text-sky-400"}`}>
-                    {selected.vitals?.spo2 ?? 98}%
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Nhịp tim (BPM)</div>
-                  <div className="text-base font-extrabold text-rose-500">
-                    {selected.vitals?.heartRate ?? 78} <span className="text-xs font-normal text-muted-foreground">bpm</span>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Pin thiết bị</div>
-                  <div className="text-base font-extrabold text-amber-400">
-                    {selected.vitals?.battery ?? 86}%
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Bảng Điều Khiển Bán Tự Động HITL với Đếm Ngược An Toàn & Phân Tầng Quyền Hạn */}
+            <HitlDispatchPanel
+              incident={selected}
+              onAction={async (payload) => {
+                await hitlMutation.mutateAsync({ incidentId: selected.id, payload });
+              }}
+              isPending={hitlMutation.isPending}
+            />
 
-            <div className="grid gap-3 p-5 md:grid-cols-3">
+            <div className="grid gap-3 px-5 pb-4 md:grid-cols-3">
               <InfoBox icon={Droplet} label="Nhóm máu" value={selected.blood} accent="text-info" />
               <InfoBox icon={HeartPulse} label="Dị ứng" value={selected.allergies} />
               <InfoBox icon={PhoneCall} label="Liên hệ khẩn cấp" value={selected.emergencyContactPhone || "Không có"} />
             </div>
 
-            <div className="grid gap-2 border-t border-border p-4 sm:grid-cols-3">
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-info px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
-                <PhoneCall className="h-4 w-4" /> Gọi người thân
-              </button>
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-success px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
-                <Ambulance className="h-4 w-4" /> Điều xe cứu thương
+            <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 border-t border-border bg-card/95 p-4 backdrop-blur-md sm:grid-cols-2">
+              <button className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-info px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90">
+                <PhoneCall className="h-4 w-4" /> Gọi người thân ({selected.emergencyContactPhone || "Chưa có"})
               </button>
               <button
                 onClick={() => resolveMutation.mutate(selected.id)}
                 disabled={resolveMutation.isPending}
-                className="flex items-center justify-center gap-2 rounded-lg bg-sos px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 pulse-sos disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-sos px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90 pulse-sos disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Siren className="h-4 w-4" /> {resolveMutation.isPending ? "Đang đánh dấu đã xử lý..." : "Đánh dấu đã xử lý"}
+                <Siren className="h-4 w-4" /> {resolveMutation.isPending ? "Đang xử lý..." : "Đóng & Đánh dấu hoàn tất sự cố"}
               </button>
             </div>
           </div>

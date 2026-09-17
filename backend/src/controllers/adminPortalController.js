@@ -56,11 +56,20 @@ async function getRevenueSummary(_req, res) {
   res.json({ success: true, data });
 }
 
+async function handleHitlAction(req, res) {
+  const data = await adminPortalService.handleHitlAction(
+    req.params.id,
+    req.body || {},
+  );
+  res.json({ success: true, data });
+}
+
 module.exports = {
   getOverview,
   listUsers,
   listIncidents,
   resolveIncident,
+  handleHitlAction,
   listSmsLogs,
   listAuditLogs,
   listKycQueue,

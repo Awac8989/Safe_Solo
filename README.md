@@ -156,12 +156,23 @@ Trong kỷ nguyên đô thị hóa và xu hướng sống độc thân (solo liv
 
 ---
 
-### 3.4. Trung tâm Điều phối Web Admin (React 18 / Vite / TanStack)
-* **Bản đồ Cứu hộ Thời gian thực (Live Map SOS Dispatch):** Bản đồ Leaflet tương tác cao, hiển thị tâm chấn vụ việc, bán kính ảnh hưởng 5km, lộ trình di chuyển của nạn nhân và vị trí các Hiệp sĩ phản ứng nhanh.
+### 3.4. Trung tâm Điều phối Web Admin (React 18 / Vite / TanStack) & Động cơ Bán Tự Động HITL
+* **Hệ thống Điều phối Bán Tự Động HITL (Human-in-the-Loop Semi-Autonomous Dispatch Engine):**
+  - **Tự động hóa phản ứng mili-giây:** AI tự động phân loại nguy cơ khẩn cấp (P1 Critical - Đột quỵ/Nguy kịch, P2 Urgent - Mã im lặng/Ngã, P3 Monitoring - Theo dõi), quét 3 Hiệp sĩ SafeSolo lân cận trong bán kính $< 1\text{ km}$, và gợi ý bệnh viện chuyên khoa cấp cứu gần nhất.
+  - **Bộ đếm ngược an toàn (Grace Period 30s Countdown):** Khi có sự cố nguy kịch P1, màn hình Điều phối viên chớp đỏ và đếm ngược 30 giây. Điều phối viên có toàn quyền tối thượng can thiệp:
+    + 🔴 `[HỦY / BÁO ĐỘNG GIẢ]`: Chặn phát lệnh tức thì, lưu lý do và mã băm kiểm toán SHA-256 để chống lãng phí nguồn lực công.
+    + 🟢 `[DUYỆT ĐIỀU PHỐI NGAY]`: Bỏ qua thời gian chờ 30 giây, phát lệnh tức thì đến đội cứu hộ.
+    + 🟡 `[TẠM DỪNG / TIẾP TỤC]`: Đóng băng bộ đếm ngược để gọi điện thoại xác minh thêm hoặc đổi đội cứu hộ.
+    + ⚡ `[FAIL-SAFE AUTO-ESCALATION]`: Nếu hết 30 giây mà người giám sát không phản hồi (ngủ gật, ngất xỉu, quá tải ca trực), hệ thống tự động kích hoạt cứu hộ Tier 2 gửi tin SMS/Telegram khẩn cấp và ping hiệp sĩ gần nhất.
+  - **Ma trận Phân tầng Quyền hạn An toàn 3 Lớp (3-Tier Security Gates Matrix):**
+    + **Tier 1 (Tự động 100% - Zero Risk):** Ghi nhật ký SHA-256, ping vị trí GPS mờ hóa & gửi thông báo cho người thân đã ủy quyền trước.
+    + **Tier 2 (Bán tự động - Semi-Auto):** Điều phối 2–3 Hiệp sĩ SafeSolo cộng đồng (Kích hoạt sau 30 giây nếu không bị hủy).
+    + **Tier 3 (Chốt nghiêm ngặt - Strict Human Gate):** Điều xe Cấp cứu 115 / Công an 113. **BẮT BUỘC Điều phối viên xác thực chữ ký/mã định danh**; cấm AI tự ý gọi trực tiếp dịch vụ công để đảm bảo tuân thủ pháp luật.
+* **Bản đồ Cứu hộ Thời gian thực (Live Map SOS Dispatch):** Bản đồ tương tác cao (MapLibre GL / Vector Tiles), hiển thị tâm chấn vụ việc, bán kính ảnh hưởng, lộ trình di chuyển của nạn nhân và vị trí các Hiệp sĩ phản ứng nhanh.
 * **Bảng điều khiển Giám sát Đa kênh (Omnichannel Live Console):** Theo dõi tức thời trạng thái gửi và nhận của 4 luồng tin cứu hộ: Telegram, Zalo ZNS, Twilio SMS và Voice Auto-Call.
 * **Quản trị & Phê duyệt Danh tính KYC (KYC Management):** So chiếu ảnh chân dung và ảnh chụp 2 mặt Căn cước công dân, phê duyệt cấp huy hiệu Hiệp sĩ tin cậy (*Trust Score*).
-* **Báo cáo Thống kê & Phân tích Sự cố 30 Ngày (30-Day Analytics):** Thống kê số ca cứu hộ thành công, thời gian tiếp cận trung bình, phân bổ mật độ rủi ro theo khu vực địa lý.
-* **Nhật ký Kiểm toán Hệ thống (Audit Trail & Telemetry):** Lưu trữ toàn bộ lịch sử thao tác không thể thay đổi theo tiêu chuẩn bảo mật thông tin y tế.
+* **Báo cáo Thống kê & Phân tích Sự cố 30 Ngày (30-Day Analytics):** Thống kê số ca cứu hộ thành công, thời gian tiếp cận trung bình, phân bổ mật độ rủi ro theo khu vực địa lý, xuất báo cáo Excel đa bảng tính (*xlsx*).
+* **Hộp đen Kiểm toán Bất biến (Cryptographic SHA-256 Audit Trail):** Lưu trữ toàn bộ lịch sử thao tác của AI và Người giám sát (`HITL_INSTANT_DISPATCH`, `HITL_CANCEL_FALSE_ALARM`, `HITL_TIER3_AMBULANCE_DISPATCH`) kèm mã băm SHA-256 không thể tẩy xóa phục vụ điều tra đối soát pháp lý.
 
 ---
 

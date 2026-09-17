@@ -71,7 +71,7 @@ export function IncidentMap({
         style: mapTilerStyleUrl,
         center: [106.7009, 10.7766],
         zoom: 12.5,
-        attributionControl: true,
+        attributionControl: false,
       });
 
       map.addControl(
