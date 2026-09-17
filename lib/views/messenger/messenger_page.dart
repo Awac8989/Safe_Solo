@@ -412,15 +412,29 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
       return;
     }
 
-    final uri = Uri.parse('tel:$phone');
-    if (!await launchUrl(uri) && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            strings.text('Không thể gọi tới $phone.', 'Could not call $phone.'),
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              strings.text('Không thể gọi tới $phone.', 'Could not call $phone.'),
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              strings.text('Không thể gọi tới $phone.', 'Could not call $phone.'),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -771,7 +785,13 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
         _duration = Duration.zero;
       });
       setState(() => _playing = true);
-      await _player.play(DeviceFileSource(voicePath));
+      try {
+        await _player.play(DeviceFileSource(voicePath));
+      } catch (_) {
+        if (mounted) {
+          setState(() => _playing = false);
+        }
+      }
       return;
     }
 

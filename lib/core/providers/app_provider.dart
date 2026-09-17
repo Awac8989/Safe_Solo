@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
 import '../app_language.dart';
+import '../constants.dart';
 import '../../models/alert_policy_model.dart';
 import '../../models/automation_settings_model.dart';
 import '../../models/interaction_event_model.dart';
@@ -25,7 +26,6 @@ import '../../services/push_notification_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/blackbox_service.dart';
-import '../../services/offline_sos_service.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -910,6 +910,10 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> _bootstrap() async {
     final prefs = await SharedPreferences.getInstance();
+    final customUrl = prefs.getString('safesolo_custom_api_url');
+    if (customUrl != null && customUrl.isNotEmpty) {
+      AppConstants.setCustomBaseUrl(customUrl);
+    }
     final raw = prefs.getString(_storageKey);
     if (raw != null && raw.isNotEmpty) {
       try {
@@ -1509,6 +1513,19 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> setHighContrast(bool enabled) async {
     _highContrast = enabled;
     await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> setCustomServerUrl(String url) async {
+    final cleanUrl = url.trim();
+    final prefs = await SharedPreferences.getInstance();
+    if (cleanUrl.isEmpty) {
+      await prefs.remove('safesolo_custom_api_url');
+      AppConstants.setCustomBaseUrl('');
+    } else {
+      await prefs.setString('safesolo_custom_api_url', cleanUrl);
+      AppConstants.setCustomBaseUrl(cleanUrl);
+    }
     notifyListeners();
   }
 

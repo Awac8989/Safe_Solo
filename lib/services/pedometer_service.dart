@@ -117,6 +117,12 @@ class PedometerService extends ChangeNotifier {
           onError: _onStepCountError,
           cancelOnError: false,
         );
+        _pedestrianStatusSubscription?.cancel();
+        _pedestrianStatusSubscription = Pedometer.pedestrianStatusStream.listen(
+          _onPedestrianStatusChanged,
+          onError: _onPedestrianStatusError,
+          cancelOnError: false,
+        );
         _isAvailable = true;
       } catch (e) {
         debugPrint('Pedometer sensor not available on this platform/device: $e');

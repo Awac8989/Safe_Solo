@@ -54,7 +54,7 @@ class OfflineResilienceService {
   // Dữ liệu PDR (Pedestrian Dead Reckoning)
   int _stepsSinceGpsLoss = 0;
   double _currentHeadingDegrees = 90.0; // 0: Bắc, 90: Đông, 180: Nam, 270: Tây
-  double _strideLengthMeters = 0.72; // Sải chân trung bình
+  final double _strideLengthMeters = 0.72; // Sải chân trung bình
   double _referencePressureHpa = 1013.25;
   double _currentPressureHpa = 1013.25;
 

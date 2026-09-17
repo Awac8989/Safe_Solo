@@ -111,11 +111,17 @@ class HazardReportModel {
   factory HazardReportModel.fromJson(Map<String, dynamic> json) {
     HazardCategory cat = HazardCategory.other;
     final catRaw = (json['category'] as String? ?? '').toUpperCase();
-    if (catRaw.contains('DARK')) cat = HazardCategory.darkRoad;
-    else if (catRaw.contains('SUSPICIOUS')) cat = HazardCategory.suspiciousPerson;
-    else if (catRaw.contains('ROAD')) cat = HazardCategory.roadHazard;
-    else if (catRaw.contains('FLOOD')) cat = HazardCategory.flooding;
-    else if (catRaw.contains('ACCIDENT')) cat = HazardCategory.accident;
+    if (catRaw.contains('DARK')) {
+      cat = HazardCategory.darkRoad;
+    } else if (catRaw.contains('SUSPICIOUS')) {
+      cat = HazardCategory.suspiciousPerson;
+    } else if (catRaw.contains('ROAD')) {
+      cat = HazardCategory.roadHazard;
+    } else if (catRaw.contains('FLOOD')) {
+      cat = HazardCategory.flooding;
+    } else if (catRaw.contains('ACCIDENT')) {
+      cat = HazardCategory.accident;
+    }
 
     return HazardReportModel(
       id: json['id'] as String? ?? json['_id'] as String? ?? '',

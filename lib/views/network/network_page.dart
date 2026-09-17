@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
@@ -360,6 +361,12 @@ class _GuardianCard extends StatelessWidget {
               ],
             ),
           ),
+          if (contact.phone.isNotEmpty)
+            IconButton(
+              tooltip: 'Gọi điện khẩn cấp',
+              icon: const Icon(Icons.call_rounded, size: 20, color: Color(0xFF10B981)),
+              onPressed: () => _callContact(context, contact),
+            ),
           IconButton(
             tooltip: 'Sửa thông tin',
             icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF0284C7)),
@@ -373,5 +380,24 @@ class _GuardianCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _callContact(BuildContext context, EmergencyContact contact) async {
+    final cleanPhone = contact.phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể gọi tới ${contact.phone}')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể gọi tới ${contact.phone}')),
+        );
+      }
+    }
   }
 }

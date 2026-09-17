@@ -145,7 +145,6 @@ class _SafetyGuidesPageState extends State<SafetyGuidesPage> {
 
   void _openGuideDetail(SafetyGuideItem guide) {
     final strings = AppStrings.of(context);
-    final isBookmarked = _bookmarkedIds.contains(guide.id);
 
     showModalBottomSheet<void>(
       context: context,

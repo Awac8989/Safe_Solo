@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/app_language.dart';
 import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
+import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
 import '../health/health_history_page.dart';
@@ -310,6 +311,42 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          const SizedBox(height: 22),
+          AppSectionLabel(strings.text('Máy chủ & Kết nối 24/7', 'Server & 24/7 Network')),
+          const SizedBox(height: 10),
+          _SectionCard(
+            children: [
+              _ActionRow(
+                icon: Icons.dns_rounded,
+                title: strings.text('Địa chỉ máy chủ API', 'API Server URL'),
+                valueText: AppConstants.backendBaseUrl,
+                onTap: () => _showServerConfigDialog(context),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.battery_saver_rounded,
+                title: strings.text('Tối ưu pin nền 24/7', '24/7 Battery Optimization'),
+                valueText: strings.text('Kiểm tra', 'Check'),
+                onTap: () async {
+                  final status = await Permission.ignoreBatteryOptimizations.status;
+                  if (!status.isGranted) {
+                    await Permission.ignoreBatteryOptimizations.request();
+                  } else if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          strings.text(
+                            'SafeSolo đã được cấp quyền chạy ngầm không giới hạn 24/7.',
+                            'SafeSolo is already granted unrestricted 24/7 background execution.',
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => context.read<AppProvider>().signOut(),
@@ -509,6 +546,61 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showServerConfigDialog(BuildContext context) async {
+    final strings = _snapshotStrings();
+    final provider = context.read<AppProvider>();
+    final controller = TextEditingController(text: AppConstants.backendBaseUrl);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(strings.text('Cấu hình Máy chủ Backend', 'Backend Server URL')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              strings.text(
+                'Nhập URL máy chủ công khai (HTTPS) để 5 máy trên nhiều mạng khác nhau kết nối 24/24.',
+                'Enter public HTTPS server URL for multi-device testing over different networks.',
+              ),
+              style: const TextStyle(fontSize: 13, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'https://api.yourdomain.com/api',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await provider.setCustomServerUrl('');
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            },
+            child: Text(strings.text('Mặc định', 'Default')),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await provider.setCustomServerUrl(controller.text.trim());
+              if (dialogContext.mounted) {
+                Navigator.pop(dialogContext);
+              }
+            },
+            child: Text(strings.text('Lưu', 'Save')),
+          ),
+        ],
+      ),
     );
   }
 

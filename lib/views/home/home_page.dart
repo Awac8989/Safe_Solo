@@ -20,6 +20,7 @@ import '../watch/widgets/add_smartwatch_sheet.dart';
 import '../journey/widgets/home_journey_card.dart';
 import '../emergency/first_aid_guide_page.dart';
 import '../emergency/offline_emergency_sheet.dart';
+import '../emergency/solocare_ai_sheet.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -236,7 +237,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           _buildWatchHealthGlanceCard(context, strings),
           const SizedBox(height: 6),
           const HomeJourneyCard(),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          _buildSoloCareAiCard(context, strings),
+          const SizedBox(height: 10),
           _buildTacticalEmergencyTools(context, strings),
           const SizedBox(height: 12),
           if (appProvider.isVacation) ...[
@@ -878,6 +881,106 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       }
     }
     return '$buffer ${strings.text('bước', 'steps')}';
+  }
+
+  /// Thẻ Trợ lý SoloCare AI: Tư vấn vết thương, thuốc & tâm lý (Qwen 3.8)
+  Widget _buildSoloCareAiCard(BuildContext context, AppStrings strings) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => SoloCareAiSheet.show(context),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF064E3B), Color(0xFF0F172A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: const Color(0xFF10B981).withValues(alpha: 0.5),
+              width: 1.2,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x1810B981),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                ),
+                child: const Icon(Icons.psychology_rounded, color: Color(0xFF34D399), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          strings.text('SoloCare AI Sơ cứu & Tâm lý', 'SoloCare First Aid & Calm AI'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Qwen 3.8',
+                            style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 9.5, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      strings.text(
+                        'Tư vấn vết thương · Kiểm tra dị ứng thuốc · Trấn an hoảng sợ',
+                        'Wound care · Drug allergy check · Calming support',
+                      ),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Công cụ Khẩn cấp Tác chiến: SOS Ngoại tuyến & Sơ cứu CPR

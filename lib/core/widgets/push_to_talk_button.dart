@@ -111,13 +111,17 @@ class _PushToTalkButtonState extends State<PushToTalkButton> {
       await _audioNoteService.cancel();
     }
 
+    _removeOverlay();
+    if (!mounted) {
+      return;
+    }
+
     setState(() {
       _recording = false;
       _cancelHover = false;
       _seconds = 0;
       _startTime = null;
     });
-    _removeOverlay();
   }
 
   void _showOverlay() {

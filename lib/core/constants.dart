@@ -6,7 +6,18 @@ class AppConstants {
   static const String _localhostBaseUrl = 'http://localhost:4000/api';
   static const String _defaultMapTilerStyle = 'streets-v2';
 
+  static String _customBaseUrl = '';
+
+  static void setCustomBaseUrl(String url) {
+    _customBaseUrl = url.trim();
+  }
+
+  static String get customBaseUrl => _customBaseUrl;
+
   static String get backendBaseUrl {
+    if (_customBaseUrl.isNotEmpty) {
+      return _customBaseUrl;
+    }
     const overridden = String.fromEnvironment('API_BASE_URL');
     if (overridden.isNotEmpty) {
       return overridden;

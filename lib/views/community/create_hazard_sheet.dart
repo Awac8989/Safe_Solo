@@ -123,7 +123,7 @@ class _CreateHazardSheetState extends State<CreateHazardSheet> {
           const Text('Loại nguy cơ:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           DropdownButtonFormField<HazardCategory>(
-            value: _category,
+            initialValue: _category,
             borderRadius: BorderRadius.circular(14),
             decoration: InputDecoration(
               filled: true,

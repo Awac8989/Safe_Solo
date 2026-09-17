@@ -59,7 +59,7 @@ class _FakeCallSetupSheetState extends State<FakeCallSetupSheet> {
     final config = FakeCallConfig(
       callerName: option['name'] as String,
       callerNumber: option['number'] as String,
-      scenario: option['scenario'] as FakeCallScenario,
+      scenario: _scenario,
       delaySeconds: _delaySeconds,
     );
 
