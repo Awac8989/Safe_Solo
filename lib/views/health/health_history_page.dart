@@ -16,6 +16,7 @@ import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import 'widgets/activity_rings_widget.dart';
 import 'widgets/vitals_matrix_card.dart';
+import 'widgets/hrv_stroke_card.dart';
 
 /// ============================================================================
 /// SAFESOLO - TRUNG TÂM SỨC KHỎE & CHỈ SỐ SINH TỒN (HEALTH & VITALS DASHBOARD)
@@ -433,7 +434,11 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                 ),
                 const SizedBox(height: 18),
 
-                // 5. BỘ LỌC KHOẢNG THỜI GIAN
+                // 5. THẺ PHÂN TÍCH BIẾN THIÊN NHỊP TIM & DỰ ĐOÁN ĐỘT QUỴ SỚM (HRV & STROKE PREDICTION)
+                const HrvStrokeCard(),
+                const SizedBox(height: 18),
+
+                // 6. BỘ LỌC KHOẢNG THỜI GIAN
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

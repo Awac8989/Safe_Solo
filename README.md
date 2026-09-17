@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Socket.IO-4.8.x-010101?style=for-the-badge&logo=socketdotio&logoColor=white" alt="Socket.IO" />
   <img src="https://img.shields.io/badge/React_18-Vite_%2B_TanStack-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Vite" />
   <img src="https://img.shields.io/badge/AI_Engine-Groq_Qwen_2.5-F55036?style=for-the-badge&logo=openai&logoColor=white" alt="Groq AI" />
-  <img src="https://img.shields.io/badge/Tests_Passing-84%2F84_Tests_100%25-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
+  <img src="https://img.shields.io/badge/Tests_Passing-93%2F93_Tests_100%25-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
 </p>
 
@@ -235,9 +235,9 @@ SafeSolo tích hợp bộ công cụ liên lạc và trợ giúp tác chiến ch
 
 ---
 
-## 🧮 12 THUẬT TOÁN AI, DSP & TOÁN HỌC CỐT LÕI
+## 🧮 13 THUẬT TOÁN AI, DSP & TOÁN HỌC CỐT LÕI
 
-Dưới đây là chi tiết 12 thuật toán xử lý tín hiệu số (DSP), trí tuệ nhân tạo (AI) và trắc địa toán học được cài đặt hoàn chỉnh trong dự án:
+Dưới đây là chi tiết 13 thuật toán xử lý tín hiệu số (DSP), trí tuệ nhân tạo (AI) và trắc địa toán học được cài đặt hoàn chỉnh trong dự án:
 
 | STT | Thuật toán | Vị trí cài đặt mã nguồn | Mục đích & Ý nghĩa Kỹ thuật | Công thức Toán học & Ngưỡng Kích hoạt |
 | :---: | :--- | :--- | :--- | :--- |
@@ -253,6 +253,7 @@ Dưới đây là chi tiết 12 thuật toán xử lý tín hiệu số (DSP), t
 | **10** | **Khoảng cách Trắc địa Haversine** | `backend/src/lib/utils.js` | Tìm kiếm Hiệp sĩ cứu hộ gần nhất trên bề mặt hình cầu Trái đất | $$d = 2R \arcsin\left(\sqrt{\sin^2\frac{\Delta\phi}{2} + \cos\phi_1\cos\phi_2\sin^2\frac{\Delta\lambda}{2}}\right)$$ |
 | **11** | **Nhận diện Khẩu lệnh Kêu cứu (Keyword Spotting)** | `AiSignalProcessor.evaluateVoiceDistress` | Phát hiện tiếng kêu cứu rảnh tay (*"Cứu tôi với"*) khi kẹt tay | Trích xuất 13 dải phổ tần MFCC kết hợp mô hình phân loại Tiny-CNN on-device |
 | **12** | **Bộ lọc Biến thiên Khí áp (Barometer Altitude)** | Sensor Fusion Engine | Phát hiện độ cao rơi tự do khi gặp tai nạn nhà cao tầng | Vận tốc thẳng đứng $v_z = \frac{dh}{dt} > 5\text{ m/s}$ kết hợp $SVM > 3.0g$ |
+| **13** | **Biến thiên Nhịp tim (HRV) & Dự đoán Đột quỵ / AFib Sớm** | `AiSignalProcessor.calculateHrvMetrics` & `evaluateStrokeCardiacRisk` | Phân tích biến thiên R-R IBI, dự đoán sớm nguy cơ đột quỵ và rung nhĩ trước 15-30 phút | $$RMSSD = \sqrt{\frac{1}{N-1}\sum \Delta RR_i^2},\quad pNN50 > 30\% \land SDNN < 25\text{ ms}$$ |
 
 ---
 
@@ -455,10 +456,11 @@ Dự án được bảo chứng chất lượng nghiêm ngặt với bộ kiểm
 flutter test
 ```
 ```
-00:07 +84: All tests passed!
+00:11 +93: All tests passed!
 ```
-* **84/84 Unit & Widget Tests ĐẠT 100%**, bao gồm:
+* **93/93 Unit & Widget Tests ĐẠT 100%**, bao gồm:
   - `ai_signal_processor_test.dart`: Kiểm thử lọc Butterworth, dò đỉnh BPM, tính SpO2, gia tốc SVM và nhận diện lắc máy Shake-to-SOS.
+  - `hrv_stroke_test.dart`: Kiểm thử phân tích biến thiên nhịp tim HRV (Mean, SDNN, RMSSD, pNN50, Baevsky Stress Index), mô hình dự đoán đột quỵ / rung nhĩ AFib và bảng kiểm tầm soát F.A.S.T.
   - `solocare_ai_test.dart`: Kiểm thử khởi tạo trợ lý SoloCare AI, kịch bản sơ cứu khẩn cấp và nhịp metronome CPR.
   - `walkie_talkie_test.dart`: Kiểm thử bộ đàm Push-to-Talk và luồng âm thanh khẩn cấp.
   - `fake_call_test.dart`: Kiểm thử bộ đếm giây, kịch bản cuộc gọi thoát hiểm và chuyển trạng thái âm thanh.

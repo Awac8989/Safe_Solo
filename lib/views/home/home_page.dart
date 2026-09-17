@@ -13,6 +13,8 @@ import '../../core/widgets/top_toast.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
+import '../../services/ai_signal_processor.dart';
+import '../../services/hrv_stroke_service.dart';
 import '../community_radar/community_radar_page.dart';
 import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
@@ -1142,9 +1144,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final pedometer = PedometerService.instance;
     final wearOs = WearOsService.instance;
     final sync = WatchSyncManager.instance;
+    final hrv = HrvStrokeService.instance;
 
     return AnimatedBuilder(
-      animation: Listenable.merge([pedometer, wearOs, sync]),
+      animation: Listenable.merge([pedometer, wearOs, sync, hrv]),
       builder: (context, _) {
         final isConnected = wearOs.isPaired && sync.isPaired;
 
@@ -1382,6 +1385,64 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           unit: 'PIN',
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (hrv.assessment.level == HrvRiskLevel.critical
+                                ? const Color(0xFFEF4444)
+                                : hrv.assessment.level == HrvRiskLevel.moderate
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF10B981))
+                            .withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (hrv.assessment.level == HrvRiskLevel.critical
+                                  ? const Color(0xFFEF4444)
+                                  : hrv.assessment.level == HrvRiskLevel.moderate
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF10B981))
+                              .withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 14,
+                            color: hrv.assessment.level == HrvRiskLevel.critical
+                                ? const Color(0xFFEF4444)
+                                : hrv.assessment.level == HrvRiskLevel.moderate
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'HRV: ${hrv.metrics.rmssdMs}ms · ${hrv.assessment.title}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${hrv.assessment.riskPercent}% rủi ro',
+                            style: TextStyle(
+                              color: hrv.assessment.level == HrvRiskLevel.critical
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF38BDF8),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
