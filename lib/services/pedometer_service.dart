@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:pedometer/pedometer.dart';
+import 'watch_sync_manager.dart';
 
 class PedometerService extends ChangeNotifier {
   PedometerService._();
@@ -19,7 +20,7 @@ class PedometerService extends ChangeNotifier {
   int _heartRate = 78;
   int _spO2 = 98;
   int _battery = 88;
-  bool _isPaired = true;
+  bool _isPaired = false;
   bool _isOffWrist = false;
 
   int get steps => _steps;
@@ -32,7 +33,19 @@ class PedometerService extends ChangeNotifier {
   int get spO2 => _spO2;
   int get battery => _battery;
   bool get isPaired => _isPaired;
-  set isPaired(bool val) { _isPaired = val; notifyListeners(); }
+  set isPaired(bool val) {
+    if (_isPaired != val) {
+      _isPaired = val;
+      notifyListeners();
+    }
+  }
+
+  void setPaired(bool val) {
+    if (_isPaired != val) {
+      _isPaired = val;
+      notifyListeners();
+    }
+  }
   bool get isOffWrist => _isOffWrist;
   Stream<Map<String, dynamic>> get watchAlertStream => _watchAlertController.stream;
 
@@ -89,22 +102,36 @@ class PedometerService extends ChangeNotifier {
     });
   }
 
-  void initialize() {
-    try {
-      _pedestrianStatusSubscription = Pedometer.pedestrianStatusStream.listen(
-        _onPedestrianStatusChanged,
-        onError: _onPedestrianStatusError,
-      );
+  bool _isInitialized = false;
 
-      _stepCountSubscription = Pedometer.stepCountStream.listen(
-        _onStepCount,
-        onError: _onStepCountError,
-      );
-      _isAvailable = true;
-    } catch (e) {
-      debugPrint('Pedometer sensor not available on this platform/device: $e');
+  void initialize() {
+    if (WatchSyncManager.kIsTesting) return;
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    runZonedGuarded(() {
+      try {
+        _stepCountSubscription?.cancel();
+        _stepCountSubscription = Pedometer.stepCountStream.listen(
+          _onStepCount,
+          onError: _onStepCountError,
+          cancelOnError: false,
+        );
+        _pedestrianStatusSubscription?.cancel();
+        _pedestrianStatusSubscription = Pedometer.pedestrianStatusStream.listen(
+          _onPedestrianStatusChanged,
+          onError: _onPedestrianStatusError,
+          cancelOnError: false,
+        );
+        _isAvailable = true;
+      } catch (e) {
+        debugPrint('Pedometer sensor not available on this platform/device: $e');
+        _isAvailable = false;
+      }
+    }, (error, stack) {
+      debugPrint('Caught pedometer stream error gracefully: $error');
       _isAvailable = false;
-    }
+    });
   }
 
   void _onStepCount(StepCount event) {
@@ -123,6 +150,7 @@ class PedometerService extends ChangeNotifier {
 
   void _onStepCountError(dynamic error) {
     debugPrint('Pedometer StepCount error: $error');
+    _isAvailable = false;
   }
 
   void _onPedestrianStatusError(dynamic error) {

@@ -84,7 +84,7 @@ function startDeadManWorker(io) {
             message: `Da qua ${security.autoWipeDays} ngay khong co check-in. Thiet bi co the thuc thi xoa du lieu nhay cam cuc bo.`,
             metadata: { autoWipeDays: security.autoWipeDays, lastCheckinTime: user.lastCheckinTime },
           });
-          io.emit('ALERT_EVENT', event);
+          io?.emit('ALERT_EVENT', event);
         }
 
         if (
@@ -96,7 +96,7 @@ function startDeadManWorker(io) {
           userDoc.lastReminderAt = now;
           await userDoc.save();
 
-          io.emit('CHECKIN_REMINDER', {
+          io?.emit('CHECKIN_REMINDER', {
             userId: user._id,
             fullName: user.fullName,
             nextDeadline: user.nextDeadline,
@@ -112,7 +112,16 @@ function startDeadManWorker(io) {
             message: 'Sap den han check-in, vui long xac nhan ban an toan',
             metadata: { nextDeadline: user.nextDeadline },
           });
-          io.emit('ALERT_EVENT', event);
+          io?.emit('ALERT_EVENT', event);
+
+          // Gửi thông báo Telegram Bot có nút bấm Inline 1-tap Check-in
+          try {
+            const telegramBotService = require('../services/telegramBotService');
+            await telegramBotService.sendCheckinReminder(userDoc, minutesUntilDeadline);
+          } catch (teleErr) {
+            console.warn('[DeadManWorker] Telegram reminder notification error:', teleErr.message);
+          }
+
           continue;
         }
 
@@ -125,7 +134,7 @@ function startDeadManWorker(io) {
           userDoc.lastWarningAt = now;
           await userDoc.save();
 
-          io.emit('CHECKIN_WARNING', {
+          io?.emit('CHECKIN_WARNING', {
             userId: user._id,
             fullName: user.fullName,
             overdueMinutes,
@@ -141,7 +150,16 @@ function startDeadManWorker(io) {
             message: 'Nguoi dung da qua han check-in, da kich hoat canh bao',
             metadata: { overdueMinutes },
           });
-          io.emit('ALERT_EVENT', event);
+          io?.emit('ALERT_EVENT', event);
+
+          // Gửi cảnh báo khẩn cấp Telegram Bot có nút bấm Inline 1-tap Check-in / SOS
+          try {
+            const telegramBotService = require('../services/telegramBotService');
+            await telegramBotService.sendCheckinWarning(userDoc, overdueMinutes);
+          } catch (teleErr) {
+            console.warn('[DeadManWorker] Telegram warning notification error:', teleErr.message);
+          }
+
           continue;
         }
 
@@ -157,7 +175,7 @@ function startDeadManWorker(io) {
               message: 'Vuot nguong SOS, da dua vao hang doi auto-call',
               metadata: { overdueMinutes, policy },
             });
-            io.emit('ALERT_EVENT', event);
+            io?.emit('ALERT_EVENT', event);
           }
         }
 
@@ -177,8 +195,8 @@ function startDeadManWorker(io) {
             message: `Người dùng mất liên lạc quá 72 giờ (${overdueMinutes} phút). Hệ thống đã tự động mở Két sinh tử và gửi thông báo khẩn cấp tới danh sách Người bảo hộ.`,
             metadata: { overdueMinutes, releaseResult },
           });
-          io.emit('ALERT_EVENT', vaultEvent);
-          io.emit('VAULT_EMERGENCY_RELEASED', {
+          io?.emit('ALERT_EVENT', vaultEvent);
+          io?.emit('VAULT_EMERGENCY_RELEASED', {
             userId: user._id,
             releasedAt: now,
             overdueMinutes,

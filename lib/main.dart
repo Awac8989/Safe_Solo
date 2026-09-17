@@ -15,11 +15,35 @@ import 'views/stealth/stealth_page.dart';
 import 'views/watch/smartwatch_connection_page.dart';
 import 'views/wear_os/wear_os_watch_page.dart';
 import 'views/vault/vault_page.dart';
+import 'views/emergency/first_aid_guide_page.dart';
+import 'views/journey/active_journey_page.dart';
+import 'views/community/hazard_feed_page.dart';
+import 'views/community/safety_guides_page.dart';
+import 'views/audio/fake_call_screen.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('FLUTTER GLOBAL ERROR: ${details.exceptionAsString()}');
+  };
+  ErrorWidget.builder = (details) {
+    debugPrint('FLUTTER BUILD ERROR: ${details.exceptionAsString()}');
+    return Material(
+      color: Colors.red.shade900,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: Text(
+            'Lỗi giao diện:\n${details.exceptionAsString()}\n\n${details.stack}',
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+          ),
+        ),
+      ),
+    );
+  };
   runApp(const SafeSoloApp());
 }
 
@@ -52,8 +76,13 @@ class SafeSoloApp extends StatelessWidget {
               '/settings': (_) => const SettingsPage(),
               '/smartwatch': (_) => const SmartwatchConnectionPage(),
               '/watch-details': (_) => const SmartwatchConnectionPage(),
-              '/watch-simulator': (_) => const SmartwatchConnectionPage(),
+              '/watch-simulator': (_) => const WearOsWatchPage(),
               '/wear-os': (_) => const WearOsWatchPage(),
+              '/first-aid': (_) => const FirstAidGuidePage(),
+              '/live-journey': (_) => const ActiveJourneyPage(),
+              '/hazard-feed': (_) => const HazardFeedPage(),
+              '/safety-guides': (_) => const SafetyGuidesPage(),
+              '/fake-call': (_) => const FakeCallScreen(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),
@@ -72,21 +101,36 @@ class _AppGate extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final media = MediaQuery.of(context);
+    final view = View.of(context);
 
-    // Màn hình đồng hồ Wear OS (màn hình tròn/vuông nhỏ, kích thước <= 260dp và tỉ lệ xấp xỉ 1:1)
+    // Tính kích thước màn hình từ View.of(context).physicalSize để phát hiện smartwatch ngay frame 0
+    final dpr = view.devicePixelRatio > 0
+        ? view.devicePixelRatio
+        : (media.devicePixelRatio > 0 ? media.devicePixelRatio : 1.0);
+    final width = view.physicalSize.width > 0 ? view.physicalSize.width / dpr : media.size.width;
+    final height = view.physicalSize.height > 0 ? view.physicalSize.height / dpr : media.size.height;
+
+    // Màn hình đồng hồ Wear OS (màn hình tròn/vuông nhỏ, kích thước <= 320dp và tỉ lệ xấp xỉ 1:1)
     // hoặc khi build chuyên biệt cho Wear OS qua flag --dart-define=WEAR_OS=true
     const isExplicitWearOs = bool.fromEnvironment('WEAR_OS', defaultValue: false);
-    final isNativeWatchHardware = media.size.width <= 260 &&
-        media.size.height <= 260 &&
-        media.size.aspectRatio >= 0.85 &&
-        media.size.aspectRatio <= 1.15;
+    final isNativeWatchHardware = width > 0 &&
+        height > 0 &&
+        width <= 454 &&
+        height <= 454 &&
+        (width / height) >= 0.8 &&
+        (width / height) <= 1.25;
     final isWatchScreen = isExplicitWearOs || isNativeWatchHardware;
 
-    debugPrint('MAIN _AppGate: size=${media.size}, shortestSide=${media.size.shortestSide}, aspectRatio=${media.size.aspectRatio}, isWatchScreen=$isWatchScreen');
+    debugPrint('MAIN _AppGate: width=$width, height=$height, isWatchScreen=$isWatchScreen');
 
     // Tự động chuyển thẳng vào Chế độ Đồng hồ WearOS nếu chạy trên thiết bị Smartwatch thật
     if (isWatchScreen) {
       return const WearOsWatchPage();
+    }
+
+    // Nếu kích thước chưa xác định (frame 0), giữ màn hình nền đen chờ frame tiếp theo có kích thước
+    if (width <= 0 || height <= 0) {
+      return const ColoredBox(color: Colors.black);
     }
 
     if (provider.isInitializing) {

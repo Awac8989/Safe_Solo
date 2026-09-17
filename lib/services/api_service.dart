@@ -11,6 +11,7 @@ import '../core/constants.dart';
 import '../models/medical_profile_model.dart';
 import '../models/security_settings_model.dart';
 import '../models/user_model.dart';
+import '../models/live_journey_model.dart';
 
 class ApiService {
   final _client = http.Client();
@@ -473,6 +474,265 @@ class ApiService {
         body: jsonEncode({
           'rating': rating,
           'content': content,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<LiveJourneyModel> startJourney({
+    required String userId,
+    required String destinationLabel,
+    required int durationMinutes,
+    double? destinationLat,
+    double? destinationLng,
+    double? startLat,
+    double? startLng,
+    int? batteryLevel,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/start');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'destinationLabel': destinationLabel,
+          'durationMinutes': durationMinutes,
+          'destinationLat': destinationLat,
+          'destinationLng': destinationLng,
+          'startLat': startLat,
+          'startLng': startLng,
+          'batteryLevel': batteryLevel,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<LiveJourneyModel?> getActiveJourney(String userId) async {
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/active');
+      final response = await _safeRequest(
+        _client.get(
+          uri,
+          headers: {'x-user-id': userId},
+        ),
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        if (body['data'] != null) {
+          return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+        }
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<LiveJourneyModel> pingJourney({
+    required String journeyId,
+    required String userId,
+    required double lat,
+    required double lng,
+    int? batteryLevel,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/$journeyId/ping');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'lat': lat,
+          'lng': lng,
+          'batteryLevel': batteryLevel,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<LiveJourneyModel> finishJourney({
+    required String journeyId,
+    required String userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/$journeyId/finish');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<LiveJourneyModel> extendJourney({
+    required String journeyId,
+    required String userId,
+    int minutes = 10,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/$journeyId/extend');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: jsonEncode({'minutes': minutes}),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<LiveJourneyModel> cancelJourney({
+    required String journeyId,
+    required String userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/$journeyId/cancel');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> uploadEmergencyEvidence({
+    required String userId,
+    String? incidentId,
+    String? photoBase64,
+    String? audioBase64,
+    String? triggerSource,
+    double? lat,
+    double? lng,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/evidence/upload');
+    try {
+      final response = await _safeRequest(
+        _client.post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-user-id': userId,
+          },
+          body: jsonEncode({
+            'incidentId': incidentId,
+            'photoBase64': photoBase64,
+            'audioBase64': audioBase64,
+            'triggerSource': triggerSource ?? 'SOS',
+            'lat': lat,
+            'lng': lng,
+          }),
+        ),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return {'success': false, 'error': response.body};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> sendTelegramOtp({required String identifier}) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/telegram/send-otp');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'identifier': identifier}),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> verifyTelegramOtp({
+    required String identifier,
+    required String otp,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/telegram/verify-otp');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'identifier': identifier, 'otp': otp}),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> sendGmailOtp({required String email}) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/gmail/send-otp');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> verifyGmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/verify-otp');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'otp': otp}),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String email,
+    String? name,
+    String? avatar,
+    String? googleId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/google');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'name': name ?? email.split('@').first,
+          'avatar': avatar,
+          'googleId': googleId,
         }),
       ),
     );

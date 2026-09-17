@@ -17,6 +17,15 @@ class EmergencyController {
       next(error);
     }
   }
+
+  async uploadEvidence(req, res, next) {
+    try {
+      const result = await emergencyService.saveEmergencyEvidence(req.user.id, req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new EmergencyController();

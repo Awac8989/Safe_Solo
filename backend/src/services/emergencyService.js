@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const RescueIncident = require('../models/RescueIncident');
 const EmergencyMemo = require('../models/EmergencyMemo');
+const EmergencyEvidence = require('../models/EmergencyEvidence');
 const radarService = require('./radarService');
 const chatService = require('./chatService');
 const systemLogService = require('./systemLogService');
@@ -258,6 +259,54 @@ class EmergencyService {
     return {
       ...incident.toObject(),
       id: incident._id,
+    };
+  }
+
+  async saveEmergencyEvidence(userId, payload) {
+    const user = await User.findById(userId);
+    ensure(user, 'User not found', 404);
+
+    let incidentId = payload.incidentId;
+    if (!incidentId) {
+      const active = await RescueIncident.findOne({ victimId: userId, status: 'ACTIVE' }).sort({ createdAt: -1 });
+      incidentId = active ? active._id : null;
+    }
+
+    const evidence = await EmergencyEvidence.create({
+      userId,
+      incidentId,
+      triggerSource: payload.triggerSource || 'SOS_BUTTON',
+      photoBase64: payload.photoBase64 || null,
+      audioBase64: payload.audioBase64 || null,
+      lat: payload.lat != null ? Number(payload.lat) : (user.lastKnownLocation?.lat || null),
+      lng: payload.lng != null ? Number(payload.lng) : (user.lastKnownLocation?.lng || null),
+      metadata: {
+        approxAddress: decryptUserSensitivePayload(user).approxAddress,
+        batteryLevel: user.batteryLevel,
+        capturedAt: new Date().toISOString(),
+      },
+    });
+
+    const io = getIo();
+    if (io) {
+      io.emit('emergency:evidence_ready', {
+        evidenceId: evidence._id,
+        incidentId,
+        userId,
+        triggerSource: evidence.triggerSource,
+        hasPhoto: Boolean(evidence.photoBase64),
+        hasAudio: Boolean(evidence.audioBase64),
+        createdAt: toIso(evidence.createdAt),
+      });
+    }
+
+    return {
+      id: evidence._id,
+      incidentId,
+      triggerSource: evidence.triggerSource,
+      hasPhoto: Boolean(evidence.photoBase64),
+      hasAudio: Boolean(evidence.audioBase64),
+      createdAt: toIso(evidence.createdAt),
     };
   }
 }

@@ -44,6 +44,8 @@ const medicalRoutes = require('./medicalRoutes');
 const communityRoutes = require('./communityRoutes');
 const kycRoutes = require('./kycRoutes');
 const locationRoutes = require('./locationRoutes');
+const watchRoutes = require('./watchRoutes');
+const journeyRoutes = require('./journeyRoutes');
 
 const apiRouter = express.Router();
 
@@ -58,6 +60,8 @@ apiRouter.use('/medical', medicalRoutes);
 apiRouter.use('/community', communityRoutes);
 apiRouter.use('/kyc', kycRoutes);
 apiRouter.use('/location', locationRoutes);
+apiRouter.use('/watch', watchRoutes);
+apiRouter.use('/journeys', journeyRoutes);
 
 // Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);

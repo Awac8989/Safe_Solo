@@ -20,6 +20,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
   bool _notificationGranted = false;
   bool _microphoneGranted = false;
   bool _contactsGranted = false;
+  bool _batteryOptGranted = false;
   bool _hasPermanentlyDeniedPermission = false;
   bool _isLoading = false;
 
@@ -54,6 +55,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
       Permission.notification: await Permission.notification.status,
       Permission.microphone: await Permission.microphone.status,
       Permission.contacts: await Permission.contacts.status,
+      Permission.ignoreBatteryOptimizations: await Permission.ignoreBatteryOptimizations.status,
     };
   }
 
@@ -62,6 +64,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
     _notificationGranted = statuses[Permission.notification]?.isGranted ?? false;
     _microphoneGranted = statuses[Permission.microphone]?.isGranted ?? false;
     _contactsGranted = statuses[Permission.contacts]?.isGranted ?? false;
+    _batteryOptGranted = statuses[Permission.ignoreBatteryOptimizations]?.isGranted ?? false;
     _hasPermanentlyDeniedPermission = statuses.values.any(
       (status) => status.isPermanentlyDenied,
     );
@@ -137,6 +140,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
       if (!_notificationGranted) Permission.notification,
       if (!_microphoneGranted) Permission.microphone,
       if (!_contactsGranted) Permission.contacts,
+      if (!_batteryOptGranted) Permission.ignoreBatteryOptimizations,
     ].request();
 
     if (!mounted) {
@@ -252,6 +256,17 @@ class _PermissionsPageState extends State<PermissionsPage> {
               ),
               granted: _contactsGranted,
               onTap: () => _requestSinglePermission(Permission.contacts),
+            ),
+            const SizedBox(height: 16),
+            _PermissionCard(
+              icon: Icons.battery_charging_full_rounded,
+              title: strings.text('Chạy ngầm 24/7 (Bỏ tối ưu pin)', '24/7 Unrestricted Battery'),
+              description: strings.text(
+                'Cho phép SafeSolo chạy liên tục không bị Android đóng băng khi tắt màn hình.',
+                'Allows SafeSolo to run continuously 24/7 without being killed by Android Doze.',
+              ),
+              granted: _batteryOptGranted,
+              onTap: () => _requestSinglePermission(Permission.ignoreBatteryOptimizations),
             ),
             const Spacer(),
             SizedBox(

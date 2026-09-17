@@ -56,3 +56,11 @@ migrate_working_dir/
 # Legacy folders kept out of repo
 mobile-app/
 database/
+
+# Root temporary screenshots
+/*.png
+
+# External reference repos
+watch-interface/
+scratch/
+

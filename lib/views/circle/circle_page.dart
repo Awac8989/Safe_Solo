@@ -7,6 +7,8 @@ import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
+import '../audio/walkie_talkie_dialog.dart';
+import 'widgets/safe_moments_carousel.dart';
 
 class CirclePage extends StatefulWidget {
   const CirclePage({super.key});
@@ -110,6 +112,64 @@ class _CirclePageState extends State<CirclePage> {
     );
   }
 
+  Widget _buildQuickActionCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.title.copyWith(fontSize: 13),
+                ),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
@@ -144,6 +204,48 @@ class _CirclePageState extends State<CirclePage> {
             ),
             style: AppTextStyles.bodyLarge.copyWith(
               color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const SafeMomentsCarousel(),
+          const SizedBox(height: 16),
+          // Community Quick Action Cards
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildQuickActionCard(
+                  icon: Icons.radar_rounded,
+                  color: AppColors.warning,
+                  title: strings.text('Bản tin nguy cơ', 'Hazard Radar'),
+                  subtitle: strings.text('Cảnh báo xung quanh', 'Nearby alerts'),
+                  onTap: () => Navigator.pushNamed(context, '/hazard-feed'),
+                ),
+                const SizedBox(width: 10),
+                _buildQuickActionCard(
+                  icon: Icons.menu_book_rounded,
+                  color: AppColors.primary,
+                  title: strings.text('Cẩm nang an toàn', 'Safety Guides'),
+                  subtitle: strings.text('Kỹ năng tự vệ', 'Solo lifehacks'),
+                  onTap: () => Navigator.pushNamed(context, '/safety-guides'),
+                ),
+                const SizedBox(width: 10),
+                _buildQuickActionCard(
+                  icon: Icons.radio_rounded,
+                  color: const Color(0xFF3B82F6),
+                  title: strings.text('Bộ đàm PTT', 'Walkie-Talkie'),
+                  subtitle: strings.text('Nói nhanh tức thì', 'Push to Talk'),
+                  onTap: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const WalkieTalkieDialog(),
+                    );
+                  },
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 18),

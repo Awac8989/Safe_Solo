@@ -27,6 +27,14 @@ class NotificationService {
         importance: Importance.high,
       );
 
+  static const AndroidNotificationChannel _backgroundSafetyChannel =
+      AndroidNotificationChannel(
+        'safesolo_background_safety',
+        'SafeSolo Background Safety',
+        description: 'Background geofence and safety monitoring',
+        importance: Importance.low,
+      );
+
   Future<void> initialize() async {
     if (_initialized) {
       return;
@@ -45,6 +53,7 @@ class NotificationService {
           >();
       await androidImplementation?.createNotificationChannel(_alertsChannel);
       await androidImplementation?.createNotificationChannel(_remindersChannel);
+      await androidImplementation?.createNotificationChannel(_backgroundSafetyChannel);
       await androidImplementation?.requestNotificationsPermission();
     } catch (_) {
       if (kDebugMode) {

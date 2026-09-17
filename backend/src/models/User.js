@@ -23,7 +23,18 @@ const UserSchema = new mongoose.Schema(
   {
     _id: { type: String, default: () => crypto.randomUUID() },
     fullName: { type: String, required: true, trim: true },
-    phoneNumber: { type: String, required: true, trim: true, unique: true, index: true },
+    phoneNumber: {
+      type: String,
+      trim: true,
+      index: {
+        unique: true,
+        partialFilterExpression: { phoneNumber: { $type: 'string', $gt: '' } },
+      },
+    },
+    telegramChatId: { type: String, default: null, sparse: true, index: true },
+    telegramUsername: { type: String, default: null },
+    googleId: { type: String, default: null, sparse: true, index: true },
+    authProvider: { type: String, enum: ['phone', 'email', 'google', 'telegram'], default: 'phone' },
     role: { type: String, enum: ['user', 'admin'], default: 'user' },
     email: { type: String, default: '', index: true },
     avatar: { type: String, default: null },

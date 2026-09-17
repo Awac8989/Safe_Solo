@@ -1,0 +1,79 @@
+version: '3.8'
+
+# ==============================================================================
+# SafeSolo Server Production Stack (Docker Compose)
+# Bao gom: SafeSolo API + MongoDB 7 + Redis Cache + Tu dong khoi dong lai 24/7
+# ==============================================================================
+
+services:
+  # 1. Co so du lieu MongoDB chinh
+  mongo:
+    image: mongo:7.0
+    container_name: safesolo-mongo
+    restart: always
+    environment:
+      MONGO_INITDB_DATABASE: Safesolo
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - safesolo-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Cache & Job Queue (Ho tro Deadman Switch worker & Khoa phan tan)
+  redis:
+    image: redis:7-alpine
+    container_name: safesolo-redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - safesolo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. Backend Express, Socket.IO & Telegram Bot Daemon
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: safesolo-backend
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - MONGODB_URI=mongodb://mongo:27017/Safesolo
+      - MONGODB_DB_NAME=Safesolo
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "127.0.0.1:4000:4000" # Chi mo noi bo cho Nginx Reverse Proxy
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - safesolo-network
+
+volumes:
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  safesolo-network:
+    driver: bridge
