@@ -64,6 +64,26 @@ async function handleHitlAction(req, res) {
   res.json({ success: true, data });
 }
 
+async function getHeroRadar(_req, res) {
+  const data = await adminPortalService.getHeroRadar();
+  res.json({ success: true, data });
+}
+
+async function getSafeHavens(_req, res) {
+  const data = await adminPortalService.getSafeHavens();
+  res.json({ success: true, data });
+}
+
+async function getThankYouNotes(_req, res) {
+  const data = await adminPortalService.getThankYouNotes();
+  res.json({ success: true, data });
+}
+
+async function getIncidentDossier(req, res) {
+  const data = await adminPortalService.getIncidentDossier(req.params.id);
+  res.json({ success: true, data });
+}
+
 module.exports = {
   getOverview,
   listUsers,
@@ -76,4 +96,8 @@ module.exports = {
   updateKycStatus,
   getChannelHealth,
   getRevenueSummary,
+  getHeroRadar,
+  getSafeHavens,
+  getThankYouNotes,
+  getIncidentDossier,
 };

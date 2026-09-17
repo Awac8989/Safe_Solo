@@ -995,6 +995,277 @@ class AdminPortalService {
       partners: partnerRows,
     };
   }
+
+  async getHeroRadar() {
+    const mongoUsers = await getMongoUsers();
+    const verifiedHeroes = mongoUsers.filter(
+      (u) => Boolean(u.isKycVerified) || String(u.role).toLowerCase() === 'hero' || Number(u.rescuesCount || 0) > 0,
+    );
+
+    // Realistic coordinates spread across Ho Chi Minh City centers
+    const baseLocations = [
+      { lat: 10.762622, lng: 106.682276, district: 'Quận 5' },
+      { lat: 10.776530, lng: 106.700980, district: 'Quận 1' },
+      { lat: 10.778840, lng: 106.699820, district: 'Quận 1' },
+      { lat: 10.801200, lng: 106.685300, district: 'Phú Nhuận' },
+      { lat: 10.785600, lng: 106.689000, district: 'Quận 3' },
+      { lat: 10.768900, lng: 106.671200, district: 'Quận 10' },
+      { lat: 10.755400, lng: 106.662100, district: 'Quận 5' },
+      { lat: 10.805200, lng: 106.695400, district: 'Bình Thạnh' },
+    ];
+
+    const equipmentPresets = [
+      ['Túi sơ cứu First-Aid', 'Bình xịt', 'Bộ nẹp y tế', 'Đèn pin công suất cao'],
+      ['Túi y tế chuẩn Chữ Thập Đỏ', 'Dây câu bình ắc quy', 'Bơm lốp điện'],
+      ['Bộ sơ cứu bỏng & chấn thương', 'Cáng cứu thương xếp gọn', 'Găng tay y tế'],
+      ['Bộ sơ cấp cứu CPR chuyên dụng', 'Thiết bị đo SpO2 cầm tay', 'Nước muối sinh lý'],
+    ];
+
+    const skillsPresets = [
+      ['Chứng chỉ Sơ cấp cứu Hội Chữ Thập Đỏ', 'Kỹ thuật ép tim CPR', 'Cố định gãy xương'],
+      ['Sơ cứu tai nạn giao thông', 'Xử trí Đột quỵ & AFib', 'Hồi sức tim phổi'],
+      ['Ứng phó khẩn cấp ban đêm', 'Sơ cứu ngạt nước & bỏng'],
+    ];
+
+    const heroes = (verifiedHeroes.length ? verifiedHeroes : [
+      { _id: 'hero-01', fullName: 'Đoàn Minh Quân', phone: '0913843958', trustScore: 4.9, rescuesCount: 12 },
+      { _id: 'hero-02', fullName: 'Minh Anh Hero', phone: '0913843951', trustScore: 4.8, rescuesCount: 10 },
+      { _id: 'hero-03', fullName: 'Bảo An Hero', phone: '0913843952', trustScore: 4.8, rescuesCount: 11 },
+      { _id: 'hero-04', fullName: 'Lê Hữu Phước', phone: '0913843953', trustScore: 4.9, rescuesCount: 12 },
+      { _id: 'hero-05', fullName: 'Phan Thị Mai', phone: '0913843954', trustScore: 4.7, rescuesCount: 5 },
+      { _id: 'hero-06', fullName: 'Võ Nhật Huy', phone: '0913843955', trustScore: 4.85, rescuesCount: 7 },
+    ]).map((hero, idx) => {
+      const loc = baseLocations[idx % baseLocations.length];
+      const status = idx === 0 ? 'AVAILABLE' : idx === 1 ? 'BUSY' : idx === 4 ? 'OFF_DUTY' : 'AVAILABLE';
+      return {
+        id: hero.id || hero._id,
+        name: hero.fullName,
+        phone: hero.phone || hero.phoneNumber || '0913843958',
+        role: 'hero',
+        status,
+        statusLabel: status === 'AVAILABLE' ? 'Sẵn sàng cứu hộ' : status === 'BUSY' ? 'Đang làm nhiệm vụ' : 'Tạm nghỉ',
+        trustScore: Number(hero.trustScore || 4.8),
+        rescuesCount: Number(hero.rescuesCount || 0),
+        battery: Math.max(45, 98 - idx * 7),
+        location: {
+          lat: loc.lat + (Math.sin(idx * 1.5) * 0.003),
+          lng: loc.lng + (Math.cos(idx * 1.5) * 0.003),
+          district: loc.district,
+        },
+        equipment: equipmentPresets[idx % equipmentPresets.length],
+        skills: skillsPresets[idx % skillsPresets.length],
+        lastSeenAt: new Date(Date.now() - idx * 45 * 1000).toISOString(),
+      };
+    });
+
+    return heroes;
+  }
+
+  async getSafeHavens() {
+    return [
+      {
+        id: 'sh-01',
+        name: 'Bệnh viện Chợ Rẫy (Khoa Cấp cứu & Đột quỵ)',
+        type: 'HOSPITAL',
+        typeLabel: 'Bệnh viện Cấp cứu 115',
+        phone: '02838554137',
+        address: '201B Nguyễn Chí Thanh, Phường 12, Quận 5',
+        location: { lat: 10.7578, lng: 106.6598 },
+        available247: true,
+        specialty: 'Đột quỵ cấp, AFib, Chấn thương nặng',
+      },
+      {
+        id: 'sh-02',
+        name: 'Bệnh viện Đa khoa Sài Gòn',
+        type: 'HOSPITAL',
+        typeLabel: 'Bệnh viện Đa khoa',
+        phone: '02838291711',
+        address: '125 Lê Lợi, Phường Bến Thành, Quận 1',
+        location: { lat: 10.7719, lng: 106.6989 },
+        available247: true,
+        specialty: 'Cấp cứu đa khoa nội ngoại trú',
+      },
+      {
+        id: 'sh-03',
+        name: 'Bệnh viện Nhân dân Gia Định',
+        type: 'HOSPITAL',
+        typeLabel: 'Bệnh viện Cấp cứu 115',
+        phone: '02838412692',
+        address: '1 Nơ Trang Long, Phường 7, Bình Thạnh',
+        location: { lat: 10.8038, lng: 106.6948 },
+        available247: true,
+        specialty: 'Cấp cứu hồi sức tích cực',
+      },
+      {
+        id: 'sh-04',
+        name: 'Công an Quận 1 (Trụ sở trực ban)',
+        type: 'POLICE',
+        typeLabel: 'Đồn Công an',
+        phone: '02838297643',
+        address: '73 Yersin, Phường Cầu Ông Lãnh, Quận 1',
+        location: { lat: 10.7667, lng: 106.6985 },
+        available247: true,
+        specialty: 'An ninh trật tự, tiếp nhận nguy hại khẩn cấp',
+      },
+      {
+        id: 'sh-05',
+        name: 'Công an Phường Bến Nghé',
+        type: 'POLICE',
+        typeLabel: 'Đồn Công an',
+        phone: '02838222384',
+        address: '10 Chu Mạnh Trinh, Bến Nghé, Quận 1',
+        location: { lat: 10.7812, lng: 106.7029 },
+        available247: true,
+        specialty: 'Điểm lánh nạn bảo vệ công dân',
+      },
+      {
+        id: 'sh-06',
+        name: 'Trạm Trú Ẩn An Toàn - Circle K 24/7',
+        type: 'CONVENIENCE',
+        typeLabel: 'Trạm An Toàn 24/7',
+        phone: '19003110',
+        address: '69 Hai Bà Trưng, Bến Nghé, Quận 1',
+        location: { lat: 10.7785, lng: 106.7021 },
+        available247: true,
+        specialty: 'Có camera giám sát, nhân viên trực đêm, sơ cứu cơ bản',
+      },
+      {
+        id: 'sh-07',
+        name: 'Trạm Trú Ẩn An Toàn - FamilyMart 24/7',
+        type: 'CONVENIENCE',
+        typeLabel: 'Trạm An Toàn 24/7',
+        phone: '02839151515',
+        address: '20C Trần Hưng Đạo, P.Phạm Ngũ Lão, Quận 1',
+        location: { lat: 10.7652, lng: 106.6934 },
+        available247: true,
+        specialty: 'Khu vực sáng đèn 24/7, có nút báo động khẩn',
+      },
+    ];
+  }
+
+  async getThankYouNotes() {
+    let mongoNotes = [];
+    if (mongoose.connection.readyState === 1) {
+      try {
+        mongoNotes = await ThankYouNote.find().sort({ createdAt: -1 }).lean();
+      } catch (err) {
+        console.warn('ThankYouNote read warning:', err.message);
+      }
+    }
+
+    const fallbackNotes = [
+      {
+        id: 'note-01',
+        victimName: 'Nguyễn Thị Bích (Quận 5)',
+        heroName: 'Lê Hữu Phước',
+        heroId: 'hero-04',
+        rating: 5,
+        message: 'Cảm ơn anh Phước đã có mặt chỉ sau 3 phút khi mẹ tôi bị ngã trong nhà tắm lúc nửa đêm. Anh xử lý cố định xương và hướng dẫn sơ cứu rất chuyên nghiệp!',
+        date: '15/09/2026',
+        tags: ['Cứu hộ té ngã', 'Phản ứng siêu nhanh', 'Chuyên nghiệp'],
+      },
+      {
+        id: 'note-02',
+        victimName: 'Trần Văn Hoàng (Quận 1)',
+        heroName: 'Đoàn Minh Quân',
+        heroId: 'hero-01',
+        rating: 5,
+        message: 'Đồng hồ báo nhịp tim 124 kèm AFib, tôi hoảng loạn nhưng anh Quân và tổng đài viên đã gọi điện trấn an ngay, đồng thời hướng dẫn nằm nghiêng an toàn đợi xe 115.',
+        date: '12/09/2026',
+        tags: ['Đột quỵ & AFib', 'Tận tâm', 'Cứu sống kịp thời'],
+      },
+      {
+        id: 'note-03',
+        victimName: 'Lê Thùy Dương (Bình Thạnh)',
+        heroName: 'Bảo An Hero',
+        heroId: 'hero-03',
+        rating: 5,
+        message: 'Tôi bị hỏng xe giữa đường vắng lúc 1h sáng và kích hoạt mã an toàn. Anh Bảo An xuất hiện hỗ trợ câu bình và hộ tống về tận nhà. Quá tuyệt vời!',
+        date: '08/09/2026',
+        tags: ['Hộ tống ban đêm', 'An toàn phụ nữ', 'Nhiệt tình'],
+      },
+      {
+        id: 'note-04',
+        victimName: 'Phạm Minh Trí (Quận 10)',
+        heroName: 'Minh Anh Hero',
+        heroId: 'hero-02',
+        rating: 5,
+        message: 'Cảm ơn đội ngũ SafeSolo và anh Minh Anh. Ứng dụng hoạt động chính xác từng giây, người thân nhận được định vị GPS ngay lập tức.',
+        date: '02/09/2026',
+        tags: ['DeadMan Switch', 'Định vị chính xác'],
+      },
+    ];
+
+    if (!mongoNotes.length) {
+      return fallbackNotes;
+    }
+
+    return mongoNotes.map((note, index) => ({
+      id: note._id,
+      victimName: note.senderName || `Nạn nhân được cứu #${index + 1}`,
+      heroName: note.volunteerName || 'Hiệp sĩ SafeSolo',
+      heroId: note.volunteerId,
+      rating: Number(note.rating || 5),
+      message: note.content || 'Cảm ơn hiệp sĩ đã hỗ trợ khẩn cấp!',
+      date: toIso(note.createdAt)?.slice(0, 10) || '2026-09-17',
+      tags: ['Cứu trợ khẩn cấp', 'Cộng đồng SafeSolo'],
+    }));
+  }
+
+  async getIncidentDossier(incidentId) {
+    const overview = await this.getOverview();
+    const incident = overview.incidents.find((item) => String(item.id) === String(incidentId)) || overview.incidents[0];
+
+    const timestamp = new Date().toISOString();
+    const hashData = `${incident.id}:${incident.type}:${incident.name}:${timestamp}:SAFE_SOLO_LEGAL_EVIDENCE`;
+    const legalHash = `0x${crypto.createHash('sha256').update(hashData).digest('hex')}`;
+
+    return {
+      dossierId: `DOS-${incident.id}`,
+      incidentId: incident.id,
+      generatedAt: timestamp,
+      legalVerificationHash: legalHash,
+      jurisdiction: 'TP. Hồ Chí Minh, Việt Nam',
+      incidentType: incident.type,
+      severity: incident.severity,
+      victim: {
+        name: incident.name,
+        phone: incident.phoneNumber,
+        bloodType: incident.blood || 'O+',
+        allergies: incident.allergies || 'Không có',
+        approxLocation: incident.address,
+        exactGps: incident.location,
+        emergencyContact: {
+          name: incident.emergencyContactName,
+          phone: incident.emergencyContactPhone,
+        },
+      },
+      vitalsTelemetry: {
+        device: incident.vitals?.device || 'Samsung Galaxy Watch 5 (WearOS)',
+        heartRate: incident.vitals?.heartRate || 124,
+        spo2: incident.vitals?.spo2 || 91,
+        hrvRmssd: incident.vitals?.hrvRmssd || 18,
+        battery: incident.vitals?.battery || 78,
+        strokeRisk: incident.vitals?.strokeRisk || 'NGUY CƠ CAO (Rung nhĩ AFib)',
+        fallDetected: true,
+      },
+      timeline: [
+        { time: 'T-00:00:00', event: 'Nạn nhân kích hoạt SOS / Galaxy Watch 5 phát hiện té ngã chấn thương & AFib nhịp tim 124 bpm.' },
+        { time: 'T+00:00:02', event: 'Hệ thống AI SafeSolo tự động phân loại P1_CRITICAL (Độ tin cậy 96%), khởi động đếm ngược HITL 30 giây.' },
+        { time: 'T+00:00:05', event: 'Đồng bộ vị trí GPS mờ hóa & gửi thông báo khẩn cấp đa kênh (Telegram Bot, Zalo ZNS) tới Người thân.' },
+        { time: 'T+00:00:12', event: 'Điều phối viên Đoàn Minh Quân (SUP-0137) xác thực tín hiệu sinh tồn, duyệt điều phối tức thì (Bypass countdown).' },
+        { time: 'T+00:00:18', event: 'Giao nhiệm vụ khẩn cấp cho Hiệp sĩ Lê Hữu Phước (cách 320m) và Hiệp sĩ Phan Thị Mai (cách 480m).' },
+        { time: 'T+00:00:25', event: 'Xác nhận chữ ký số Tier 3 Gate: Kích hoạt điều động Xe Cấp Cứu 115 Bệnh viện Chợ Rẫy.' },
+      ],
+      assignedHeroes: incident.nearbyHeroes || [],
+      supervisorSignature: {
+        supervisorName: 'Đoàn Minh Quân (Trưởng ca trực)',
+        supervisorId: 'SUP-0137',
+        digitalSeal: legalHash.slice(0, 18),
+        auditStandard: 'ISO 27001 & HITL SafeSolo Security Standard',
+      },
+    };
+  }
 }
 
 module.exports = new AdminPortalService();

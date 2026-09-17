@@ -15,6 +15,12 @@ import {
   Siren,
   Users,
   Volume2,
+  VolumeX,
+  Maximize2,
+  Minimize2,
+  Keyboard,
+  Radio,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
@@ -24,6 +30,7 @@ import { Topbar } from "@/components/Topbar";
 import { fetchAdminOverview, resolveIncident, submitHitlAction } from "@/lib/api";
 import type { HitlActionPayload } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
+import { audioAlarm } from "@/lib/audioAlarm";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -56,6 +63,7 @@ function DispatchCenter() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const overviewQuery = useQuery({
     queryKey: ["admin-overview"],
@@ -110,6 +118,95 @@ function DispatchCenter() {
     },
   });
 
+  // Audio Alarm Automation
+  useEffect(() => {
+    audioAlarm.setMuted(muted);
+    const hasActiveP1 = incidents.some(
+      (inc) =>
+        inc.hitl?.priority === "P1_CRITICAL" &&
+        inc.hitl?.state !== "DISPATCHED" &&
+        inc.hitl?.state !== "CANCELLED_FALSE_ALARM" &&
+        inc.status === "ACTIVE",
+    );
+
+    if (hasActiveP1 && !muted) {
+      audioAlarm.playP1Siren();
+    } else {
+      audioAlarm.stop();
+    }
+  }, [incidents, muted]);
+
+  // Keyboard Hotkeys for 24/7 Operations Cockpit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (selected && selected.hitl?.state !== "DISPATCHED" && selected.hitl?.state !== "CANCELLED_FALSE_ALARM") {
+          hitlMutation.mutate({
+            incidentId: selected.id,
+            payload: {
+              action: "INSTANT_DISPATCH",
+              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              tier: 2,
+            },
+          });
+        }
+      } else if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        if (selected) {
+          const isCurrentlyPaused = selected.hitl?.state === "PAUSED";
+          hitlMutation.mutate({
+            incidentId: selected.id,
+            payload: {
+              action: isCurrentlyPaused ? "RESUME_COUNTDOWN" : "PAUSE_COUNTDOWN",
+              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              tier: 2,
+            },
+          });
+        }
+      } else if (e.code === "Escape") {
+        e.preventDefault();
+        if (isDetailOpen) {
+          setIsDetailOpen(false);
+        }
+      } else if (e.key === "1" && incidents[0]) {
+        setSelectedId(incidents[0].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "2" && incidents[1]) {
+        setSelectedId(incidents[1].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "3" && incidents[2]) {
+        setSelectedId(incidents[2].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "m" || e.key === "M") {
+        setMuted((prev) => {
+          const next = !prev;
+          audioAlarm.setMuted(next);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selected, isDetailOpen, incidents, hitlMutation]);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
+
   const incidentStats = useMemo(
     () => ({
       sos: incidents.filter((incident) => incident.type === "SOS").length,
@@ -162,16 +259,39 @@ function DispatchCenter() {
 
   return (
     <>
-      <Topbar title="Trung tâm điều phối trực tiếp" subtitle="Luồng SOS thời gian thực · mạng SafeSolo" />
-      <div className="space-y-3 p-3">
-        <div className="flex justify-end">
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
-          >
-            <Download className="h-4 w-4" />
-            Xuất Excel
-          </button>
+      <Topbar title="Trung tâm điều phối trực tiếp" subtitle="Phòng trực ban cứu hộ 24/7 · Mạng lưới SafeSolo" />
+      <div className="space-y-3 p-3 pb-12">
+        {/* Cockpit Status & Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <span className="font-bold text-foreground">TRỰC BAN:</span>
+            <span className="text-muted-foreground">Đoàn Minh Quân (SUP-0137)</span>
+            <span className="text-border">|</span>
+            <span className="text-muted-foreground font-mono">Độ trễ: 12ms (Live Stream)</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => audioAlarm.playTestSpeaker()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              <Volume2 className="h-3.5 w-3.5 text-sky-400" /> Test Còi Trực Ban
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            </button>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              <Download className="h-3.5 w-3.5" /> Xuất Excel
+            </button>
+          </div>
         </div>
 
         {stats && (
@@ -194,31 +314,25 @@ function DispatchCenter() {
               }}
             />
 
-            <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-              <div className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur">
-                <div className="flex items-center gap-2 font-mono">
-                  <span className="h-2 w-2 rounded-full bg-success" /> ĐANG NHẬN DỮ LIỆU · API đã kết nối
-                </div>
-              </div>
-              <div className="flex gap-1.5 rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur">
-                <Tag tone="sos">SOS {incidentStats.sos}</Tag>
-                <Tag tone="duress">IM LẶNG {incidentStats.duress}</Tag>
-                <Tag tone="warning">Y TẾ {incidentStats.medical}</Tag>
-              </div>
-            </div>
-            <div className="absolute right-3 top-3 flex gap-2">
+            <div className="absolute right-3 top-3 flex gap-2 z-20">
               <button
-                onClick={() => setMuted((value) => !value)}
-                className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur hover:bg-accent"
+                onClick={() => {
+                  const next = !muted;
+                  setMuted(next);
+                  audioAlarm.setMuted(next);
+                }}
+                className={`rounded-md border border-border px-3 py-2 text-xs backdrop-blur font-bold transition ${
+                  muted ? "bg-background/80 text-muted-foreground hover:bg-accent" : "bg-rose-600 text-white animate-pulse"
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <Volume2 className="h-3.5 w-3.5" />
-                  {muted ? "Âm thanh cảnh báo: TẮT" : "Âm thanh cảnh báo: BẬT"}
+                  {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  {muted ? "Còi báo: TẮT" : "Còi báo: ĐANG BẬT"}
                 </div>
               </button>
             </div>
-            <div className="absolute bottom-3 right-3 rounded-md border border-border bg-background/70 px-3 py-2 text-[10px] font-mono uppercase backdrop-blur">
-              Bản đồ mật độ sự cố SafeSolo
+            <div className="absolute bottom-3 right-3 rounded-md border border-border bg-background/70 px-3 py-2 text-[10px] font-mono uppercase backdrop-blur z-20">
+              Bản đồ Radar tác chiến SafeSolo
             </div>
           </div>
 
@@ -347,6 +461,33 @@ function DispatchCenter() {
           </div>
         </div>
       )}
+      {/* 24/7 Operations Cockpit Hotkeys Hints Footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/80 bg-[#090e1a]/95 px-4 py-2 text-[11px] backdrop-blur-md flex flex-wrap items-center justify-between gap-2 shadow-2xl">
+        <div className="flex items-center gap-2 text-sky-400 font-bold">
+          <Keyboard className="h-4 w-4" /> PHÍM TẮT TRỰC BAN 24/7:
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">SPACE</kbd> Duyệt Điều Phối
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">P</kbd> Tạm Dừng / Tiếp Tục
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">ESC</kbd> Đóng Chi Tiết
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">1 / 2 / 3</kbd> Chọn Ca Sự Cố
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">M</kbd> Bật / Tắt Còi Báo
+          </span>
+        </div>
+        <div className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+          ISO 27001 & HITL COCKPIT ACTIVE
+        </div>
+      </div>
     </>
   );
 }

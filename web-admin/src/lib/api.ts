@@ -302,3 +302,108 @@ export const sendDeviceSignal = async (
     body: JSON.stringify({ signalType, payload }),
   });
 };
+
+export type HeroRadarItem = {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+  status: "AVAILABLE" | "BUSY" | "OFF_DUTY";
+  statusLabel: string;
+  trustScore: number;
+  rescuesCount: number;
+  battery: number;
+  location: {
+    lat: number;
+    lng: number;
+    district?: string;
+  };
+  equipment: string[];
+  skills: string[];
+  lastSeenAt: string;
+};
+
+export type SafeHavenItem = {
+  id: string;
+  name: string;
+  type: "HOSPITAL" | "POLICE" | "CONVENIENCE";
+  typeLabel: string;
+  phone: string;
+  address: string;
+  location: {
+    lat: number;
+    lng: number;
+  };
+  available247: boolean;
+  specialty: string;
+};
+
+export type ThankYouNoteItem = {
+  id: string;
+  victimName: string;
+  heroName: string;
+  heroId?: string;
+  rating: number;
+  message: string;
+  date: string;
+  tags: string[];
+};
+
+export type IncidentDossier = {
+  dossierId: string;
+  incidentId: string;
+  generatedAt: string;
+  legalVerificationHash: string;
+  jurisdiction: string;
+  incidentType: string;
+  severity: number;
+  victim: {
+    name: string;
+    phone: string;
+    bloodType: string;
+    allergies: string;
+    approxLocation: string;
+    exactGps?: { lat: number; lng: number };
+    emergencyContact?: {
+      name: string;
+      phone: string;
+    };
+  };
+  vitalsTelemetry: {
+    device: string;
+    heartRate: number;
+    spo2: number;
+    hrvRmssd: number;
+    battery: number;
+    strokeRisk: string;
+    fallDetected: boolean;
+  };
+  timeline: Array<{
+    time: string;
+    event: string;
+  }>;
+  assignedHeroes: NearbyHero[];
+  supervisorSignature: {
+    supervisorName: string;
+    supervisorId: string;
+    digitalSeal: string;
+    auditStandard: string;
+  };
+};
+
+export const fetchHeroRadar = async () => {
+  return request<{ success: true; data: HeroRadarItem[] }>("/admin/heroes/radar");
+};
+
+export const fetchSafeHavens = async () => {
+  return request<{ success: true; data: SafeHavenItem[] }>("/admin/safe-havens");
+};
+
+export const fetchThankYouNotes = async () => {
+  return request<{ success: true; data: ThankYouNoteItem[] }>("/admin/thank-you-notes");
+};
+
+export const fetchIncidentDossier = async (incidentId: string) => {
+  return request<{ success: true; data: IncidentDossier }>(`/admin/incidents/${incidentId}/dossier`);
+};
+

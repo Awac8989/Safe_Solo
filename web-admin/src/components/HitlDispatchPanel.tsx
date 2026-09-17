@@ -16,9 +16,13 @@ import {
   Sparkles,
   UserCheck,
   XCircle,
+  FileText,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
 import type { AdminOverviewResponse, HitlActionPayload } from "@/lib/api";
+import { LiveVitalsTelemetry } from "@/components/LiveVitalsTelemetry";
+import { DispatchCommsConsole } from "@/components/DispatchCommsConsole";
+import { IncidentDossierModal } from "@/components/IncidentDossierModal";
 
 type IncidentItem = AdminOverviewResponse["data"]["incidents"][number];
 
@@ -37,6 +41,7 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
   const [showFalseAlarmModal, setShowFalseAlarmModal] = useState(false);
   const [falseAlarmReason, setFalseAlarmReason] = useState("Nạn nhân bấm nhầm");
   const [showAmbulanceModal, setShowAmbulanceModal] = useState(false);
+  const [showDossierModal, setShowDossierModal] = useState(false);
   const [supervisorCode, setSupervisorCode] = useState("SUP-0137");
 
   const currentState = hitl?.state || "COUNTDOWN_ACTIVE";
@@ -191,13 +196,13 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
       </div>
 
       {/* 3. AI Triage & Bio-Signals Matrix */}
-      <div className="grid gap-2.5 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 sm:grid-cols-2">
-        <div className="space-y-1">
+      <div className="space-y-2.5">
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3">
           <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
             <Sparkles className="h-3.5 w-3.5 text-amber-400" />
             <span>Phân tích lâm sàng & Đề xuất AI</span>
           </div>
-          <p className="text-xs text-foreground/90 leading-relaxed">
+          <p className="mt-1 text-xs text-foreground/90 leading-relaxed">
             {hitl?.aiSummary || "Nghi ngờ Đột quỵ cấp / Nguy kịch (Rung nhĩ AFib, SpO2 91%, Nhịp tim 124 bpm) kèm ngã chấn thương."}
           </p>
           <div className="mt-1 text-[11px] text-sky-300/80 font-medium">
@@ -205,26 +210,16 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           </div>
         </div>
 
-        <div className="space-y-1.5 rounded-lg border border-border/60 bg-background/70 p-2.5">
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground flex items-center gap-1">
-              <HeartPulse className="h-3 w-3 text-rose-500" /> Nguy cơ Đột quỵ / AFib:
-            </span>
-            <strong className="text-rose-400 font-semibold">{incident.vitals?.strokeRisk || "NGUY CƠ CAO (Rung nhĩ AFib)"}</strong>
-          </div>
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground flex items-center gap-1">
-              <Activity className="h-3 w-3 text-sky-400" /> HRV RMSSD (Galaxy Watch 5):
-            </span>
-            <strong className="font-mono text-sky-400">{incident.vitals?.hrvRmssd || 18} ms</strong>
-          </div>
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground">SpO2 / Nhịp tim:</span>
-            <strong className="font-mono text-amber-400">
-              {incident.vitals?.spo2 ?? 91}% · {incident.vitals?.heartRate ?? 124} bpm
-            </strong>
-          </div>
-        </div>
+        {/* Real-time Dynamic ECG & WearOS Telemetry */}
+        <LiveVitalsTelemetry
+          heartRate={incident.vitals?.heartRate ?? 124}
+          spo2={incident.vitals?.spo2 ?? 91}
+          hrvRmssd={incident.vitals?.hrvRmssd ?? 18}
+          strokeRisk={incident.vitals?.strokeRisk ?? "NGUY CƠ CAO (Rung nhĩ AFib)"}
+          battery={incident.vitals?.battery ?? 78}
+          device={incident.vitals?.device ?? "Samsung Galaxy Watch 5 (WearOS)"}
+          isAlert={Boolean(incident.vitals?.spo2 && incident.vitals.spo2 < 92)}
+        />
       </div>
 
       {/* 4. 3-Tier Security Gates Matrix */}
@@ -317,6 +312,16 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         </div>
       )}
 
+      {/* 4.8. Bàn Đàm Thoại & Chỉ Dẫn Sơ Cấp Cứu Y Tế 1-Chạm */}
+      <DispatchCommsConsole
+        victimName={incident.name}
+        victimPhone={incident.phoneNumber}
+        guardianName={incident.emergencyContactName}
+        guardianPhone={incident.emergencyContactPhone}
+        heroName={incident.nearbyHeroes?.[0]?.name}
+        heroPhone={incident.nearbyHeroes?.[0]?.phone}
+      />
+
       {/* 5. Supervisor Action Bar (Quyền Can Thiệp Của Người Giám Sát) */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {/* Nút Hủy / Báo động giả */}
@@ -364,9 +369,17 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
             disabled={isPending}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-rose-500 animate-pulse"
           >
-            <Ambulance className="h-4 w-4" /> ĐIỀU XE 115 (TIER 3 GATE)
+            <Ambulance className="h-4 w-4" /> ĐIỀU XE 115 (TIER 3)
           </button>
         )}
+
+        {/* Nút Xuất Hồ sơ Bằng chứng Pháp lý (Dossier) */}
+        <button
+          onClick={() => setShowDossierModal(true)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 transition"
+        >
+          <FileText className="h-4 w-4" /> XUẤT HỒ SƠ (DOSSIER)
+        </button>
       </div>
 
       {/* Modal: Xác nhận Báo động giả */}
@@ -451,6 +464,14 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Hồ Sơ Bằng Chứng Sự Cố Pháp Lý */}
+      {showDossierModal && (
+        <IncidentDossierModal
+          incidentId={incident.id}
+          onClose={() => setShowDossierModal(false)}
+        />
       )}
     </div>
   );

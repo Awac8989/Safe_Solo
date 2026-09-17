@@ -15,5 +15,9 @@ router.get('/kyc', controller.listKycQueue);
 router.patch('/kyc/:id', controller.updateKycStatus);
 router.get('/channels', controller.getChannelHealth);
 router.get('/revenue', controller.getRevenueSummary);
+router.get('/heroes/radar', controller.getHeroRadar);
+router.get('/safe-havens', controller.getSafeHavens);
+router.get('/thank-you-notes', controller.getThankYouNotes);
+router.get('/incidents/:id/dossier', controller.getIncidentDossier);
 
 module.exports = router;
