@@ -44,7 +44,14 @@ function buildEncryptedUserSensitiveUpdate(userId, source = {}) {
 
 function decryptUserSensitivePayload(row) {
   const raw = row && typeof row.toObject === 'function' ? row.toObject() : row;
-  const payload = decryptJson(raw?.encryptedSensitive, `user:${raw?._id}:sensitive`) || {};
+  let payload = {};
+  if (raw?.encryptedSensitive) {
+    try {
+      payload = decryptJson(raw.encryptedSensitive, `user:${raw?._id}:sensitive`) || {};
+    } catch {
+      payload = {};
+    }
+  }
   return {
     approxAddress: payload.approxAddress || raw?.approxAddress || null,
     medicalNotes: payload.medicalNotes || raw?.medicalNotes || '',

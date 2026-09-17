@@ -194,6 +194,9 @@ export type AdminUser = {
   quietHoursStart: string;
   quietHoursEnd: string;
   falseAlertGraceMinutes: number;
+  trustScore?: number;
+  rescuesCount?: number;
+  isKycVerified?: boolean;
   createdAt: string;
   updatedAt: string;
 };

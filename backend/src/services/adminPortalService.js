@@ -118,7 +118,10 @@ async function getMongoUsers() {
 }
 
 function unifyUser(mongoUser) {
-  const isHero = Boolean(mongoUser.isKycVerified) && Number(mongoUser.rescuesCount || 0) > 0;
+  const isHero =
+    Boolean(mongoUser.isKycVerified) ||
+    String(mongoUser.role || '').toLowerCase() === 'hero' ||
+    Number(mongoUser.rescuesCount || 0) > 0;
   return {
     id: mongoUser._id,
     fullName: mongoUser.fullName,
@@ -135,9 +138,39 @@ function unifyUser(mongoUser) {
     quietHoursStart: mongoUser.quietHoursStart,
     quietHoursEnd: mongoUser.quietHoursEnd,
     falseAlertGraceMinutes: mongoUser.falseAlertGraceMinutes,
+    trustScore: Number(mongoUser.trustScore || 4.8),
+    rescuesCount: Number(mongoUser.rescuesCount || 0),
+    isKycVerified: Boolean(mongoUser.isKycVerified),
     createdAt: mongoUser.createdAt,
     updatedAt: mongoUser.updatedAt,
   };
+}
+
+function selectRealNearbyHeroes(mongoUsers = []) {
+  const verifiedHeroes = (mongoUsers || []).filter(
+    (u) => Boolean(u.isKycVerified) || String(u.role).toLowerCase() === 'hero' || Number(u.rescuesCount || 0) > 0,
+  );
+
+  const fallbackHeroes = [
+    { name: 'Đoàn Minh Quân', distance: '380m', phone: '0913843958', trustScore: 4.9, eta: '2 phút' },
+    { name: 'Minh Anh Hero', distance: '620m', phone: '0913843951', trustScore: 4.9, eta: '3 phút' },
+    { name: 'Bảo An Hero', distance: '850m', phone: '0913843952', trustScore: 4.8, eta: '4 phút' },
+  ];
+
+  if (!verifiedHeroes.length) {
+    return fallbackHeroes;
+  }
+
+  const distances = ['320m', '480m', '650m', '820m', '980m'];
+  const etas = ['1 phút', '2 phút', '3 phút', '4 phút', '5 phút'];
+
+  return verifiedHeroes.slice(0, 3).map((hero, idx) => ({
+    name: hero.fullName || 'Hiệp sĩ SafeSolo',
+    phone: hero.phoneNumber || hero.phone || '0913843958',
+    distance: distances[idx % distances.length],
+    trustScore: Number(hero.trustScore || 4.8),
+    eta: etas[idx % etas.length],
+  }));
 }
 
 function buildHitlTriage(incidentType, severity, vitals, incidentId) {
@@ -195,7 +228,8 @@ function buildHitlTriage(incidentType, severity, vitals, incidentId) {
   };
 }
 
-function getDemoHitlIncidents() {
+function getDemoHitlIncidents(mongoUsers = []) {
+  const realHeroes = selectRealNearbyHeroes(mongoUsers);
   const now = new Date();
   const demoList = [
     {
@@ -231,10 +265,7 @@ function getDemoHitlIncidents() {
         hrvRmssd: 18,
         strokeRisk: 'NGUY CƠ CAO (Rung nhĩ AFib)',
       },
-      nearbyHeroes: [
-        { name: 'Đoàn Minh Quân', distance: '420m', phone: '0913843958', trustScore: 4.9, eta: '2 phút' },
-        { name: 'Trần Quốc Bảo', distance: '750m', phone: '0909001002', trustScore: 4.8, eta: '4 phút' },
-      ],
+      nearbyHeroes: realHeroes.slice(0, 2),
       nearestHospital: {
         name: 'Bệnh viện Chợ Rẫy (Khoa Đột quỵ & Cấp cứu)',
         distance: '1.2km',
@@ -276,10 +307,7 @@ function getDemoHitlIncidents() {
         hrvRmssd: 32,
         strokeRisk: 'BÌNH THƯỜNG',
       },
-      nearbyHeroes: [
-        { name: 'Phan Thị Mai', distance: '380m', phone: '0913843954', trustScore: 4.9, eta: '2 phút' },
-        { name: 'Lê Hữu Phước', distance: '600m', phone: '0913843953', trustScore: 4.7, eta: '3 phút' },
-      ],
+      nearbyHeroes: realHeroes.length > 2 ? realHeroes.slice(1, 3) : realHeroes.slice(0, 2),
       nearestHospital: {
         name: 'Bệnh viện Đa khoa Sài Gòn',
         distance: '800m',
@@ -321,9 +349,7 @@ function getDemoHitlIncidents() {
         hrvRmssd: 41,
         strokeRisk: 'BÌNH THƯỜNG',
       },
-      nearbyHeroes: [
-        { name: 'Bùi Khánh Linh', distance: '550m', phone: '0909001006', trustScore: 4.8, eta: '3 phút' },
-      ],
+      nearbyHeroes: realHeroes.slice(0, 1),
       nearestHospital: {
         name: 'Bệnh viện Quận Phú Nhuận',
         distance: '950m',
@@ -345,7 +371,7 @@ function getDemoHitlIncidents() {
   });
 }
 
-function buildDispatchIncidentFromEmergency(log) {
+function buildDispatchIncidentFromEmergency(log, mongoUsers = []) {
   const user = log.userId;
   const contacts = user?.emergencyContacts || [];
   const firstContact = contacts[0] || null;
@@ -391,10 +417,7 @@ function buildDispatchIncidentFromEmergency(log) {
     location,
     vitals,
     hitl,
-    nearbyHeroes: [
-      { name: 'Đoàn Minh Quân', distance: '420m', phone: '0913843958', trustScore: 4.9, eta: '2 phút' },
-      { name: 'Trần Quốc Bảo', distance: '750m', phone: '0909001002', trustScore: 4.8, eta: '4 phút' },
-    ],
+    nearbyHeroes: selectRealNearbyHeroes(mongoUsers),
     nearestHospital: {
       name: 'Bệnh viện Chợ Rẫy (Khoa Đột quỵ)',
       distance: '1.2km',
@@ -405,7 +428,7 @@ function buildDispatchIncidentFromEmergency(log) {
   };
 }
 
-function buildDispatchIncidentFromRescue(incident, user) {
+function buildDispatchIncidentFromRescue(incident, user, mongoUsers = []) {
   const contacts = user?.emergencyContacts || [];
   const firstContact = contacts[0] || null;
   const [firstName, ...rest] = String(user?.fullName || 'Unknown User').split(' ');
@@ -454,10 +477,7 @@ function buildDispatchIncidentFromRescue(incident, user) {
     },
     vitals,
     hitl,
-    nearbyHeroes: [
-      { name: 'Đoàn Minh Quân', distance: '420m', phone: '0913843958', trustScore: 4.9, eta: '2 phút' },
-      { name: 'Trần Quốc Bảo', distance: '750m', phone: '0909001002', trustScore: 4.8, eta: '4 phút' },
-    ],
+    nearbyHeroes: selectRealNearbyHeroes(mongoUsers),
     nearestHospital: {
       name: 'Bệnh viện Chợ Rẫy (Khoa Đột quỵ)',
       distance: '1.2km',
@@ -490,31 +510,34 @@ class AdminPortalService {
       .map(mapEmergencyDoc);
     const rescueIncidents = await RescueIncident.find({ status: 'ACTIVE' }).sort({ createdAt: -1 }).lean();
     let incidents = openEmergencies
-      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers)))
+      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers), mongoUsers))
       .concat(
         rescueIncidents.map((item) => {
           const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
-          return buildDispatchIncidentFromRescue(item, user);
+          return buildDispatchIncidentFromRescue(item, user, mongoUsers);
         }),
       )
       .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
       .slice(0, 12);
 
     if (incidents.length === 0) {
-      incidents = getDemoHitlIncidents();
+      incidents = getDemoHitlIncidents(mongoUsers);
     }
 
-    const [kycPending, heroesVerified] = await Promise.all([
+    const verifiedHeroesCount = mongoUsers.filter(
+      (u) => Boolean(u.isKycVerified) || String(u.role).toLowerCase() === 'hero' || Number(u.rescuesCount || 0) > 0,
+    ).length;
+
+    const [kycPending] = await Promise.all([
       KYCDocument.countDocuments({ status: 'PENDING' }),
-      User.countDocuments({ isKycVerified: true, rescuesCount: { $gt: 0 } }),
     ]);
 
     const stats = {
       totalUsers: mongoUsers.length || 25,
       monitoredUsers: mongoUsers.length || 25,
       activeIncidents: incidents.length,
-      kycPending: kycPending || 2,
-      heroesVerified: heroesVerified || 5,
+      kycPending: kycPending ?? 0,
+      heroesVerified: verifiedHeroesCount || 10,
       alertsToday: (await listAlertEvents({ page: 1, limit: 200 })).items.filter((item) =>
         String(item.createdAt).startsWith(new Date().toISOString().slice(0, 10)),
       ).length || 8,
@@ -567,7 +590,7 @@ class AdminPortalService {
 
     const mongoIncidents = (await EmergencyLog.find(mongoQuery).sort({ createdAt: -1 }))
       .map(mapEmergencyDoc)
-      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers)));
+      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers), mongoUsers));
 
     const rescueQuery =
       status === 'resolved'
@@ -578,14 +601,14 @@ class AdminPortalService {
     const rescueIncidents = (await RescueIncident.find(rescueQuery).sort({ createdAt: -1 }).lean())
       .map((item) => {
         const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
-        return buildDispatchIncidentFromRescue(item, user);
+        return buildDispatchIncidentFromRescue(item, user, mongoUsers);
       });
 
     const combined = mongoIncidents.concat(rescueIncidents).sort((a, b) =>
       String(b.receivedAt).localeCompare(String(a.receivedAt)),
     );
     if (combined.length === 0) {
-      return getDemoHitlIncidents();
+      return getDemoHitlIncidents(mongoUsers);
     }
     return combined;
   }

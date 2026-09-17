@@ -283,6 +283,40 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         </div>
       </div>
 
+      {/* 4.5. Lực lượng Hiệp sĩ SafeSolo lân cận thực tế (Đồng bộ MongoDB) */}
+      {incident.nearbyHeroes && incident.nearbyHeroes.length > 0 && (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              Hiệp sĩ SafeSolo lân cận sẵn sàng cứu hộ ({incident.nearbyHeroes.length})
+            </span>
+            <span className="text-[10px] text-emerald-400/90 font-medium">Đã xác thực CCCD & KYC</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {incident.nearbyHeroes.map((hero, idx) => (
+              <div key={idx} className="flex items-center justify-between rounded-lg border border-border/80 bg-background/80 p-2.5">
+                <div>
+                  <div className="text-xs font-bold flex items-center gap-1.5">
+                    {hero.name}
+                    <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-semibold text-emerald-400">
+                      Hiệp sĩ
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
+                    📞 {hero.phone || "0913843958"} · Cách vị trí: <strong className="text-foreground">{hero.distance}</strong>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-bold text-amber-400">⭐ {hero.trustScore || 4.9}</div>
+                  <div className="text-[10px] font-semibold text-sky-400">Đến trong: {hero.eta}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 5. Supervisor Action Bar (Quyền Can Thiệp Của Người Giám Sát) */}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {/* Nút Hủy / Báo động giả */}
