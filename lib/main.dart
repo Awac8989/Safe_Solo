@@ -23,6 +23,7 @@ import 'views/community/safety_guides_page.dart';
 import 'views/audio/fake_call_screen.dart';
 import 'views/heroes/hero_workspace_page.dart';
 import 'views/community/accident_report_page.dart';
+import 'views/settings/app_user_guide_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
@@ -89,6 +90,7 @@ class SafeSoloApp extends StatelessWidget {
               '/fake-call': (_) => const FakeCallScreen(),
               '/hero-workspace': (_) => const HeroWorkspacePage(),
               '/report-accident': (_) => const AccidentReportPage(),
+              '/user-guide': (_) => const AppUserGuidePage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),

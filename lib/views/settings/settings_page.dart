@@ -118,9 +118,19 @@ class _SettingsPageState extends State<SettingsPage> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 18, bottom: 120),
         children: [
-          Text(
-            strings.text('Cài đặt', 'Settings'),
-            style: AppTextStyles.h2.copyWith(fontSize: 28),
+          Row(
+            children: [
+              Text(
+                strings.text('Cài đặt', 'Settings'),
+                style: AppTextStyles.h2.copyWith(fontSize: 28),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.help_outline_rounded, color: AppColors.primary, size: 24),
+                tooltip: strings.text('Hướng dẫn sử dụng', 'User Guide'),
+                onPressed: () => Navigator.pushNamed(context, '/user-guide'),
+              ),
+            ],
           ),
           const SizedBox(height: 18),
           _ProfileCard(
@@ -270,6 +280,36 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.workspace_premium_outlined,
                 title: strings.text('Huy hiệu của tôi', 'My achievements'),
                 onTap: () => Navigator.pushNamed(context, '/achievements'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          AppSectionLabel(strings.text('Trợ giúp & Hướng dẫn', 'Help & Guides')),
+          const SizedBox(height: 10),
+          _SectionCard(
+            children: [
+              _ActionRow(
+                icon: Icons.menu_book_rounded,
+                title: strings.text('Hướng dẫn sử dụng SafeSolo', 'SafeSolo User Guide'),
+                subtitle: strings.text('Làm chủ 6 tính năng bảo vệ sự sống cá nhân', 'Master 6 personal life-protection features'),
+                valueText: strings.text('Chi tiết', 'Details'),
+                onTap: () => Navigator.pushNamed(context, '/user-guide'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.shield_outlined,
+                title: strings.text('Cẩm nang an toàn tình huống', 'Situational safety guides'),
+                subtitle: strings.text('Dò camera, bám đuôi, taxi đêm, hỏa hoạn', 'Hidden cameras, stalking, night taxi, fire exit'),
+                valueText: strings.text('12 mẹo', '12 tips'),
+                onTap: () => Navigator.pushNamed(context, '/safety-guides'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.medical_services_outlined,
+                title: strings.text('Cẩm nang sơ cứu khẩn cấp', 'Emergency first aid guide'),
+                subtitle: strings.text('Ép tim CPR Metronome, đột quỵ FAST, Heimlich', 'CPR Metronome, stroke FAST, Heimlich choking'),
+                valueText: strings.text('Chuẩn y tế', 'Medical standard'),
+                onTap: () => Navigator.pushNamed(context, '/first-aid'),
               ),
             ],
           ),
@@ -943,12 +983,14 @@ class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.icon,
     required this.title,
+    this.subtitle,
     this.valueText,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final String? valueText;
   final VoidCallback onTap;
 
@@ -963,7 +1005,22 @@ class _ActionRow extends StatelessWidget {
           children: [
             _LeadingIcon(icon: icon),
             const SizedBox(width: 14),
-            Expanded(child: Text(title, style: AppTextStyles.title)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: AppTextStyles.title),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             if (valueText != null) ...[
               Flexible(
                 child: Text(
