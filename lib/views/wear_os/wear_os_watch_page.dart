@@ -27,6 +27,16 @@ const List<WatchScreen> kWatchScreens = [
   WatchScreen.medical,
 ];
 
+/// 5 Màn hình thẻ thường nhật (Routine Tiles) người dùng có thể vuốt qua lại bình thường
+/// KHÔNG BAO GỒM cảnh báo khẩn cấp (warning, sos) để tránh vuốt nhầm báo động
+const List<WatchScreen> kRoutineScreens = [
+  WatchScreen.watchface,
+  WatchScreen.dashboard,
+  WatchScreen.checkin,
+  WatchScreen.health,
+  WatchScreen.medical,
+];
+
 const Map<WatchScreen, String> kScreenLabels = {
   WatchScreen.watchface: 'Watch Face',
   WatchScreen.dashboard: 'Dashboard',
@@ -86,6 +96,10 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   Timer? _telemetryTimer;
   final List<int> _bpmHistory = [68, 70, 72, 71, 73, 74, 72, 72, 75, 73, 72, 71, 70, 72, 73];
 
+  // Phản hồi điểm danh tức thời trên đồng hồ
+  bool _showCheckinSuccessToast = false;
+  Timer? _toastTimer;
+
   final List<Map<String, dynamic>> _moods = [
     {'emoji': '😄', 'label': 'Tuyệt vời', 'color': const Color(0xFF00C853)},
     {'emoji': '🙂', 'label': 'Bình thường', 'color': const Color(0xFF4FC3F7)},
@@ -115,13 +129,18 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
         if (!mounted) return;
         final newNow = DateTime.now();
         final minuteChanged = newNow.minute != _now.minute;
-        final isDashboard = _screen == WatchScreen.dashboard;
 
-        if (isDashboard && _dashboardSeconds > 0) {
+        // Bộ đếm sinh tồn hoạt động liên tục ngầm bất kể đang ở màn hình nào
+        if (_dashboardSeconds > 0) {
           _dashboardSeconds--;
+          if (_dashboardSeconds == 0 && _screen != WatchScreen.warning && _screen != WatchScreen.sos) {
+            _nav(WatchScreen.warning);
+            _graceSeconds = 30;
+            WearOsService.instance.triggerHardwareSos();
+          }
         }
 
-        if (minuteChanged || isDashboard) {
+        if (minuteChanged || _screen == WatchScreen.dashboard) {
           setState(() {
             _now = newNow;
           });
@@ -225,7 +244,69 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     _telemetryTimer?.cancel();
     _checkinTimer1?.cancel();
     _checkinTimer2?.cancel();
+    _toastTimer?.cancel();
     super.dispose();
+  }
+
+  /// Điểm danh tức thì 1-chạm từ mặt đồng hồ
+  void _performInstantCheckin() {
+    debugPrint('WATCH_CHECKIN: Instant checkin tapped on Watch Face');
+    HapticFeedback.heavyImpact();
+
+    setState(() {
+      _dashboardSeconds = _dashboardTotal;
+      _showCheckinSuccessToast = true;
+    });
+
+    WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Tuyệt vời');
+
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        setState(() => _showCheckinSuccessToast = false);
+      }
+    });
+  }
+
+  /// Hủy cảnh báo khẩn cấp và đưa về trạng thái an toàn
+  void _cancelWarningAndReturn() {
+    debugPrint('WATCH_WARNING: Cancelled by user - returning to watchface');
+    HapticFeedback.selectionClick();
+    WearOsService.instance.cancelEmergency();
+    setState(() {
+      _dashboardSeconds = _dashboardTotal;
+      _showCheckinSuccessToast = true;
+    });
+    WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Tôi an toàn');
+    _nav(WatchScreen.watchface);
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        setState(() => _showCheckinSuccessToast = false);
+      }
+    });
+  }
+
+  /// Định dạng giờ đến hạn hiển thị trên huy hiệu mặt đồng hồ
+  String _formatDeadlineBadge() {
+    if (_dashboardSeconds == 4320) {
+      return '14:32 đến hạn';
+    }
+    final deadline = _now.add(Duration(seconds: _dashboardSeconds));
+    final h = deadline.hour.toString().padLeft(2, '0');
+    final m = deadline.minute.toString().padLeft(2, '0');
+    return '$h:$m đến hạn';
+  }
+
+  /// Định dạng hạn chót điểm danh hiển thị trên Dashboard
+  String _formatDeadlineLimit() {
+    if (_dashboardSeconds == 4320) {
+      return 'Hạn chót: 14:00';
+    }
+    final deadline = _now.add(Duration(seconds: _dashboardSeconds));
+    final h = deadline.hour.toString().padLeft(2, '0');
+    final m = deadline.minute.toString().padLeft(2, '0');
+    return 'Hạn chót: $h:$m';
   }
 
   void _nav(WatchScreen s) {
@@ -249,15 +330,25 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   }
 
   void _prev() {
-    final idx = kWatchScreens.indexOf(_screen);
-    final prevIdx = (idx - 1 + kWatchScreens.length) % kWatchScreens.length;
-    _nav(kWatchScreens[prevIdx]);
+    if (_screen == WatchScreen.warning || _screen == WatchScreen.sos) return;
+    final idx = kRoutineScreens.indexOf(_screen);
+    if (idx == -1) {
+      _nav(kRoutineScreens[0]);
+      return;
+    }
+    final prevIdx = (idx - 1 + kRoutineScreens.length) % kRoutineScreens.length;
+    _nav(kRoutineScreens[prevIdx]);
   }
 
   void _next() {
-    final idx = kWatchScreens.indexOf(_screen);
-    final nextIdx = (idx + 1) % kWatchScreens.length;
-    _nav(kWatchScreens[nextIdx]);
+    if (_screen == WatchScreen.warning || _screen == WatchScreen.sos) return;
+    final idx = kRoutineScreens.indexOf(_screen);
+    if (idx == -1) {
+      _nav(kRoutineScreens[0]);
+      return;
+    }
+    final nextIdx = (idx + 1) % kRoutineScreens.length;
+    _nav(kRoutineScreens[nextIdx]);
   }
 
   @override
@@ -289,7 +380,8 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
   /// GIAO DIỆN CHUYÊN BIỆT CHO WEAR OS THẬT (FULL SCREEN 100%, AMOLED, KHÔNG KHUNG BEZEL GIẢ)
   Widget _buildNativeWatchLayout(BuildContext context, double size) {
-    final currentIdx = kWatchScreens.indexOf(_screen);
+    final isEmergency = _screen == WatchScreen.warning || _screen == WatchScreen.sos;
+    final currentRoutineIdx = kRoutineScreens.indexOf(_screen);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -309,6 +401,14 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                   onHorizontalDragUpdate: (details) => _dragDelta += details.delta.dx,
                   onHorizontalDragEnd: (details) {
                     final vx = details.primaryVelocity ?? 0;
+                    if (isEmergency) {
+                      // Nếu đang ở màn hình cảnh báo, vuốt sang phải để hủy ("← Vuốt: Tôi an toàn")
+                      if (_screen == WatchScreen.warning && (vx > 50 || _dragDelta > 30)) {
+                        _cancelWarningAndReturn();
+                      }
+                      _dragDelta = 0;
+                      return;
+                    }
                     if (vx < -50 || _dragDelta < -30) {
                       _next();
                     } else if (vx > 50 || _dragDelta > 30) {
@@ -338,26 +438,45 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                 ),
               ),
 
-              // 7 Chấm chỉ báo trang ở đỉnh màn hình tròn (Native Watch Indicator)
+              // Chấm chỉ báo trang ở đỉnh màn hình tròn (Native Watch Indicator)
               Positioned(
                 top: 6,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(kWatchScreens.length, (i) {
-                    final isCur = i == currentIdx;
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 1.5),
-                      width: isCur ? 10 : 3,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: isCur ? const Color(0xFF00C853) : Colors.white24,
-                        borderRadius: BorderRadius.circular(1.5),
-                        boxShadow: isCur ? const [BoxShadow(color: Color(0x9900C853), blurRadius: 4)] : null,
+                child: isEmergency
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF44336),
+                          borderRadius: BorderRadius.circular(6),
+                          boxShadow: const [BoxShadow(color: Color(0x80F44336), blurRadius: 6)],
+                        ),
+                        child: const Text(
+                          'KHẨN CẤP',
+                          style: TextStyle(
+                            fontFamily: 'sans-serif',
+                            fontSize: 7,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(kRoutineScreens.length, (i) {
+                          final isCur = i == currentRoutineIdx;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                            width: isCur ? 10 : 3,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: isCur ? const Color(0xFF00C853) : Colors.white24,
+                              borderRadius: BorderRadius.circular(1.5),
+                              boxShadow: isCur ? const [BoxShadow(color: Color(0x9900C853), blurRadius: 4)] : null,
+                            ),
+                          );
+                        }),
                       ),
-                    );
-                  }),
-                ),
               ),
             ],
           ),
@@ -760,16 +879,23 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     final bottomOffset = isNativeWatch ? (size <= 200 ? 8.0 : 14.0) : 22.0;
     final arcStroke = isNativeWatch ? 5.0 : 6.0;
 
+    final arcProgress = (_dashboardSeconds / _dashboardTotal).clamp(0.0, 1.0);
+    final arcColor = arcProgress > 0.5
+        ? const Color(0xFF00C853)
+        : arcProgress > 0.2
+            ? const Color(0xFFFFB300)
+            : const Color(0xFFF44336);
+
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Vòng cung chu vi CircularArc 0.72 (#00C853, bg #0a1a0a)
+        // Vòng cung chu vi CircularArc chuyển màu sinh tồn theo thời gian đếm ngược
         CustomPaint(
           size: Size(size, size),
           painter: _CircularArcPainter(
-            progress: 0.72,
+            progress: arcProgress,
             strokeWidth: arcStroke,
-            color: const Color(0xFF00C853),
+            color: arcColor,
             backgroundColor: const Color(0xFF0A1A0A),
           ),
         ),
@@ -836,11 +962,11 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
             SizedBox(height: isNativeWatch ? (size <= 200 ? 4 : 6) : 8),
 
-            // Huy hiệu SafeSolo 14:32 đến hạn
+            // Huy hiệu SafeSolo giờ đến hạn
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
-                debugPrint('WATCH_TAP: 14:32 chip tapped');
+                debugPrint('WATCH_TAP: deadline badge tapped');
                 _nav(WatchScreen.dashboard);
               },
               child: Container(
@@ -864,7 +990,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      '14:32 đến hạn',
+                      _formatDeadlineBadge(),
                       style: TextStyle(
                         fontFamily: 'sans-serif',
                         fontSize: badgeFontSize,
@@ -879,12 +1005,13 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
             SizedBox(height: isNativeWatch ? (size <= 200 ? 6 : 10) : 14),
 
-            // Nút tròn TÔI AN TOÀN
+            // Nút tròn TÔI AN TOÀN (Tap: Điểm danh ngay, Giữ 2s: SOS khẩn)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                debugPrint('WATCH_TAP: TÔI AN TOÀN button tapped');
-                _nav(WatchScreen.dashboard);
+              onTap: _performInstantCheckin,
+              onLongPress: () {
+                HapticFeedback.heavyImpact();
+                _nav(WatchScreen.warning);
               },
               child: Container(
                 width: buttonSize,
@@ -912,6 +1039,40 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
             ),
           ],
         ),
+
+        // Thông báo phản hồi đã điểm danh an toàn tức thì
+        if (_showCheckinSuccessToast)
+          Positioned(
+            top: isNativeWatch ? (size <= 200 ? 11.0 : 16.0) : 22.0,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isNativeWatch ? (size <= 200 ? 6.0 : 8.0) : 10.0,
+                vertical: isNativeWatch ? 1.5 : 3.0,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFA0B2312),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF00C853), width: 1.0),
+                boxShadow: const [BoxShadow(color: Color(0x6600C853), blurRadius: 10)],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle_rounded, color: const Color(0xFF00C853), size: isNativeWatch ? 8.5 : 11.0),
+                  const SizedBox(width: 3.5),
+                  Text(
+                    'ĐÃ ĐIỂM DANH AN TOÀN',
+                    style: TextStyle(
+                      fontFamily: 'sans-serif',
+                      fontSize: isNativeWatch ? (size <= 200 ? 6.5 : 7.5) : 8.5,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF00C853),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
         // Thanh trạng thái dưới đáy: ♥ $_healthBpm   SpO₂ $_healthSpo2%   🔋 $_battery%
         Positioned(
@@ -1103,7 +1264,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
             SizedBox(height: isNativeWatch ? 2 : 3),
 
-            Text('Hạn chót: 14:00', style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFF666666))),
+            Text(_formatDeadlineLimit(), style: TextStyle(fontSize: isNativeWatch ? 8.5 : 10, color: const Color(0xFF666666))),
 
             SizedBox(height: isNativeWatch ? 4 : 6),
 
@@ -1219,7 +1380,10 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
               behavior: HitTestBehavior.opaque,
               onTap: () {
                 HapticFeedback.selectionClick();
-                setState(() => _selectedMood = i);
+                setState(() {
+                  _selectedMood = i;
+                  _dashboardSeconds = _dashboardTotal;
+                });
                 WatchSyncManager.instance.emitDeadmanCheckin(mood: m['label'] as String? ?? 'Tuyệt vời');
                 _checkinTimer1?.cancel();
                 _checkinTimer2?.cancel();
@@ -1227,7 +1391,13 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                   if (mounted) setState(() => _checkinDone = true);
                 });
                 _checkinTimer2 = Timer(const Duration(milliseconds: 1600), () {
-                  if (mounted) _nav(WatchScreen.dashboard);
+                  if (mounted) {
+                    setState(() {
+                      _checkinDone = false;
+                      _selectedMood = null;
+                    });
+                    _nav(WatchScreen.dashboard);
+                  }
                 });
               },
               child: Container(
@@ -1257,7 +1427,23 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => _nav(WatchScreen.dashboard),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _dashboardSeconds = _dashboardTotal;
+              _checkinDone = true;
+            });
+            WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Bình thường');
+            Future.delayed(const Duration(milliseconds: 1000), () {
+              if (mounted) {
+                setState(() {
+                  _checkinDone = false;
+                  _selectedMood = null;
+                });
+                _nav(WatchScreen.dashboard);
+              }
+            });
+          },
           child: Text('Chỉ check-in', style: TextStyle(fontSize: isNativeWatch ? 9 : 10, color: const Color(0xFF666666))),
         ),
       ],
@@ -1344,10 +1530,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
             // Nút "← Vuốt: Tôi an toàn"
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () {
-                WearOsService.instance.cancelEmergency();
-                _nav(WatchScreen.dashboard);
-              },
+              onTap: _cancelWarningAndReturn,
               child: Container(
                 width: isNativeWatch ? (size <= 200 ? 116.0 : 134.0) : 160.0,
                 height: isNativeWatch ? (size <= 200 ? 24.0 : 30.0) : 36.0,
@@ -1448,8 +1631,15 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                           setState(() {
                             _enteredPin = '';
                             _pinMode = false;
+                            _dashboardSeconds = _dashboardTotal;
+                            _showCheckinSuccessToast = true;
                           });
-                          _nav(WatchScreen.dashboard);
+                          WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Đã hủy SOS');
+                          _nav(WatchScreen.watchface);
+                          _toastTimer?.cancel();
+                          _toastTimer = Timer(const Duration(milliseconds: 2500), () {
+                            if (mounted) setState(() => _showCheckinSuccessToast = false);
+                          });
                         });
                       }
                     });

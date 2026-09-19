@@ -188,36 +188,33 @@ void main() {
       expect(find.text('CẢM XÚC HÔM NAY?'), findsOneWidget);
       expect(find.text('Tuyệt vời'), findsOneWidget);
 
-      // Swipe to Page 4: Alert Warning
-      await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('⚠ CẢNH BÁO KHẨN CẤP'), findsOneWidget);
-      expect(find.text('GỬI SOS NGAY'), findsOneWidget);
-
-      // Swipe to Page 5: Active SOS
-      await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('🆘 SOS ĐANG HOẠT ĐỘNG'), findsOneWidget);
-      expect(find.text('📍 Đã chốt tọa độ GPS'), findsOneWidget);
-
-      // Swipe to Page 6: Health Monitor
+      // Swipe to Page 4: Health Monitor (Routine safe tile, skipping emergency modals)
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('SỨC KHỎE SINH TỒN'), findsOneWidget);
       expect(find.text('♥ NHỊP TIM'), findsOneWidget);
 
-      // Swipe to Page 7: Medical ID
+      // Swipe to Page 5: Medical ID
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('THẺ Y TẾ KHẨN CẤP'), findsOneWidget);
       expect(find.text('Nhóm máu'), findsOneWidget);
 
-      // Test Emergency Countdown Overlay on 384x384
+      // Test Emergency Modal: Warning & SOS triggered explicitly by fall/SOS
       WearOsService.instance.simulateFall();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('← Vuốt: Tôi an toàn'), findsOneWidget);
+      expect(find.text('⚠ CẢNH BÁO KHẨN CẤP'), findsOneWidget);
       expect(find.text('GỬI SOS NGAY'), findsOneWidget);
+      expect(find.text('← Vuốt: Tôi an toàn'), findsOneWidget);
+
+      // Tap "GỬI SOS NGAY" -> Active SOS Screen
+      await tester.tap(find.text('GỬI SOS NGAY'));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('🆘 SOS ĐANG HOẠT ĐỘNG'), findsOneWidget);
+      expect(find.text('📍 Đã chốt tọa độ GPS'), findsOneWidget);
+
       WearOsService.instance.cancelEmergency();
+      await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
     });
 
