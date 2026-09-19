@@ -37,9 +37,23 @@ class WatchSyncManager extends ChangeNotifier {
   bool _isPaired = false;
   WatchConnectionType _connectionType = WatchConnectionType.disconnected;
   String _deviceId = 'watch_galaxy_5';
-  final String _deviceModel = 'Samsung Galaxy Watch 5 (WearOS 4.0)';
+  String _deviceModel = 'Samsung Galaxy Watch 5 (WearOS 4.0)';
   String _pairingCode = '742-891';
   int _latencyMs = 28;
+
+  void setBleConnected({
+    required String deviceId,
+    required String deviceModel,
+  }) {
+    _deviceId = deviceId;
+    _deviceModel = deviceModel;
+    _isPaired = true;
+    _connectionType = WatchConnectionType.localBle;
+    _latencyMs = 12;
+    WearOsService.instance.setPaired(true);
+    PedometerService.instance.setPaired(true);
+    notifyListeners();
+  }
   bool _isSyncing = false;
   bool _isCheckingStatus = false;
   String? _pairedUserId;
