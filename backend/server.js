@@ -32,7 +32,11 @@ const port = process.env.PORT || 4000;
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  skip: (req) => req.path.startsWith('/api/watch') || req.path.startsWith('/watch') || req.path.includes('/health'),
+  skip: (req) =>
+    req.path.startsWith('/api/watch') ||
+    req.path.startsWith('/watch') ||
+    req.path.startsWith('/api/admin') ||
+    req.path.includes('/health'),
   message: {
     success: false,
     error: 'Too many requests from this IP, please try again later.',
@@ -92,7 +96,7 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
-server.listen(port, async () => {
+server.listen(port, '0.0.0.0', async () => {
   try {
     await database.$connect();
     console.log('Database connected successfully');

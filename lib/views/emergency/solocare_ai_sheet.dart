@@ -272,7 +272,7 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
                         ],
                       ),
                       Text(
-                        'Sơ cứu · Thuốc · Trấn an (Qwen 3.8)',
+                        'Sơ cứu · Dùng thuốc · Trấn an tức thì',
                         style: TextStyle(color: Colors.white54, fontSize: 11),
                       ),
                     ],

@@ -16,6 +16,7 @@ import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import 'widgets/activity_rings_widget.dart';
 import 'widgets/vitals_matrix_card.dart';
+import 'widgets/hrv_stroke_card.dart';
 
 /// ============================================================================
 /// SAFESOLO - TRUNG TÂM SỨC KHỎE & CHỈ SỐ SINH TỒN (HEALTH & VITALS DASHBOARD)
@@ -433,7 +434,11 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                 ),
                 const SizedBox(height: 18),
 
-                // 5. BỘ LỌC KHOẢNG THỜI GIAN
+                // 5. THẺ PHÂN TÍCH BIẾN THIÊN NHỊP TIM & DỰ ĐOÁN ĐỘT QUỴ SỚM (HRV & STROKE PREDICTION)
+                const HrvStrokeCard(),
+                const SizedBox(height: 18),
+
+                // 6. BỘ LỌC KHOẢNG THỜI GIAN
                 AppCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -620,7 +625,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                             title: item.autoTriggered
                                 ? strings.text('Tự động điểm danh (Wearable)', 'Auto check-in (Wearable)')
                                 : strings.text('Điểm danh an toàn', 'Safe check-in'),
-                            subtitle: _dateTimeFormat.format(DateTime.parse(item.createdAt)),
+                            subtitle: _formatDateTime(item.createdAt),
                             trailing: item.location == null
                                 ? null
                                 : '${item.location!['lat']}, ${item.location!['lng']}',
@@ -664,7 +669,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                             iconColor: _alertColor(item.status, item.level),
                             title: item.title,
                             subtitle:
-                                '${item.status ?? '-'} · ${_dateTimeFormat.format(DateTime.parse(item.createdAt))}',
+                                '${item.status ?? '-'} · ${_formatDateTime(item.createdAt)}',
                             body: item.message,
                           ),
                         ),
@@ -708,11 +713,21 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
   }
 
   String _formatDate(String value) {
+    if (value.trim().isEmpty) return '--';
     final parsed = DateTime.tryParse(value);
     if (parsed == null) {
       return value;
     }
-    return _dateFormat.format(parsed);
+    return _dateFormat.format(parsed.toLocal());
+  }
+
+  String _formatDateTime(String value) {
+    if (value.trim().isEmpty) return '--';
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    return _dateTimeFormat.format(parsed.toLocal());
   }
 
   String _moodLabel(AppStrings strings, String key) {

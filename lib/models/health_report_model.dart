@@ -56,11 +56,12 @@ class HealthReportEvent {
   final bool autoTriggered;
 
   factory HealthReportEvent.fromJson(Map<String, dynamic> json) {
+    final rawDate = json['createdAt'] ?? json['checkinTime'] ?? json['timestamp'] ?? json['time'] ?? '';
     return HealthReportEvent(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
       message: json['message'] as String? ?? '',
-      createdAt: json['createdAt'] as String? ?? '',
+      createdAt: rawDate.toString(),
       status: json['status'] as String?,
       level: json['level'] as String?,
       location: json['locationAtCheckin'] is Map

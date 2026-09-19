@@ -9,6 +9,10 @@ import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
 import '../audio/walkie_talkie_dialog.dart';
 import 'widgets/safe_moments_carousel.dart';
+import 'widgets/night_shield_bar.dart';
+import 'widgets/circle_orbit_visualizer.dart';
+import 'widgets/live_safety_cockpit_card.dart';
+import 'widgets/ai_safety_capsule_card.dart';
 
 class CirclePage extends StatefulWidget {
   const CirclePage({super.key});
@@ -196,17 +200,29 @@ class _CirclePageState extends State<CirclePage> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             strings.text(
-              'Bảng tin bình an cho gia đình và cộng đồng.',
-              'Safety updates for family and community.',
+              'Trạm điều khiển sinh mệnh & quỹ đạo an tâm gia đình.',
+              'Live biometric orbit and family peace-of-mind hub.',
             ),
             style: AppTextStyles.bodyLarge.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 16),
+          const NightShieldBar(),
+          const SizedBox(height: 14),
+          const CircleOrbitVisualizer(),
+          const SizedBox(height: 14),
+          if (appProvider.activeCircleEscortJourney != null) ...[
+            const LiveSafetyCockpitCard(),
+            const SizedBox(height: 14),
+          ],
+          if (appProvider.dailySafetyCapsule != null) ...[
+            const AiSafetyCapsuleCard(),
+            const SizedBox(height: 14),
+          ],
           const SafeMomentsCarousel(),
           const SizedBox(height: 16),
           // Community Quick Action Cards

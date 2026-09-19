@@ -6,6 +6,7 @@ enum HazardCategory {
   suspiciousPerson,
   roadHazard,
   flooding,
+  landslide,
   accident,
   other,
 }
@@ -25,6 +26,8 @@ class HazardReportModel {
     this.resolvedCount = 0,
     required this.createdAt,
     this.isAnonymous = false,
+    this.isAdminBroadcast = false,
+    this.severity = 'P2_URGENT',
   });
 
   final String id;
@@ -40,6 +43,8 @@ class HazardReportModel {
   final int resolvedCount;
   final DateTime createdAt;
   final bool isAnonymous;
+  final bool isAdminBroadcast;
+  final String severity;
 
   String get categoryLabel {
     switch (category) {
@@ -51,6 +56,8 @@ class HazardReportModel {
         return 'Ổ gà / Thi công';
       case HazardCategory.flooding:
         return 'Ngập nước sâu';
+      case HazardCategory.landslide:
+        return 'Sạt lở đất đá';
       case HazardCategory.accident:
         return 'Sự cố va chạm';
       case HazardCategory.other:
@@ -68,6 +75,8 @@ class HazardReportModel {
         return Icons.construction_rounded;
       case HazardCategory.flooding:
         return Icons.water_drop_rounded;
+      case HazardCategory.landslide:
+        return Icons.landslide_rounded;
       case HazardCategory.accident:
         return Icons.car_crash_rounded;
       case HazardCategory.other:
@@ -85,6 +94,8 @@ class HazardReportModel {
         return AppColors.warning;
       case HazardCategory.flooding:
         return const Color(0xFF0284C7);
+      case HazardCategory.landslide:
+        return const Color(0xFFDC2626);
       case HazardCategory.accident:
         return AppColors.destructive;
       case HazardCategory.other:
@@ -106,12 +117,16 @@ class HazardReportModel {
     'resolvedCount': resolvedCount,
     'createdAt': createdAt.toIso8601String(),
     'isAnonymous': isAnonymous,
+    'isAdminBroadcast': isAdminBroadcast,
+    'severity': severity,
   };
 
   factory HazardReportModel.fromJson(Map<String, dynamic> json) {
     HazardCategory cat = HazardCategory.other;
     final catRaw = (json['category'] as String? ?? '').toUpperCase();
-    if (catRaw.contains('DARK')) {
+    if (catRaw.contains('LANDSLIDE')) {
+      cat = HazardCategory.landslide;
+    } else if (catRaw.contains('DARK')) {
       cat = HazardCategory.darkRoad;
     } else if (catRaw.contains('SUSPICIOUS')) {
       cat = HazardCategory.suspiciousPerson;
@@ -137,6 +152,44 @@ class HazardReportModel {
       resolvedCount: json['resolvedCount'] as int? ?? 0,
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
       isAnonymous: json['isAnonymous'] as bool? ?? false,
+      isAdminBroadcast: json['isAdminBroadcast'] as bool? ?? false,
+      severity: json['severity'] as String? ?? 'P2_URGENT',
+    );
+  }
+
+  HazardReportModel copyWith({
+    String? id,
+    String? authorName,
+    String? title,
+    String? description,
+    HazardCategory? category,
+    double? lat,
+    double? lng,
+    String? address,
+    double? distanceKm,
+    int? confirmCount,
+    int? resolvedCount,
+    DateTime? createdAt,
+    bool? isAnonymous,
+    bool? isAdminBroadcast,
+    String? severity,
+  }) {
+    return HazardReportModel(
+      id: id ?? this.id,
+      authorName: authorName ?? this.authorName,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      lat: lat ?? this.lat,
+      lng: lng ?? this.lng,
+      address: address ?? this.address,
+      distanceKm: distanceKm ?? this.distanceKm,
+      confirmCount: confirmCount ?? this.confirmCount,
+      resolvedCount: resolvedCount ?? this.resolvedCount,
+      createdAt: createdAt ?? this.createdAt,
+      isAnonymous: isAnonymous ?? this.isAnonymous,
+      isAdminBroadcast: isAdminBroadcast ?? this.isAdminBroadcast,
+      severity: severity ?? this.severity,
     );
   }
 }

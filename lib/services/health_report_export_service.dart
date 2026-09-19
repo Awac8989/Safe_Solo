@@ -53,6 +53,13 @@ class HealthReportExportService {
     }
   }
 
+  String _formatDateTime(String raw) {
+    if (raw.trim().isEmpty) return '-';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    return _humanDateTime.format(parsed.toLocal());
+  }
+
   xls.CellValue _textCell(String value) => xls.TextCellValue(value);
   xls.CellValue _intCell(int value) => xls.IntCellValue(value);
   xls.CellValue _numCell(num value) =>
@@ -138,7 +145,7 @@ class HealthReportExportService {
             data: report.recentCheckins
                 .map(
                   (item) => [
-                    _humanDateTime.format(DateTime.parse(item.createdAt)),
+                    _formatDateTime(item.createdAt),
                     item.autoTriggered ? 'Tự động' : 'Thủ công',
                     item.location == null
                         ? '-'
@@ -158,7 +165,7 @@ class HealthReportExportService {
             data: report.recentAlerts
                 .map(
                   (item) => [
-                    _humanDateTime.format(DateTime.parse(item.createdAt)),
+                    _formatDateTime(item.createdAt),
                     item.level ?? item.status ?? '-',
                     item.message,
                   ],
@@ -226,7 +233,7 @@ class HealthReportExportService {
     for (final item in report.recentCheckins) {
       recentCheckinSheet.appendRow(
         _toTextRow([
-          _humanDateTime.format(DateTime.parse(item.createdAt)),
+          _formatDateTime(item.createdAt),
           item.autoTriggered ? 'Có' : 'Không',
           item.location == null
               ? '-'
@@ -240,7 +247,7 @@ class HealthReportExportService {
     for (final item in report.recentAlerts) {
       alertsSheet.appendRow(
         _toTextRow([
-          _humanDateTime.format(DateTime.parse(item.createdAt)),
+          _formatDateTime(item.createdAt),
           item.level ?? '-',
           item.status ?? '-',
           item.message,

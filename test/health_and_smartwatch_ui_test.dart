@@ -6,6 +6,7 @@ import 'package:safesolo/services/watch_sync_manager.dart';
 import 'package:safesolo/views/health/widgets/activity_rings_widget.dart';
 import 'package:safesolo/views/health/widgets/vitals_matrix_card.dart';
 import 'package:safesolo/views/home/home_page.dart';
+import 'package:safesolo/models/health_report_model.dart';
 import 'package:safesolo/views/watch/smartwatch_connection_page.dart';
 
 void main() {
@@ -171,6 +172,46 @@ void main() {
       WatchSyncManager.instance.stopPeriodicChecks();
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
+    });
+
+    test('HealthReportModel handles both checkinTime and createdAt gracefully', () {
+      final json = {
+        'period': 'month',
+        'range': {'start': '2026-09-01T00:00:00.000Z', 'end': '2026-09-30T23:59:59.999Z'},
+        'summary': {'totalCheckIns': 5, 'autoCheckIns': 2, 'overdueCount': 0, 'sosCount': 0},
+        'dailySeries': [],
+        'recentCheckins': [
+          {
+            'id': 'chk1',
+            'checkinTime': '2026-09-18T03:00:00.000Z',
+            'isSystemAutoTriggered': true,
+          },
+          {
+            'id': 'chk2',
+            'createdAt': '2026-09-18T02:00:00.000Z',
+            'isSystemAutoTriggered': false,
+          },
+          {
+            'id': 'chk3',
+            'isSystemAutoTriggered': false,
+          }
+        ],
+        'recentAlerts': [
+          {
+            'id': 'alt1',
+            'createdAt': '2026-09-18T01:00:00.000Z',
+            'title': 'Test alert',
+            'message': 'Test message'
+          }
+        ]
+      };
+
+      final report = HealthReportModel.fromJson(json);
+      expect(report.recentCheckins.length, 3);
+      expect(report.recentCheckins[0].createdAt, '2026-09-18T03:00:00.000Z');
+      expect(report.recentCheckins[1].createdAt, '2026-09-18T02:00:00.000Z');
+      expect(report.recentCheckins[2].createdAt, '');
+      expect(report.recentAlerts.length, 1);
     });
   });
 }

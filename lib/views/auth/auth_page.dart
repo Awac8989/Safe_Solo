@@ -76,13 +76,23 @@ class _AuthPageState extends State<AuthPage> {
   }
 
   Future<void> _handleGoogleSignIn() async {
-    final email = _gmailEmailController.text.trim().isNotEmpty
-        ? _gmailEmailController.text.trim()
-        : 'user.safesolo@gmail.com';
-    final name = _gmailNameController.text.trim().isNotEmpty
-        ? _gmailNameController.text.trim()
-        : 'Google User';
+    // Khi gọi từ nút hoặc test, mở Account Chooser sheet hoặc đăng nhập trực tiếp
+    if (_gmailEmailController.text.trim().isNotEmpty && _gmailEmailController.text.trim() != 'user.safesolo@gmail.com') {
+      await _signInWithSpecificGoogleAccount(
+        email: _gmailEmailController.text.trim(),
+        name: _gmailNameController.text.trim().isNotEmpty ? _gmailNameController.text.trim() : 'Google User',
+      );
+      return;
+    }
+    await _showGoogleAccountChooserSheet(context);
+  }
 
+  Future<void> _signInWithSpecificGoogleAccount({
+    required String email,
+    required String name,
+    bool isExisting = false,
+    bool isHero = false,
+  }) async {
     final provider = context.read<AppProvider>();
     try {
       await provider.authenticateWithGoogle(
@@ -90,6 +100,499 @@ class _AuthPageState extends State<AuthPage> {
         name: name,
         avatar: 'https://lh3.googleusercontent.com/a/default-user=s96-c',
       );
+      if (isExisting) {
+        if (!provider.hasCompletedProfile) {
+          await provider.completeProfileSetup(
+            fullName: name,
+            phoneNumber: isHero ? '0901111004' : '0908889999',
+            email: email,
+            emergencyName: isHero ? 'Tổng Đài Điều Phối SafeSolo 115' : 'Người giám hộ SafeSolo',
+            emergencyPhone: '0901112222',
+            emergencyRelation: isHero ? 'Trung tâm điều phối' : 'Người thân',
+          );
+        }
+      }
+      if (isHero) {
+        await provider.setKycVerified(true);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
+
+  AppStrings _snapshotStrings() {
+    final provider = context.read<AppProvider>();
+    return AppStrings(provider.language);
+  }
+
+  Future<void> _showGoogleAccountChooserSheet(BuildContext context) async {
+    final strings = _snapshotStrings();
+    final accounts = [
+      {
+        'name': 'Đoàn Minh Quân (Hiệp Sĩ SafeSolo)',
+        'email': 'hiepsi.safesolo@gmail.com',
+        'isExisting': true,
+        'isHero': true,
+        'badge': strings.text('Hiệp Sĩ KYC', 'Verified Knight'),
+      },
+      {
+        'name': 'Google SafeSolo User',
+        'email': 'user.safesolo@gmail.com',
+        'isExisting': true,
+        'isHero': false,
+        'badge': strings.text('Đã có hồ sơ', 'Existing profile'),
+      },
+      {
+        'name': 'Nguyễn Văn Minh',
+        'email': 'minh.safesolo@gmail.com',
+        'isExisting': false,
+        'isHero': false,
+        'badge': strings.text('Đăng ký mới', 'New registration'),
+      },
+      {
+        'name': 'Cứu Hộ SafeSolo 115',
+        'email': 'rescue.safesolo@gmail.com',
+        'isExisting': true,
+        'isHero': true,
+        'badge': strings.text('Đội Cứu Hộ 115', 'Rescue Team 115'),
+      },
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4285F4),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.text('Đăng nhập bằng Google', 'Sign in with Google'),
+                          style: AppTextStyles.title.copyWith(fontSize: 17),
+                        ),
+                        Text(
+                          strings.text(
+                            'Chọn tài khoản để tiếp tục với SafeSolo',
+                            'Choose an account to continue to SafeSolo',
+                          ),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+
+              // Danh sách tài khoản Google
+              for (final acc in accounts) ...[
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: (acc['isHero'] as bool? ?? false)
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                        : const Color(0xFF4285F4).withValues(alpha: 0.12),
+                    child: (acc['isHero'] as bool? ?? false)
+                        ? const Icon(Icons.shield_rounded, color: Color(0xFFD97706), size: 20)
+                        : Text(
+                            (acc['name'] as String).substring(0, 1).toUpperCase(),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4285F4),
+                            ),
+                          ),
+                  ),
+                  title: Text(
+                    acc['name'] as String,
+                    style: AppTextStyles.bodyStrong.copyWith(fontSize: 14.5),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          acc['email'] as String,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: (acc['isHero'] as bool? ?? false)
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                              : (acc['isExisting'] as bool)
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                  : const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          acc['badge'] as String,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: (acc['isHero'] as bool? ?? false)
+                                ? const Color(0xFFD97706)
+                                : (acc['isExisting'] as bool)
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _signInWithSpecificGoogleAccount(
+                      email: acc['email'] as String,
+                      name: acc['name'] as String,
+                      isExisting: acc['isExisting'] as bool,
+                      isHero: acc['isHero'] as bool? ?? false,
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+              ],
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                leading: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.grey.shade100,
+                  child: const Icon(Icons.person_add_alt_1_rounded, color: Colors.grey, size: 20),
+                ),
+                title: Text(
+                  strings.text('Sử dụng tài khoản Google khác...', 'Use another Google account...'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 14),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _showCustomGoogleAccountDialog(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showCustomGoogleAccountDialog(BuildContext context) async {
+    final customEmailController = TextEditingController();
+    final customNameController = TextEditingController();
+    final strings = _snapshotStrings();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.mail_outline_rounded, color: Color(0xFF4285F4)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  strings.text('Nhập tài khoản Google', 'Enter Google Account'),
+                  style: AppTextStyles.title.copyWith(fontSize: 17),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: customEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  labelText: strings.text('Địa chỉ Gmail', 'Gmail address'),
+                  hintText: 'tenban@gmail.com',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: customNameController,
+                decoration: InputDecoration(
+                  labelText: strings.text('Họ và tên hiển thị', 'Display name'),
+                  hintText: 'Nguyễn Văn A',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: Text(strings.text('Hủy', 'Cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4285F4),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                final email = customEmailController.text.trim();
+                final name = customNameController.text.trim();
+                if (email.isEmpty || !email.contains('@')) {
+                  return;
+                }
+                Navigator.of(dialogCtx).pop();
+                await _signInWithSpecificGoogleAccount(
+                  email: email,
+                  name: name.isNotEmpty ? name : email.split('@').first,
+                  isExisting: false,
+                );
+              },
+              child: Text(strings.text('Đăng nhập', 'Sign In')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showTelegramAccountChooserSheet(BuildContext context) async {
+    final strings = _snapshotStrings();
+    final teleAccounts = [
+      {
+        'username': '@safesolo_hero',
+        'name': 'Đoàn Minh Quân (Hiệp Sĩ Cứu Hộ)',
+        'isExisting': true,
+        'isHero': true,
+        'badge': strings.text('Hiệp Sĩ KYC', 'Verified Knight'),
+      },
+      {
+        'username': '@safesolo_user',
+        'name': 'SafeSolo Telegram User',
+        'isExisting': true,
+        'isHero': false,
+        'badge': strings.text('Đã có hồ sơ', 'Existing profile'),
+      },
+      {
+        'username': '@minh_telegram',
+        'name': 'Nguyễn Văn Minh (Tele)',
+        'isExisting': false,
+        'isHero': false,
+        'badge': strings.text('Đăng ký mới', 'New registration'),
+      },
+    ];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF229ED9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.text('Đăng nhập với Telegram', 'Sign in with Telegram'),
+                          style: AppTextStyles.title.copyWith(fontSize: 17),
+                        ),
+                        Text(
+                          strings.text(
+                            'Chọn tài khoản hoặc chatbot @SFESOLOBot',
+                            'Select account or @SFESOLOBot chatbot',
+                          ),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              for (final acc in teleAccounts) ...[
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: (acc['isHero'] as bool? ?? false)
+                        ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                        : const Color(0xFF229ED9).withValues(alpha: 0.15),
+                    child: (acc['isHero'] as bool? ?? false)
+                        ? const Icon(Icons.shield_rounded, color: Color(0xFFD97706), size: 20)
+                        : const Icon(Icons.person_rounded, color: Color(0xFF229ED9), size: 22),
+                  ),
+                  title: Text(
+                    acc['name'] as String,
+                    style: AppTextStyles.bodyStrong.copyWith(fontSize: 14.5),
+                  ),
+                  subtitle: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          acc['username'] as String,
+                          style: AppTextStyles.caption.copyWith(color: const Color(0xFF229ED9), fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: (acc['isHero'] as bool? ?? false)
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
+                              : (acc['isExisting'] as bool)
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.12)
+                                  : const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          acc['badge'] as String,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: (acc['isHero'] as bool? ?? false)
+                                ? const Color(0xFFD97706)
+                                : (acc['isExisting'] as bool)
+                                    ? const Color(0xFF059669)
+                                    : const Color(0xFF2563EB),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _signInWithSpecificTelegramAccount(
+                      username: acc['username'] as String,
+                      name: acc['name'] as String,
+                      isExisting: acc['isExisting'] as bool,
+                      isHero: acc['isHero'] as bool? ?? false,
+                    );
+                  },
+                ),
+                const Divider(height: 1),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _signInWithSpecificTelegramAccount({
+    required String username,
+    required String name,
+    bool isExisting = false,
+    bool isHero = false,
+  }) async {
+    final provider = context.read<AppProvider>();
+    try {
+      await provider.verifyTelegramOtp(
+        identifier: username,
+        otp: '123456',
+        name: name,
+      );
+      if (isExisting) {
+        if (!provider.hasCompletedProfile) {
+          await provider.completeProfileSetup(
+            fullName: name,
+            phoneNumber: isHero ? '0901111004' : '0907778888',
+            email: '$username@tele.safesolo',
+            emergencyName: isHero ? 'Tổng Đài Điều Phối SafeSolo 115' : 'Người giám hộ Telegram',
+            emergencyPhone: '0901112222',
+            emergencyRelation: isHero ? 'Trung tâm điều phối' : 'Người thân',
+          );
+        }
+      }
+      if (isHero) {
+        await provider.setKycVerified(true);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -164,7 +667,7 @@ class _AuthPageState extends State<AuthPage> {
     String? displayName,
   }) async {
     final otpController = TextEditingController(text: previewOtp ?? '');
-    final strings = AppStrings.of(context);
+    final strings = _snapshotStrings();
     bool isVerifying = false;
     String? dialogError;
 
@@ -473,6 +976,7 @@ class _AuthPageState extends State<AuthPage> {
     final isSelected = _selectedTab == index;
     return Expanded(
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () => setState(() => _selectedTab = index),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -902,6 +1406,26 @@ class _AuthPageState extends State<AuthPage> {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: Color(0xFF229ED9), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: appProvider.isBusy ? null : () => _showTelegramAccountChooserSheet(context),
+              icon: const Icon(Icons.send_rounded, color: Color(0xFF229ED9)),
+              label: Text(
+                strings.text('Chọn tài khoản Telegram để tiếp tục', 'Choose Telegram Account to continue'),
+                style: AppTextStyles.title.copyWith(
+                  color: const Color(0xFF229ED9),
+                  fontSize: 15,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 18),

@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,13 +15,22 @@ import {
   Siren,
   Users,
   Volume2,
+  VolumeX,
+  Maximize2,
+  Minimize2,
+  Keyboard,
+  Radio,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
+import { HitlDispatchPanel } from "@/components/HitlDispatchPanel";
 import { IncidentMap } from "@/components/IncidentMap";
 import { Topbar } from "@/components/Topbar";
-import { fetchAdminOverview, resolveIncident } from "@/lib/api";
+import { fetchAdminOverview, resolveIncident, submitHitlAction } from "@/lib/api";
+import type { HitlActionPayload } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
+import { audioAlarm } from "@/lib/audioAlarm";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,6 +63,7 @@ function DispatchCenter() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [hasAutoSelected, setHasAutoSelected] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const overviewQuery = useQuery({
     queryKey: ["admin-overview"],
@@ -98,6 +108,104 @@ function DispatchCenter() {
       await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
     },
   });
+
+  const hitlMutation = useMutation({
+    mutationFn: ({ incidentId, payload }: { incidentId: string; payload: HitlActionPayload }) =>
+      submitHitlAction(incidentId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+    },
+  });
+
+  // Audio Alarm Automation
+  useEffect(() => {
+    audioAlarm.setMuted(muted);
+    const hasActiveP1 = incidents.some(
+      (inc) =>
+        inc.hitl?.priority === "P1_CRITICAL" &&
+        inc.hitl?.state !== "DISPATCHED" &&
+        inc.hitl?.state !== "CANCELLED_FALSE_ALARM" &&
+        inc.status === "ACTIVE",
+    );
+
+    if (hasActiveP1 && !muted) {
+      audioAlarm.playP1Siren();
+    } else {
+      audioAlarm.stop();
+    }
+  }, [incidents, muted]);
+
+  // Keyboard Hotkeys for 24/7 Operations Cockpit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (selected && selected.hitl?.state !== "DISPATCHED" && selected.hitl?.state !== "CANCELLED_FALSE_ALARM") {
+          hitlMutation.mutate({
+            incidentId: selected.id,
+            payload: {
+              action: "INSTANT_DISPATCH",
+              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              tier: 2,
+            },
+          });
+        }
+      } else if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        if (selected) {
+          const isCurrentlyPaused = selected.hitl?.state === "PAUSED";
+          hitlMutation.mutate({
+            incidentId: selected.id,
+            payload: {
+              action: isCurrentlyPaused ? "RESUME_COUNTDOWN" : "PAUSE_COUNTDOWN",
+              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              tier: 2,
+            },
+          });
+        }
+      } else if (e.code === "Escape") {
+        e.preventDefault();
+        if (isDetailOpen) {
+          setIsDetailOpen(false);
+        }
+      } else if (e.key === "1" && incidents[0]) {
+        setSelectedId(incidents[0].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "2" && incidents[1]) {
+        setSelectedId(incidents[1].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "3" && incidents[2]) {
+        setSelectedId(incidents[2].id);
+        setIsDetailOpen(true);
+      } else if (e.key === "m" || e.key === "M") {
+        setMuted((prev) => {
+          const next = !prev;
+          audioAlarm.setMuted(next);
+          return next;
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selected, isDetailOpen, incidents, hitlMutation]);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
 
   const incidentStats = useMemo(
     () => ({
@@ -151,16 +259,55 @@ function DispatchCenter() {
 
   return (
     <>
-      <Topbar title="Trung tâm điều phối trực tiếp" subtitle="Luồng SOS thời gian thực · mạng SafeSolo" />
-      <div className="space-y-3 p-3">
-        <div className="flex justify-end">
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent"
-          >
-            <Download className="h-4 w-4" />
-            Xuất Excel
-          </button>
+      <Topbar title="Trung tâm điều phối trực tiếp" subtitle="Phòng trực ban cứu hộ 24/7 · Mạng lưới SafeSolo" />
+      <div className="space-y-3 p-3 pb-12">
+        {/* Cockpit Status & Action Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 shadow-sm">
+          <div className="flex items-center gap-2 text-xs">
+            {overviewQuery.isError ? (
+              <>
+                <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="font-bold text-rose-400">MẤT KẾT NỐI MÁY CHỦ BACKEND (PORT 4000)</span>
+                <span className="text-border">|</span>
+                <button
+                  onClick={() => overviewQuery.refetch()}
+                  className="text-xs text-sky-400 underline font-semibold hover:text-sky-300"
+                >
+                  Kết nối lại
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="font-bold text-foreground">TRỰC BAN:</span>
+                <span className="text-muted-foreground">Đoàn Minh Quân (SUP-0137)</span>
+                <span className="text-border">|</span>
+                <span className="text-muted-foreground font-mono">Độ trễ: 12ms (Live Stream)</span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => audioAlarm.playTestSpeaker()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              <Volume2 className="h-3.5 w-3.5 text-sky-400" /> Test Còi Trực Ban
+            </button>
+            <button
+              onClick={toggleFullscreen}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              {isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            </button>
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
+            >
+              <Download className="h-3.5 w-3.5" /> Xuất Excel
+            </button>
+          </div>
         </div>
 
         {stats && (
@@ -183,31 +330,25 @@ function DispatchCenter() {
               }}
             />
 
-            <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-              <div className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur">
-                <div className="flex items-center gap-2 font-mono">
-                  <span className="h-2 w-2 rounded-full bg-success" /> ĐANG NHẬN DỮ LIỆU · API đã kết nối
-                </div>
-              </div>
-              <div className="flex gap-1.5 rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur">
-                <Tag tone="sos">SOS {incidentStats.sos}</Tag>
-                <Tag tone="duress">IM LẶNG {incidentStats.duress}</Tag>
-                <Tag tone="warning">Y TẾ {incidentStats.medical}</Tag>
-              </div>
-            </div>
-            <div className="absolute right-3 top-3 flex gap-2">
+            <div className="absolute right-3 top-3 flex gap-2 z-20">
               <button
-                onClick={() => setMuted((value) => !value)}
-                className="rounded-md border border-border bg-background/70 px-3 py-2 text-xs backdrop-blur hover:bg-accent"
+                onClick={() => {
+                  const next = !muted;
+                  setMuted(next);
+                  audioAlarm.setMuted(next);
+                }}
+                className={`rounded-md border border-border px-3 py-2 text-xs backdrop-blur font-bold transition ${
+                  muted ? "bg-background/80 text-muted-foreground hover:bg-accent" : "bg-rose-600 text-white animate-pulse"
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <Volume2 className="h-3.5 w-3.5" />
-                  {muted ? "Âm thanh cảnh báo: TẮT" : "Âm thanh cảnh báo: BẬT"}
+                  {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  {muted ? "Còi báo: TẮT" : "Còi báo: ĐANG BẬT"}
                 </div>
               </button>
             </div>
-            <div className="absolute bottom-3 right-3 rounded-md border border-border bg-background/70 px-3 py-2 text-[10px] font-mono uppercase backdrop-blur">
-              Bản đồ mật độ sự cố SafeSolo
+            <div className="absolute bottom-3 right-3 rounded-md border border-border bg-background/70 px-3 py-2 text-[10px] font-mono uppercase backdrop-blur z-20">
+              Bản đồ Radar tác chiến SafeSolo
             </div>
           </div>
 
@@ -221,9 +362,26 @@ function DispatchCenter() {
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {overviewQuery.isLoading ? (
-                <div className="text-sm text-muted-foreground">Đang tải danh sách sự cố...</div>
+                <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground gap-2">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span>Đang kết nối trung tâm dữ liệu...</span>
+                </div>
               ) : overviewQuery.isError ? (
-                <div className="text-sm text-sos">{overviewQuery.error.message}</div>
+                <div className="rounded-lg border border-sos/30 bg-sos/10 p-4 text-xs text-sos space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Không thể kết nối máy chủ SafeSolo Backend
+                  </div>
+                  <p className="text-muted-foreground text-[11px]">
+                    Vui lòng kiểm tra backend server trên cổng 4000 (cd backend && npm start).
+                  </p>
+                  <button
+                    onClick={() => overviewQuery.refetch()}
+                    className="rounded bg-sos/20 px-2.5 py-1 text-xs font-semibold hover:bg-sos/30 transition text-foreground"
+                  >
+                    Thử kết nối lại
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {incidents.map((incident) => (
@@ -240,9 +398,16 @@ function DispatchCenter() {
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <Tag tone={incident.type === "DURESS" ? "duress" : incident.type === "SOS" ? "sos" : "warning"}>
-                          {formatIncidentType(incident.type)}
-                        </Tag>
+                        <div className="flex items-center gap-1.5">
+                          <Tag tone={incident.type === "DURESS" ? "duress" : incident.type === "SOS" ? "sos" : "warning"}>
+                            {formatIncidentType(incident.type)}
+                          </Tag>
+                          {incident.hitl?.priority === "P1_CRITICAL" && (
+                            <span className="inline-flex items-center rounded bg-rose-500/20 px-1.5 py-0.5 text-[9px] font-extrabold text-rose-400 animate-pulse">
+                              ⚡ HITL 30s
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-mono text-muted-foreground">{timeAgo(incident.receivedAt)}</span>
                       </div>
                       <div className="mt-2 text-sm font-semibold">{incident.name}</div>
@@ -262,10 +427,10 @@ function DispatchCenter() {
       </div>
 
       {isDetailOpen && selected && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-          <div className="pointer-events-auto w-full max-w-2xl rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center p-4">
+          <div className="pointer-events-auto max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
             <div
-              className={`flex items-center justify-between rounded-t-2xl border-b border-border px-5 py-3 ${
+              className={`sticky top-0 z-10 flex items-center justify-between rounded-t-2xl border-b border-border px-5 py-3 backdrop-blur-md ${
                 selected.type === "DURESS" ? "bg-duress/10" : selected.type === "SOS" ? "bg-sos/10" : "bg-warning/10"
               }`}
             >
@@ -299,65 +464,63 @@ function DispatchCenter() {
               </button>
             </div>
 
-                        {/* Chỉ số sinh tồn nạn nhân từ Samsung Galaxy Watch 5 */}
-            <div className="mx-5 mt-4 rounded-xl border border-sky-500/25 bg-sky-500/5 p-3.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-400">
-                  <Activity className="h-4 w-4 animate-pulse text-rose-500" />
-                  <span>Chỉ số sinh tồn ({selected.vitals?.device || "Samsung Galaxy Watch 5 - WearOS"})</span>
-                </div>
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                  (selected.vitals?.spo2 ?? 98) < 92 ? "bg-red-500/20 text-red-400 border border-red-500/40" : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                }`}>
-                  {selected.vitals?.status || "BÌNH THƯỜNG"}
-                </span>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2.5 text-center">
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">SpO2 (Oxy máu)</div>
-                  <div className={`text-base font-extrabold ${(selected.vitals?.spo2 ?? 98) < 92 ? "text-red-500" : "text-sky-400"}`}>
-                    {selected.vitals?.spo2 ?? 98}%
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Nhịp tim (BPM)</div>
-                  <div className="text-base font-extrabold text-rose-500">
-                    {selected.vitals?.heartRate ?? 78} <span className="text-xs font-normal text-muted-foreground">bpm</span>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border/60 bg-background/70 p-2">
-                  <div className="text-[10px] text-muted-foreground uppercase font-medium">Pin thiết bị</div>
-                  <div className="text-base font-extrabold text-amber-400">
-                    {selected.vitals?.battery ?? 86}%
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Bảng Điều Khiển Bán Tự Động HITL với Đếm Ngược An Toàn & Phân Tầng Quyền Hạn */}
+            <HitlDispatchPanel
+              incident={selected}
+              onAction={async (payload) => {
+                await hitlMutation.mutateAsync({ incidentId: selected.id, payload });
+              }}
+              isPending={hitlMutation.isPending}
+            />
 
-            <div className="grid gap-3 p-5 md:grid-cols-3">
+            <div className="grid gap-3 px-5 pb-4 md:grid-cols-3">
               <InfoBox icon={Droplet} label="Nhóm máu" value={selected.blood} accent="text-info" />
               <InfoBox icon={HeartPulse} label="Dị ứng" value={selected.allergies} />
               <InfoBox icon={PhoneCall} label="Liên hệ khẩn cấp" value={selected.emergencyContactPhone || "Không có"} />
             </div>
 
-            <div className="grid gap-2 border-t border-border p-4 sm:grid-cols-3">
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-info px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
-                <PhoneCall className="h-4 w-4" /> Gọi người thân
-              </button>
-              <button className="flex items-center justify-center gap-2 rounded-lg bg-success px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
-                <Ambulance className="h-4 w-4" /> Điều xe cứu thương
+            <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 border-t border-border bg-card/95 p-4 backdrop-blur-md sm:grid-cols-2">
+              <button className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-info px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90">
+                <PhoneCall className="h-4 w-4" /> Gọi người thân ({selected.emergencyContactPhone || "Chưa có"})
               </button>
               <button
                 onClick={() => resolveMutation.mutate(selected.id)}
                 disabled={resolveMutation.isPending}
-                className="flex items-center justify-center gap-2 rounded-lg bg-sos px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 pulse-sos disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-sos px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90 pulse-sos disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Siren className="h-4 w-4" /> {resolveMutation.isPending ? "Đang đánh dấu đã xử lý..." : "Đánh dấu đã xử lý"}
+                <Siren className="h-4 w-4" /> {resolveMutation.isPending ? "Đang xử lý..." : "Đóng & Đánh dấu hoàn tất sự cố"}
               </button>
             </div>
           </div>
         </div>
       )}
+      {/* 24/7 Operations Cockpit Hotkeys Hints Footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border/80 bg-[#090e1a]/95 px-4 py-2 text-[11px] backdrop-blur-md flex flex-wrap items-center justify-between gap-2 shadow-2xl">
+        <div className="flex items-center gap-2 text-sky-400 font-bold">
+          <Keyboard className="h-4 w-4" /> PHÍM TẮT TRỰC BAN 24/7:
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">SPACE</kbd> Duyệt Điều Phối
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">P</kbd> Tạm Dừng / Tiếp Tục
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">ESC</kbd> Đóng Chi Tiết
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">1 / 2 / 3</kbd> Chọn Ca Sự Cố
+          </span>
+          <span className="flex items-center gap-1">
+            <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-foreground font-bold border border-border">M</kbd> Bật / Tắt Còi Báo
+          </span>
+        </div>
+        <div className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+          ISO 27001 & HITL COCKPIT ACTIVE
+        </div>
+      </div>
     </>
   );
 }

@@ -1,11 +1,14 @@
-﻿import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Bell, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
-  const [time, setTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
+  const [time, setTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    setMounted(true);
+    setTime(new Date());
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
@@ -22,7 +25,9 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
           <Search className="h-3.5 w-3.5" />
           <span>Tìm sự cố, người dùng, bệnh viện...</span>
         </div>
-        <div className="font-mono text-xs text-muted-foreground">{time.toLocaleTimeString("vi-VN")}</div>
+        <div className="font-mono text-xs text-muted-foreground" suppressHydrationWarning>
+          {mounted && time ? time.toLocaleTimeString("vi-VN") : "--:--:--"}
+        </div>
         <button className="relative rounded-md border border-border p-1.5 hover:bg-accent">
           <Bell className="h-4 w-4" />
           <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-sos pulse-sos" />

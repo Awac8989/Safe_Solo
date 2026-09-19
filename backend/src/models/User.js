@@ -83,6 +83,34 @@ const UserSchema = new mongoose.Schema(
     deadmanStage: { type: Number, default: 0 },
     deadmanEscalationTriggeredAt: { type: Date, default: null },
     vaultReleasedAt: { type: Date, default: null },
+    personaType: {
+      type: String,
+      enum: ['ELDERLY', 'CHRONIC_ILLNESS', 'SOLO_TRAVELER', 'SINGLE_YOUTH'],
+      default: 'SINGLE_YOUTH',
+    },
+    consecutiveSoftCheckins: { type: Number, default: 0 },
+    maxSoftCheckinAllowed: { type: Number, default: 3 },
+    softExtensionMinutes: { type: Number, default: 45 },
+    snoozeCountToday: { type: Number, default: 0 },
+    homeGeofence: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      radiusMeters: { type: Number, default: 150 },
+      isInside: { type: Boolean, default: false },
+    },
+    homeWifiSsid: { type: String, default: null },
+    pendingFamilyPings: {
+      type: [
+        {
+          id: { type: String },
+          fromUserId: { type: String },
+          fromUserName: { type: String },
+          message: { type: String },
+          sentAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

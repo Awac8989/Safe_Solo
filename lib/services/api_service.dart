@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -12,6 +13,7 @@ import '../models/medical_profile_model.dart';
 import '../models/security_settings_model.dart';
 import '../models/user_model.dart';
 import '../models/live_journey_model.dart';
+import '../models/disaster_alert_model.dart';
 
 class ApiService {
   final _client = http.Client();
@@ -84,22 +86,100 @@ class ApiService {
 
   Future<UserModel> checkin({
     required String userId,
-    required double lat,
-    required double lng,
+    double? lat,
+    double? lng,
+    String type = 'HARD_TAP',
+    String? passiveSource,
+    bool isDuress = false,
+    int? snoozeMinutes,
+    String? routineType,
+    Map<String, dynamic>? mediaSnapshot,
+    String? familyPingRef,
+    Map<String, dynamic>? metadata,
   }) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/checkin');
+    final payload = <String, dynamic>{
+      'type': type,
+      'isDuress': isDuress,
+    };
+    if (lat != null && lng != null) {
+      payload['location'] = {'lat': lat, 'lng': lng};
+    }
+    if (passiveSource != null) payload['passiveSource'] = passiveSource;
+    if (snoozeMinutes != null) payload['snoozeMinutes'] = snoozeMinutes;
+    if (routineType != null) payload['routineType'] = routineType;
+    if (mediaSnapshot != null) payload['mediaSnapshot'] = mediaSnapshot;
+    if (familyPingRef != null) payload['familyPingRef'] = familyPingRef;
+    if (metadata != null) payload['metadata'] = metadata;
+
     final response = await _safeRequest(
       _client.post(
         uri,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'location': {'lat': lat, 'lng': lng}
-        }),
+        body: jsonEncode(payload),
       ),
     );
     _throwIfFailed(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return UserModel.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
+  Future<void> sendFamilyPing({
+    required String userId,
+    required String fromName,
+    String? fromPhone,
+    String? message,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/family-ping');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'fromName': fromName,
+          'fromPhone': fromPhone ?? '',
+          'message': message ?? 'Gửi cái ôm ấm áp! Bạn vẫn khỏe chứ?',
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+  }
+
+  Future<UserModel> respondFamilyPing({
+    required String userId,
+    required String pingId,
+    String? responseMessage,
+    double? lat,
+    double? lng,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/family-ping/respond');
+    final payload = <String, dynamic>{
+      'pingId': pingId,
+      'responseMessage': responseMessage ?? 'Vẫn khỏe',
+    };
+    if (lat != null && lng != null) {
+      payload['location'] = {'lat': lat, 'lng': lng};
+    }
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return UserModel.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
+  Future<List<Map<String, dynamic>>> listCheckInMoments(String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/checkin/moments');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['moments'] as List<dynamic>? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   Future<UserModel> updateLocation({
@@ -481,6 +561,60 @@ class ApiService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Báo cáo tai nạn / cấp cứu khẩn cấp cho người khác kèm ảnh TimeMark
+  Future<Map<String, dynamic>> reportAccidentWithTimemark({
+    required String title,
+    required String description,
+    required String category,
+    required double lat,
+    required double lng,
+    required String address,
+    required String severity,
+    required String victimCount,
+    required String victimCondition,
+    String? photoPath,
+    Map<String, dynamic>? timemarkMeta,
+    String? userId,
+    String? token,
+    String? reportedByPhone,
+    bool isAnonymous = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/hazards/accident-report');
+    final request = http.MultipartRequest('POST', uri);
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    if (userId != null && userId.isNotEmpty) {
+      request.headers['x-user-id'] = userId;
+    }
+
+    request.fields['title'] = title;
+    request.fields['description'] = description;
+    request.fields['category'] = category;
+    request.fields['lat'] = lat.toString();
+    request.fields['lng'] = lng.toString();
+    request.fields['address'] = address;
+    request.fields['severity'] = severity;
+    request.fields['victimCount'] = victimCount;
+    request.fields['victimCondition'] = victimCondition;
+    request.fields['isAnonymous'] = isAnonymous.toString();
+    if (reportedByPhone != null) {
+      request.fields['reportedByPhone'] = reportedByPhone;
+    }
+    if (timemarkMeta != null) {
+      request.fields['timemarkMeta'] = jsonEncode(timemarkMeta);
+    }
+
+    if (photoPath != null && photoPath.isNotEmpty && File(photoPath).existsSync()) {
+      request.files.add(await http.MultipartFile.fromPath('timemark_photo', photoPath));
+    }
+
+    final streamedResponse = await request.send().timeout(_timeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<LiveJourneyModel> startJourney({
     required String userId,
     required String destinationLabel,
@@ -738,6 +872,32 @@ class ApiService {
     );
     _throwIfFailed(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<List<DisasterAlertModel>> getActiveDisasterAlerts({
+    double? lat,
+    double? lng,
+  }) async {
+    final queryParams = <String, String>{};
+    if (lat != null && lng != null) {
+      queryParams['lat'] = lat.toString();
+      queryParams['lng'] = lng.toString();
+    }
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/disaster-alerts/active')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    try {
+      final response = await _safeRequest(_client.get(uri));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final list = (body['data'] as List<dynamic>? ?? const []);
+        return list
+            .map((item) => DisasterAlertModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+      return const [];
+    } catch (_) {
+      return const [];
+    }
   }
 
   void _throwIfFailed(http.Response response) {

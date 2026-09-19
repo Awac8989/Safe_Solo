@@ -55,6 +55,8 @@ function startDeadManWorker(io) {
         const minutesUntilDeadline = toMinutes(msUntilDeadline);
         const overdueMinutes = toMinutes(-msUntilDeadline);
         const grace = Number(user.falseAlertGraceMinutes || 0);
+        // Home Safe Geofence or Wi-Fi relaxed tolerance: add 30 min grace if inside home zone
+        const homeRelaxationMinutes = (user.homeGeofence?.isInside || user.homeWifiSsid) ? 30 : 0;
         const reminderMinutes = Number(policy?.level1Minutes || defaultReminderMinutes);
         const warningMinutes = Number(policy?.level2Minutes || defaultWarningMinutes);
         const sosMinutes = Number(policy?.level3Minutes || defaultSosMinutes);
@@ -126,8 +128,8 @@ function startDeadManWorker(io) {
         }
 
         if (
-          overdueMinutes >= warningMinutes + grace &&
-          overdueMinutes < sosMinutes + grace &&
+          overdueMinutes >= warningMinutes + grace + homeRelaxationMinutes &&
+          overdueMinutes < sosMinutes + grace + homeRelaxationMinutes &&
           user.currentStatus !== 'WARNING'
         ) {
           userDoc.currentStatus = 'WARNING';
@@ -148,7 +150,7 @@ function startDeadManWorker(io) {
             source: 'SYSTEM',
             title: 'Canh bao muc 2',
             message: 'Nguoi dung da qua han check-in, da kich hoat canh bao',
-            metadata: { overdueMinutes },
+            metadata: { overdueMinutes, homeRelaxationMinutes },
           });
           io?.emit('ALERT_EVENT', event);
 
@@ -163,7 +165,7 @@ function startDeadManWorker(io) {
           continue;
         }
 
-        if (overdueMinutes >= sosMinutes + grace && user.currentStatus !== 'SOS') {
+        if (overdueMinutes >= sosMinutes + grace + homeRelaxationMinutes && user.currentStatus !== 'SOS') {
           await triggerSosForUser(io, user);
           if (policy?.level4Enabled && overdueMinutes >= sosMinutes + grace + 10) {
             const event = await createAlertEvent({

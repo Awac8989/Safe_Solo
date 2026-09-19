@@ -13,6 +13,8 @@ import '../../core/widgets/top_toast.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
+import '../../services/ai_signal_processor.dart';
+import '../../services/hrv_stroke_service.dart';
 import '../community_radar/community_radar_page.dart';
 import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
@@ -21,6 +23,9 @@ import '../journey/widgets/home_journey_card.dart';
 import '../emergency/first_aid_guide_page.dart';
 import '../emergency/offline_emergency_sheet.dart';
 import '../emergency/solocare_ai_sheet.dart';
+import '../heroes/hero_workspace_page.dart';
+import 'widgets/disaster_alert_card.dart';
+import 'widgets/disaster_live_feed_section.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -234,14 +239,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ],
           ),
           const SizedBox(height: 18),
-          _buildWatchHealthGlanceCard(context, strings),
-          const SizedBox(height: 6),
-          const HomeJourneyCard(),
-          const SizedBox(height: 10),
-          _buildSoloCareAiCard(context, strings),
-          const SizedBox(height: 10),
-          _buildTacticalEmergencyTools(context, strings),
-          const SizedBox(height: 12),
+          if (appProvider.activeDisasterAlerts.isNotEmpty) ...[
+            DisasterAlertCard(alerts: appProvider.activeDisasterAlerts),
+            const SizedBox(height: 10),
+          ],
+          _buildFamilyPingBanner(context, appProvider, strings),
           if (appProvider.isVacation) ...[
             MaterialBanner(
               backgroundColor: const Color(0xFFE8F1FF),
@@ -425,6 +427,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          _buildQuickCheckInActionBar(context, appProvider, strings),
           const SizedBox(height: 22),
           if (guardians.isNotEmpty)
             AppCard(
@@ -607,6 +611,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
             ),
           ],
+          const SizedBox(height: 18),
+          _buildWatchHealthGlanceCard(context, strings),
+          const HomeJourneyCard(),
+          const SizedBox(height: 10),
+          _buildSoloCareAiCard(context, strings),
+          if (appProvider.isKycVerified) ...[
+            const SizedBox(height: 10),
+            _buildHeroDutyStatusCard(context, strings),
+          ],
+          const SizedBox(height: 10),
+          _buildTacticalEmergencyTools(context, strings),
+          const SizedBox(height: 14),
+          const DisasterLiveFeedSection(),
+          const SizedBox(height: 14),
+          _buildAccidentReportingBanner(context, strings),
         ],
       ),
     );
@@ -614,7 +633,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   Future<void> _openMoodPrompt() async {
     final strings = _snapshotStrings();
-    final selected = await showDialog<Mood?>(
+    final appProvider = context.read<AppProvider>();
+
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.28),
       builder: (dialogContext) {
@@ -623,58 +644,127 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  strings.text('Hôm nay bạn cảm thấy thế nào?', 'How are you feeling today?'),
-                  style: AppTextStyles.h3.copyWith(fontSize: 20),
-                  textAlign: TextAlign.center,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      strings.text('Điểm danh & Trạng thái', 'Check-in & Status'),
+                      style: AppTextStyles.h3.copyWith(fontSize: 18),
+                    ),
+                    // Secret Duress gesture button (Long press 3s triggers Duress SOS silently)
+                    Tooltip(
+                      message: strings.text('Bảo mật', 'Security'),
+                      child: GestureDetector(
+                        onLongPress: () {
+                          Navigator.pop(dialogContext, {'action': 'DURESS'});
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            color: AppColors.cardSoft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.verified_user_outlined,
+                            size: 18,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   strings.text(
-                    'Người bảo hộ sẽ thấy tâm trạng của bạn',
-                    'Your guardians will see your current mood',
+                    'Chọn tâm trạng hoặc thói quen để hoàn tất điểm danh:',
+                    'Select your mood or routine to complete check-in:',
                   ),
-                  style: AppTextStyles.bodyLarge.copyWith(
+                  style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
+                // Mood options
                 Row(
                   children: [
                     Expanded(
                       child: _MoodOption(
                         emoji: '😊',
                         label: strings.text('Vui vẻ', 'Happy'),
-                        onTap: () => Navigator.pop(dialogContext, Mood.happy),
+                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.happy}),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _MoodOption(
                         emoji: '😐',
-                        label: strings.text('Bình thường', 'Normal'),
-                        onTap: () => Navigator.pop(dialogContext, Mood.calm),
+                        label: strings.text('Bình an', 'Calm'),
+                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.calm}),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _MoodOption(
+                        emoji: '😴',
+                        label: strings.text('Hơi mệt', 'Tired'),
+                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.tired}),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _MoodOption(
                         emoji: '🤒',
-                        label: strings.text('Mệt / Ốm', 'Tired / Sick'),
-                        onTap: () => Navigator.pop(dialogContext, Mood.sick),
+                        label: strings.text('Cần lưu ý', 'Sick'),
+                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.sick}),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, null),
-                  child: Text(strings.text('Bỏ qua', 'Skip')),
+                const SizedBox(height: 14),
+                // Routine Quick Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ActionChip(
+                        avatar: const Text('💊', style: TextStyle(fontSize: 14)),
+                        label: Text(strings.text('Đã uống thuốc', 'Took medicine')),
+                        onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MEDICATION'}),
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Text('🚶', style: TextStyle(fontSize: 14)),
+                        label: Text(strings.text('Đi bộ sáng', 'Morning walk')),
+                        onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MORNING_WALK'}),
+                      ),
+                      const SizedBox(width: 8),
+                      ActionChip(
+                        avatar: const Text('⏰', style: TextStyle(fontSize: 14)),
+                        label: Text(strings.text('Hoãn 30p', 'Snooze 30m')),
+                        onPressed: () => Navigator.pop(dialogContext, {'action': 'SNOOZE', 'minutes': 30}),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => Navigator.pop(dialogContext, {'action': 'MOMENT'}),
+                      icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                      label: Text(strings.text('Khoảnh khắc', 'Moment')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, null),
+                      child: Text(strings.text('Điểm danh nhanh', 'Quick Check-in')),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -683,7 +773,354 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       },
     );
 
-    await _handleCheckIn(selected);
+    if (result == null) {
+      await _handleCheckIn(null);
+      return;
+    }
+
+    final action = result['action'] as String?;
+    if (action == 'DURESS') {
+      try {
+        await appProvider.performDuressCheckIn();
+        if (!mounted) return;
+        TopToast.show(
+          context,
+          message: strings.text('Đã điểm danh và cập nhật an toàn.', 'Check-in completed and safety status updated.'),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        TopToast.show(context, message: 'Đã điểm danh thành công.');
+      }
+      return;
+    }
+
+    if (action == 'SNOOZE') {
+      try {
+        await appProvider.performSnooze(minutes: (result['minutes'] as int?) ?? 30);
+        if (!mounted) return;
+        TopToast.show(
+          context,
+          message: strings.text('Đã hoãn điểm danh thêm 30 phút.', 'Check-in snoozed for 30 minutes.'),
+          icon: Icons.snooze_rounded,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+
+    if (action == 'ROUTINE') {
+      final routine = (result['routine'] as String?) ?? 'CUSTOM';
+      try {
+        await appProvider.performRoutineCheckIn(routineType: routine);
+        if (!mounted) return;
+        TopToast.show(
+          context,
+          message: strings.text('Đã ghi nhận thói quen & điểm danh an toàn!', 'Routine recorded & check-in confirmed!'),
+          icon: Icons.check_circle_outline,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+      return;
+    }
+
+    if (action == 'MOMENT') {
+      if (!mounted) return;
+      _showEmotionalMomentSheet(context, appProvider, strings);
+      return;
+    }
+
+    final mood = result['mood'] as Mood?;
+    await _handleCheckIn(mood);
+  }
+
+  Widget _buildFamilyPingBanner(BuildContext context, AppProvider provider, AppStrings strings) {
+    final pings = provider.user?.pendingFamilyPings ?? const [];
+    final activePing = pings.firstWhere(
+      (p) => p['status'] == 'PENDING',
+      orElse: () => const <String, dynamic>{},
+    );
+    if (activePing.isEmpty) return const SizedBox.shrink();
+
+    final pingId = activePing['_id'] ?? activePing['id'] ?? '';
+    final fromName = activePing['fromName'] ?? 'Người thân';
+    final message = activePing['message'] ?? 'Gửi cái ôm ấm áp! Bạn vẫn khỏe chứ?';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF831843), Color(0xFF500724)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFF43F5E).withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF43F5E).withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF43F5E).withValues(alpha: 0.25),
+              shape: BoxShape.circle,
+            ),
+            child: const Text('🤗', style: TextStyle(fontSize: 22)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$fromName ${strings.text('vừa gửi lời hỏi thăm', 'sent a check-in ping')}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '"$message"',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF43F5E),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              await provider.respondToFamilyPing(
+                pingId: pingId.toString(),
+                responseMessage: 'Vẫn khỏe, cảm ơn lời hỏi thăm nhé!',
+              );
+              if (context.mounted) {
+                TopToast.show(
+                  context,
+                  message: strings.text(
+                    'Đã gửi phản hồi và cập nhật an toàn!',
+                    'Responded and safety updated!',
+                  ),
+                  icon: Icons.favorite_rounded,
+                );
+              }
+            },
+            child: Text(
+              strings.text('Vẫn khỏe', 'I\'m fine'),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCheckInActionBar(BuildContext context, AppProvider provider, AppStrings strings) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+            ),
+            icon: const Icon(Icons.snooze_rounded, size: 16, color: AppColors.primary),
+            label: Text(
+              strings.text('Hoãn 30p', 'Snooze 30m'),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+            ),
+            onPressed: () async {
+              try {
+                await provider.performSnooze(minutes: 30);
+                if (context.mounted) {
+                  TopToast.show(
+                    context,
+                    message: strings.text('Đã hoãn điểm danh thêm 30 phút.', 'Check-in snoozed for 30 minutes.'),
+                    icon: Icons.snooze_rounded,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
+              }
+            },
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+            ),
+            icon: const Icon(Icons.camera_alt_outlined, size: 16, color: Color(0xFF10B981)),
+            label: Text(
+              strings.text('Khoảnh khắc', 'Moment'),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+            ),
+            onPressed: () => _showEmotionalMomentSheet(context, provider, strings),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              side: BorderSide(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+            ),
+            icon: const Icon(Icons.medication_outlined, size: 16, color: Color(0xFFF59E0B)),
+            label: Text(
+              strings.text('Đã uống thuốc', 'Took medicine'),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+            ),
+            onPressed: () async {
+              try {
+                await provider.performRoutineCheckIn(routineType: 'MEDICATION');
+                if (context.mounted) {
+                  TopToast.show(
+                    context,
+                    message: strings.text('Đã ghi nhận uống thuốc & cập nhật an toàn!', 'Medication recorded & safety updated!'),
+                    icon: Icons.check_circle_outline,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                }
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEmotionalMomentSheet(BuildContext context, AppProvider provider, AppStrings strings) {
+    final noteController = TextEditingController();
+    Mood selectedMood = Mood.happy;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                20,
+                20,
+                MediaQuery.of(context).viewInsets.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        strings.text('Khoảnh khắc gia đình', 'Family Moment'),
+                        style: AppTextStyles.h3.copyWith(fontSize: 18),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    strings.text(
+                      'Gửi ảnh hoặc vài chữ để người thân an tâm:',
+                      'Send a quick note or photo to keep family relieved:',
+                    ),
+                    style: AppTextStyles.caption,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: noteController,
+                    decoration: InputDecoration(
+                      hintText: strings.text(
+                        'Ví dụ: "Con vừa tới nơi làm việc an toàn!"',
+                        'E.g.: "Arrived safely at work!"',
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      prefixIcon: const Icon(Icons.edit_note_rounded),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.send_rounded, size: 18),
+                      label: Text(
+                        strings.text('Gửi & Hoàn tất điểm danh', 'Send & Complete Check-in'),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(sheetContext);
+                        final note = noteController.text.trim();
+                        try {
+                          await provider.performEmotionalCheckIn(
+                            mood: selectedMood,
+                            note: note.isNotEmpty ? note : 'Vẫn bình an!',
+                          );
+                          if (context.mounted) {
+                            TopToast.show(
+                              context,
+                              message: strings.text('Đã gửi khoảnh khắc và điểm danh!', 'Moment sent & check-in confirmed!'),
+                              icon: Icons.favorite_rounded,
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _scheduleDemoPush() async {
@@ -736,7 +1173,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         pulseStrength: 0.035,
         title: (strings) => strings.text('Cần điểm danh', 'Check-in needed'),
         subtitle: (strings) => strings.text(
-          'Bạn đã quá hạn check-in',
+          'Bạn đã quá hạn điểm danh',
           'You are overdue',
         ),
       );
@@ -929,24 +1366,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   children: [
                     Row(
                       children: [
-                        Text(
-                          strings.text('SoloCare AI Sơ cứu & Tâm lý', 'SoloCare First Aid & Calm AI'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            strings.text('SoloCare AI Sơ cứu & Tâm lý', 'SoloCare First Aid & Calm AI'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFF10B981).withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
-                            'Qwen 3.8',
-                            style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 9.5, fontWeight: FontWeight.w700),
+                          child: Text(
+                            strings.text('Trợ lý 24/7', '24/7 Helper'),
+                            style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 9.5, fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
@@ -1142,16 +1583,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final pedometer = PedometerService.instance;
     final wearOs = WearOsService.instance;
     final sync = WatchSyncManager.instance;
+    final hrv = HrvStrokeService.instance;
 
     return AnimatedBuilder(
-      animation: Listenable.merge([pedometer, wearOs, sync]),
+      animation: Listenable.merge([pedometer, wearOs, sync, hrv]),
       builder: (context, _) {
         final isConnected = wearOs.isPaired && sync.isPaired;
 
         // KHI CHƯA KẾT NỐI: ẨN TOÀN BỘ CHỈ SỐ SINH TỒN & HIỂN THỊ NÚT "+ THÊM ĐỒNG HỒ"
         if (!isConnected) {
           return Container(
-            margin: const EdgeInsets.only(bottom: 18),
+            margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -1247,7 +1689,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
         // KHI ĐÃ KẾT NỐI: HIỂN THỊ ĐẦY ĐỦ THÔNG SỐ ĐỒNG BỘ THỜI GIAN THỰC TỪ ĐỒNG HỒ
         return Container(
-          margin: const EdgeInsets.only(bottom: 18),
+          margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
@@ -1383,6 +1825,64 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: (hrv.assessment.level == HrvRiskLevel.critical
+                                ? const Color(0xFFEF4444)
+                                : hrv.assessment.level == HrvRiskLevel.moderate
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF10B981))
+                            .withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: (hrv.assessment.level == HrvRiskLevel.critical
+                                  ? const Color(0xFFEF4444)
+                                  : hrv.assessment.level == HrvRiskLevel.moderate
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF10B981))
+                              .withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 14,
+                            color: hrv.assessment.level == HrvRiskLevel.critical
+                                ? const Color(0xFFEF4444)
+                                : hrv.assessment.level == HrvRiskLevel.moderate
+                                    ? const Color(0xFFF59E0B)
+                                    : const Color(0xFF10B981),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'HRV: ${hrv.metrics.rmssdMs}ms · ${hrv.assessment.title}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${hrv.assessment.riskPercent}% rủi ro',
+                            style: TextStyle(
+                              color: hrv.assessment.level == HrvRiskLevel.critical
+                                  ? const Color(0xFFEF4444)
+                                  : const Color(0xFF38BDF8),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1425,6 +1925,275 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAccidentReportingBanner(BuildContext context, AppStrings strings) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: AppColors.border,
+          width: 1.2,
+        ),
+        boxShadow: AppShadows.card,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: () => Navigator.pushNamed(context, '/report-accident'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFFECDD3),
+                          width: 1.2,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.camera_enhance_rounded,
+                        color: Color(0xFFE11D48),
+                        size: 22,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                        ),
+                        child: const Icon(
+                          Icons.verified_rounded,
+                          color: Color(0xFF0284C7),
+                          size: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              strings.text(
+                                'Báo cáo tai nạn',
+                                'Accident Report',
+                              ),
+                              style: AppTextStyles.bodyStrong.copyWith(
+                                fontSize: 13.5,
+                                color: AppColors.textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFCA5A5),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Text(
+                              'TIMEMARK 115',
+                              style: TextStyle(
+                                color: Color(0xFFDC2626),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        strings.text(
+                          'Chụp ảnh đóng dấu GPS & thời gian thực gửi cấp cứu',
+                          'Snap verified GPS & time-stamped photo to dispatch',
+                        ),
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 11.5,
+                          height: 1.25,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppColors.cardSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: AppColors.primary,
+                    size: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeroDutyStatusCard(BuildContext context, AppStrings strings) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF064E3B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.6),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute<void>(builder: (_) => const HeroWorkspacePage()),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                      ),
+                      child: const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 24),
+                    ),
+                    Positioned(
+                      top: 1,
+                      right: 1,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'CHẾ ĐỘ HIỆP SĨ TRỰC CHIẾN',
+                              style: TextStyle(
+                                color: Color(0xFF34D399),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFFF59E0B), width: 0.8),
+                            ),
+                            child: const Text(
+                              'ĐÃ XÁC THỰC',
+                              style: TextStyle(color: Color(0xFFF59E0B), fontSize: 8.5, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Đang trực thám ca SOS bán kính 3km · Chạm mở Bàn Tác Chiến',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

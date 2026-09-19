@@ -9,13 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VitalsRouteImport } from './routes/vitals'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as RevenueRouteImport } from './routes/revenue'
 import { Route as OmnichannelRouteImport } from './routes/omnichannel'
 import { Route as KycRouteImport } from './routes/kyc'
+import { Route as HeroesRouteImport } from './routes/heroes'
+import { Route as HazardsRouteImport } from './routes/hazards'
+import { Route as B2bRouteImport } from './routes/b2b'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as IndexRouteImport } from './routes/index'
 
+const VitalsRoute = VitalsRouteImport.update({
+  id: '/vitals',
+  path: '/vitals',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -36,6 +45,21 @@ const KycRoute = KycRouteImport.update({
   path: '/kyc',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HeroesRoute = HeroesRouteImport.update({
+  id: '/heroes',
+  path: '/heroes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HazardsRoute = HazardsRouteImport.update({
+  id: '/hazards',
+  path: '/hazards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const B2bRoute = B2bRouteImport.update({
+  id: '/b2b',
+  path: '/b2b',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuditRoute = AuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -50,54 +74,101 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/b2b': typeof B2bRoute
+  '/hazards': typeof HazardsRoute
+  '/heroes': typeof HeroesRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/vitals': typeof VitalsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/b2b': typeof B2bRoute
+  '/hazards': typeof HazardsRoute
+  '/heroes': typeof HeroesRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/vitals': typeof VitalsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/audit': typeof AuditRoute
+  '/b2b': typeof B2bRoute
+  '/hazards': typeof HazardsRoute
+  '/heroes': typeof HeroesRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
   '/users': typeof UsersRoute
+  '/vitals': typeof VitalsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/audit' | '/kyc' | '/omnichannel' | '/revenue' | '/users'
-  id:
-    | '__root__'
+  fullPaths:
     | '/'
     | '/audit'
+    | '/b2b'
+    | '/hazards'
+    | '/heroes'
     | '/kyc'
     | '/omnichannel'
     | '/revenue'
     | '/users'
+    | '/vitals'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/audit'
+    | '/b2b'
+    | '/hazards'
+    | '/heroes'
+    | '/kyc'
+    | '/omnichannel'
+    | '/revenue'
+    | '/users'
+    | '/vitals'
+  id:
+    | '__root__'
+    | '/'
+    | '/audit'
+    | '/b2b'
+    | '/hazards'
+    | '/heroes'
+    | '/kyc'
+    | '/omnichannel'
+    | '/revenue'
+    | '/users'
+    | '/vitals'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuditRoute: typeof AuditRoute
+  B2bRoute: typeof B2bRoute
+  HazardsRoute: typeof HazardsRoute
+  HeroesRoute: typeof HeroesRoute
   KycRoute: typeof KycRoute
   OmnichannelRoute: typeof OmnichannelRoute
   RevenueRoute: typeof RevenueRoute
   UsersRoute: typeof UsersRoute
+  VitalsRoute: typeof VitalsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/vitals': {
+      id: '/vitals'
+      path: '/vitals'
+      fullPath: '/vitals'
+      preLoaderRoute: typeof VitalsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/users': {
       id: '/users'
       path: '/users'
@@ -126,6 +197,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KycRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/heroes': {
+      id: '/heroes'
+      path: '/heroes'
+      fullPath: '/heroes'
+      preLoaderRoute: typeof HeroesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hazards': {
+      id: '/hazards'
+      path: '/hazards'
+      fullPath: '/hazards'
+      preLoaderRoute: typeof HazardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/b2b': {
+      id: '/b2b'
+      path: '/b2b'
+      fullPath: '/b2b'
+      preLoaderRoute: typeof B2bRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/audit': {
       id: '/audit'
       path: '/audit'
@@ -146,10 +238,14 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuditRoute: AuditRoute,
+  B2bRoute: B2bRoute,
+  HazardsRoute: HazardsRoute,
+  HeroesRoute: HeroesRoute,
   KycRoute: KycRoute,
   OmnichannelRoute: OmnichannelRoute,
   RevenueRoute: RevenueRoute,
   UsersRoute: UsersRoute,
+  VitalsRoute: VitalsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

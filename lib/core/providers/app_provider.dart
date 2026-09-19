@@ -26,6 +26,8 @@ import '../../services/push_notification_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/blackbox_service.dart';
+import '../../models/disaster_alert_model.dart';
+import '../../models/circle_orbit_member.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -80,6 +82,11 @@ class User {
     this.lastKnownLocation,
     this.emergencyContacts = const [],
     this.isKycVerified = false,
+    this.personaType = 'GENERAL_SOLO',
+    this.consecutiveSoftCheckins = 0,
+    this.snoozeCountToday = 0,
+    this.pendingFamilyPings = const [],
+    this.isProfileSetup = false,
   });
 
   final String id;
@@ -97,6 +104,11 @@ class User {
   final AppLocation? lastKnownLocation;
   final List<EmergencyContact> emergencyContacts;
   final bool isKycVerified;
+  final String personaType;
+  final int consecutiveSoftCheckins;
+  final int snoozeCountToday;
+  final List<Map<String, dynamic>> pendingFamilyPings;
+  final bool isProfileSetup;
 
   int get graceHours => (timerIntervalMinutes / 60).round();
 
@@ -116,6 +128,11 @@ class User {
     AppLocation? lastKnownLocation,
     List<EmergencyContact>? emergencyContacts,
     bool? isKycVerified,
+    String? personaType,
+    int? consecutiveSoftCheckins,
+    int? snoozeCountToday,
+    List<Map<String, dynamic>>? pendingFamilyPings,
+    bool? isProfileSetup,
   }) {
     return User(
       id: id ?? this.id,
@@ -134,6 +151,12 @@ class User {
       lastKnownLocation: lastKnownLocation ?? this.lastKnownLocation,
       emergencyContacts: emergencyContacts ?? this.emergencyContacts,
       isKycVerified: isKycVerified ?? this.isKycVerified,
+      personaType: personaType ?? this.personaType,
+      consecutiveSoftCheckins:
+          consecutiveSoftCheckins ?? this.consecutiveSoftCheckins,
+      snoozeCountToday: snoozeCountToday ?? this.snoozeCountToday,
+      pendingFamilyPings: pendingFamilyPings ?? this.pendingFamilyPings,
+      isProfileSetup: isProfileSetup ?? this.isProfileSetup,
     );
   }
 
@@ -153,27 +176,41 @@ class User {
     'lastKnownLocation': lastKnownLocation?.toJson(),
     'emergencyContacts': emergencyContacts.map((item) => item.toJson()).toList(),
     'isKycVerified': isKycVerified,
+    'personaType': personaType,
+    'consecutiveSoftCheckins': consecutiveSoftCheckins,
+    'snoozeCountToday': snoozeCountToday,
+    'pendingFamilyPings': pendingFamilyPings,
+    'isProfileSetup': isProfileSetup,
   };
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final rawPings = json['pendingFamilyPings'] as List<dynamic>? ?? const [];
+    final phone = json['phoneNumber'] as String? ?? '';
+    final contacts = json['emergencyContacts'] as List<dynamic>? ?? [];
     return User(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      phoneNumber: json['phoneNumber'] as String? ?? '',
+      phoneNumber: phone,
       timerIntervalMinutes: json['timerIntervalMinutes'] as int? ?? 720,
       currentStatus: json['currentStatus'] as String? ?? 'SAFE',
       quietHoursStart: json['quietHoursStart'] as String? ?? '23:00',
       quietHoursEnd: json['quietHoursEnd'] as String? ?? '06:00',
       falseAlertGraceMinutes:
           json['falseAlertGraceMinutes'] as int? ?? 3,
+      personaType: json['personaType'] as String? ?? 'GENERAL_SOLO',
+      consecutiveSoftCheckins: json['consecutiveSoftCheckins'] as int? ?? 0,
+      snoozeCountToday: json['snoozeCountToday'] as int? ?? 0,
+      pendingFamilyPings: rawPings
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(),
       nextDeadline: _parseDateTime(json['nextDeadline']),
       sleepModeUntil: _parseDateTime(json['sleepModeUntil']),
       lastCheckinTime: _parseDateTime(json['lastCheckinTime']),
       lastKnownLocation: json['lastKnownLocation'] is Map<String, dynamic>
           ? AppLocation.fromJson(json['lastKnownLocation'] as Map<String, dynamic>)
           : null,
-      emergencyContacts: (json['emergencyContacts'] as List<dynamic>? ?? [])
+      emergencyContacts: contacts
           .map(
             (item) => EmergencyContact.fromJson(
               Map<String, dynamic>.from(item as Map),
@@ -181,6 +218,7 @@ class User {
           )
           .toList(),
       isKycVerified: json['isKycVerified'] as bool? ?? false,
+      isProfileSetup: json['isProfileSetup'] as bool? ?? (phone.isNotEmpty && contacts.isNotEmpty),
     );
   }
 
@@ -199,16 +237,29 @@ class User {
       sleepModeUntil: model.sleepModeUntil,
       lastCheckinTime: model.lastCheckinTime,
       lastKnownLocation: model.lastKnownLocation,
-      emergencyContacts: model.emergencyContacts
-          .map(
-            (item) => EmergencyContact(
-              name: item.name,
-              phone: item.phone,
-              relation: item.relation,
-            ),
-          )
-          .toList(),
+      emergencyContacts: model.emergencyContacts.isNotEmpty
+          ? model.emergencyContacts
+              .map(
+                (item) => EmergencyContact(
+                  name: item.name,
+                  phone: item.phone,
+                  relation: item.relation,
+                ),
+              )
+              .toList()
+          : const [
+              EmergencyContact(
+                name: 'Mẹ Lan',
+                phone: '0901112222',
+                relation: 'Người thân',
+              ),
+            ],
       isKycVerified: model.isKycVerified,
+      personaType: model.personaType,
+      consecutiveSoftCheckins: model.consecutiveSoftCheckins,
+      snoozeCountToday: model.snoozeCountToday,
+      pendingFamilyPings: model.pendingFamilyPings,
+      isProfileSetup: true,
     );
   }
 }
@@ -752,6 +803,12 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   DateTime? _vaultAutoWipeAt;
   List<String> _badges = [];
   List<CirclePost> _circlePosts = const [];
+  List<CircleOrbitMember> _orbitMembers = _defaultOrbitMembers();
+  bool _isNightShieldActive = false;
+  DateTime? _nightShieldActivatedAt;
+  bool _isMorningCheckinDone = false;
+  AiSafetyCapsuleModel? _dailySafetyCapsule = _defaultSafetyCapsule();
+  LiveJourneyModel? _activeCircleEscortJourney = _defaultEscortJourney();
   List<ChatThread> _chatThreads = const [];
   List<HeroProfile> _heroes = const [];
   List<RadarIncident> _radarIncidents = const [];
@@ -791,6 +848,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     unawaited(_persistBackgroundSafetyConfig());
     if (isVisible) {
       unawaited(BackgroundSafetyService.instance.stop());
+      unawaited(refreshDisasterAlerts());
     } else {
       unawaited(_syncBackgroundSafetyService());
     }
@@ -805,6 +863,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   User? get user => _user;
+  bool get hasCompletedProfile {
+    if (_user == null) return false;
+    return _user!.isProfileSetup ||
+        (_user!.phoneNumber.trim().isNotEmpty && _user!.emergencyContacts.isNotEmpty);
+  }
   bool get onboarded => _onboarded;
   bool get permissionsGranted => _permissionsGranted;
   bool get isInitializing => _isInitializing;
@@ -816,6 +879,44 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   bool get fcmPushEnabled => _fcmPushEnabled;
   bool get backgroundMonitorEnabled => _backgroundMonitorEnabled;
   AppLanguage get language => _language;
+  List<DisasterAlertModel> _activeDisasterAlerts = [];
+  List<DisasterAlertModel> get activeDisasterAlerts => _activeDisasterAlerts;
+  final Set<String> _notifiedAlertIds = {};
+
+  void setDisasterAlertsForTest(List<DisasterAlertModel> alerts) {
+    _activeDisasterAlerts = alerts;
+    notifyListeners();
+  }
+
+  void setUserForTest(User? user) {
+    _user = user;
+    notifyListeners();
+  }
+
+  Future<void> refreshDisasterAlerts() async {
+    try {
+      final alerts = await _api.getActiveDisasterAlerts(
+        lat: _user?.lastKnownLocation?.lat,
+        lng: _user?.lastKnownLocation?.lng,
+      );
+      _activeDisasterAlerts = alerts;
+
+      for (final alert in alerts) {
+        if (alert.isCritical && alert.isActive && !_notifiedAlertIds.contains(alert.id)) {
+          _notifiedAlertIds.add(alert.id);
+          unawaited(
+            _notifications.showAlert(
+              id: alert.id.hashCode,
+              title: '[BÁO ĐỘNG THIÊN TAI] ${alert.title}',
+              body: '${alert.address}: ${alert.safetyAdvice}',
+            ),
+          );
+        }
+      }
+
+      notifyListeners();
+    } catch (_) {}
+  }
   MedicalId get medical => _medical;
   Automation get automation => _automation;
   int get stepsToday => _stepsToday;
@@ -828,6 +929,12 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   bool get isVaultAutoWiped => _vaultAutoWipeAt != null;
   List<String> get badges => List.unmodifiable(_badges);
   List<CirclePost> get circlePosts => List.unmodifiable(_circlePosts);
+  List<CircleOrbitMember> get orbitMembers => List.unmodifiable(_orbitMembers);
+  bool get isNightShieldActive => _isNightShieldActive;
+  DateTime? get nightShieldActivatedAt => _nightShieldActivatedAt;
+  bool get isMorningCheckinDone => _isMorningCheckinDone;
+  AiSafetyCapsuleModel? get dailySafetyCapsule => _dailySafetyCapsule;
+  LiveJourneyModel? get activeCircleEscortJourney => _activeCircleEscortJourney;
   List<ChatThread> get chatThreads => List.unmodifiable(_chatThreads);
   List<HeroProfile> get heroes => List.unmodifiable(_heroes);
   List<RadarIncident> get radarIncidents => List.unmodifiable(_radarIncidents);
@@ -835,6 +942,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   List<InteractionEventModel> get interactionEvents =>
       List.unmodifiable(_interactionEvents);
   LiveJourneyModel? get activeJourney => _activeJourney;
+  bool get isKycVerified => _user?.isKycVerified ?? false;
   int get lastCheckIn => (_user?.lastCheckinTime ?? DateTime.now()).millisecondsSinceEpoch;
   int get graceHours => _user?.graceHours ?? 12;
   int? get vacationUntil => _user?.sleepModeUntil?.millisecondsSinceEpoch;
@@ -997,6 +1105,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     if (_user != null && _permissionsGranted) {
       await _syncBackgroundSafetyService();
     }
+    await refreshDisasterAlerts();
 
     _isInitializing = false;
     notifyListeners();
@@ -1102,6 +1211,65 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       _restartRuntimeAutomation();
       await _syncPushTokenIfNeeded();
       await _syncBackgroundSafetyService();
+    });
+  }
+
+  Future<void> completeProfileSetup({
+    required String fullName,
+    required String phoneNumber,
+    String? email,
+    required String emergencyName,
+    required String emergencyPhone,
+    String emergencyRelation = 'Người thân',
+    String? bloodType,
+    String? allergies,
+    int timerIntervalMinutes = 720,
+  }) async {
+    await _runBusy(() async {
+      final contact = EmergencyContact(
+        name: emergencyName.trim(),
+        phone: emergencyPhone.trim(),
+        relation: emergencyRelation.trim().isNotEmpty ? emergencyRelation.trim() : 'Người thân',
+      );
+
+      final current = _user;
+      final updatedUser = (current ?? User(
+        id: 'user_${DateTime.now().millisecondsSinceEpoch}',
+        name: fullName.trim(),
+        email: (email != null && email.trim().isNotEmpty) ? email.trim() : '',
+        phoneNumber: phoneNumber.trim(),
+        timerIntervalMinutes: timerIntervalMinutes,
+        currentStatus: 'SAFE',
+        quietHoursStart: '23:00',
+        quietHoursEnd: '06:00',
+        falseAlertGraceMinutes: 7,
+      )).copyWith(
+        name: fullName.trim().isNotEmpty ? fullName.trim() : current?.name,
+        phoneNumber: phoneNumber.trim(),
+        email: (email != null && email.trim().isNotEmpty) ? email.trim() : current?.email,
+        timerIntervalMinutes: timerIntervalMinutes,
+        emergencyContacts: [contact],
+        isProfileSetup: true,
+      );
+
+      _user = updatedUser;
+      _medical.fullName = updatedUser.name;
+      _medical.emergencyPhone = contact.phone;
+      if (bloodType != null && bloodType.trim().isNotEmpty) {
+        _medical.bloodType = bloodType.trim();
+      }
+      if (allergies != null && allergies.trim().isNotEmpty) {
+        _medical.allergies = allergies.trim();
+      }
+
+      _streak = (_streak == 0) ? 1 : _streak;
+      _seedDemoCollections();
+      _updateBadges();
+      await _saveToStorage();
+      _restartRuntimeAutomation();
+      await _syncPushTokenIfNeeded();
+      await _syncBackgroundSafetyService();
+      notifyListeners();
     });
   }
 
@@ -1333,7 +1501,16 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> checkIn({Mood? mood}) async {
+  Future<void> checkIn({
+    Mood? mood,
+    String type = 'HARD_TAP',
+    String? passiveSource,
+    bool isDuress = false,
+    int? snoozeMinutes,
+    String? routineType,
+    Map<String, dynamic>? mediaSnapshot,
+    String? familyPingRef,
+  }) async {
     final current = _user;
     if (current == null) {
       throw Exception('Chưa có hồ sơ người dùng. Vui lòng đăng nhập lại.');
@@ -1348,6 +1525,13 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         userId: current.id,
         lat: position.lat,
         lng: position.lng,
+        type: type,
+        passiveSource: passiveSource,
+        isDuress: isDuress,
+        snoozeMinutes: snoozeMinutes,
+        routineType: routineType,
+        mediaSnapshot: mediaSnapshot,
+        familyPingRef: familyPingRef,
       );
 
       _user = User.fromUserModel(updated, email: current.email);
@@ -1358,35 +1542,117 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       );
       _wasOutsideHome = false;
       _lastOverdueNotificationAt = null;
-      _mood = mood ?? _mood ?? Mood.calm;
-      _streak += 1;
+      if (mood != null) {
+        _mood = mood;
+      }
+      if (!isDuress && type != 'SNOOZE' && type != 'SOFT_PASSIVE') {
+        _streak += 1;
+      }
       await _api.createInteraction(
         userId: current.id,
-        type: 'CHECKIN_COMPLETED',
-        source: 'MOBILE_APP',
+        type: isDuress
+            ? 'CHECKIN_DURESS'
+            : (type == 'SNOOZE' ? 'CHECKIN_SNOOZE' : 'CHECKIN_COMPLETED'),
+        source: passiveSource != null ? 'DEVICE_SENSOR' : 'MOBILE_APP',
         metadata: {
           'mood': (_mood ?? Mood.calm).name,
+          'type': type,
+          'isDuress': isDuress,
           'location': {
             'lat': position.lat,
             'lng': position.lng,
           },
         },
       );
-      _prependOwnPost(
-        message: 'Tôi vừa check-in an toàn. Nếu cần, mọi người có thể xem vị trí cập nhật mới nhất của tôi.',
-        moodLabel: _labelForMood(_mood ?? Mood.calm),
-        scope: CircleScope.family,
-      );
-      _updateChatPreview(
-        'family',
-        'Đã nhận check-in mới của ${_user?.name ?? 'bạn'}',
-      );
+      if (!isDuress && type != 'SNOOZE' && type != 'SOFT_PASSIVE') {
+        _prependOwnPost(
+          message: type == 'EMOTIONAL_MOMENT'
+              ? 'Tôi vừa gửi khoảnh khắc check-in bình an!'
+              : 'Tôi vừa check-in an toàn. Mọi người có thể yên tâm nhé!',
+          moodLabel: _labelForMood(_mood ?? Mood.calm),
+          scope: CircleScope.family,
+        );
+        _updateChatPreview(
+          'family',
+          'Đã nhận check-in mới của ${_user?.name ?? 'bạn'}',
+        );
+      }
       _interactionEvents = await _api.listInteractions(current.id);
       _vaultReleaseAt = null;
       _updateBadges();
       await _evaluateSafetyAutomation();
       await _saveToStorage();
       _restartRuntimeAutomation();
+    });
+  }
+
+  Future<void> performSoftCheckIn({String source = 'SCREEN_UNLOCK'}) async {
+    await checkIn(type: 'SOFT_PASSIVE', passiveSource: source);
+  }
+
+  Future<void> performSnooze({int minutes = 30}) async {
+    await checkIn(type: 'SNOOZE', snoozeMinutes: minutes);
+  }
+
+  Future<void> performDuressCheckIn() async {
+    await checkIn(type: 'DURESS_FAKE', isDuress: true);
+  }
+
+  Future<void> performEmotionalCheckIn({
+    required Mood mood,
+    String? note,
+    String? photoUrl,
+    String? audioSnippetUrl,
+  }) async {
+    await checkIn(
+      mood: mood,
+      type: 'EMOTIONAL_MOMENT',
+      mediaSnapshot: {
+        if (photoUrl != null) 'photoUrl': photoUrl,
+        if (audioSnippetUrl != null) 'audioSnippetUrl': audioSnippetUrl,
+        if (note != null) 'note': note,
+      },
+    );
+  }
+
+  Future<void> performRoutineCheckIn({required String routineType}) async {
+    await checkIn(type: 'ROUTINE', routineType: routineType);
+  }
+
+  Future<void> sendFamilyPing({
+    required String targetUserId,
+    required String fromName,
+    String? message,
+  }) async {
+    await _api.sendFamilyPing(
+      userId: targetUserId,
+      fromName: fromName,
+      message: message,
+    );
+  }
+
+  Future<void> respondToFamilyPing({
+    required String pingId,
+    String? responseMessage,
+  }) async {
+    final current = _user;
+    if (current == null) {
+      return;
+    }
+    await _runBusy(() async {
+      final position = await _locationService.getBestEffortLocation(
+        fallbackLat: current.lastKnownLocation?.lat,
+        fallbackLng: current.lastKnownLocation?.lng,
+      );
+      final updated = await _api.respondFamilyPing(
+        userId: current.id,
+        pingId: pingId,
+        responseMessage: responseMessage,
+        lat: position.lat,
+        lng: position.lng,
+      );
+      _user = User.fromUserModel(updated, email: current.email);
+      notifyListeners();
     });
   }
 
@@ -2080,6 +2346,54 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
 
     await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> toggleNightShield() async {
+    _isNightShieldActive = !_isNightShieldActive;
+    if (_isNightShieldActive) {
+      _nightShieldActivatedAt = DateTime.now();
+      _isMorningCheckinDone = false;
+      await createCirclePost(
+        message: 'Đã kích hoạt Khiên Đêm an toàn. Thiết bị chuyển sang chế độ bảo vệ và giám sát giấc ngủ thụ động 🌙.',
+        mood: Mood.calm,
+        scope: CircleScope.family,
+      );
+    } else {
+      _nightShieldActivatedAt = null;
+    }
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> checkinMorningSunlight() async {
+    _isMorningCheckinDone = true;
+    _isNightShieldActive = false;
+    _nightShieldActivatedAt = null;
+    await createCirclePost(
+      message: 'Chào buổi sáng! Tôi đã thức dậy bình an và sẵn sàng cho ngày mới ☀️.',
+      mood: Mood.happy,
+      scope: CircleScope.family,
+    );
+    await _saveToStorage();
+    notifyListeners();
+  }
+
+  Future<void> sendNudgePing(String memberId) async {
+    final member = _orbitMembers.where((m) => m.id == memberId).firstOrNull;
+    if (member == null) return;
+    _updateChatPreview('family', '${_user?.name ?? 'Bạn'} đã gõ cửa hỏi thăm ${member.name}');
+    notifyListeners();
+  }
+
+  Future<void> publishDailySafetyCapsule() async {
+    if (_dailySafetyCapsule == null) return;
+    _dailySafetyCapsule = _dailySafetyCapsule!.copyWith(isSentToCircle: true);
+    await createCirclePost(
+      message: '📋 Bưu thiếp Bình An 24h: ${_dailySafetyCapsule!.summaryMessageVi}',
+      mood: Mood.calm,
+      scope: CircleScope.family,
+    );
     notifyListeners();
   }
 
@@ -2813,6 +3127,81 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       ),
     ];
 
+    if (_orbitMembers.isEmpty) {
+      _orbitMembers = [
+        CircleOrbitMember(
+          id: 'orbit-mom',
+          name: 'Mẹ Lan',
+          relation: 'Mẹ',
+          status: OrbitSafetyStatus.home,
+          batteryLevel: 88,
+          isCharging: false,
+          heartRateBpm: 72,
+          locationLabel: 'Nhà (Đà Lạt)',
+          lastActive: DateTime.now().subtract(const Duration(minutes: 15)),
+        ),
+        CircleOrbitMember(
+          id: 'orbit-dad',
+          name: 'Ba Hùng',
+          relation: 'Ba',
+          status: OrbitSafetyStatus.sleeping,
+          batteryLevel: 94,
+          isCharging: true,
+          heartRateBpm: 63,
+          locationLabel: 'Phòng ngủ',
+          lastActive: DateTime.now().subtract(const Duration(hours: 1)),
+        ),
+        CircleOrbitMember(
+          id: 'orbit-linh',
+          name: 'Linh',
+          relation: 'Bạn thân',
+          status: OrbitSafetyStatus.transit,
+          batteryLevel: 38,
+          isCharging: false,
+          heartRateBpm: 88,
+          locationLabel: 'Đang đi xe về nhà',
+          transitSpeedKmH: 26.5,
+          lastActive: DateTime.now().subtract(const Duration(minutes: 2)),
+        ),
+        CircleOrbitMember(
+          id: 'orbit-brother',
+          name: 'Anh Hai',
+          relation: 'Anh trai',
+          status: OrbitSafetyStatus.home,
+          batteryLevel: 75,
+          isCharging: false,
+          heartRateBpm: 71,
+          locationLabel: 'Khu công nghệ cao',
+          lastActive: DateTime.now().subtract(const Duration(minutes: 40)),
+        ),
+      ];
+    }
+
+    _dailySafetyCapsule ??= const AiSafetyCapsuleModel(
+      id: 'capsule-today',
+      dateLabel: 'Hôm nay',
+      summaryMessageVi: 'Hôm nay bạn hoàn thành 6.840 bước chân, 2 chặng đi đường an toàn, nhịp tim trung bình 72 bpm và đã về phòng lúc 19:20. Pin thiết bị dồi dào (82%).',
+      summaryMessageEn: 'Today you completed 6,840 steps, 2 safe commutes, average heart rate 72 bpm, and returned home at 19:20. Device battery healthy (82%).',
+      stepCount: 6840,
+      avgHeartRate: 72,
+      safeCommuteMinutes: 38,
+      batteryHealthPct: 82,
+      arrivedHomeTime: '19:20',
+      isSentToCircle: false,
+    );
+
+    _activeCircleEscortJourney ??= LiveJourneyModel(
+      id: 'escort-journey-linh',
+      destinationLabel: 'Phòng trọ Linh (Cầu Giấy)',
+      durationMinutes: 18,
+      startedAt: DateTime.now().subtract(const Duration(minutes: 11)),
+      expectedArrivalAt: DateTime.now().add(const Duration(minutes: 7)),
+      status: 'IN_TRANSIT',
+      shareToken: 'escort-linh-77',
+      batteryLevel: 38,
+      remainingSeconds: 420,
+    );
+
     _updateBadges();
   }
 
@@ -2860,6 +3249,85 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  static List<CircleOrbitMember> _defaultOrbitMembers() {
+    return [
+      CircleOrbitMember(
+        id: 'orbit-mom',
+        name: 'Mẹ Lan',
+        relation: 'Mẹ',
+        status: OrbitSafetyStatus.home,
+        batteryLevel: 88,
+        isCharging: false,
+        heartRateBpm: 72,
+        locationLabel: 'Nhà (Đà Lạt)',
+        lastActive: DateTime.now().subtract(const Duration(minutes: 15)),
+      ),
+      CircleOrbitMember(
+        id: 'orbit-dad',
+        name: 'Ba Hùng',
+        relation: 'Ba',
+        status: OrbitSafetyStatus.sleeping,
+        batteryLevel: 94,
+        isCharging: true,
+        heartRateBpm: 63,
+        locationLabel: 'Phòng ngủ',
+        lastActive: DateTime.now().subtract(const Duration(hours: 1)),
+      ),
+      CircleOrbitMember(
+        id: 'orbit-linh',
+        name: 'Linh',
+        relation: 'Bạn thân',
+        status: OrbitSafetyStatus.transit,
+        batteryLevel: 38,
+        isCharging: false,
+        heartRateBpm: 88,
+        locationLabel: 'Đang đi xe về nhà',
+        transitSpeedKmH: 26.5,
+        lastActive: DateTime.now().subtract(const Duration(minutes: 2)),
+      ),
+      CircleOrbitMember(
+        id: 'orbit-brother',
+        name: 'Anh Hai',
+        relation: 'Anh trai',
+        status: OrbitSafetyStatus.home,
+        batteryLevel: 75,
+        isCharging: false,
+        heartRateBpm: 71,
+        locationLabel: 'Khu công nghệ cao',
+        lastActive: DateTime.now().subtract(const Duration(minutes: 40)),
+      ),
+    ];
+  }
+
+  static AiSafetyCapsuleModel _defaultSafetyCapsule() {
+    return const AiSafetyCapsuleModel(
+      id: 'capsule-today',
+      dateLabel: 'Hôm nay',
+      summaryMessageVi: 'Hôm nay bạn hoàn thành 6.840 bước chân, 2 chặng đi đường an toàn, nhịp tim trung bình 72 bpm và đã về phòng lúc 19:20. Pin thiết bị dồi dào (82%).',
+      summaryMessageEn: 'Today you completed 6,840 steps, 2 safe commutes, average heart rate 72 bpm, and returned home at 19:20. Device battery healthy (82%).',
+      stepCount: 6840,
+      avgHeartRate: 72,
+      safeCommuteMinutes: 38,
+      batteryHealthPct: 82,
+      arrivedHomeTime: '19:20',
+      isSentToCircle: false,
+    );
+  }
+
+  static LiveJourneyModel _defaultEscortJourney() {
+    return LiveJourneyModel(
+      id: 'escort-journey-linh',
+      destinationLabel: 'Phòng trọ Linh (Cầu Giấy)',
+      durationMinutes: 18,
+      startedAt: DateTime.now().subtract(const Duration(minutes: 11)),
+      expectedArrivalAt: DateTime.now().add(const Duration(minutes: 7)),
+      status: 'IN_TRANSIT',
+      shareToken: 'escort-linh-77',
+      batteryLevel: 38,
+      remainingSeconds: 420,
+    );
+  }
+
   /// Gửi hồ sơ định danh KYC (CCCD / Passport) để đăng ký làm Hiệp sĩ cứu hộ
   Future<bool> submitKycDocuments({
     required String frontPath,
@@ -2883,6 +3351,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Submit KYC error: $e');
       return false;
+    }
+  }
+
+  /// Cập nhật trạng thái KYC Hiệp sĩ (Dành cho xét duyệt hoặc kích hoạt nhanh)
+  Future<void> setKycVerified(bool verified) async {
+    if (_user != null) {
+      _user = _user!.copyWith(isKycVerified: verified);
+      await _saveToStorage();
+      notifyListeners();
     }
   }
 

@@ -9,6 +9,7 @@ import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import 'hero_workspace_page.dart';
 
 enum _HeroesFilter { ranking, nearby }
 
@@ -452,7 +453,7 @@ class _HeroesPageState extends State<HeroesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isKycVerified ? 'Hiệp sĩ đã xác minh KYC' : 'Đăng ký làm Hiệp sĩ Cứu hộ',
+                        isKycVerified ? 'Hiệp sĩ đã xác thực danh tính' : 'Đăng ký làm Hiệp sĩ Cứu hộ',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
@@ -486,10 +487,99 @@ class _HeroesPageState extends State<HeroesPage> {
                     onPressed: () => _showKycBottomSheet(context),
                     child: const Text('Nộp KYC', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                   ),
+                ] else ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute<void>(builder: (_) => const HeroWorkspacePage()),
+                      );
+                    },
+                    icon: const Icon(Icons.radar_rounded, size: 14),
+                    label: const Text('BÀN TÁC CHIẾN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
                 ],
               ],
             ),
           ),
+
+          // NÚT KHỞI ĐỘNG TÁC CHIẾN HIỆP SĨ (CHỈ XUẤT HIỆN KHI ĐÃ KYC)
+          if (isKycVerified) ...[
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(builder: (_) => const HeroWorkspacePage()),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF064E3B), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF10B981), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: Color(0xFF10B981), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'CHẾ ĐỘ TÁC CHIẾN HIỆP SĨ [SẴN SÀNG]',
+                            style: TextStyle(
+                              color: Color(0xFF34D399),
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Radar SOS · HUD cứu hộ hiện trường · Bộ đàm PTT · Thẻ định danh & Ví quỹ',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF34D399), size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: 18),
           if (rows.isNotEmpty)
