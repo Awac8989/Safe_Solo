@@ -74,6 +74,10 @@ class UserModel {
     this.lastCheckinTime,
     this.lastKnownLocation,
     this.isKycVerified = false,
+    this.personaType = 'GENERAL_SOLO',
+    this.consecutiveSoftCheckins = 0,
+    this.snoozeCountToday = 0,
+    this.pendingFamilyPings = const [],
   });
 
   final String id;
@@ -90,10 +94,15 @@ class UserModel {
   final AppLocation? lastKnownLocation;
   final List<EmergencyContactModel> emergencyContacts;
   final bool isKycVerified;
+  final String personaType;
+  final int consecutiveSoftCheckins;
+  final int snoozeCountToday;
+  final List<Map<String, dynamic>> pendingFamilyPings;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     final rawContacts = json['emergencyContacts'] as List<dynamic>? ?? const [];
     final rawLocation = json['lastKnownLocation'];
+    final rawPings = json['pendingFamilyPings'] as List<dynamic>? ?? const [];
 
     return UserModel(
       isKycVerified: json['isKycVerified'] as bool? ?? false,
@@ -101,6 +110,12 @@ class UserModel {
       fullName: json['fullName'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
       timerIntervalMinutes: json['timerIntervalMinutes'] as int? ?? 720,
+      personaType: json['personaType'] as String? ?? 'GENERAL_SOLO',
+      consecutiveSoftCheckins: json['consecutiveSoftCheckins'] as int? ?? 0,
+      snoozeCountToday: json['snoozeCountToday'] as int? ?? 0,
+      pendingFamilyPings: rawPings
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(),
       nextDeadline: json['nextDeadline'] != null
           ? DateTime.tryParse(json['nextDeadline'] as String)
           : null,

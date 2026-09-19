@@ -9,9 +9,20 @@ import {
   HeartPulse,
   Navigation,
   Crosshair,
+  AlertTriangle,
 } from "lucide-react";
 import { hasMapTiler, mapTilerStyleUrl } from "@/lib/maptiler";
-import { fetchHeroRadar, fetchSafeHavens, type HeroRadarItem, type SafeHavenItem } from "@/lib/api";
+import {
+  fetchHeroRadar,
+  fetchSafeHavens,
+  fetchHazards,
+  fetchDangerGeofences,
+  type HeroRadarItem,
+  type SafeHavenItem,
+  type HazardItem,
+  type DangerGeofenceItem,
+} from "@/lib/api";
+import { DangerGeofenceModal } from "@/components/DangerGeofenceModal";
 
 type Incident = {
   id: string;
@@ -50,6 +61,9 @@ export function IncidentMap({
 }) {
   const [showHeroes, setShowHeroes] = useState(true);
   const [showSafeHavens, setShowSafeHavens] = useState(true);
+  const [showHazards, setShowHazards] = useState(true);
+  const [showGeofences, setShowGeofences] = useState(true);
+  const [showGeofenceModal, setShowGeofenceModal] = useState(false);
   const [showDistanceLines, setShowDistanceLines] = useState(true);
   const [hoveredEntity, setHoveredEntity] = useState<any>(null);
 
@@ -58,7 +72,7 @@ export function IncidentMap({
   const maplibreRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
 
-  // Fetch real-time heroes and safe havens
+  // Fetch real-time heroes, safe havens, community hazards, and danger geofences
   const heroesQuery = useQuery({
     queryKey: ["hero-radar"],
     queryFn: fetchHeroRadar,
@@ -70,8 +84,22 @@ export function IncidentMap({
     queryFn: fetchSafeHavens,
   });
 
+  const hazardsQuery = useQuery({
+    queryKey: ["hazards-radar"],
+    queryFn: fetchHazards,
+    refetchInterval: 15000,
+  });
+
+  const geofencesQuery = useQuery({
+    queryKey: ["danger-geofences"],
+    queryFn: fetchDangerGeofences,
+    refetchInterval: 15000,
+  });
+
   const heroes = heroesQuery.data?.data ?? [];
   const safeHavens = safeHavensQuery.data?.data ?? [];
+  const hazards = hazardsQuery.data?.data?.hazards ?? [];
+  const geofences = geofencesQuery.data?.data?.geofences ?? [];
 
   const locatedIncidents = useMemo(
     () =>
@@ -200,7 +228,35 @@ export function IncidentMap({
         markersRef.current.push(marker);
       }
     }
-  }, [locatedIncidents, heroes, safeHavens, showHeroes, showSafeHavens, selectedId, onSelect]);
+
+    // 4. Add Community Hazard Markers
+    if (showHazards) {
+      for (const hazard of hazards) {
+        if (!hazard.lat || !hazard.lng) continue;
+        const el = document.createElement("div");
+        el.className =
+          "relative flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-amber-300 bg-amber-600 text-white shadow-lg cursor-pointer";
+        el.title = `[HIỂM HỌA] ${hazard.title} (${hazard.address}) - ${hazard.confirmCount} xác nhận`;
+
+        const iconSpan = document.createElement("span");
+        iconSpan.className = "text-[10px] font-bold";
+        iconSpan.innerText = "⚠";
+        el.appendChild(iconSpan);
+
+        if (hazard.status === "ACTIVE") {
+          const pulse = document.createElement("span");
+          pulse.className = "absolute -inset-1 rounded-full border border-amber-400 opacity-60 animate-ping";
+          el.appendChild(pulse);
+        }
+
+        const marker = new maplibregl.Marker({ element: el, anchor: "center" })
+          .setLngLat([hazard.lng, hazard.lat])
+          .addTo(map);
+
+        markersRef.current.push(marker);
+      }
+    }
+  }, [locatedIncidents, heroes, safeHavens, hazards, showHeroes, showSafeHavens, showHazards, selectedId, onSelect]);
 
   // Center coordinate reference: District 5 / District 1 in HCMC
   const centerLat = 10.7680;
@@ -239,6 +295,29 @@ export function IncidentMap({
           }`}
         >
           <Building2 className="h-3 w-3" /> Trạm An Toàn ({safeHavens.length})
+        </button>
+        <button
+          onClick={() => setShowHazards((v) => !v)}
+          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition ${
+            showHazards ? "bg-amber-600 text-white font-bold" : "text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          <AlertTriangle className="h-3 w-3" /> Hiểm họa ({hazards.length})
+        </button>
+        <button
+          onClick={() => setShowGeofences((v) => !v)}
+          className={`inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition ${
+            showGeofences ? "bg-rose-600 text-white font-bold" : "text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          <Radio className="h-3 w-3" /> Vùng Nguy Hiểm ({geofences.filter((g) => g.status === "ACTIVE").length})
+        </button>
+        <button
+          onClick={() => setShowGeofenceModal(true)}
+          className="inline-flex items-center gap-1 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[11px] font-bold text-rose-300 hover:bg-rose-500/20 transition"
+          title="Mở bảng quản trị và vẽ Vùng Nguy Hiểm Động"
+        >
+          + Geofence
         </button>
         <button
           onClick={() => setShowDistanceLines((v) => !v)}
@@ -442,9 +521,86 @@ export function IncidentMap({
                   </div>
                 </div>
               )}
+
+              {hoveredEntity.kind === "GEOFENCE" && (
+                <div>
+                  <div className="font-bold text-rose-400 flex items-center gap-1">
+                    <Radio className="h-3.5 w-3.5 animate-pulse" /> VÙNG NGUY HIỂM: {hoveredEntity.name}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{hoveredEntity.address}</div>
+                  <div className="mt-1 flex items-center gap-2 font-mono text-[10px]">
+                    <span>Bán kính: <strong>{hoveredEntity.radiusMeters}m</strong></span>
+                    <span>Mức độ: <strong className="text-rose-400">{hoveredEntity.severity}</strong></span>
+                  </div>
+                  <div className="mt-1 text-[10px] text-sky-300">
+                    👥 <strong>{hoveredEntity.activePeopleCount} người</strong> đang có mặt trong vùng
+                  </div>
+                  <div className="mt-0.5 text-[10px] italic text-muted-foreground">
+                    "{hoveredEntity.description}"
+                  </div>
+                </div>
+              )}
             </div>
           )}
+
+          {/* 6. Render Dynamic Danger Geofence Zones */}
+          {showGeofences &&
+            geofences
+              .filter((geo) => geo.status === "ACTIVE")
+              .map((geo) => {
+                const { x, y } = project(geo.center.lat, geo.center.lng);
+                const rPx = Math.max(36, Math.min(160, Math.round((geo.radiusMeters / 1000) * 130)));
+                const isCritical = geo.severity === "CRITICAL";
+
+                return (
+                  <div
+                    key={geo.id}
+                    onMouseEnter={() => setHoveredEntity({ ...geo, kind: "GEOFENCE" })}
+                    onMouseLeave={() => setHoveredEntity(null)}
+                    style={{
+                      left: `${x}%`,
+                      top: `${y}%`,
+                      width: `${rPx * 2}px`,
+                      height: `${rPx * 2}px`,
+                    }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-auto cursor-pointer rounded-full flex items-center justify-center transition-transform hover:scale-105"
+                  >
+                    <div
+                      className={`absolute inset-0 rounded-full animate-ping opacity-20 ${
+                        isCritical ? "bg-rose-500" : "bg-amber-500"
+                      }`}
+                    />
+                    <div
+                      className={`absolute inset-0 rounded-full border-2 border-dashed ${
+                        isCritical
+                          ? "border-rose-500/80 bg-rose-950/25 shadow-[0_0_25px_rgba(244,63,94,0.35)]"
+                          : "border-amber-500/80 bg-amber-950/25 shadow-[0_0_25px_rgba(245,158,11,0.35)]"
+                      }`}
+                    />
+                    <div className="relative z-10 flex flex-col items-center pointer-events-none">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase shadow backdrop-blur ${
+                          isCritical ? "bg-rose-600/90 text-white" : "bg-amber-600/90 text-black"
+                        }`}
+                      >
+                        ⚠️ {geo.name.slice(0, 16)}...
+                      </span>
+                      <span className="text-[9px] font-bold text-white/90 bg-black/70 px-1 rounded mt-0.5">
+                        👥 {geo.activePeopleCount} người ({geo.radiusMeters}m)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
         </div>
+      )}
+
+      {/* Danger Geofence Setup Modal */}
+      {showGeofenceModal && (
+        <DangerGeofenceModal
+          onClose={() => setShowGeofenceModal(false)}
+          defaultCoordinates={{ lat: centerLat, lng: centerLng }}
+        />
       )}
     </div>
   );

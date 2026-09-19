@@ -71,7 +71,7 @@ class NotificationService {
       id: 3101,
       title: isVietnamese ? 'Cần điểm danh' : 'Check-in needed',
       body: isVietnamese
-          ? 'Bạn đã quá hạn check-in. Hãy xác nhận an toàn ngay bây giờ.'
+          ? 'Bạn đã quá hạn điểm danh. Hãy xác nhận an toàn ngay bây giờ.'
           : 'Your check-in is overdue. Please confirm you are safe now.',
       channelId: _alertsChannel.id,
       channelName: _alertsChannel.name,

@@ -5,6 +5,7 @@ import 'core/app_theme.dart';
 import 'core/providers/app_provider.dart';
 import 'views/achievements/achievements_page.dart';
 import 'views/auth/auth_page.dart';
+import 'views/auth/profile_setup_page.dart';
 import 'views/medical/medical_page.dart';
 import 'views/network/network_page.dart';
 import 'views/onboarding/onboarding_page.dart';
@@ -20,6 +21,8 @@ import 'views/journey/active_journey_page.dart';
 import 'views/community/hazard_feed_page.dart';
 import 'views/community/safety_guides_page.dart';
 import 'views/audio/fake_call_screen.dart';
+import 'views/heroes/hero_workspace_page.dart';
+import 'views/community/accident_report_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
@@ -65,6 +68,7 @@ class SafeSoloApp extends StatelessWidget {
             home: const _AppGate(),
             routes: {
               '/auth': (_) => const AuthPage(),
+              '/profile-setup': (_) => const ProfileSetupPage(),
               '/onboarding': (_) => const OnboardingPage(),
               '/permissions': (_) => const PermissionsPage(),
               '/medical': (_) => const MedicalPage(),
@@ -83,6 +87,8 @@ class SafeSoloApp extends StatelessWidget {
               '/hazard-feed': (_) => const HazardFeedPage(),
               '/safety-guides': (_) => const SafetyGuidesPage(),
               '/fake-call': (_) => const FakeCallScreen(),
+              '/hero-workspace': (_) => const HeroWorkspacePage(),
+              '/report-accident': (_) => const AccidentReportPage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),
@@ -147,6 +153,10 @@ class _AppGate extends StatelessWidget {
 
     if (provider.user == null) {
       return const AuthPage();
+    }
+
+    if (!provider.hasCompletedProfile) {
+      return const ProfileSetupPage();
     }
 
     return const MainNavigation();

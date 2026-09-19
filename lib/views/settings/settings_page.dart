@@ -20,6 +20,82 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   double? _graceHoursDraft;
   double? _autoWipeDaysDraft;
+  bool _devModeEnabled = false;
+  int _versionTapCount = 0;
+
+  void _onVersionTap(AppStrings strings) {
+    final hasScaffold = Scaffold.maybeOf(context) != null;
+
+    if (_devModeEnabled) {
+      if (hasScaffold) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(
+              strings.text(
+                'Tùy chọn nhà phát triển đang được hiển thị bên dưới.',
+                'Developer options are already active below.',
+              ),
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() {
+      _versionTapCount++;
+    });
+
+    if (_versionTapCount >= 7) {
+      setState(() {
+        _devModeEnabled = true;
+        _versionTapCount = 0;
+      });
+      if (hasScaffold) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primary,
+            content: Row(
+              children: [
+                const Icon(Icons.developer_mode_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    strings.text(
+                      'Đã kích hoạt Tùy chọn Nhà phát triển!',
+                      'Developer options activated!',
+                    ),
+                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else if (_versionTapCount >= 4 && hasScaffold) {
+      final remaining = 7 - _versionTapCount;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            strings.text(
+              'Nhấn thêm $remaining lần để bật Tùy chọn Nhà phát triển.',
+              'Tap $remaining more times to enable Developer options.',
+            ),
+          ),
+          duration: const Duration(milliseconds: 700),
+        ),
+      );
+    }
+  }
 
   AppStrings _snapshotStrings() {
     final language = context.read<AppProvider>().language;
@@ -275,13 +351,13 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Thông báo & nền', 'Notifications & background')),
+          AppSectionLabel(strings.text('Thông báo & chạy ngầm 24/7', 'Notifications & background 24/7')),
           const SizedBox(height: 10),
           _SectionCard(
             children: [
               _SwitchRow(
                 icon: Icons.notifications_active_outlined,
-                title: strings.text('FCM push thật', 'Real FCM push'),
+                title: strings.text('Thông báo đẩy khẩn cấp', 'Emergency push notifications'),
                 value: provider.fcmPushEnabled,
                 onChanged: (value) => _runGuarded(
                   () => context.read<AppProvider>().setFcmPushEnabled(value),
@@ -290,37 +366,11 @@ class _SettingsPageState extends State<SettingsPage> {
               const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.layers_outlined,
-                title: strings.text('Giám sát nền', 'Background monitor'),
+                title: strings.text('Giám sát an toàn chạy ngầm', 'Background safety monitor'),
                 value: provider.backgroundMonitorEnabled,
                 onChanged: (value) => _runGuarded(
                   () => context.read<AppProvider>().setBackgroundMonitorEnabled(value),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Thiết bị đeo thông minh', 'Wearable devices')),
-          const SizedBox(height: 10),
-          _SectionCard(
-            children: [
-              _ActionRow(
-                icon: Icons.watch_rounded,
-                title: strings.text('Mặt đồng hồ WearOS (Galaxy Watch 5)', 'WearOS Watch Face (Galaxy Watch 5)'),
-                valueText: strings.text('Xem ngay', 'Open'),
-                onTap: () => Navigator.pushNamed(context, '/wear-os'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Máy chủ & Kết nối 24/7', 'Server & 24/7 Network')),
-          const SizedBox(height: 10),
-          _SectionCard(
-            children: [
-              _ActionRow(
-                icon: Icons.dns_rounded,
-                title: strings.text('Địa chỉ máy chủ API', 'API Server URL'),
-                valueText: AppConstants.backendBaseUrl,
-                onTap: () => _showServerConfigDialog(context),
               ),
               const _SectionDivider(),
               _ActionRow(
@@ -347,6 +397,46 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
+          if (_devModeEnabled) ...[
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                const Icon(Icons.developer_mode_rounded, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                AppSectionLabel(strings.text('Tùy chọn nhà phát triển', 'Developer options')),
+                const Spacer(),
+                TextButton(
+                  onPressed: () => setState(() => _devModeEnabled = false),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(
+                    strings.text('Ẩn chế độ Dev', 'Hide Dev'),
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _SectionCard(
+              children: [
+                _ActionRow(
+                  icon: Icons.dns_rounded,
+                  title: strings.text('Địa chỉ máy chủ API', 'API Server URL'),
+                  valueText: AppConstants.backendBaseUrl,
+                  onTap: () => _showServerConfigDialog(context),
+                ),
+                const _SectionDivider(),
+                _ActionRow(
+                  icon: Icons.watch_rounded,
+                  title: strings.text('Giả lập WearOS (Galaxy Watch 5)', 'WearOS Simulator (Galaxy Watch 5)'),
+                  valueText: strings.text('Mở test', 'Open'),
+                  onTap: () => Navigator.pushNamed(context, '/wear-os'),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => context.read<AppProvider>().signOut(),
@@ -358,6 +448,41 @@ class _SettingsPageState extends State<SettingsPage> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: InkWell(
+              key: const ValueKey('version_footer_inkwell'),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+              onTap: () => _onVersionTap(strings),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'SafeSolo v1.0.0 (Build 2026)',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      strings.text(
+                        'Bảo vệ an toàn cá nhân & Cứu hộ khẩn cấp 24/7',
+                        'Personal Safety & Emergency Rescue 24/7',
+                      ),
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 11,
+                        color: AppColors.textMuted.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

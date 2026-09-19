@@ -71,6 +71,23 @@ function mapUserDoc(doc) {
     quietHoursEnd: row.quietHoursEnd || '06:00',
     sleepModeUntil: toIso(row.sleepModeUntil),
     falseAlertGraceMinutes: row.falseAlertGraceMinutes ?? 3,
+    personaType: row.personaType || 'GENERAL_SOLO',
+    consecutiveSoftCheckins: Number(row.consecutiveSoftCheckins || 0),
+    maxSoftCheckinAllowed: Number(row.maxSoftCheckinAllowed || 3),
+    softExtensionMinutes: Number(row.softExtensionMinutes || 45),
+    snoozeCountToday: Number(row.snoozeCountToday || 0),
+    homeGeofence: row.homeGeofence || null,
+    homeWifiSsid: row.homeWifiSsid || null,
+    pendingFamilyPings: Array.isArray(row.pendingFamilyPings)
+      ? row.pendingFamilyPings.map(p => ({
+          _id: p._id,
+          fromName: p.fromName,
+          fromPhone: p.fromPhone,
+          message: p.message,
+          requestedAt: toIso(p.requestedAt),
+          status: p.status,
+        }))
+      : [],
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };

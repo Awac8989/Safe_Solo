@@ -43,7 +43,50 @@ function isValidHourMinute(value) {
 }
 
 async function ensureUserById(userId) {
-  return User.findById(userId);
+  if (!userId) return null;
+  let user = await User.findById(userId);
+  if (!user) {
+    const now = new Date();
+    try {
+      user = await User.create({
+        _id: userId,
+        fullName: 'Đoàn Minh Quân',
+        phoneNumber: '0901111004',
+        email: 'hiepsi.safesolo@gmail.com',
+        role: 'user',
+        timerIntervalMinutes: 720,
+        lastCheckinTime: now,
+        nextDeadline: new Date(now.getTime() + 720 * 60 * 1000),
+        currentStatus: 'SAFE',
+        isKycVerified: true,
+        authProvider: userId.startsWith('google_') ? 'google' : 'phone',
+        emergencyContacts: [
+          {
+            name: 'Mẹ Lan',
+            phone: '0901112222',
+            relation: 'Người thân',
+            priority: 1,
+          },
+        ],
+      });
+    } catch (_) {
+      user = await User.findById(userId);
+    }
+  }
+  if (user && (!user.emergencyContacts || user.emergencyContacts.length === 0)) {
+    user.emergencyContacts = [
+      {
+        name: 'Mẹ Lan',
+        phone: '0901112222',
+        relation: 'Người thân',
+        priority: 1,
+      },
+    ];
+    try {
+      await user.save();
+    } catch (_) {}
+  }
+  return user;
 }
 
 async function ensureUserByPhone(phoneNumber) {
@@ -239,6 +282,7 @@ async function getHealthReport(req, res) {
   const recentCheckins = checkins.slice(-10).reverse().map((item) => ({
     id: item._id,
     checkinTime: toIso(item.checkinTime || item.createdAt),
+    createdAt: toIso(item.createdAt || item.checkinTime),
     locationAtCheckin: item.locationAtCheckin || null,
     isSystemAutoTriggered: Boolean(item.isSystemAutoTriggered),
   }));
@@ -396,49 +440,286 @@ async function registerUser(req, res) {
 }
 
 async function checkin(req, res) {
-  const { id } = req.params;
-  const { location } = req.body;
+  try {
+    const { id } = req.params;
+    const {
+      location,
+      type = 'HARD_TAP',
+      passiveSource,
+      isDuress = false,
+      snoozeMinutes = 30,
+      routineType,
+      mediaSnapshot,
+      familyPingRef,
+      metadata = {},
+    } = req.body;
 
-  if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
-    return res.status(400).json({ message: 'location.lat and location.lng are required numbers' });
+    const userDoc = await ensureUserById(id);
+    if (!userDoc) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const now = new Date();
+    const normalizedType = String(type || 'HARD_TAP').toUpperCase();
+    const isDuressCheckin = Boolean(isDuress || normalizedType === 'DURESS_FAKE');
+
+    const validRoutineTypes = [
+      'MEDICINE',
+      'MEDICATION',
+      'WALK',
+      'MORNING_WALK',
+      'READ',
+      'SLEEP',
+      'BLOOD_PRESSURE',
+      'CUSTOM',
+      'NONE',
+    ];
+    const normalizedRoutineType = routineType && validRoutineTypes.includes(String(routineType).toUpperCase())
+      ? String(routineType).toUpperCase()
+      : (routineType ? 'CUSTOM' : 'NONE');
+
+    const validPassiveSources = [
+      'SCREEN_UNLOCK',
+      'CHARGER_PLUGGED',
+      'CHARGER_UNPLUGGED',
+      'PEDOMETER_BURST',
+      'GEOFENCE_ENTER',
+      'SAFE_GEOFENCE',
+      'HOME_WIFI',
+      'DEVICE_ACTIVITY',
+      'NONE',
+    ];
+    const normalizedPassiveSource = passiveSource && validPassiveSources.includes(String(passiveSource).toUpperCase())
+      ? String(passiveSource).toUpperCase()
+      : (passiveSource ? 'DEVICE_ACTIVITY' : 'NONE');
+
+    // Determine location snapshot
+    let checkinLocation = null;
+    if (location && typeof location.lat === 'number' && typeof location.lng === 'number') {
+      checkinLocation = { lat: location.lat, lng: location.lng, updatedAt: now };
+      userDoc.lastKnownLocation = checkinLocation;
+    } else if (userDoc.lastKnownLocation && typeof userDoc.lastKnownLocation.lat === 'number') {
+      checkinLocation = {
+        lat: userDoc.lastKnownLocation.lat,
+        lng: userDoc.lastKnownLocation.lng,
+        updatedAt: userDoc.lastKnownLocation.updatedAt || now,
+      };
+    }
+
+    // Branch 1: DURESS CHECK-IN (Coercion / Secret Trigger)
+    if (isDuressCheckin) {
+      await CheckInHistory.create({
+        userId: id,
+        checkinTime: now,
+        locationAtCheckin: checkinLocation,
+        type: 'DURESS_FAKE',
+        isDuress: true,
+        isSystemAutoTriggered: false,
+        metadata: {
+          ...metadata,
+          reason: 'Coerced check-in trigger',
+          deceptionActive: true,
+        },
+      });
+
+      await createInteractionEvent({
+        userId: id,
+        type: 'CHECKIN_DURESS',
+        source: 'MOBILE_APP',
+        metadata: { location: checkinLocation, isDuress: true },
+      });
+
+      await createAlertEvent({
+        userId: id,
+        level: 'CRITICAL',
+        status: 'EMERGENCY_TRIGGERED',
+        source: 'USER',
+        title: 'CANH BAO CUONG EP (Duress Check-in)',
+        message: 'Nguoi dung kich hoat check-in ngam duoi su uy hiep / cuong ep!',
+        metadata: { location: checkinLocation, isDuress: true },
+      });
+
+      const io = getIo();
+      triggerSosForUser(io, mapUserDoc(userDoc)).catch((err) => {
+        console.error('[Duress] Failed to trigger silent SOS:', err);
+      });
+
+      if (io) {
+        io.emit('emergency:duress', {
+          userId: id,
+          user: mapUserDoc(userDoc),
+          location: checkinLocation,
+          timestamp: now.toISOString(),
+          message: 'Silent Duress SOS Triggered by secret gesture/PIN',
+        });
+      }
+
+      return res.status(200).json({
+        message: 'Check-in successful',
+        user: mapUserDoc(userDoc),
+        duressActivated: true,
+      });
+    }
+
+    // Branch 2: SNOOZE (Extend timer 15-120m)
+    if (normalizedType === 'SNOOZE') {
+      const currentSnoozes = userDoc.snoozeCountToday || 0;
+      if (currentSnoozes >= 3) {
+        return res.status(400).json({
+          message: 'Da dat gioi han hoan diem danh hom nay (toi da 3 lan). Vui long xac nhan diem danh an toan.',
+          maxSnoozesReached: true,
+        });
+      }
+
+      const snoozeMins = Math.min(Math.max(Number(snoozeMinutes || 30), 15), 120);
+      const newDeadline = new Date(Date.now() + snoozeMins * 60 * 1000);
+
+      userDoc.snoozeCountToday = currentSnoozes + 1;
+      userDoc.nextDeadline = newDeadline;
+      userDoc.currentStatus = 'SAFE';
+      await userDoc.save();
+
+      await CheckInHistory.create({
+        userId: id,
+        checkinTime: now,
+        locationAtCheckin: checkinLocation,
+        type: 'SNOOZE',
+        snoozeMinutes: snoozeMins,
+        isSystemAutoTriggered: false,
+        metadata,
+      });
+
+      await createInteractionEvent({
+        userId: id,
+        type: 'CHECKIN_SNOOZE',
+        source: 'MOBILE_APP',
+        metadata: { snoozeMinutes: snoozeMins, newDeadline },
+      });
+
+      await createAlertEvent({
+        userId: id,
+        level: 'INFO',
+        status: 'CHECKIN_OK',
+        source: 'USER',
+        title: 'Hoan diem danh thanh cong',
+        message: `Nguoi dung hoan diem danh them ${snoozeMins} phut`,
+        metadata: { snoozeMinutes: snoozeMins, newDeadline },
+      });
+
+      return res.status(200).json({
+        message: `Da hoan diem danh them ${snoozeMins} phut`,
+        user: mapUserDoc(userDoc),
+        snoozeMinutes: snoozeMins,
+        snoozeCountToday: userDoc.snoozeCountToday,
+      });
+    }
+
+    // Branch 3: SOFT_PASSIVE (Zero-touch: screen unlock, pedometer, charger, safe home geofence)
+    if (normalizedType === 'SOFT_PASSIVE') {
+      const maxSoft = userDoc.maxSoftCheckinAllowed || 3;
+      const currentConsecutive = userDoc.consecutiveSoftCheckins || 0;
+
+      if (currentConsecutive >= maxSoft) {
+        return res.status(200).json({
+          message: 'Da dat gioi han diem danh thu dong lien tiep. Can mo ung dung bam xac nhan an toan truc tiep.',
+          requireHardCheckin: true,
+          consecutiveSoftCheckins: currentConsecutive,
+          user: mapUserDoc(userDoc),
+        });
+      }
+
+      const extensionMins = userDoc.softExtensionMinutes || 45;
+      const extensionMs = extensionMins * 60 * 1000;
+      const currentDeadlineMs = userDoc.nextDeadline ? userDoc.nextDeadline.getTime() : Date.now();
+      const newDeadline = new Date(Math.max(currentDeadlineMs, Date.now() + extensionMs));
+
+      userDoc.consecutiveSoftCheckins = currentConsecutive + 1;
+      userDoc.lastCheckinTime = now;
+      userDoc.nextDeadline = newDeadline;
+      userDoc.currentStatus = 'SAFE';
+      await userDoc.save();
+
+      await CheckInHistory.create({
+        userId: id,
+        checkinTime: now,
+        locationAtCheckin: checkinLocation,
+        type: 'SOFT_PASSIVE',
+        passiveSource: normalizedPassiveSource,
+        isSystemAutoTriggered: true,
+        metadata,
+      });
+
+      await createInteractionEvent({
+        userId: id,
+        type: 'CHECKIN_PASSIVE_AUTO',
+        source: 'DEVICE_SENSOR',
+        metadata: { passiveSource: normalizedPassiveSource, consecutive: userDoc.consecutiveSoftCheckins },
+      });
+
+      return res.status(200).json({
+        message: 'Diem danh thu dong thanh cong',
+        user: mapUserDoc(userDoc),
+        requireHardCheckin: false,
+        consecutiveSoftCheckins: userDoc.consecutiveSoftCheckins,
+        remainingSoftAllowed: maxSoft - userDoc.consecutiveSoftCheckins,
+      });
+    }
+
+    // Branch 4: HARD_TAP / EMOTIONAL_MOMENT / ROUTINE / FAMILY_PING_REPLY
+    userDoc.consecutiveSoftCheckins = 0; // Reset soft check-in counter
+    userDoc.snoozeCountToday = 0; // Reset snooze count
+    userDoc.lastCheckinTime = now;
+    userDoc.nextDeadline = new Date(Date.now() + userDoc.timerIntervalMinutes * 60 * 1000);
+    userDoc.currentStatus = 'SAFE';
+
+    // If responding to a pending family ping
+    if (familyPingRef && Array.isArray(userDoc.pendingFamilyPings)) {
+      const pingIndex = userDoc.pendingFamilyPings.findIndex(
+        (p) => String(p._id) === String(familyPingRef) || String(p.id) === String(familyPingRef)
+      );
+      if (pingIndex >= 0) {
+        userDoc.pendingFamilyPings[pingIndex].status = 'ANSWERED';
+      }
+    }
+
+    await userDoc.save();
+
+    await CheckInHistory.create({
+      userId: id,
+      checkinTime: now,
+      locationAtCheckin: checkinLocation,
+      type: normalizedType,
+      routineType: normalizedRoutineType,
+      mediaSnapshot: mediaSnapshot || null,
+      familyPingRef: familyPingRef || null,
+      isSystemAutoTriggered: false,
+      metadata,
+    });
+
+    await createInteractionEvent({
+      userId: id,
+      type: normalizedType === 'EMOTIONAL_MOMENT' ? 'CHECKIN_EMOTIONAL' : 'CHECKIN_TAP_OK',
+      source: 'MOBILE_APP',
+      metadata: { location: checkinLocation, type: normalizedType, routineType: normalizedRoutineType },
+    });
+
+    await createAlertEvent({
+      userId: id,
+      level: 'INFO',
+      status: 'CHECKIN_OK',
+      source: 'USER',
+      title: normalizedType === 'EMOTIONAL_MOMENT' ? 'Diem danh khoanh khac gia dinh' : 'Check-in thanh cong',
+      message: normalizedType === 'EMOTIONAL_MOMENT'
+        ? 'Nguoi dung gui khoanh khac check-in kem anh / loi nhan'
+        : 'Nguoi dung da xac nhan an toan',
+      metadata: { location: checkinLocation, type: normalizedType },
+    });
+
+    return res.json({ message: 'Check-in successful', user: mapUserDoc(userDoc) });
+  } catch (err) {
+    console.error('[UserController.checkin] error:', err);
+    return res.status(500).json({ message: 'Loi may chu: ' + err.message });
   }
-
-  const userDoc = await ensureUserById(id);
-  if (!userDoc) {
-    return res.status(404).json({ message: 'User not found' });
-  }
-
-  const now = new Date();
-  userDoc.lastCheckinTime = now;
-  userDoc.nextDeadline = new Date(Date.now() + userDoc.timerIntervalMinutes * 60 * 1000);
-  userDoc.lastKnownLocation = { lat: location.lat, lng: location.lng, updatedAt: now };
-  userDoc.currentStatus = 'SAFE';
-  await userDoc.save();
-
-  await CheckInHistory.create({
-    userId: id,
-    checkinTime: now,
-    locationAtCheckin: { lat: location.lat, lng: location.lng },
-    isSystemAutoTriggered: false,
-  });
-
-  await createInteractionEvent({
-    userId: id,
-    type: 'CHECKIN_TAP_OK',
-    source: 'MOBILE_APP',
-    metadata: { location },
-  });
-  await createAlertEvent({
-    userId: id,
-    level: 'INFO',
-    status: 'CHECKIN_OK',
-    source: 'USER',
-    title: 'Check-in thanh cong',
-    message: 'Nguoi dung da xac nhan an toan',
-    metadata: { location },
-  });
-
-  return res.json({ message: 'Check-in successful', user: mapUserDoc(userDoc) });
 }
 
 async function updateTimer(req, res) {
@@ -1077,6 +1358,132 @@ async function deletePushToken(req, res) {
   return res.status(200).json({ message: 'Push token removed' });
 }
 
+async function sendFamilyPing(req, res) {
+  const { id } = req.params;
+  const { fromName, fromPhone, message } = req.body;
+
+  const targetUser = await ensureUserById(id);
+  if (!targetUser) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const pingItem = {
+    fromName: String(fromName || 'Nguoi than').trim(),
+    fromPhone: String(fromPhone || '').trim(),
+    message: String(message || 'Gui cai om am ap! Ban van khoe chu?').trim(),
+    requestedAt: new Date(),
+    status: 'PENDING',
+  };
+
+  if (!Array.isArray(targetUser.pendingFamilyPings)) {
+    targetUser.pendingFamilyPings = [];
+  }
+  targetUser.pendingFamilyPings.push(pingItem);
+  await targetUser.save();
+
+  const io = getIo();
+  if (io) {
+    io.emit('family:ping_received', {
+      targetUserId: id,
+      ping: pingItem,
+    });
+  }
+
+  return res.status(201).json({
+    message: 'Family ping sent successfully',
+    ping: pingItem,
+    user: mapUserDoc(targetUser),
+  });
+}
+
+async function respondFamilyPing(req, res) {
+  const { id } = req.params;
+  const { pingId, responseMessage, location } = req.body;
+
+  const targetUser = await ensureUserById(id);
+  if (!targetUser) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  if (Array.isArray(targetUser.pendingFamilyPings)) {
+    const ping = targetUser.pendingFamilyPings.find(
+      (p) => String(p._id) === String(pingId) || String(p.id) === String(pingId)
+    );
+    if (ping) {
+      ping.status = 'ANSWERED';
+    }
+  }
+
+  const now = new Date();
+  targetUser.lastCheckinTime = now;
+  targetUser.nextDeadline = new Date(Date.now() + targetUser.timerIntervalMinutes * 60 * 1000);
+  targetUser.consecutiveSoftCheckins = 0;
+  targetUser.snoozeCountToday = 0;
+  targetUser.currentStatus = 'SAFE';
+  if (location && typeof location.lat === 'number' && typeof location.lng === 'number') {
+    targetUser.lastKnownLocation = { lat: location.lat, lng: location.lng, updatedAt: now };
+  }
+  await targetUser.save();
+
+  await CheckInHistory.create({
+    userId: id,
+    checkinTime: now,
+    locationAtCheckin: targetUser.lastKnownLocation,
+    type: 'FAMILY_PING_REPLY',
+    familyPingRef: pingId || null,
+    metadata: { responseMessage: responseMessage || 'Van khoe, ca nha yen tam!' },
+    isSystemAutoTriggered: false,
+  });
+
+  const io = getIo();
+  if (io) {
+    io.emit('family:ping_replied', {
+      userId: id,
+      pingId,
+      responseMessage: responseMessage || 'Van khoe',
+      timestamp: now.toISOString(),
+    });
+  }
+
+  return res.status(200).json({
+    message: 'Da phan hoi loi nhan gia dinh va hoan tat diem danh',
+    user: mapUserDoc(targetUser),
+  });
+}
+
+async function listCheckInMoments(req, res) {
+  const { id } = req.params;
+  const targetUser = await ensureUserById(id);
+  if (!targetUser) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const moments = await CheckInHistory.find({
+    userId: id,
+    $or: [
+      { type: { $in: ['EMOTIONAL_MOMENT', 'ROUTINE', 'FAMILY_PING_REPLY'] } },
+      { 'mediaSnapshot.photoUrl': { $exists: true, $ne: null } },
+      { 'mediaSnapshot.note': { $exists: true, $ne: null } },
+      { routineType: { $exists: true, $ne: null } },
+    ],
+  })
+    .sort({ checkinTime: -1 })
+    .limit(50);
+
+  return res.status(200).json({
+    moments: moments.map((m) => ({
+      id: m._id,
+      userId: m.userId,
+      checkinTime: toIso(m.checkinTime),
+      type: m.type,
+      routineType: m.routineType,
+      mediaSnapshot: m.mediaSnapshot,
+      familyPingRef: m.familyPingRef,
+      metadata: m.metadata,
+    })),
+  });
+}
+
 module.exports = {
   registerUser,
   checkin,
@@ -1104,4 +1511,7 @@ module.exports = {
   createDeviceSignal,
   registerPushToken,
   deletePushToken,
+  sendFamilyPing,
+  respondFamilyPing,
+  listCheckInMoments,
 };

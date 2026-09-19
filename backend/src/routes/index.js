@@ -27,6 +27,9 @@ const {
   createDeviceSignal,
   registerPushToken,
   deletePushToken,
+  sendFamilyPing,
+  respondFamilyPing,
+  listCheckInMoments,
 } = require('../controllers/userController');
 const {
   listEmergencies,
@@ -90,6 +93,9 @@ apiRouter.get('/users/:id/device-signals', listDeviceSignals);
 apiRouter.post('/users/:id/device-signals', createDeviceSignal);
 apiRouter.post('/users/:id/push-tokens', registerPushToken);
 apiRouter.delete('/users/:id/push-tokens/:token', deletePushToken);
+apiRouter.post('/users/:id/family-ping', sendFamilyPing);
+apiRouter.post('/users/:id/family-ping/respond', respondFamilyPing);
+apiRouter.get('/users/:id/checkin/moments', listCheckInMoments);
 
 apiRouter.get('/admin/emergencies', listEmergencies);
 apiRouter.patch('/admin/emergencies/:id/resolve', resolveEmergencyLog);

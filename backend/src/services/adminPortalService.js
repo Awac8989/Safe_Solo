@@ -12,10 +12,61 @@ const SystemLog = require('../models/SystemLog');
 const KYCDocument = require('../models/KYCDocument');
 const ThankYouNote = require('../models/ThankYouNote');
 const VolunteerResponse = require('../models/VolunteerResponse');
+const HazardReport = require('../models/HazardReport');
+const DisasterAlert = require('../models/DisasterAlert');
 const { mapUserDoc, toIso } = require('../lib/mongoCore');
 const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 const hitlIncidentStates = new Map();
+const incidentSopStates = new Map();
+
+const dangerGeofences = [
+  {
+    id: 'geo-zone-1',
+    name: 'Điểm ngập sâu ngã tư Nguyễn Hữu Cảnh - Ung Văn Khiêm',
+    category: 'FLOODING',
+    severity: 'CRITICAL',
+    center: { lat: 10.7981, lng: 106.7142 },
+    radiusMeters: 450,
+    address: 'Đường Nguyễn Hữu Cảnh, P. 25, Q. Bình Thạnh',
+    status: 'ACTIVE',
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    expiresAt: new Date(Date.now() + 3600000 * 8).toISOString(),
+    activePeopleCount: 14,
+    broadcastCount: 86,
+    description: 'Triều cường dâng cao ngập 0.6m, nhiều xe máy chết máy và té ngã.',
+  },
+  {
+    id: 'geo-zone-2',
+    name: 'Đoạn đường tối & mất an ninh gầm cầu Ba Son',
+    category: 'DARK_ROAD',
+    severity: 'WARNING',
+    center: { lat: 10.7765, lng: 106.7082 },
+    radiusMeters: 350,
+    address: 'Khu vực gầm Cầu Ba Son, Bến Nghé, Quận 1',
+    status: 'ACTIVE',
+    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    expiresAt: new Date(Date.now() + 3600000 * 36).toISOString(),
+    activePeopleCount: 6,
+    broadcastCount: 124,
+    description: 'Hệ thống đèn đường đang sửa chữa, có phản ánh nhóm đối tượng khả nghi theo đuôi.',
+  },
+  {
+    id: 'geo-zone-3',
+    name: 'Khu vực công trình rào chắn & bẫy đinh đường Hoàng Sa',
+    category: 'ROAD_HAZARD',
+    severity: 'WARNING',
+    center: { lat: 10.7892, lng: 106.6921 },
+    radiusMeters: 280,
+    address: 'Đường Hoàng Sa, P. Đa Kao, Quận 1',
+    status: 'ACTIVE',
+    createdAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+    expiresAt: new Date(Date.now() + 3600000 * 16).toISOString(),
+    activePeopleCount: 9,
+    broadcastCount: 42,
+    description: 'Đoạn cua hẹp rào tôn che khuất tầm nhìn, phát hiện nhiều đinh kim loại trên mặt đường.',
+  },
+];
 
 function svgDataUrl(markup) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(markup)}`;
@@ -1264,6 +1315,817 @@ class AdminPortalService {
         digitalSeal: legalHash.slice(0, 18),
         auditStandard: 'ISO 27001 & HITL SafeSolo Security Standard',
       },
+    };
+  }
+
+  async listHazards() {
+    let hazards = await HazardReport.find().sort({ createdAt: -1 });
+
+    // If no hazards in DB yet, auto-seed realistic demo data around TP.HCM
+    if (!hazards || hazards.length === 0) {
+      const demoHazards = [
+        {
+          userId: 'demo-user-1',
+          authorName: 'Lê Văn Hoàng (Hiệp sĩ Q.5)',
+          title: 'Đoạn đường tối thiếu đèn chiếu sáng',
+          description: 'Hệ thống đèn đường ngã tư bị chập, đoạn dài 300m rất tối sau 21h, đề phòng cướp giật.',
+          category: 'DARK_ROAD',
+          lat: 10.7570,
+          lng: 106.6630,
+          address: 'Giao lộ Nguyễn Tri Phương - An Dương Vương, Phường 8, Quận 5',
+          status: 'ACTIVE',
+          confirmCount: 7,
+          resolvedCount: 0,
+        },
+        {
+          userId: 'demo-user-2',
+          authorName: 'Trần Minh Tâm (Cư dân Q.7)',
+          title: 'Ngập nước sâu do triều cường 40cm',
+          description: 'Đoạn đường ngập nửa bánh xe, nhiều xe máy chết máy, đã có 2 hiệp sĩ cắm chốt hỗ trợ đẩy xe.',
+          category: 'FLOODING',
+          lat: 10.7420,
+          lng: 106.6840,
+          address: 'Đường Trần Xuân Soạn (đoạn chân Cầu Tân Thuận), Quận 7',
+          status: 'ACTIVE',
+          confirmCount: 14,
+          resolvedCount: 0,
+        },
+        {
+          userId: 'demo-user-3',
+          authorName: 'Đoàn Minh Quân (Trực ban)',
+          title: 'Va chạm xe máy tại giao lộ - đang chờ cứu hộ',
+          description: 'Va quẹt 2 xe máy, nạn nhân xây xát nhẹ đã được sơ cứu, cảnh sát giao thông đang xử lý.',
+          category: 'ACCIDENT',
+          lat: 10.7680,
+          lng: 106.6710,
+          address: 'Ngã tư Lý Thường Kiệt - Đường 3 Tháng 2, Phường 7, Quận 10',
+          status: 'ACTIVE',
+          confirmCount: 9,
+          resolvedCount: 0,
+        },
+        {
+          userId: 'demo-user-4',
+          authorName: 'Nguyễn Thị Bích (Người đi bộ)',
+          title: 'Đối tượng khả nghi áp sát người đi bộ ban đêm',
+          description: 'Hai đối tượng chạy xe Exciter không biển số lượn quanh khu vực công viên, đã báo bảo vệ.',
+          category: 'SUSPICIOUS_PERSON',
+          lat: 10.7710,
+          lng: 106.6950,
+          address: 'Công viên 23 Tháng 9 (gần ga xe buýt ngầm), Phạm Ngũ Lão, Quận 1',
+          status: 'ACTIVE',
+          confirmCount: 12,
+          resolvedCount: 0,
+        },
+        {
+          userId: 'demo-user-5',
+          authorName: 'Phan Hữu Thắng (Hiệp sĩ Q.3)',
+          title: 'Mặt đường sụt lún rào chắn công trình tạm',
+          description: 'Hố ga thi công đào đường không đậy nắp cẩn thận, biển báo lỏng lẻo dễ gây té ngã xe máy.',
+          category: 'ROAD_HAZARD',
+          lat: 10.7810,
+          lng: 106.6870,
+          address: 'Đường Nam Kỳ Khởi Nghĩa (gần ngã tư Điện Biên Phủ), Phường 7, Quận 3',
+          status: 'ACTIVE',
+          confirmCount: 5,
+          resolvedCount: 0,
+        },
+        {
+          userId: 'demo-user-6',
+          authorName: 'Võ Minh Trí (Tài xế công nghệ)',
+          title: 'Bẫy đinh rải dốc cầu kênh tẻ',
+          description: 'Nghi vấn rải đinh hình thoi dốc cầu hướng Q4 sang Q7, đội tình nguyện đã thu gom được 15 đinh.',
+          category: 'ROAD_HAZARD',
+          lat: 10.7510,
+          lng: 106.6980,
+          address: 'Dốc Cầu Kênh Tẻ (hướng Quận 4 sang Quận 7)',
+          status: 'RESOLVED',
+          confirmCount: 18,
+          resolvedCount: 18,
+        },
+      ];
+
+      try {
+        hazards = await HazardReport.insertMany(demoHazards);
+      } catch (err) {
+        hazards = demoHazards.map((h, i) => ({ ...h, _id: `hz-demo-${i + 1}`, createdAt: new Date().toISOString() }));
+      }
+    }
+
+    const mapped = (hazards || []).map((h) => {
+      const row = h.toObject ? h.toObject() : h;
+      const isAccident = row.category === 'ACCIDENT';
+      const timemarkPhotoUrl = row.timemarkPhotoUrl || (isAccident ? 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80' : '');
+      const timemarkMeta = row.timemarkMeta || (isAccident ? {
+        timestamp: '17/09/2026 15:15:20 GMT+7',
+        lat: Number(row.lat || 10.7680),
+        lng: Number(row.lng || 106.6710),
+        address: row.address || 'Ngã tư Lý Thường Kiệt - Đường 3 Tháng 2, Quận 10',
+        hash: 'SHA256: 9F2D8A41-7BC9-4B52-8812-E51A18F9C4A2',
+        device: 'SafeSolo Cam v2.4 (TimeMark Real-Time Certified)'
+      } : null);
+
+      return {
+        id: String(row._id),
+        title: row.title,
+        description: row.description || '',
+        category: row.category,
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        address: row.address || '',
+        status: row.status || 'ACTIVE',
+        authorName: row.authorName || 'Cộng đồng SafeSolo',
+        confirmCount: Number(row.confirmCount || 1),
+        resolvedCount: Number(row.resolvedCount || 0),
+        timemarkPhotoUrl,
+        timemarkMeta,
+        severity: row.severity || (isAccident ? 'P1_CRITICAL' : 'P2_URGENT'),
+        victimCount: row.victimCount || (isAccident ? '1 người (Bất tỉnh)' : 'Không có'),
+        victimCondition: row.victimCondition || (isAccident ? 'Chấn thương chi dưới, bất tỉnh tạm thời' : ''),
+        reportedByPhone: row.reportedByPhone || (isAccident ? '0908.115.999' : ''),
+        createdAt: toIso(row.createdAt),
+      };
+    });
+
+    return {
+      hazards: mapped,
+      stats: {
+        total: mapped.length,
+        active: mapped.filter((h) => h.status === 'ACTIVE').length,
+        resolved: mapped.filter((h) => h.status === 'RESOLVED').length,
+        darkRoads: mapped.filter((h) => h.category === 'DARK_ROAD').length,
+        floodings: mapped.filter((h) => h.category === 'FLOODING').length,
+        accidents: mapped.filter((h) => h.category === 'ACCIDENT').length,
+        suspicious: mapped.filter((h) => h.category === 'SUSPICIOUS_PERSON').length,
+      },
+    };
+  }
+
+  async verifyHazard(id, action = 'VERIFY') {
+    const hazard = await HazardReport.findById(id);
+    if (!hazard) {
+      return { id, action, success: true, message: 'Updated in-memory' };
+    }
+    if (action === 'RESOLVE') {
+      hazard.status = 'RESOLVED';
+      hazard.resolvedCount = (hazard.resolvedCount || 0) + 1;
+    } else {
+      hazard.confirmCount = (hazard.confirmCount || 0) + 1;
+    }
+    await hazard.save();
+    return { id, status: hazard.status, confirmCount: hazard.confirmCount, success: true };
+  }
+
+  async createHazard(payload) {
+    const doc = await HazardReport.create({
+      userId: payload.userId || 'admin-dispatcher',
+      authorName: payload.authorName || 'Trung tâm Điều phối SafeSolo',
+      title: payload.title || 'Khu vực cảnh báo nguy hiểm',
+      description: payload.description || '',
+      category: payload.category || 'ROAD_HAZARD',
+      lat: Number(payload.lat),
+      lng: Number(payload.lng),
+      address: payload.address || '',
+      status: 'ACTIVE',
+      confirmCount: 5,
+    });
+    return { success: true, hazard: doc.toObject() };
+  }
+
+  async getMultiVictimVitals() {
+    const overview = await this.getOverview();
+    const incidents = overview.incidents || [];
+
+    return incidents.map((inc) => {
+      const p = inc.hitl?.priority || 'P2_URGENT';
+      const isCritical = p === 'P1_CRITICAL';
+      return {
+        incidentId: inc.id,
+        victimName: inc.name,
+        victimPhone: inc.phoneNumber,
+        age: inc.age || 28,
+        blood: inc.blood || 'O+',
+        priority: p,
+        severity: inc.severity,
+        status: inc.status,
+        address: inc.address,
+        location: inc.location,
+        receivedAt: inc.receivedAt,
+        vitals: {
+          heartRate: inc.vitals?.heartRate || (isCritical ? 128 : 82),
+          spo2: inc.vitals?.spo2 || (isCritical ? 91 : 98),
+          hrvRmssd: inc.vitals?.hrvRmssd || (isCritical ? 18 : 42),
+          strokeRisk: inc.vitals?.strokeRisk || (isCritical ? 'NGUY CƠ CAO (Rung nhĩ AFib)' : 'Bình thường'),
+          fallDetected: Boolean(isCritical),
+          battery: inc.vitals?.battery || 82,
+          device: inc.vitals?.device || 'Samsung Galaxy Watch 5 (WearOS)',
+          status: isCritical ? 'CẢNH BÁO NGUY HIỂM' : 'ĐANG THEO DÕI',
+          syncTime: 'Trực tiếp qua 4G eSIM',
+        },
+      };
+    });
+  }
+
+  async getB2BOverview() {
+    const enterprises = [
+      {
+        id: 'ent-01',
+        name: 'Công ty Cổ phần Dịch vụ Bảo vệ Long Hoàng',
+        code: 'LONGHOANG-SEC',
+        industry: 'Dịch vụ An ninh & Bảo vệ Mục tiêu',
+        activeWorkers: 68,
+        totalWorkers: 72,
+        checkInInterval: 30,
+        complianceRate: 98.5,
+        alertsToday: 0,
+        contactPerson: 'Nguyễn Văn Minh (Trưởng ban An toàn EHS)',
+        contactPhone: '0903841122',
+        servicePlan: 'ENTERPRISE_LONE_WORKER_PRO',
+        activeShifts: [
+          { workerName: 'Trần Văn Kiên', post: 'Trạm điện biến áp Hóc Môn (Đêm)', deadline: '15 phút nữa', status: 'ON_TRACK', battery: 88 },
+          { workerName: 'Phạm Đức Duy', post: 'Kho hàng lạnh Khu CNC Quận 9', deadline: '5 phút nữa', status: 'PENDING_CHECKIN', battery: 64 },
+          { workerName: 'Lê Hoàng Nam', post: 'Tòa nhà văn phòng Landmark 81', deadline: '22 phút nữa', status: 'ON_TRACK', battery: 92 },
+        ],
+      },
+      {
+        id: 'ent-02',
+        name: 'Đội Giao Hàng Đêm - GHTK Express TP.HCM',
+        code: 'GHTK-NIGHT-LOGISTICS',
+        industry: 'Vận chuyển & Giao vận 24/7',
+        activeWorkers: 124,
+        totalWorkers: 130,
+        checkInInterval: 60,
+        complianceRate: 96.8,
+        alertsToday: 1,
+        contactPerson: 'Vũ Quốc Toàn (Phó Giám đốc Vận hành)',
+        contactPhone: '0918772233',
+        servicePlan: 'ENTERPRISE_FLEET_SAFETY',
+        activeShifts: [
+          { workerName: 'Nguyễn Tiến Dũng', post: 'Tuyến Q.12 - Củ Chi (Xe tải 2.5T)', deadline: '18 phút nữa', status: 'ON_TRACK', battery: 76 },
+          { workerName: 'Hoàng Văn Lộc', post: 'Tuyến Bình Chánh - Q.8 (Xe máy)', deadline: '2 phút nữa', status: 'URGENT_CHECKIN', battery: 38 },
+        ],
+      },
+      {
+        id: 'ent-03',
+        name: 'Trung tâm Kỹ thuật Viễn thông VNPT Net 2',
+        code: 'VNPT-FIELD-ENGINEERS',
+        industry: 'Hạ tầng Viễn thông & Trạm BTS Cao độ',
+        activeWorkers: 45,
+        totalWorkers: 48,
+        checkInInterval: 45,
+        complianceRate: 99.1,
+        alertsToday: 0,
+        contactPerson: 'Đặng Thanh Tùng (Chuyên viên EHS Cấp cao)',
+        contactPhone: '0944889900',
+        servicePlan: 'ENTERPRISE_HAZARDOUS_WORK',
+        activeShifts: [
+          { workerName: 'Đào Xuân Hùng', post: 'Trạm BTS Núi Bà Đen - Leo trụ', deadline: '35 phút nữa', status: 'ON_TRACK', battery: 95 },
+          { workerName: 'Bùi Anh Tuấn', post: 'Hầm cáp ngầm đại lộ Võ Văn Kiệt', deadline: '12 phút nữa', status: 'ON_TRACK', battery: 84 },
+        ],
+      },
+      {
+        id: 'ent-04',
+        name: 'Mạng lưới Cấp cứu 115 Đối tác SafeSolo',
+        code: 'EMERGENCY-115-NETWORK',
+        industry: 'Y tế Cấp cứu & Bệnh viện',
+        activeWorkers: 38,
+        totalWorkers: 38,
+        checkInInterval: 15,
+        complianceRate: 100.0,
+        alertsToday: 0,
+        contactPerson: 'Bác sĩ CKII Nguyễn Văn Hùng',
+        contactPhone: '02838554137',
+        servicePlan: 'NATIONAL_PARAMEDIC_TIER',
+        activeShifts: [
+          { workerName: 'Kíp Cứu Thương Xe 03', post: 'Trực sẵn sàng - BV Chợ Rẫy', deadline: '10 phút nữa', status: 'STANDBY', battery: 100 },
+          { workerName: 'Kíp Cứu Thương Xe 07', post: 'Trực sẵn sàng - BV 115', deadline: '10 phút nữa', status: 'STANDBY', battery: 100 },
+        ],
+      },
+    ];
+
+    const totalMonitored = enterprises.reduce((sum, e) => sum + e.activeWorkers, 0);
+    const avgCompliance = (enterprises.reduce((sum, e) => sum + e.complianceRate, 0) / enterprises.length).toFixed(1);
+
+    return {
+      stats: {
+        totalEnterprises: enterprises.length,
+        totalMonitoredWorkers: totalMonitored,
+        averageComplianceRate: Number(avgCompliance),
+        activeShiftsCount: 275,
+        alertsTodayCount: 1,
+        systemHealth: '99.98% SLA UP',
+      },
+      enterprises,
+    };
+  }
+
+  async getHeroFleet() {
+    const radarData = await this.getHeroRadar();
+    const realHeroes = radarData || [];
+
+    const fleet = realHeroes.map((hero, idx) => {
+      const statuses = ['ON_DUTY', 'AVAILABLE', 'ON_MISSION', 'AVAILABLE'];
+      const currentStatus = statuses[idx % statuses.length];
+      const zones = ['Khu vực Quận 1 - Bến Nghé', 'Khu vực Quận 5 - Chợ Lớn', 'Khu vực Quận 7 - Phú Mỹ Hưng', 'Khu vực Quận 10 - Bắc Hải', 'Khu vực Quận 3 - Bàn Cờ'];
+      return {
+        id: hero.id || `hero-${idx + 1}`,
+        name: hero.name,
+        phone: hero.phone,
+        trustScore: hero.trustScore,
+        rescuesCount: hero.rescuesCount || (12 + idx * 3),
+        status: currentStatus,
+        location: hero.location,
+        zone: zones[idx % zones.length],
+        responseEta: `${idx + 2} phút`,
+        battery: 85 - idx * 4,
+        equippedGear: [
+          'Túi sơ cứu đa năng SafeSolo',
+          idx % 2 === 0 ? 'Máy sốc tim AED tự động' : 'Đèn pin tuần tra siêu sáng 2000lm',
+          'Camera hành trình (Bodycam)',
+          'Bộ đàm khẩn cấp PTT',
+        ],
+        availableBountyVND: (1500000 + idx * 350000),
+        ratingStars: 4.9,
+      };
+    });
+
+    const safeHavensInventory = [
+      { name: 'BV Chợ Rẫy (Trạm số 1)', aedStatus: 'SẴN SÀNG (Pin 100%)', oxygenStatus: '100% (2 bình 10L)', firstAidKit: 'Đầy đủ' },
+      { name: 'Công an Phường Bến Nghé (Trạm số 2)', aedStatus: 'SẴN SÀNG (Pin 95%)', oxygenStatus: 'Tiêu chuẩn', firstAidKit: 'Đầy đủ' },
+      { name: 'Circle K 24/7 Nguyễn Thị Minh Khai (Trạm số 3)', aedStatus: 'SẴN SÀNG (Pin 90%)', oxygenStatus: 'N/A', firstAidKit: 'Vừa bổ sung gạc & nẹp' },
+      { name: 'Cây xăng Petrolimex Hàng Xanh (Trạm số 4)', aedStatus: 'ĐANG KIỂM ĐỊNH', oxygenStatus: 'N/A', firstAidKit: 'Cần bổ sung băng ép' },
+    ];
+
+    return {
+      fleet,
+      stats: {
+        totalHeroes: fleet.length,
+        onDutyCount: fleet.filter((h) => h.status === 'ON_DUTY' || h.status === 'AVAILABLE').length,
+        onMissionCount: fleet.filter((h) => h.status === 'ON_MISSION').length,
+        totalRescuesThisMonth: 148,
+        averageResponseTimeMinutes: 2.8,
+        bountyFundPoolVND: 45000000,
+        bountyDisbursedThisMonthVND: 18500000,
+      },
+      safeHavensInventory,
+    };
+  }
+
+  async disburseHeroBounty(heroId, amount = 200000, reason = 'Hỗ trợ xăng xe & sơ cứu tại chỗ') {
+    return {
+      success: true,
+      heroId,
+      disbursedAmountVND: Number(amount),
+      reason,
+      transferredAt: new Date().toISOString(),
+      transactionRef: `BNT-${Date.now().toString().slice(-6)}`,
+      digitalSignature: crypto.randomBytes(8).toString('hex').toUpperCase(),
+    };
+  }
+
+  async getIncidentPlayback(incidentId) {
+    const overview = await this.getOverview();
+    const incident = overview.incidents.find((item) => String(item.id) === String(incidentId)) || overview.incidents[0];
+
+    const baseLat = incident?.location?.lat || 10.7725;
+    const baseLng = incident?.location?.lng || 106.6980;
+    const victimName = incident?.name || 'Nguyễn Thị Thu Trang';
+    const incidentType = incident?.type || 'SOS';
+
+    const startSec = -45;
+    const endSec = 115;
+    const relSecondsList = [
+      -45, -40, -35, -30, -25, -20, -15, -12, -8, -5, -2, 0, 2, 3, 5, 8, 12, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70, 80, 90, 100, 110, 115,
+    ];
+
+    const timelinePoints = [];
+    for (let i = 0; i < relSecondsList.length; i++) {
+      const relSec = relSecondsList[i];
+      const isBeforeImpact = relSec < 0;
+      const isAtImpact = relSec >= -2 && relSec <= 3;
+
+      const progressToImpact = Math.min(1, Math.max(0, (relSec + 45) / 43));
+      const latOffset = isBeforeImpact ? (1 - progressToImpact) * 0.0035 : 0;
+      const lngOffset = isBeforeImpact ? (1 - progressToImpact) * -0.0042 : (relSec > 20 ? (Math.sin(relSec) * 0.00005) : 0);
+
+      let speedKmH = 0;
+      if (relSec < -10) speedKmH = 34 + Math.round(Math.sin(i) * 3);
+      else if (relSec < -2) speedKmH = Math.max(0, 32 - (relSec + 10) * 4);
+      else speedKmH = 0;
+
+      let heartRate = 74 + Math.round(Math.sin(i * 0.5) * 4);
+      if (relSec >= -2 && relSec <= 15) {
+        heartRate = Math.min(152, 78 + Math.round((relSec + 2) * 4.5));
+      } else if (relSec > 15) {
+        heartRate = 124 + Math.round(Math.sin(i) * 4);
+      }
+
+      let spo2 = 98;
+      if (relSec > 0 && relSec <= 30) {
+        spo2 = Math.max(91, 98 - Math.round(relSec * 0.25));
+      } else if (relSec > 30) {
+        spo2 = 91 + (i % 2 === 0 ? 1 : 0);
+      }
+
+      let gForce = 1.0 + Number((Math.sin(i) * 0.08).toFixed(2));
+      if (isAtImpact) {
+        gForce = relSec === 0 ? 4.8 : 3.2;
+      }
+
+      let decibel = 52 + Math.round(Math.random() * 8);
+      if (relSec >= -5 && relSec < -1) decibel = 74;
+      if (relSec >= -1 && relSec <= 1) decibel = 89;
+      if (relSec >= 3 && relSec <= 7) decibel = 81;
+      if (relSec >= 15 && relSec <= 40) decibel = 95;
+
+      let eventLabel = null;
+      if (relSec === -45) eventLabel = 'Bắt đầu giám sát ca đêm SafeSolo';
+      else if (relSec === -5) eventLabel = 'Phát hiện tiếng phanh gấp đột ngột (74dB)';
+      else if (relSec === 0) eventLabel = 'Va chạm mạnh (4.8g) & Té ngã tự do';
+      else if (relSec === 3) eventLabel = 'Nạn nhân kêu cứu & Nhịp tim tăng vọt 146 bpm';
+      else if (relSec === 15) eventLabel = 'Tự động kích hoạt còi báo động khẩn cấp';
+      else if (relSec === 35) eventLabel = 'Hệ thống gửi SMS / Zalo cho Người thân ICE';
+      else if (relSec === 60) eventLabel = 'Điều phối viên SafeSolo duyệt phái cử cứu hộ';
+      else if (relSec === 90) eventLabel = 'Hiệp sĩ Lê Hữu Phước xác nhận đang tiếp cận';
+
+      const sign = relSec < 0 ? '-' : '+';
+      const absSec = Math.abs(relSec);
+      const m = String(Math.floor(absSec / 60)).padStart(2, '0');
+      const s = String(absSec % 60).padStart(2, '0');
+      const timeFormatted = `T${sign}${m}:${s}`;
+
+      timelinePoints.push({
+        relSec,
+        timeFormatted,
+        lat: Number((baseLat + latOffset).toFixed(6)),
+        lng: Number((baseLng + lngOffset).toFixed(6)),
+        speedKmH,
+        heartRate,
+        spo2,
+        gForce,
+        decibel,
+        eventLabel,
+      });
+    }
+
+    const eventMilestones = [
+      { time: 'T-00:45', title: 'Khởi hành bình thường', desc: 'Tốc độ 34 km/h, nhịp tim 76 bpm, nhịp sinh tồn ổn định.', category: 'NORMAL' },
+      { time: 'T-00:05', title: 'Phanh gấp cơ học', desc: 'Phát hiện âm thanh rít bánh phanh 74dB trên đường vắng.', category: 'WARNING' },
+      { time: 'T+00:00', title: 'Va chạm chấn thương & Rơi tự do', desc: 'Cảm biến gia tốc phát hiện lực va đập 4.8g. Galaxy Watch ghi nhận cú ngã nghiêm trọng.', category: 'CRITICAL' },
+      { time: 'T+00:03', title: 'Tín hiệu âm thanh SOS', desc: 'Microphone ghi nhận tiếng la hét và từ khóa "Cứu tôi với". Nhịp tim vọt lên 146 bpm.', category: 'CRITICAL' },
+      { time: 'T+00:15', title: 'Hú còi khẩn cấp & Khóa bằng chứng', desc: 'Kích hoạt còi hú 95dB trên điện thoại và niêm phong file âm thanh vào Hộp đen.', category: 'SYSTEM' },
+      { time: 'T+00:35', title: 'Báo động đa kênh Người thân', desc: 'Gửi SMS & tin nhắn Telegram đính kèm vị trí GPS đến số liên lạc khẩn cấp (Bà Mai).', category: 'DISPATCH' },
+      { time: 'T+01:00', title: 'Điều phối viên HITL can thiệp', desc: 'Điều phối viên Đoàn Minh Quân (SUP-0137) xác thực tín hiệu, duyệt phái cử tức thì.', category: 'DISPATCH' },
+      { time: 'T+01:30', title: 'Hiệp sĩ SafeSolo xuất phát', desc: 'Hiệp sĩ Lê Hữu Phước (cách 320m) nhận nhiệm vụ và đang di chuyển tới hiện trường.', category: 'RESCUE' },
+    ];
+
+    const blackboxHash = `0x${crypto.createHash('sha256').update(`${incident.id}:${baseLat}:${baseLng}:BLACKBOX_RECORDER_EVIDENCE`).digest('hex')}`;
+
+    return {
+      incidentId: incident.id,
+      incidentType,
+      victimName,
+      deviceModel: incident?.vitals?.device || 'Samsung Galaxy Watch 5 (WearOS)',
+      durationSeconds: endSec - startSec,
+      startSec,
+      endSec,
+      baseLocation: { lat: baseLat, lng: baseLng, address: incident?.address || 'Quận 1, TP. HCM' },
+      blackboxHash,
+      timelinePoints,
+      eventMilestones,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async listGeofences() {
+    const totalActive = dangerGeofences.filter((g) => g.status === 'ACTIVE').length;
+    const totalMonitored = dangerGeofences.reduce((acc, curr) => acc + (curr.status === 'ACTIVE' ? curr.activePeopleCount : 0), 0);
+    const totalBroadcasts = dangerGeofences.reduce((acc, curr) => acc + curr.broadcastCount, 0);
+
+    return {
+      geofences: dangerGeofences,
+      stats: {
+        total: dangerGeofences.length,
+        active: totalActive,
+        totalMonitoredUsers: totalMonitored,
+        totalBroadcastsDispatched: totalBroadcasts,
+      },
+    };
+  }
+
+  async createGeofence(payload = {}) {
+    const newId = `geo-zone-${Date.now()}`;
+    const durationHours = Number(payload.durationHours) || 12;
+    const radiusMeters = Number(payload.radiusMeters) || 350;
+
+    const geofence = {
+      id: newId,
+      name: String(payload.name || 'Vùng cảnh báo nguy hiểm').trim(),
+      category: payload.category || 'ROAD_HAZARD',
+      severity: payload.severity || 'WARNING',
+      center: {
+        lat: Number(payload.lat) || 10.7765,
+        lng: Number(payload.lng) || 106.7009,
+      },
+      radiusMeters,
+      address: String(payload.address || 'TP. Hồ Chí Minh').trim(),
+      status: 'ACTIVE',
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + durationHours * 3600000).toISOString(),
+      activePeopleCount: Math.floor(Math.random() * 12) + 3,
+      broadcastCount: 0,
+      description: String(payload.description || 'Cảnh báo tự động thiết lập bởi Điều phối viên SafeSolo').trim(),
+    };
+
+    dangerGeofences.unshift(geofence);
+    return geofence;
+  }
+
+  async toggleGeofence(id) {
+    const geofence = dangerGeofences.find((g) => g.id === id);
+    if (!geofence) {
+      throw new Error('Geofence zone not found');
+    }
+    geofence.status = geofence.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    return geofence;
+  }
+
+  async deleteGeofence(id) {
+    const idx = dangerGeofences.findIndex((g) => g.id === id);
+    if (idx !== -1) {
+      const removed = dangerGeofences.splice(idx, 1)[0];
+      return { success: true, removedId: removed.id };
+    }
+    return { success: true, removedId: id };
+  }
+
+  async broadcastGeofenceAlert(id, customMessage = '') {
+    const geofence = dangerGeofences.find((g) => g.id === id);
+    if (!geofence) {
+      throw new Error('Geofence zone not found');
+    }
+    geofence.broadcastCount += geofence.activePeopleCount || 10;
+
+    // Auto-create active DisasterAlert so all mobile users in region receive the notification
+    try {
+      await this.createDisasterAlert({
+        title: `[CẢNH BÁO KHẨN CẤP] ${geofence.name}`,
+        description: geofence.description || customMessage,
+        category: geofence.category || 'FLOODING',
+        severity: geofence.severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING',
+        lat: geofence.center?.lat || 10.7765,
+        lng: geofence.center?.lng || 106.7009,
+        radiusMeters: geofence.radiusMeters || 1000,
+        address: geofence.address || '',
+        safetyAdvice: customMessage || 'Khu vực nguy cơ cao. Vui lòng di chuyển theo lộ trình an toàn tránh né vùng rủi ro.',
+        evacuationRouteTip: 'Chọn tuyến đường song song không qua vùng cảnh báo.',
+        issuedBy: 'Ban Điều Phối Cứu Hộ SafeSolo',
+        broadcastCount: geofence.broadcastCount,
+      });
+    } catch (_) {}
+
+    return {
+      success: true,
+      geofenceId: geofence.id,
+      geofenceName: geofence.name,
+      recipientsCount: geofence.activePeopleCount,
+      broadcastTimestamp: new Date().toISOString(),
+      message: customMessage || `[CẢNH BÁO AN TOÀN SAFESOLO] Bạn đang ở gần vùng rủi ro: ${geofence.name}. Vui lòng giảm tốc độ hoặc chọn lộ trình thay thế.`,
+    };
+  }
+
+  async listDisasterAlerts() {
+    let alerts = await DisasterAlert.find().sort({ createdAt: -1 });
+    if (!alerts || alerts.length === 0) {
+      const seedAlerts = [
+        {
+          title: 'CẢNH BÁO SẠT LỞ ĐẤT ĐÈO BẢO LỘC - NGUY HIỂM',
+          description: 'Mưa lớn kéo dài gây sạt trượt taluy dương tại Km 104+200, đất đá tràn mặt đường, nguy cơ sạt lở thứ cấp cao.',
+          category: 'LANDSLIDE',
+          severity: 'CRITICAL',
+          lat: 11.4720,
+          lng: 107.7260,
+          radiusMeters: 5000,
+          address: 'Đèo Bảo Lộc, Quốc lộ 20, Tỉnh Lâm Đồng',
+          safetyAdvice: 'Tuyệt đối không lưu thông qua đèo trong lúc mưa lớn. Tìm nơi dừng đỗ an toàn tại chân đèo hoặc đi vòng theo hướng Tỉnh lộ 725.',
+          evacuationRouteTip: 'Đường tránh Tỉnh lộ 725 qua Huyện Đạ Tẻh ➔ Bảo Lâm.',
+          status: 'ACTIVE',
+          issuedBy: 'Ban Chỉ Huy PCTT & TKCN / Trực ban SafeSolo',
+          broadcastCount: 142,
+        },
+        {
+          title: 'NGẬP NƯỚC SÂU 0.7M ĐƯỜNG TRẦN XUÂN SOẠN TRIỀU CƯỜNG ĐỈNH ĐIỂM',
+          description: 'Triều cường sông Sài Gòn vượt mức báo động 3, nước tràn ngập đường sâu trên 60-70cm, nhiều xe chết máy, nguy cơ rò rỉ điện.',
+          category: 'FLOODING',
+          severity: 'CRITICAL',
+          lat: 10.7420,
+          lng: 106.6840,
+          radiusMeters: 1500,
+          address: 'Đường Trần Xuân Soạn (từ Cầu Rạch Ông đến Cầu Tân Thuận), Quận 7, TP.HCM',
+          safetyAdvice: 'Không cố đi xe qua vùng nước ngập quá bánh xe. Tránh xa các trạm biến áp, tủ điện ven đường.',
+          evacuationRouteTip: 'Di chuyển theo trục Đường Nguyễn Thị Thập hoặc Cầu Kênh Tẻ.',
+          status: 'ACTIVE',
+          issuedBy: 'Trung tâm Điều phối Cứu hộ SafeSolo Q7',
+          broadcastCount: 385,
+        },
+      ];
+      try {
+        alerts = await DisasterAlert.insertMany(seedAlerts);
+      } catch (_) {
+        alerts = seedAlerts.map((a, i) => ({ ...a, _id: `disaster-demo-${i + 1}`, createdAt: new Date() }));
+      }
+    }
+
+    return (alerts || []).map((a) => {
+      const row = a.toObject ? a.toObject() : a;
+      return {
+        id: String(row._id),
+        title: row.title,
+        description: row.description || '',
+        category: row.category || 'FLOODING',
+        severity: row.severity || 'CRITICAL',
+        lat: Number(row.lat),
+        lng: Number(row.lng),
+        radiusMeters: Number(row.radiusMeters || 2000),
+        address: row.address || '',
+        safetyAdvice: row.safetyAdvice || '',
+        evacuationRouteTip: row.evacuationRouteTip || '',
+        status: row.status || 'ACTIVE',
+        issuedBy: row.issuedBy || 'Ban Điều Phối SafeSolo',
+        broadcastCount: Number(row.broadcastCount || 1),
+        resolvedAt: toIso(row.resolvedAt),
+        createdAt: toIso(row.createdAt),
+      };
+    });
+  }
+
+  async createDisasterAlert(payload = {}) {
+    const alert = await DisasterAlert.create({
+      title: payload.title || 'Cảnh báo nguy hiểm khẩn cấp',
+      description: payload.description || '',
+      category: payload.category || 'FLOODING',
+      severity: payload.severity || 'CRITICAL',
+      lat: Number(payload.lat || 10.7769),
+      lng: Number(payload.lng || 106.7009),
+      radiusMeters: Number(payload.radiusMeters || 2000),
+      address: payload.address || '',
+      safetyAdvice: payload.safetyAdvice || '',
+      evacuationRouteTip: payload.evacuationRouteTip || '',
+      status: 'ACTIVE',
+      issuedBy: payload.issuedBy || 'Ban Điều Phối Cứu Hộ SafeSolo',
+      broadcastCount: Number(payload.broadcastCount || 1),
+    });
+
+    // Also auto create/sync a hazard report so community feed shows it
+    try {
+      await HazardReport.create({
+        userId: 'admin-dispatcher',
+        authorName: 'BAN ĐIỀU PHỐI SAFESOLO (ADMIN)',
+        title: alert.title,
+        description: `${alert.description}\n\n[Khuyến cáo an toàn]: ${alert.safetyAdvice}`,
+        category: alert.category,
+        lat: alert.lat,
+        lng: alert.lng,
+        address: alert.address,
+        status: 'ACTIVE',
+        confirmCount: 50,
+        isAdminBroadcast: true,
+        severity: alert.severity === 'CRITICAL' ? 'P1_CRITICAL' : 'P2_URGENT',
+      });
+    } catch (_) {}
+
+    return alert.toObject ? alert.toObject() : alert;
+  }
+
+  async resolveDisasterAlert(id) {
+    const alert = await DisasterAlert.findById(id);
+    if (!alert) {
+      return { success: false, message: 'Disaster alert not found' };
+    }
+    alert.status = 'RESOLVED';
+    alert.resolvedAt = new Date();
+    await alert.save();
+    return { success: true, alert: alert.toObject ? alert.toObject() : alert };
+  }
+
+  async getAiIncidentBriefing(incidentId) {
+    const overview = await this.getOverview();
+    const incident = overview.incidents.find((item) => String(item.id) === String(incidentId)) || overview.incidents[0];
+
+    const existingState = incidentSopStates.get(String(incident.id));
+    const initialSteps = [
+      {
+        code: 'SOP_VERIFY_GUARDIAN',
+        label: 'Xác thực định vị & Ping đa kênh cho người thân (Guardian Circle)',
+        status: 'COMPLETED',
+        autoExecuted: true,
+        completedAt: new Date(Date.now() - 45000).toISOString(),
+        actor: 'Hệ thống SafeSolo Auto-Dispatch',
+        description: 'Đã gửi tọa độ GPS mờ hóa & thông báo khẩn qua Zalo ZNS và Telegram Bot.',
+      },
+      {
+        code: 'SOP_DISPATCH_HEROES',
+        label: 'Phái cử 2 Hiệp sĩ sơ cấp cứu SafeSolo gần nhất (< 600m)',
+        status: 'COMPLETED',
+        autoExecuted: true,
+        completedAt: new Date(Date.now() - 25000).toISOString(),
+        actor: 'Đoàn Minh Quân (SUP-0137)',
+        description: 'Hiệp sĩ Lê Hữu Phước (cách 320m) và Phan Thị Mai (cách 480m) đã nhận nhiệm vụ.',
+      },
+      {
+        code: 'SOP_REMOTE_SIREN',
+        label: 'Kích hoạt còi hú âm lượng tối đa 100dB từ xa trên điện thoại nạn nhân',
+        status: 'PENDING',
+        autoExecuted: false,
+        canExecute: true,
+        description: 'Phát còi báo động xua đuổi kẻ gian và hỗ trợ người đi đường nhanh chóng phát hiện nạn nhân.',
+      },
+      {
+        code: 'SOP_DISPATCH_115',
+        label: 'Xuất hồ sơ y tế & Chuyển giao xe Cấp cứu 115 Bệnh viện Chợ Rẫy',
+        status: incident.hitl?.state === 'AMBULANCE_DISPATCHED' ? 'COMPLETED' : 'PENDING',
+        autoExecuted: false,
+        canExecute: true,
+        description: 'Chuyển gói dữ liệu tiền sử bệnh (Nhóm máu O+, hen suyễn) và sinh tồn cho kíp cấp cứu 115.',
+      },
+      {
+        code: 'SOP_START_3WAY_CALL',
+        label: 'Khởi tạo phòng đàm thoại khẩn cấp 3 bên (Điều phối viên - Nạn nhân - Hiệp sĩ)',
+        status: 'PENDING',
+        autoExecuted: false,
+        canExecute: true,
+        description: 'Mở kênh PTT Voice VoIP trực tiếp để hướng dẫn nạn nhân giữ bình tĩnh và hỗ trợ hiệp sĩ tìm ngõ.',
+      },
+    ];
+
+    const sopSteps = existingState ? existingState.sopSteps : initialSteps;
+
+    return {
+      incidentId: incident.id,
+      victimName: incident.name,
+      incidentType: incident.type,
+      credibilityScore: 98,
+      credibilityVerdict: 'XÁC THỰC CAO (98% Sự cố thực tế / 2% Báo động giả)',
+      riskLevel: incident.severity >= 4 ? 'CỰC KỲ NGUY HIỂM (P1_CRITICAL)' : 'NGUY HIỂM (P2_URGENT)',
+      multimodalAnalysis: {
+        audio: {
+          decibelPeak: 88,
+          detectedKeywords: ['cứu tôi với', 'đau quá', 'tiếng va chạm xe'],
+          transcript: 'Phát hiện tiếng rít phanh gấp (1.8s) -> Va chạm cơ học 88dB -> Nạn nhân la hét "Đau chân quá, cứu tôi với!" ở giây thứ 3.',
+          ambientStatus: 'Đường vắng đêm khuya, không có tạp âm phụ huynh/trẻ em đùa nghịch.',
+        },
+        motion: {
+          impactG: 4.8,
+          freeFallDurationMs: 650,
+          postImpactImmobilitySeconds: 45,
+          status: 'Té ngã chấn thương & Bất động (Man-Down Protocol kích hoạt)',
+        },
+        biometrics: {
+          baselineHr: 76,
+          peakHr: 146,
+          currentHr: incident.vitals?.heartRate || 124,
+          spo2: incident.vitals?.spo2 || 91,
+          rhythm: incident.vitals?.strokeRisk || 'Rung nhĩ kịch phát (AFib) - Nguy cơ sốc chấn thương',
+        },
+        medicalContext: {
+          bloodType: incident.blood || 'O+',
+          allergies: incident.allergies || 'Không có',
+          chronicConditions: 'Hen suyễn nhẹ',
+          emergencyContact: `${incident.emergencyContactName} - ${incident.emergencyContactPhone}`,
+        },
+      },
+      goldenHourPrognosis: {
+        remainingMinutes: 11,
+        risk: 'NGUY CƠ TỤT HUYẾT ÁP & THIẾU OXY NÃO',
+        advice: 'Cần can thiệp nẹp cố định chi & hỗ trợ hô hấp trong vòng 11 phút để ngăn ngừa thiếu máu cục bộ.',
+      },
+      sopSteps,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async executeSopAction(incidentId, actionCode, payload = {}) {
+    const briefing = await this.getAiIncidentBriefing(incidentId);
+    const steps = briefing.sopSteps;
+    const targetStep = steps.find((s) => s.code === actionCode);
+
+    if (!targetStep) {
+      throw new Error(`SOP Action code ${actionCode} not found`);
+    }
+
+    targetStep.status = 'COMPLETED';
+    targetStep.completedAt = new Date().toISOString();
+    targetStep.actor = payload.supervisorName || 'Đoàn Minh Quân (Trưởng ca SUP-0137)';
+    targetStep.note = payload.note || 'Thực thi 1-chạm thành công';
+
+    incidentSopStates.set(String(incidentId), { sopSteps: steps });
+
+    return {
+      success: true,
+      incidentId,
+      actionCode,
+      updatedStep: targetStep,
+      sopSteps: steps,
+      executedAt: new Date().toISOString(),
     };
   }
 }

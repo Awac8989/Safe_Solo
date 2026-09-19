@@ -195,80 +195,90 @@ class _PermissionsPageState extends State<PermissionsPage> {
     return Scaffold(
       body: AppPage(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 22),
-            Text(
-              strings.text('Cấp quyền hệ thống', 'Grant system permissions'),
-              style: AppTextStyles.h1.copyWith(fontSize: 34),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 22),
+                    Text(
+                      strings.text('Cấp quyền hệ thống', 'Grant system permissions'),
+                      style: AppTextStyles.h1.copyWith(fontSize: 34),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      strings.text(
+                        'Để SafeSolo bảo vệ bạn khi cần, ứng dụng cần các quyền sau:',
+                        'For SafeSolo to protect you when needed, it requires these permissions:',
+                      ),
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.55,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _PermissionCard(
+                      icon: Icons.location_on_outlined,
+                      title: strings.text('Vị trí', 'Location'),
+                      description: strings.text(
+                        'Gửi tọa độ chính xác cho người bảo hộ và bản đồ SOS.',
+                        'Share precise coordinates with guardians and SOS maps.',
+                      ),
+                      granted: _locationGranted,
+                      onTap: () => _requestSinglePermission(Permission.location),
+                    ),
+                    const SizedBox(height: 14),
+                    _PermissionCard(
+                      icon: Icons.mic_none_rounded,
+                      title: strings.text('Micro', 'Microphone'),
+                      description: strings.text(
+                        'Thu âm ghi chú khẩn cấp và push-to-talk.',
+                        'Record emergency voice notes and push-to-talk audio.',
+                      ),
+                      granted: _microphoneGranted,
+                      onTap: () => _requestSinglePermission(Permission.microphone),
+                    ),
+                    const SizedBox(height: 14),
+                    _PermissionCard(
+                      icon: Icons.notifications_active_outlined,
+                      title: strings.text('Thông báo', 'Notifications'),
+                      description: strings.text(
+                        'Nhận nhắc check-in và thông báo SOS gần bạn.',
+                        'Receive check-in reminders and nearby SOS alerts.',
+                      ),
+                      granted: _notificationGranted,
+                      onTap: () => _requestSinglePermission(Permission.notification),
+                    ),
+                    const SizedBox(height: 14),
+                    _PermissionCard(
+                      icon: Icons.contacts_outlined,
+                      title: strings.text('Danh bạ', 'Contacts'),
+                      description: strings.text(
+                        'Thêm nhanh người bảo hộ và liên hệ khẩn cấp.',
+                        'Quickly add guardians and emergency contacts.',
+                      ),
+                      granted: _contactsGranted,
+                      onTap: () => _requestSinglePermission(Permission.contacts),
+                    ),
+                    const SizedBox(height: 14),
+                    _PermissionCard(
+                      icon: Icons.battery_charging_full_rounded,
+                      title: strings.text('Chạy ngầm 24/7 (Bỏ tối ưu pin)', '24/7 Unrestricted Battery'),
+                      description: strings.text(
+                        'Cho phép SafeSolo chạy liên tục không bị Android đóng băng khi tắt màn hình.',
+                        'Allows SafeSolo to run continuously 24/7 without being killed by Android Doze.',
+                      ),
+                      granted: _batteryOptGranted,
+                      onTap: () => _requestSinglePermission(Permission.ignoreBatteryOptimizations),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 12),
-            Text(
-              strings.text(
-                'Để SafeSolo bảo vệ bạn khi cần, ứng dụng cần các quyền sau:',
-                'For SafeSolo to protect you when needed, it requires these permissions:',
-              ),
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.55,
-              ),
-            ),
-            const SizedBox(height: 28),
-            _PermissionCard(
-              icon: Icons.location_on_outlined,
-              title: strings.text('Vị trí', 'Location'),
-              description: strings.text(
-                'Gửi tọa độ chính xác cho người bảo hộ và bản đồ SOS.',
-                'Share precise coordinates with guardians and SOS maps.',
-              ),
-              granted: _locationGranted,
-              onTap: () => _requestSinglePermission(Permission.location),
-            ),
-            const SizedBox(height: 16),
-            _PermissionCard(
-              icon: Icons.mic_none_rounded,
-              title: strings.text('Micro', 'Microphone'),
-              description: strings.text(
-                'Thu âm ghi chú khẩn cấp và push-to-talk.',
-                'Record emergency voice notes and push-to-talk audio.',
-              ),
-              granted: _microphoneGranted,
-              onTap: () => _requestSinglePermission(Permission.microphone),
-            ),
-            const SizedBox(height: 16),
-            _PermissionCard(
-              icon: Icons.notifications_active_outlined,
-              title: strings.text('Thông báo', 'Notifications'),
-              description: strings.text(
-                'Nhận nhắc check-in và thông báo SOS gần bạn.',
-                'Receive check-in reminders and nearby SOS alerts.',
-              ),
-              granted: _notificationGranted,
-              onTap: () => _requestSinglePermission(Permission.notification),
-            ),
-            const SizedBox(height: 16),
-            _PermissionCard(
-              icon: Icons.contacts_outlined,
-              title: strings.text('Danh bạ', 'Contacts'),
-              description: strings.text(
-                'Thêm nhanh người bảo hộ và liên hệ khẩn cấp.',
-                'Quickly add guardians and emergency contacts.',
-              ),
-              granted: _contactsGranted,
-              onTap: () => _requestSinglePermission(Permission.contacts),
-            ),
-            const SizedBox(height: 16),
-            _PermissionCard(
-              icon: Icons.battery_charging_full_rounded,
-              title: strings.text('Chạy ngầm 24/7 (Bỏ tối ưu pin)', '24/7 Unrestricted Battery'),
-              description: strings.text(
-                'Cho phép SafeSolo chạy liên tục không bị Android đóng băng khi tắt màn hình.',
-                'Allows SafeSolo to run continuously 24/7 without being killed by Android Doze.',
-              ),
-              granted: _batteryOptGranted,
-              onTap: () => _requestSinglePermission(Permission.ignoreBatteryOptimizations),
-            ),
-            const Spacer(),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

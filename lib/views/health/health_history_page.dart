@@ -625,7 +625,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                             title: item.autoTriggered
                                 ? strings.text('Tự động điểm danh (Wearable)', 'Auto check-in (Wearable)')
                                 : strings.text('Điểm danh an toàn', 'Safe check-in'),
-                            subtitle: _dateTimeFormat.format(DateTime.parse(item.createdAt)),
+                            subtitle: _formatDateTime(item.createdAt),
                             trailing: item.location == null
                                 ? null
                                 : '${item.location!['lat']}, ${item.location!['lng']}',
@@ -669,7 +669,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                             iconColor: _alertColor(item.status, item.level),
                             title: item.title,
                             subtitle:
-                                '${item.status ?? '-'} · ${_dateTimeFormat.format(DateTime.parse(item.createdAt))}',
+                                '${item.status ?? '-'} · ${_formatDateTime(item.createdAt)}',
                             body: item.message,
                           ),
                         ),
@@ -713,11 +713,21 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
   }
 
   String _formatDate(String value) {
+    if (value.trim().isEmpty) return '--';
     final parsed = DateTime.tryParse(value);
     if (parsed == null) {
       return value;
     }
-    return _dateFormat.format(parsed);
+    return _dateFormat.format(parsed.toLocal());
+  }
+
+  String _formatDateTime(String value) {
+    if (value.trim().isEmpty) return '--';
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) {
+      return value;
+    }
+    return _dateTimeFormat.format(parsed.toLocal());
   }
 
   String _moodLabel(AppStrings strings, String key) {

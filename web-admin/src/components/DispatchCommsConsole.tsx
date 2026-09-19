@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Phone, PhoneCall, PhoneOff, Mic, Send, Check, HeartHandshake, AlertCircle, Stethoscope } from "lucide-react";
+import { Phone, PhoneCall, PhoneOff, Mic, Send, Check, HeartHandshake, AlertCircle, Stethoscope, Radio } from "lucide-react";
 
 interface DispatchCommsConsoleProps {
   victimName: string;
@@ -23,13 +23,10 @@ export function DispatchCommsConsole({
   const [selectedProtocol, setSelectedProtocol] = useState<"CPR" | "FAST" | "RECOVERY">("FAST");
   const [sentMessageNotice, setSentMessageNotice] = useState<string | null>(null);
 
-  // Call duration counter
   useEffect(() => {
     let timer: any;
     if (activeCallTarget) {
-      timer = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-      }, 1000);
+      timer = setInterval(() => setCallDuration((prev) => prev + 1), 1000);
     } else {
       setCallDuration(0);
     }
@@ -47,9 +44,7 @@ export function DispatchCommsConsole({
 
   const handleSendProtocol = (protocolName: string) => {
     setSentMessageNotice(`Đã gửi hướng dẫn [${protocolName}] qua Zalo ZNS & SMS tới Người thân & Hiệp sĩ!`);
-    setTimeout(() => {
-      setSentMessageNotice(null);
-    }, 4000);
+    setTimeout(() => setSentMessageNotice(null), 4000);
   };
 
   const formatDuration = (seconds: number) => {
@@ -58,9 +53,31 @@ export function DispatchCommsConsole({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const [isPttMode, setIsPttMode] = useState(false);
+  const [isTransmitting, setIsTransmitting] = useState(false);
+  const [pttChannel, setPttChannel] = useState<"VICTIM" | "HEROES">("HEROES");
+  const [transcripts, setTranscripts] = useState<Array<{ sender: string; text: string; time: string }>>([
+    { sender: "Trực ban (SUP-0137)", text: "SafeSolo TOC gọi Hiệp sĩ Lê Hữu Phước và Phan Thị Mai, có nạn nhân AFib nhịp tim 124 cách vị trí 320m.", time: "14:24:10" },
+    { sender: "Hiệp sĩ Lê Hữu Phước", text: "Rõ! Tôi đang di chuyển qua đường Nguyễn Tri Phương, ETA 1 phút 30 giây.", time: "14:24:25" },
+  ]);
+
+  const handlePttStart = () => {
+    setIsTransmitting(true);
+  };
+
+  const handlePttEnd = () => {
+    if (!isTransmitting) return;
+    setIsTransmitting(false);
+    const now = new Date().toLocaleTimeString("vi-VN");
+    const msg = pttChannel === "HEROES"
+      ? "Lệnh điều phối: Xe 115 Chợ Rẫy đã xuất phát, các hiệp sĩ tiếp cận mở đường ưu tiên."
+      : "Trực ban đang nói: Bạn hãy giữ bình tĩnh, nằm yên tại chỗ, đội cứu hộ SafeSolo đang đến gần bạn 200m.";
+    setTranscripts((prev) => [...prev, { sender: "Trực ban (Phát thanh PTT)", text: msg, time: now }]);
+  };
+
   return (
     <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 shadow-md backdrop-blur space-y-3">
-      {/* 1. Header */}
+      {/* 1. Header with Mode Toggle */}
       <div className="flex items-center justify-between border-b border-border/50 pb-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
@@ -68,18 +85,108 @@ export function DispatchCommsConsole({
           </div>
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Trung Tâm Đàm Thoại & Chỉ Dẫn Sơ Cứu 1-Chạm
+              Tổng Đài Đàm Thoại & Bộ Đàm Web PTT
             </span>
-            <p className="text-[10px] text-muted-foreground">Kênh VoIP WebRTC trực ban & Cẩm nang y tế cấp cứu ban đầu</p>
+            <p className="text-[10px] text-muted-foreground">Phát thanh hiện trường 2 chiều & Cẩm nang sơ cấp cứu ban đầu</p>
           </div>
         </div>
-        <span className="font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-          WEBRTC READY
-        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setIsPttMode(false)}
+            className={`rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
+              !isPttMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            CUỘC GỌI
+          </button>
+          <button
+            onClick={() => setIsPttMode(true)}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
+              isPttMode ? "bg-amber-600 text-white animate-pulse" : "text-amber-400 bg-amber-950/20 hover:bg-amber-950/40"
+            }`}
+          >
+            <Radio className="h-3 w-3" /> BỘ ĐÀM PTT
+          </button>
+        </div>
       </div>
 
-      {/* 2. Active Call Box (If In-Call) */}
-      {activeCallTarget ? (
+      {/* 2. PTT Mode vs Call Mode */}
+      {isPttMode ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-950/10 p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${isTransmitting ? "bg-rose-500 animate-ping" : "bg-emerald-500"}`} />
+              <span className="text-xs font-bold text-amber-400">
+                {isTransmitting ? "🔴 ĐANG PHÁT THANH TRỰC TIẾP (ON AIR)" : "KÊNH BỘ ĐÀM SẴN SÀNG"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 text-[11px]">
+              <button
+                onClick={() => setPttChannel("HEROES")}
+                className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  pttChannel === "HEROES" ? "bg-emerald-600 text-white" : "text-muted-foreground bg-background"
+                }`}
+              >
+                Kênh Hiệp Sĩ (3 người)
+              </button>
+              <button
+                onClick={() => setPttChannel("VICTIM")}
+                className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                  pttChannel === "VICTIM" ? "bg-sky-600 text-white" : "text-muted-foreground bg-background"
+                }`}
+              >
+                Loa Ngoài Nạn Nhân
+              </button>
+            </div>
+          </div>
+
+          {/* Waveform Visualizer & Push-To-Talk Trigger */}
+          <div className="flex flex-col items-center justify-center p-3 rounded-xl border border-border/60 bg-[#070b14] space-y-2">
+            <div className="flex items-center gap-1 h-6">
+              {[12, 24, 18, 28, 14, 30, 22, 16, 26, 12, 20, 32, 15, 25, 10].map((h, i) => (
+                <span
+                  key={i}
+                  className={`w-1 rounded-full transition-all duration-75 ${
+                    isTransmitting ? "bg-emerald-400 animate-pulse" : "bg-muted-foreground/30"
+                  }`}
+                  style={{ height: isTransmitting ? `${(h * (1 + (i % 3) * 0.2)).toFixed(0)}px` : "4px" }}
+                />
+              ))}
+            </div>
+
+            <button
+              onMouseDown={handlePttStart}
+              onMouseUp={handlePttEnd}
+              onTouchStart={handlePttStart}
+              onTouchEnd={handlePttEnd}
+              className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-xl transition select-none active:scale-95 ${
+                isTransmitting
+                  ? "bg-rose-600 ring-4 ring-rose-500/50 animate-pulse"
+                  : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90"
+              }`}
+            >
+              <Mic className={`h-4 w-4 ${isTransmitting ? "animate-bounce" : ""}`} />
+              {isTransmitting ? "NHẢ CHUỘT ĐỂ DỪNG PHÁT" : "GIỮ ĐỂ NÓI (PUSH TO TALK)"}
+            </button>
+            <p className="text-[10px] text-muted-foreground">Giữ chuột hoặc ngón tay để phát giọng nói HD 16kHz</p>
+          </div>
+
+          {/* Live Audio Transcript Box */}
+          <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1.5 max-h-28 overflow-y-auto">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center justify-between">
+              <span>Bản Ghi Bóc Tách Đàm Thoại (Live Transcription):</span>
+              <span className="text-emerald-400 font-mono">AI WHISPER ON</span>
+            </div>
+            {transcripts.map((t, idx) => (
+              <div key={idx} className="text-[11px] leading-tight flex items-start gap-1.5">
+                <span className="font-mono text-[10px] text-muted-foreground shrink-0">{t.time}</span>
+                <span className="font-bold text-sky-400 shrink-0">[{t.sender}]:</span>
+                <span className="text-foreground">{t.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : activeCallTarget ? (
         <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/20 p-3 animate-pulse">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

@@ -407,3 +407,411 @@ export const fetchIncidentDossier = async (incidentId: string) => {
   return request<{ success: true; data: IncidentDossier }>(`/admin/incidents/${incidentId}/dossier`);
 };
 
+export type HazardItem = {
+  id: string;
+  title: string;
+  description: string;
+  category: "DARK_ROAD" | "SUSPICIOUS_PERSON" | "ROAD_HAZARD" | "FLOODING" | "ACCIDENT" | "OTHER";
+  lat: number;
+  lng: number;
+  address: string;
+  status: "ACTIVE" | "RESOLVED" | "EXPIRED";
+  authorName: string;
+  confirmCount: number;
+  resolvedCount: number;
+  timemarkPhotoUrl?: string;
+  timemarkMeta?: {
+    timestamp: string;
+    lat: number;
+    lng: number;
+    address: string;
+    hash?: string;
+    device?: string;
+  } | null;
+  severity?: "P1_CRITICAL" | "P2_URGENT" | "P3_SUPPORT";
+  victimCount?: string;
+  victimCondition?: string;
+  reportedByPhone?: string;
+  createdAt: string;
+};
+
+export type HazardsResponse = {
+  success: true;
+  data: {
+    hazards: HazardItem[];
+    stats: {
+      total: number;
+      active: number;
+      resolved: number;
+      darkRoads: number;
+      floodings: number;
+      accidents: number;
+      suspicious: number;
+    };
+  };
+};
+
+export const fetchHazards = async () => {
+  return request<HazardsResponse>("/admin/hazards");
+};
+
+export const verifyHazard = async (hazardId: string, action: "VERIFY" | "RESOLVE") => {
+  return request<{ success: true; data: any }>(`/admin/hazards/${hazardId}/verify`, {
+    method: "PATCH",
+    body: JSON.stringify({ action }),
+  });
+};
+
+export const createHazard = async (payload: Partial<HazardItem>) => {
+  return request<{ success: true; data: any }>("/admin/hazards", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export type MultiVictimVitalsItem = {
+  incidentId: string;
+  victimName: string;
+  victimPhone: string;
+  age: number;
+  blood: string;
+  priority: "P1_CRITICAL" | "P2_URGENT" | "P3_MONITORING";
+  severity: number;
+  status: string;
+  address: string;
+  location?: { lat: number; lng: number } | null;
+  receivedAt: string;
+  vitals: {
+    heartRate: number;
+    spo2: number;
+    hrvRmssd: number;
+    strokeRisk: string;
+    fallDetected: boolean;
+    battery: number;
+    device: string;
+    status: string;
+    syncTime: string;
+  };
+};
+
+export const fetchMultiVictimVitals = async () => {
+  return request<{ success: true; data: MultiVictimVitalsItem[] }>("/admin/vitals/active");
+};
+
+export type B2BEnterprise = {
+  id: string;
+  name: string;
+  code: string;
+  industry: string;
+  activeWorkers: number;
+  totalWorkers: number;
+  checkInInterval: number;
+  complianceRate: number;
+  alertsToday: number;
+  contactPerson: string;
+  contactPhone: string;
+  servicePlan: string;
+  activeShifts: Array<{
+    workerName: string;
+    post: string;
+    deadline: string;
+    status: string;
+    battery: number;
+  }>;
+};
+
+export type B2BOverviewResponse = {
+  success: true;
+  data: {
+    stats: {
+      totalEnterprises: number;
+      totalMonitoredWorkers: number;
+      averageComplianceRate: number;
+      activeShiftsCount: number;
+      alertsTodayCount: number;
+      systemHealth: string;
+    };
+    enterprises: B2BEnterprise[];
+  };
+};
+
+export const fetchB2BOverview = async () => {
+  return request<B2BOverviewResponse>("/admin/b2b/overview");
+};
+
+export type HeroFleetItem = {
+  id: string;
+  name: string;
+  phone: string;
+  trustScore: number;
+  rescuesCount: number;
+  status: "ON_DUTY" | "AVAILABLE" | "ON_MISSION" | "RESTING";
+  location: { lat: number; lng: number; district?: string };
+  zone: string;
+  responseEta: string;
+  battery: number;
+  equippedGear: string[];
+  availableBountyVND: number;
+  ratingStars: number;
+};
+
+export type HeroFleetResponse = {
+  success: true;
+  data: {
+    fleet: HeroFleetItem[];
+    stats: {
+      totalHeroes: number;
+      onDutyCount: number;
+      onMissionCount: number;
+      totalRescuesThisMonth: number;
+      averageResponseTimeMinutes: number;
+      bountyFundPoolVND: number;
+      bountyDisbursedThisMonthVND: number;
+    };
+    safeHavensInventory: Array<{
+      name: string;
+      aedStatus: string;
+      oxygenStatus: string;
+      firstAidKit: string;
+    }>;
+  };
+};
+
+export const fetchHeroFleet = async () => {
+  return request<HeroFleetResponse>("/admin/heroes/fleet");
+};
+
+export const disburseHeroBounty = async (heroId: string, amount: number, reason: string) => {
+  return request<{ success: true; data: any }>(`/admin/heroes/${heroId}/bounty`, {
+    method: "POST",
+    body: JSON.stringify({ amount, reason }),
+  });
+};
+
+// ==========================================
+// P1: Incident Timeline Playback (Flight Recorder)
+// ==========================================
+export type PlaybackPoint = {
+  relSec: number;
+  timeFormatted: string;
+  lat: number;
+  lng: number;
+  speedKmH: number;
+  heartRate: number;
+  spo2: number;
+  gForce: number;
+  decibel: number;
+  eventLabel: string | null;
+};
+
+export type PlaybackMilestone = {
+  time: string;
+  title: string;
+  desc: string;
+  category: string;
+};
+
+export type IncidentPlaybackData = {
+  incidentId: string;
+  incidentType: string;
+  victimName: string;
+  deviceModel: string;
+  durationSeconds: number;
+  startSec: number;
+  endSec: number;
+  baseLocation: { lat: number; lng: number; address: string };
+  blackboxHash: string;
+  timelinePoints: PlaybackPoint[];
+  eventMilestones: PlaybackMilestone[];
+  generatedAt: string;
+};
+
+export const fetchIncidentPlayback = async (incidentId: string) => {
+  return request<{ success: true; data: IncidentPlaybackData }>(`/admin/incidents/${incidentId}/playback`);
+};
+
+// ==========================================
+// P2: Dynamic Danger Geofences
+// ==========================================
+export type DangerGeofenceItem = {
+  id: string;
+  name: string;
+  category: "FLOODING" | "DARK_ROAD" | "ROAD_HAZARD" | "CRIME_HOTSPOT" | "CONSTRUCTION";
+  severity: "CRITICAL" | "WARNING" | "ADVISORY";
+  center: {
+    lat: number;
+    lng: number;
+  };
+  radiusMeters: number;
+  address: string;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  expiresAt: string;
+  activePeopleCount: number;
+  broadcastCount: number;
+  description: string;
+};
+
+export type DangerGeofencesResponse = {
+  success: true;
+  data: {
+    geofences: DangerGeofenceItem[];
+    stats: {
+      total: number;
+      active: number;
+      totalMonitoredUsers: number;
+      totalBroadcastsDispatched: number;
+    };
+  };
+};
+
+export const fetchDangerGeofences = async () => {
+  return request<DangerGeofencesResponse>("/admin/geofences");
+};
+
+export const createDangerGeofence = async (payload: Partial<DangerGeofenceItem> & { durationHours?: number }) => {
+  return request<{ success: true; data: DangerGeofenceItem }>("/admin/geofences", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const toggleDangerGeofence = async (geofenceId: string) => {
+  return request<{ success: true; data: DangerGeofenceItem }>(`/admin/geofences/${geofenceId}/toggle`, {
+    method: "PATCH",
+  });
+};
+
+export const deleteDangerGeofence = async (geofenceId: string) => {
+  return request<{ success: true; data: { success: true; removedId: string } }>(`/admin/geofences/${geofenceId}`, {
+    method: "DELETE",
+  });
+};
+
+export const broadcastGeofenceAlert = async (geofenceId: string, message?: string) => {
+  return request<{
+    success: true;
+    geofenceId: string;
+    geofenceName: string;
+    recipientsCount: number;
+    broadcastTimestamp: string;
+    message: string;
+  }>(`/admin/geofences/${geofenceId}/broadcast`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+};
+
+// ==========================================
+// P3: AI Incident Briefing & SOP Engine
+// ==========================================
+export type SopStepItem = {
+  code: string;
+  label: string;
+  status: "COMPLETED" | "PENDING";
+  autoExecuted: boolean;
+  completedAt?: string;
+  actor?: string;
+  canExecute?: boolean;
+  description: string;
+  note?: string;
+};
+
+export type AiBriefingData = {
+  incidentId: string;
+  victimName: string;
+  incidentType: string;
+  credibilityScore: number;
+  credibilityVerdict: string;
+  riskLevel: string;
+  multimodalAnalysis: {
+    audio: {
+      decibelPeak: number;
+      detectedKeywords: string[];
+      transcript: string;
+      ambientStatus: string;
+    };
+    motion: {
+      impactG: number;
+      freeFallDurationMs: number;
+      postImpactImmobilitySeconds: number;
+      status: string;
+    };
+    biometrics: {
+      baselineHr: number;
+      peakHr: number;
+      currentHr: number;
+      spo2: number;
+      rhythm: string;
+    };
+    medicalContext: {
+      bloodType: string;
+      allergies: string;
+      chronicConditions: string;
+      emergencyContact: string;
+    };
+  };
+  goldenHourPrognosis: {
+    remainingMinutes: number;
+    risk: string;
+    advice: string;
+  };
+  sopSteps: SopStepItem[];
+  generatedAt: string;
+};
+
+export const fetchAiIncidentBriefing = async (incidentId: string) => {
+  return request<{ success: true; data: AiBriefingData }>(`/admin/incidents/${incidentId}/ai-briefing`);
+};
+
+export const executeSopAction = async (incidentId: string, actionCode: string, payload?: Record<string, any>) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    actionCode: string;
+    updatedStep: SopStepItem;
+    sopSteps: SopStepItem[];
+    executedAt: string;
+  }>(`/admin/incidents/${incidentId}/sop-action`, {
+    method: "POST",
+    body: JSON.stringify({ actionCode, ...(payload || {}) }),
+  });
+};
+
+export type DisasterAlertItem = {
+  id: string;
+  title: string;
+  description: string;
+  category: "FLOODING" | "LANDSLIDE" | "CRITICAL_DANGER" | "STORM_SURGE" | "ROAD_HAZARD" | "DARK_ROAD";
+  severity: "CRITICAL" | "WARNING" | "ADVISORY";
+  lat: number;
+  lng: number;
+  radiusMeters: number;
+  address: string;
+  safetyAdvice: string;
+  evacuationRouteTip: string;
+  status: "ACTIVE" | "RESOLVED";
+  issuedBy: string;
+  broadcastCount: number;
+  createdAt: string;
+  resolvedAt?: string | null;
+};
+
+export const fetchDisasterAlerts = async () => {
+  return request<{ success: true; data: DisasterAlertItem[] }>("/admin/disaster-alerts");
+};
+
+export const createDisasterAlert = async (payload: Partial<DisasterAlertItem>) => {
+  return request<{ success: true; data: DisasterAlertItem }>("/admin/disaster-alerts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const resolveDisasterAlert = async (id: string) => {
+  return request<{ success: true; data: { alert: DisasterAlertItem } }>(`/admin/disaster-alerts/${id}/resolve`, {
+    method: "PATCH",
+  });
+};
+
+

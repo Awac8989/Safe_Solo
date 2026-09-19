@@ -264,11 +264,27 @@ function DispatchCenter() {
         {/* Cockpit Status & Action Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/60 px-4 py-2.5 shadow-sm">
           <div className="flex items-center gap-2 text-xs">
-            <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
-            <span className="font-bold text-foreground">TRỰC BAN:</span>
-            <span className="text-muted-foreground">Đoàn Minh Quân (SUP-0137)</span>
-            <span className="text-border">|</span>
-            <span className="text-muted-foreground font-mono">Độ trễ: 12ms (Live Stream)</span>
+            {overviewQuery.isError ? (
+              <>
+                <span className="flex h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping" />
+                <span className="font-bold text-rose-400">MẤT KẾT NỐI MÁY CHỦ BACKEND (PORT 4000)</span>
+                <span className="text-border">|</span>
+                <button
+                  onClick={() => overviewQuery.refetch()}
+                  className="text-xs text-sky-400 underline font-semibold hover:text-sky-300"
+                >
+                  Kết nối lại
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="font-bold text-foreground">TRỰC BAN:</span>
+                <span className="text-muted-foreground">Đoàn Minh Quân (SUP-0137)</span>
+                <span className="text-border">|</span>
+                <span className="text-muted-foreground font-mono">Độ trễ: 12ms (Live Stream)</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -346,9 +362,26 @@ function DispatchCenter() {
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {overviewQuery.isLoading ? (
-                <div className="text-sm text-muted-foreground">Đang tải danh sách sự cố...</div>
+                <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground gap-2">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  <span>Đang kết nối trung tâm dữ liệu...</span>
+                </div>
               ) : overviewQuery.isError ? (
-                <div className="text-sm text-sos">{overviewQuery.error.message}</div>
+                <div className="rounded-lg border border-sos/30 bg-sos/10 p-4 text-xs text-sos space-y-2">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    Không thể kết nối máy chủ SafeSolo Backend
+                  </div>
+                  <p className="text-muted-foreground text-[11px]">
+                    Vui lòng kiểm tra backend server trên cổng 4000 (cd backend && npm start).
+                  </p>
+                  <button
+                    onClick={() => overviewQuery.refetch()}
+                    className="rounded bg-sos/20 px-2.5 py-1 text-xs font-semibold hover:bg-sos/30 transition text-foreground"
+                  >
+                    Thử kết nối lại
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {incidents.map((incident) => (

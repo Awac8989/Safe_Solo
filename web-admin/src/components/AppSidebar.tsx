@@ -7,6 +7,10 @@ import {
   ScrollText,
   ShieldAlert,
   Smartphone,
+  AlertTriangle,
+  HeartPulse,
+  Briefcase,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -22,12 +26,22 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const items = [
+const operationItems = [
   { title: "Trung tâm điều phối", url: "/", icon: Radio },
+  { title: "Bản đồ hiểm họa", url: "/hazards", icon: AlertTriangle },
+  { title: "Sinh tồn đa nạn nhân", url: "/vitals", icon: HeartPulse },
+];
+
+const fleetAndB2bItems = [
+  { title: "Đội ngũ hiệp sĩ", url: "/heroes", icon: ShieldCheck },
+  { title: "Cổng doanh nghiệp B2B", url: "/b2b", icon: Briefcase },
+  { title: "Người dùng & KYC", url: "/kyc", icon: Users },
+];
+
+const systemItems = [
   { title: "Người dùng ứng dụng", url: "/users", icon: Smartphone },
-  { title: "Người dùng và KYC", url: "/kyc", icon: Users },
-  { title: "Kênh liên lạc", url: "/omnichannel", icon: Network },
-  { title: "Doanh thu và đối tác", url: "/revenue", icon: DollarSign },
+  { title: "Kênh liên lạc & PTT", url: "/omnichannel", icon: Network },
+  { title: "Doanh thu & Đối tác", url: "/revenue", icon: DollarSign },
   { title: "Nhật ký hệ thống", url: "/audit", icon: ScrollText },
 ];
 
@@ -54,11 +68,50 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
+        {/* Group 1: Tác chiến */}
         <SidebarGroup>
-          <SidebarGroupLabel>Điều hành</SidebarGroupLabel>
+          <SidebarGroupLabel>Tác chiến khẩn cấp</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {operationItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={path === item.url}>
+                    <Link to={item.url} className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Group 2: Lực lượng & Doanh nghiệp */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Lực lượng & Doanh nghiệp</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {fleetAndB2bItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={path === item.url}>
+                    <Link to={item.url} className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Group 3: Hệ thống & Báo cáo */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Hệ thống & Báo cáo</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {systemItems.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={path === item.url}>
                     <Link to={item.url} className="flex items-center gap-2">

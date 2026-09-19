@@ -1,5 +1,3 @@
-const { createDeviceSignal } = require('../controllers/userController');
-
 // In-memory store for 6-digit pairing codes
 // code -> { deviceId, deviceModel, socketId, createdAt }
 const pairingCodes = new Map();

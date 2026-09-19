@@ -17,12 +17,16 @@ import {
   UserCheck,
   XCircle,
   FileText,
+  Compass,
+  Brain,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
 import type { AdminOverviewResponse, HitlActionPayload } from "@/lib/api";
 import { LiveVitalsTelemetry } from "@/components/LiveVitalsTelemetry";
 import { DispatchCommsConsole } from "@/components/DispatchCommsConsole";
 import { IncidentDossierModal } from "@/components/IncidentDossierModal";
+import { IncidentPlaybackModal } from "@/components/IncidentPlaybackModal";
+import { AiIncidentCopilotDrawer } from "@/components/AiIncidentCopilotDrawer";
 
 type IncidentItem = AdminOverviewResponse["data"]["incidents"][number];
 
@@ -42,6 +46,8 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
   const [falseAlarmReason, setFalseAlarmReason] = useState("Nạn nhân bấm nhầm");
   const [showAmbulanceModal, setShowAmbulanceModal] = useState(false);
   const [showDossierModal, setShowDossierModal] = useState(false);
+  const [showPlaybackModal, setShowPlaybackModal] = useState(false);
+  const [showAiCopilotDrawer, setShowAiCopilotDrawer] = useState(false);
   const [supervisorCode, setSupervisorCode] = useState("SUP-0137");
 
   const currentState = hitl?.state || "COUNTDOWN_ACTIVE";
@@ -378,7 +384,23 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           onClick={() => setShowDossierModal(true)}
           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 transition"
         >
-          <FileText className="h-4 w-4" /> XUẤT HỒ SƠ (DOSSIER)
+          <FileText className="h-4 w-4" /> HỒ SƠ (DOSSIER)
+        </button>
+
+        {/* P1: Nút Hộp Đen Sự Cố Playback */}
+        <button
+          onClick={() => setShowPlaybackModal(true)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs font-bold text-amber-400 hover:bg-amber-500/20 transition"
+        >
+          <Compass className="h-4 w-4 text-amber-400 animate-spin-slow" /> HỘP ĐEN (PLAYBACK)
+        </button>
+
+        {/* P3: Nút Trợ Lý AI SOP */}
+        <button
+          onClick={() => setShowAiCopilotDrawer(true)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition"
+        >
+          <Brain className="h-4 w-4 text-emerald-400 animate-pulse" /> TRỢ LÝ AI SOP
         </button>
       </div>
 
@@ -471,6 +493,22 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         <IncidentDossierModal
           incidentId={incident.id}
           onClose={() => setShowDossierModal(false)}
+        />
+      )}
+
+      {/* P1: Modal Hộp Đen Tái Hiện Diễn Biến Sự Cố */}
+      {showPlaybackModal && (
+        <IncidentPlaybackModal
+          incidentId={incident.id}
+          onClose={() => setShowPlaybackModal(false)}
+        />
+      )}
+
+      {/* P3: Drawer / Modal Trợ Lý AI SOP & Tình Báo Đa Phương Thức */}
+      {showAiCopilotDrawer && (
+        <AiIncidentCopilotDrawer
+          incidentId={incident.id}
+          onClose={() => setShowAiCopilotDrawer(false)}
         />
       )}
     </div>
