@@ -31,10 +31,10 @@ void main() {
     expect(find.text('CHƯA KẾT NỐI'), findsOneWidget);
 
     // Verify Tab 1 Telemetry Headers
-    expect(find.text('THÔNG SỐ SINH TỒN BIOACTIVE TRỰC TIẾP'), findsOneWidget);
-    expect(find.text('Nhịp tim PPG'), findsOneWidget);
-    expect(find.text('Oxy máu SpO2'), findsOneWidget);
-    expect(find.text('Pin đồng hồ'), findsOneWidget);
+    expect(find.text('CHỈ SỐ SỨC KHỎE TRỰC TIẾP'), findsOneWidget);
+    expect(find.text('Nhịp tim'), findsOneWidget);
+    expect(find.text('Oxy máu (SpO2)'), findsOneWidget);
+    expect(find.text('Pin đồng hồ'), findsWidgets);
   });
 
   testWidgets('WatchSimulatorPage redirects properly to SmartwatchConnectionPage', (WidgetTester tester) async {

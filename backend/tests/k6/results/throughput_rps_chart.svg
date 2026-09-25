@@ -1,0 +1,77 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 400" width="850" height="400" style="background-color: #0F172A; font-family: 'Segoe UI', Arial, sans-serif;">
+  <style>
+    .title { font-size: 16px; font-weight: bold; fill: #FFFFFF; }
+    .subtitle { font-size: 11px; fill: #94A3B8; }
+    .axis { stroke: #334155; stroke-width: 1; }
+    .grid { stroke: #1E293B; stroke-dasharray: 3,3; }
+    .label { font-size: 10px; fill: #94A3B8; }
+    .val-text { font-size: 11px; font-weight: bold; fill: #38EF7D; text-anchor: middle; }
+  </style>
+
+  <text x="80" y="30" class="title">BIỂU ĐỒ 4.2: THÔNG LƯỢNG XỬ LÝ (THROUGHPUT RPS) THEO KỊCH BẢN</text>
+  <text x="80" y="48" class="subtitle">Đo đạc số lượng yêu cầu xử lý thành công mỗi giây (Requests Per Second)</text>
+
+  <line x1="80" y1="320" x2="790" y2="320" class="grid" />
+  <text x="70" y="324" class="label" text-anchor="end">0 req/s</text>
+
+  <line x1="80" y1="255" x2="790" y2="255" class="grid" />
+  <text x="70" y="259" class="label" text-anchor="end">400 req/s</text>
+
+  <line x1="80" y1="190" x2="790" y2="190" class="grid" />
+  <text x="70" y="194" class="label" text-anchor="end">800 req/s</text>
+
+  <line x1="80" y1="125" x2="790" y2="125" class="grid" />
+  <text x="70" y="129" class="label" text-anchor="end">1200 req/s</text>
+
+  <line x1="80" y1="60" x2="790" y2="60" class="grid" />
+  <text x="70" y="64" class="label" text-anchor="end">1600 req/s</text>
+
+  <line x1="80" y1="60" x2="80" y2="320" class="axis" />
+  <line x1="80" y1="320" x2="790" y2="320" class="axis" />
+
+  <defs>
+    <linearGradient id="rpsGrad0" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38EF7D" />
+      <stop offset="100%" stop-color="#11998E" />
+    </linearGradient>
+  </defs>
+  <rect x="147.75" y="87.86875" width="42" height="232.13125" fill="url(#rpsGrad0)" rx="4" />
+  <text x="168.75" y="79.86875" class="val-text">1428.5 rps</text>
+  <text x="168.75" y="340" class="label" text-anchor="middle" font-weight="bold">Kịch bản 1</text>
+  <text x="168.75" y="354" class="label" text-anchor="middle">(10 VUs)</text>
+
+  <defs>
+    <linearGradient id="rpsGrad1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38EF7D" />
+      <stop offset="100%" stop-color="#11998E" />
+    </linearGradient>
+  </defs>
+  <rect x="325.25" y="127.5675" width="42" height="192.4325" fill="url(#rpsGrad1)" rx="4" />
+  <text x="346.25" y="119.5675" class="val-text">1184.2 rps</text>
+  <text x="346.25" y="340" class="label" text-anchor="middle" font-weight="bold">Kịch bản 2</text>
+  <text x="346.25" y="354" class="label" text-anchor="middle">(50 VUs)</text>
+
+  <defs>
+    <linearGradient id="rpsGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38EF7D" />
+      <stop offset="100%" stop-color="#11998E" />
+    </linearGradient>
+  </defs>
+  <rect x="502.75" y="161.465" width="42" height="158.535" fill="url(#rpsGrad2)" rx="4" />
+  <text x="523.75" y="153.465" class="val-text">975.6 rps</text>
+  <text x="523.75" y="340" class="label" text-anchor="middle" font-weight="bold">Kịch bản 3</text>
+  <text x="523.75" y="354" class="label" text-anchor="middle">(100 VUs)</text>
+
+  <defs>
+    <linearGradient id="rpsGrad3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38EF7D" />
+      <stop offset="100%" stop-color="#11998E" />
+    </linearGradient>
+  </defs>
+  <rect x="680.25" y="183.15875" width="42" height="136.84125" fill="url(#rpsGrad3)" rx="4" />
+  <text x="701.25" y="175.15875" class="val-text">842.1 rps</text>
+  <text x="701.25" y="340" class="label" text-anchor="middle" font-weight="bold">Kịch bản 4</text>
+  <text x="701.25" y="354" class="label" text-anchor="middle">(200 VUs)</text>
+
+</svg>

@@ -123,6 +123,84 @@ class _MedicalPageState extends State<MedicalPage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+              InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                onTap: () => Navigator.pushNamed(context, '/lockscreen-medical'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.4),
+                      width: 1.2,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x18EF4444),
+                        blurRadius: 10,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.emergency_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.text(
+                                'Thẻ Cấp Cứu Màn Hình Khóa & Mã QR',
+                                'Lockscreen Medical Card & Emergency QR',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              strings.text(
+                                'Dành cho Bác sĩ 115 & Cứu trợ tiếp cận không cần mở máy',
+                                'For 115 Paramedics & Responders without unlocking phone',
+                              ),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        color: Color(0xFF94A3B8),
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 18),
               _SectionTitle(strings.text('Thông tin cá nhân', 'Personal information')),
               const SizedBox(height: 10),

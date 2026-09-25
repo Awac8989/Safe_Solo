@@ -18,6 +18,7 @@ const CheckInHistorySchema = new mongoose.Schema(
         'VOICE_KEYWORD',
         'SMS_FALLBACK',
         'FAMILY_PING_REPLY',
+        'WATCH_CHECKIN',
       ],
       default: 'HARD_TAP',
     },

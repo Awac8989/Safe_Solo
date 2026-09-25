@@ -148,7 +148,7 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               _SliderRow(
                 icon: Icons.access_time_rounded,
-                title: strings.text('Thời gian ân hạn', 'Grace window'),
+                title: strings.text('Hạn điểm danh an toàn', 'Safety check-in window'),
                 valueText: _formatHours(strings, graceValue.round()),
                 minLabel: '1h',
                 maxLabel: '72h',
@@ -185,14 +185,14 @@ class _SettingsPageState extends State<SettingsPage> {
               const _SectionDivider(),
               _ActionRow(
                 icon: Icons.bedtime_outlined,
-                title: strings.text('Khung giờ yên tĩnh (Bắt đầu)', 'Quiet hours start'),
+                title: strings.text('Bắt đầu giờ yên tĩnh', 'Quiet hours start'),
                 valueText: provider.user?.quietHoursStart ?? '23:00',
                 onTap: () => _pickQuietHours(context, isStart: true),
               ),
               const _SectionDivider(),
               _ActionRow(
                 icon: Icons.wb_sunny_outlined,
-                title: strings.text('Khung giờ yên tĩnh (Kết thúc)', 'Quiet hours end'),
+                title: strings.text('Kết thúc giờ yên tĩnh', 'Quiet hours end'),
                 valueText: provider.user?.quietHoursEnd ?? '06:00',
                 onTap: () => _pickQuietHours(context, isStart: false),
               ),
@@ -226,7 +226,7 @@ class _SettingsPageState extends State<SettingsPage> {
               const _SectionDivider(),
               _SwitchRow(
                 icon: Icons.home_work_outlined,
-                title: strings.text('Tự check-in khi về nhà', 'Auto check-in at home'),
+                title: strings.text('Tự động điểm danh khi về nhà', 'Auto check-in at home'),
                 value: automation.geofenceAutoCheckin,
                 onChanged: (value) => _saveAutomation(provider, geofenceAutoCheckin: value),
               ),
@@ -314,16 +314,24 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 22),
-          AppSectionLabel(strings.text('Trợ năng', 'Accessibility')),
+          AppSectionLabel(strings.text('Giao diện & Hiển thị', 'Appearance & Theme')),
           const SizedBox(height: 10),
           _SectionCard(
             children: [
               _SwitchRow(
-                icon: Icons.contrast_rounded,
-                title: strings.text('Tương phản cao (WCAG AAA)', 'High contrast (WCAG AAA)'),
-                value: provider.highContrast,
+                icon: provider.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                title: strings.text('Chế độ nền tối (Dark Mode)', 'Dark Mode (OLED)'),
+                subtitle: strings.text(
+                  provider.isDarkMode
+                      ? 'Nền đen sâu OLED · Giảm mỏi mắt & tiết kiệm pin'
+                      : 'Nền sáng chuẩn thanh lịch · Dễ nhìn ban ngày',
+                  provider.isDarkMode
+                      ? 'Deep black OLED · Eye comfort & battery saving'
+                      : 'Clean bright light mode · Crisp daytime reading',
+                ),
+                value: provider.isDarkMode,
                 onChanged: (value) => _runGuarded(
-                  () => context.read<AppProvider>().setHighContrast(value),
+                  () => context.read<AppProvider>().setDarkMode(value),
                 ),
               ),
               const _SectionDivider(),
@@ -473,6 +481,16 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: strings.text('Giả lập WearOS (Galaxy Watch 5)', 'WearOS Simulator (Galaxy Watch 5)'),
                   valueText: strings.text('Mở test', 'Open'),
                   onTap: () => Navigator.pushNamed(context, '/wear-os'),
+                ),
+                const _SectionDivider(),
+                _ActionRow(
+                  icon: Icons.biotech_rounded,
+                  title: strings.text(
+                    'Hộp cát Trình diễn Hội đồng (Defense Demo Sandbox)',
+                    'Defense Demo Sandbox (Thesis Presentation)',
+                  ),
+                  valueText: strings.text('Mở thao trường', 'Open Sandbox'),
+                  onTap: () => Navigator.pushNamed(context, '/demo-sandbox'),
                 ),
               ],
             ),
@@ -922,6 +940,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       child: Row(
         children: [
@@ -943,13 +962,26 @@ class _ProfileCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: AppTextStyles.title),
+                Text(
+                  name,
+                  style: AppTextStyles.title.copyWith(
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(subtitle, style: AppTextStyles.body),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.body.copyWith(
+                    color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                  ),
+                ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: isDark ? AppDarkColors.textMuted : AppColors.textMuted,
+          ),
         ],
       ),
     );
@@ -975,7 +1007,12 @@ class _SectionDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(height: 1, thickness: 1, color: AppColors.border);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: isDark ? AppDarkColors.border : AppColors.border,
+    );
   }
 }
 
@@ -996,6 +1033,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -1010,12 +1048,19 @@ class _ActionRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title, style: AppTextStyles.title),
+                  Text(
+                    title,
+                    style: AppTextStyles.title.copyWith(
+                      color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                    ),
+                  ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       subtitle!,
-                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.caption.copyWith(
+                        color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ],
@@ -1026,12 +1071,17 @@ class _ActionRow extends StatelessWidget {
                 child: Text(
                   valueText!,
                   overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary),
+                  style: AppTextStyles.bodyStrong.copyWith(
+                    color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
             ],
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: isDark ? AppDarkColors.textMuted : AppColors.textMuted,
+            ),
           ],
         ),
       ),
@@ -1043,25 +1093,60 @@ class _SwitchRow extends StatelessWidget {
   const _SwitchRow({
     required this.icon,
     required this.title,
+    this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           _LeadingIcon(icon: icon),
           const SizedBox(width: 14),
-          Expanded(child: Text(title, style: AppTextStyles.title)),
-          Switch.adaptive(value: value, onChanged: onChanged),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.title.copyWith(
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: AppTextStyles.caption.copyWith(
+                      color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            onChanged: onChanged,
+            activeTrackColor: isDark ? AppDarkColors.primarySoft : AppColors.primarySoft,
+            thumbColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return isDark ? AppDarkColors.primary : AppColors.primary;
+              }
+              return Colors.white70;
+            }),
+          ),
         ],
       ),
     );
@@ -1097,6 +1182,7 @@ class _SliderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       child: Column(
@@ -1105,19 +1191,28 @@ class _SliderRow extends StatelessWidget {
             children: [
               _LeadingIcon(icon: icon),
               const SizedBox(width: 14),
-              Expanded(child: Text(title, style: AppTextStyles.title)),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.title.copyWith(
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                  ),
+                ),
+              ),
               Text(
                 valueText,
-                style: AppTextStyles.title.copyWith(color: AppColors.primary),
+                style: AppTextStyles.title.copyWith(
+                  color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
+                ),
               ),
             ],
           ),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppColors.primary,
-              inactiveTrackColor: AppColors.border,
+              activeTrackColor: isDark ? AppDarkColors.primary : AppColors.primary,
+              inactiveTrackColor: isDark ? AppDarkColors.border : AppColors.border,
               thumbColor: Colors.white,
-              overlayColor: AppColors.primary.withValues(alpha: 0.12),
+              overlayColor: (isDark ? AppDarkColors.primary : AppColors.primary).withValues(alpha: 0.12),
               trackHeight: 4,
             ),
             child: Slider(
@@ -1132,8 +1227,18 @@ class _SliderRow extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(minLabel, style: AppTextStyles.caption),
-              Text(maxLabel, style: AppTextStyles.caption),
+              Text(
+                minLabel,
+                style: AppTextStyles.caption.copyWith(
+                  color: isDark ? AppDarkColors.textMuted : AppColors.textMuted,
+                ),
+              ),
+              Text(
+                maxLabel,
+                style: AppTextStyles.caption.copyWith(
+                  color: isDark ? AppDarkColors.textMuted : AppColors.textMuted,
+                ),
+              ),
             ],
           ),
         ],
@@ -1149,14 +1254,18 @@ class _LeadingIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: AppColors.primarySoft,
+        color: isDark ? AppDarkColors.primarySoft : AppColors.primarySoft,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Icon(icon, color: AppColors.primary),
+      child: Icon(
+        icon,
+        color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
+      ),
     );
   }
 }
@@ -1174,6 +1283,7 @@ class _LanguageOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1181,12 +1291,21 @@ class _LanguageOption extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         child: Row(
           children: [
-            Expanded(child: Text(label, style: AppTextStyles.bodyLarge)),
+            Expanded(
+              child: Text(
+                label,
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                ),
+              ),
+            ),
             Icon(
               selected
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected ? AppColors.primary : AppColors.textMuted,
+              color: selected
+                  ? (isDark ? AppDarkColors.primaryGlow : AppColors.primary)
+                  : (isDark ? AppDarkColors.textMuted : AppColors.textMuted),
             ),
           ],
         ),

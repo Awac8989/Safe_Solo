@@ -18,14 +18,37 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.transparent,
+      color: isDark ? AppDarkColors.background : AppColors.background,
       child: DecoratedBox(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppDarkColors.backgroundGradient
+              : AppColors.backgroundGradient,
+        ),
         child: SafeArea(
           top: safeTop,
           bottom: safeBottom,
-          child: Padding(padding: padding, child: child),
+          child: Padding(
+            padding: padding,
+            child: DefaultTextStyle.merge(
+              style: TextStyle(
+                color: isDark
+                    ? AppDarkColors.textPrimary
+                    : AppColors.textPrimary,
+                fontFamily: AppTextStyles.fontFamily,
+              ),
+              child: IconTheme.merge(
+                data: IconThemeData(
+                  color: isDark
+                      ? AppDarkColors.textPrimary
+                      : AppColors.textPrimary,
+                ),
+                child: child,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -42,6 +65,7 @@ class AppCard extends StatelessWidget {
     this.radius = AppRadius.xl,
     this.shadow,
     this.border,
+    this.borderColor,
   });
 
   final Widget child;
@@ -51,19 +75,54 @@ class AppCard extends StatelessWidget {
   final double radius;
   final List<BoxShadow>? shadow;
   final Border? border;
+  final Color? borderColor;
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    Color bg;
+    if (color == null) {
+      bg = isDark ? AppDarkColors.card : AppColors.card;
+    } else if (isDark) {
+      if (color == AppColors.card ||
+          color == Colors.white ||
+          color == AppColors.surface ||
+          color == const Color(0xFFFFFBF4) ||
+          color == const Color(0xFFFFFBF2) ||
+          color == const Color(0xFFFFF1D7) ||
+          color == const Color(0xFFE8F1FF)) {
+        bg = AppDarkColors.card;
+      } else if (color == AppColors.cardSoft || color == AppColors.secondary) {
+        bg = AppDarkColors.cardSoft;
+      } else {
+        bg = color!;
+      }
+    } else {
+      bg = color!;
+    }
+
+    final effectiveBorder = border ?? (borderColor != null
+        ? Border.all(color: borderColor!, width: 1)
+        : (isDark ? Border.all(color: AppDarkColors.border, width: 1) : null));
+
     return Container(
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: color ?? AppColors.card,
+        color: bg,
         borderRadius: BorderRadius.circular(radius),
-        border: border,
-        boxShadow: shadow ?? AppShadows.card,
+        border: effectiveBorder,
+        boxShadow: shadow ?? (isDark ? const [] : AppShadows.card),
       ),
-      child: child,
+      child: DefaultTextStyle.merge(
+        style: TextStyle(
+          color: isDark
+              ? AppDarkColors.textPrimary
+              : AppColors.textPrimary,
+        ),
+        child: child,
+      ),
     );
   }
 }
@@ -76,6 +135,7 @@ class AppRoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -85,12 +145,20 @@ class AppRoundIconButton extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.card,
+            color: isDark ? AppDarkColors.card : AppColors.card,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: AppShadows.card,
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.35)),
+            boxShadow: isDark ? const [] : AppShadows.card,
+            border: Border.all(
+              color: isDark
+                  ? AppDarkColors.border
+                  : AppColors.border.withValues(alpha: 0.35),
+            ),
           ),
-          child: Icon(icon, size: 22, color: AppColors.textPrimary),
+          child: Icon(
+            icon,
+            size: 22,
+            color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+          ),
         ),
       ),
     );
@@ -105,11 +173,16 @@ class AppSectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Text(
       text.toUpperCase(),
       style: AppTextStyles.caption.copyWith(
-        color: color ?? AppColors.textSecondary,
+        color: color ??
+            (isDark
+                ? AppDarkColors.textSecondary
+                : AppColors.textSecondary),
         fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
       ),
     );
   }
@@ -129,9 +202,10 @@ class AppSegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       padding: const EdgeInsets.all(4),
-      color: AppColors.secondary,
+      color: isDark ? AppDarkColors.surface : AppColors.secondary,
       radius: AppRadius.lg,
       shadow: const [],
       child: Row(
@@ -148,9 +222,14 @@ class AppSegmentedControl<T> extends StatelessWidget {
                   vertical: 13,
                 ),
                 decoration: BoxDecoration(
-                  color: active ? AppColors.card : Colors.transparent,
+                  color: active
+                      ? (isDark ? AppDarkColors.cardSoft : AppColors.card)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(AppRadius.md),
-                  boxShadow: active ? AppShadows.card : const [],
+                  boxShadow: active && !isDark ? AppShadows.card : const [],
+                  border: active && isDark
+                      ? Border.all(color: AppDarkColors.border)
+                      : null,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -159,8 +238,8 @@ class AppSegmentedControl<T> extends StatelessWidget {
                       item.icon,
                       size: 18,
                       color: active
-                          ? AppColors.primary
-                          : AppColors.textSecondary,
+                          ? (isDark ? AppDarkColors.primaryGlow : AppColors.primary)
+                          : (isDark ? AppDarkColors.textMuted : AppColors.textSecondary),
                     ),
                     const SizedBox(width: 8),
                     Flexible(
@@ -170,8 +249,8 @@ class AppSegmentedControl<T> extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: AppTextStyles.bodyStrong.copyWith(
                           color: active
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
+                              ? (isDark ? AppDarkColors.primaryGlow : AppColors.primary)
+                              : (isDark ? AppDarkColors.textMuted : AppColors.textSecondary),
                         ),
                       ),
                     ),

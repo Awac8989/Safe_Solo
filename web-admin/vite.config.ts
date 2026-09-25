@@ -12,4 +12,14 @@ export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
   },
+  vite: {
+    server: {
+      proxy: {
+        "/uploads": {
+          target: "http://127.0.0.1:4000",
+          changeOrigin: true,
+        },
+      },
+    },
+  },
 });

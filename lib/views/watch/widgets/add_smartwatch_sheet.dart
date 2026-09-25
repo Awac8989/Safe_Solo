@@ -209,41 +209,47 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.bluetooth_searching_rounded, color: Color(0xFF38BDF8), size: 22),
                       ),
-                      child: const Icon(Icons.bluetooth_searching_rounded, color: Color(0xFF38BDF8), size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          strings.text('Kết Nối Đồng Hồ Thật', 'Connect Real Smartwatch'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.text('Kết Nối Đồng Hồ Thông Minh', 'Connect Smartwatch'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              isPaired
+                                  ? 'Đã kết nối · ${_sync.connectionStatusLabel}'
+                                  : 'Tìm kiếm qua Bluetooth & Wi-Fi',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Text(
-                          isPaired
-                              ? 'Đã kết nối · ${_sync.connectionStatusLabel}'
-                              : 'Quét sóng Bluetooth LE & Relay thời gian thực',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, color: Colors.white60),
@@ -285,7 +291,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _ble.isScanning ? 'Đang dò tìm đồng hồ thật xung quanh...' : 'Đã quét xong Bluetooth',
+                            _ble.isScanning ? 'Đang dò tìm đồng hồ xung quanh...' : 'Đã dừng quét Bluetooth',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13,
@@ -294,7 +300,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Galaxy Watch, Apple Watch, Garmin, Mi Band (BLE)',
+                            'Galaxy Watch, Apple Watch, Garmin, Mi Band',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
                           ),
                         ],
@@ -321,7 +327,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                 const Padding(
                   padding: EdgeInsets.only(left: 4, bottom: 8),
                   child: Text(
-                    'ĐỒNG HỒ BLUETOOTH THẬT PHÁT HIỆN ĐƯỢC:',
+                    'ĐỒNG HỒ PHÁT HIỆN ĐƯỢC:',
                     style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.8),
                   ),
                 ),
@@ -417,7 +423,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  'Samsung Galaxy Watch (Wear OS)',
+                                  'Samsung Galaxy Watch 5',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
@@ -426,7 +432,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  'Wear OS 4.0/5.0 · Cảm biến BioActive & Gia tốc',
+                                  'Đồng hồ thông minh theo dõi an toàn',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.65),
                                     fontSize: 11,
@@ -473,7 +479,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                                 )
                               : const Icon(Icons.bolt_rounded, size: 20),
                           label: Text(
-                            _isProcessing ? 'ĐANG KẾT NỐI...' : 'GHÉP NỐI NHANH WEAR OS (1-CHẠM)',
+                            _isProcessing ? 'ĐANG KẾT NỐI...' : 'KẾT NỐI NHANH (1-CHẠM)',
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                         ),
@@ -497,15 +503,21 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.pin_rounded, color: Color(0xFF94A3B8), size: 18),
-                          const SizedBox(width: 8),
-                          Text(
-                            _showPinInput ? 'Ẩn nhập mã PIN 6 số' : 'Hoặc ghép nối bằng mã PIN 6 số từ mặt đồng hồ',
-                            style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
-                          ),
-                        ],
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.pin_rounded, color: Color(0xFF94A3B8), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _showPinInput ? 'Ẩn nhập mã số' : 'Hoặc nhập mã 6 số hiển thị trên đồng hồ',
+                                style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       Icon(
                         _showPinInput ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
@@ -551,7 +563,7 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: _isProcessing ? null : _handlePinPair,
-                    child: const Text('XÁC NHẬN MÃ PIN', style: TextStyle(fontWeight: FontWeight.bold)),
+                    child: const Text('XÁC NHẬN KẾT NỐI', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -577,11 +589,15 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                               Text(
                                 _sync.deviceModel,
                                 style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 'Kênh: ${_sync.connectionStatusLabel} · Độ trễ ${_sync.latencyMs}ms',
                                 style: const TextStyle(color: Color(0xFF34D399), fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),

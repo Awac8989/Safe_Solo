@@ -1,15 +1,50 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConstants {
-  static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:4000/api';
+  static const String _defaultLanBaseUrl = 'http://192.168.1.5:4000/api';
   static const String _localhostBaseUrl = 'http://localhost:4000/api';
   static const String _defaultMapTilerStyle = 'streets-v2';
 
   static String _customBaseUrl = '';
+  static const String customBaseUrlStorageKey = 'safesolo_custom_base_url';
 
-  static void setCustomBaseUrl(String url) {
+  static Future<void> setCustomBaseUrl(String url) async {
     _customBaseUrl = url.trim();
+    await _persistCustomBaseUrl(_customBaseUrl);
+  }
+
+  static Future<void> setHostIp(String ip, {int port = 4000}) async {
+    final cleanIp = ip.trim().replaceAll('http://', '').replaceAll('https://', '').split('/')[0];
+    final host = cleanIp.contains(':') ? cleanIp : '$cleanIp:$port';
+    await setCustomBaseUrl('http://$host/api');
+  }
+
+  static Future<void> _persistCustomBaseUrl(String url) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (url.isEmpty) {
+        await prefs.remove(customBaseUrlStorageKey);
+      } else {
+        await prefs.setString(customBaseUrlStorageKey, url);
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> loadPersistedBaseUrl() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(customBaseUrlStorageKey);
+      if (saved != null && saved.trim().isNotEmpty) {
+        if (saved.contains('192.168.1.13')) {
+          _customBaseUrl = saved.replaceAll('192.168.1.13', '192.168.1.5');
+          await _persistCustomBaseUrl(_customBaseUrl);
+        } else {
+          _customBaseUrl = saved.trim();
+        }
+      }
+    } catch (_) {}
   }
 
   static String get customBaseUrl => _customBaseUrl;
@@ -26,7 +61,7 @@ class AppConstants {
     if (!kIsWeb) {
       try {
         if (Platform.isAndroid) {
-          return _androidEmulatorBaseUrl;
+          return _defaultLanBaseUrl;
         }
       } catch (_) {}
     }

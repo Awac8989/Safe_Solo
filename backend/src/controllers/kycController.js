@@ -67,8 +67,7 @@ class KYCController {
 
         const frontFile = req.files.front_image[0];
         const backFile = req.files.back_image[0];
-        const userId = req.user?.id || req.body?.userId || req.headers['x-user-id'];
-
+        const userId = req.user?.id || req.user?._id;
         if (!userId) {
           return res.status(401).json({
             success: false,

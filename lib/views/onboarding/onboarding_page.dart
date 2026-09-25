@@ -32,7 +32,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
         icon: Icons.notifications_active_outlined,
         title: strings.text('Kết nối', 'Connected'),
         description: strings.text(
-          'SafeSolo giữ nhịp check-in nhẹ nhàng để bạn yên tâm mà không thấy áp lực.',
+          'SafeSolo giữ nhịp điểm danh nhẹ nhàng để bạn yên tâm mà không thấy áp lực.',
           'SafeSolo keeps your check-in rhythm gentle so you stay reassured without pressure.',
         ),
       ),

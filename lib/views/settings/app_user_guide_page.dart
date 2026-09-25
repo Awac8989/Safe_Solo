@@ -54,7 +54,7 @@ class _AppUserGuidePageState extends State<AppUserGuidePage> {
       accentColor: AppColors.primary,
       steps: [
         'SafeSolo hoạt động theo nguyên lý "Công tắc an toàn" (Dead-man switch): Bạn chỉ cần xác nhận mình vẫn bình an định kỳ qua Quả cầu an toàn.',
-        'Nếu quá thời gian ân hạn mà bạn không phản hồi, hệ thống sẽ tự động kích hoạt chu trình bảo vệ đa tầng: gửi tin nhắn SMS, gọi người thân và phát tín hiệu định vị cứu hộ.',
+        'Nếu quá thời gian chờ điểm danh mà bạn không phản hồi, hệ thống sẽ tự động kích hoạt chu trình bảo vệ đa tầng: gửi tin nhắn SMS, gọi người thân và phát tín hiệu định vị cứu hộ.',
         'Hệ sinh thái liên kết chặt chẽ: Điện thoại cá nhân, Đồng hồ thông minh trên cổ tay, Người bảo hộ thân cận và Mạng lưới Hiệp sĩ cứu trợ khu vực.',
         'Mọi dữ liệu sinh trắc, vị trí và y tế của bạn đều được mã hóa chuẩn quân đội AES-256 trực tiếp trên máy, không chia sẻ cho bên thứ ba.',
       ],
@@ -74,7 +74,7 @@ class _AppUserGuidePageState extends State<AppUserGuidePage> {
       steps: [
         '🟢 Màu Xanh lá (An toàn): Bạn vừa điểm danh gần đây, trạng thái hoàn toàn ổn định và an tâm.',
         '🟡 Màu Vàng (Nhắc nhở): Thời hạn điểm danh sắp đến (còn dưới 2 giờ) hoặc có lịch uống thuốc. Hãy bấm vào quả cầu để điểm danh ngay.',
-        '🔴 Màu Đỏ (Báo động SOS): Đã quá hạn thời gian ân hạn hoặc kích hoạt khẩn cấp, hệ thống đang tiến hành chu trình báo động và cứu nạn.',
+        '🔴 Màu Đỏ (Báo động SOS): Đã quá hạn điểm danh an toàn hoặc kích hoạt khẩn cấp, hệ thống đang tiến hành chu trình báo động và cứu nạn.',
         'Đồng hồ đếm ngược hiển thị chính xác thời gian còn lại trước khi chu trình nhắc nhở bắt đầu.',
       ],
       tip: 'Chạm nhẹ vào Quả cầu hoặc vuốt lên để mở bảng điểm danh nhanh, kèm chọn tâm trạng và gửi ảnh khoảnh khắc cho người thân.',
@@ -94,7 +94,7 @@ class _AppUserGuidePageState extends State<AppUserGuidePage> {
         '4. Nút "Hoãn 30 phút": Khi bạn đang họp quan trọng, đang lái xe trên đường hoặc bận việc đột xuất chưa tiện điểm danh, hãy bấm nút này để tạm hoãn chuông nhắc 30 phút.',
         '5. Nhắc uống thuốc: Bấm nút viên thuốc để đánh dấu đã uống thuốc đúng giờ, lưu vào nhật ký sức khỏe.',
       ],
-      tip: 'Bạn có thể tùy chỉnh thời gian ân hạn từ 1 đến 72 giờ trong Cài đặt tùy theo lịch trình sinh hoạt cá nhân.',
+      tip: 'Bạn có thể tùy chỉnh hạn điểm danh an toàn từ 1 đến 72 giờ trong Cài đặt tùy theo lịch trình sinh hoạt cá nhân.',
     ),
 
     // 3. VÒNG TRÒN ALIVE CIRCLE & HỘ TỐNG

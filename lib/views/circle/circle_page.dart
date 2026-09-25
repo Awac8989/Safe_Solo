@@ -312,7 +312,7 @@ class _CirclePageState extends State<CirclePage> {
                         const SizedBox(height: 4),
                         Text(
                           strings.text(
-                            'Chạm để chia sẻ mood, check-in hoặc thông điệp ngắn',
+                            'Chạm để chia sẻ cảm xúc, điểm danh hoặc tin nhắn ngắn',
                             'Tap to share a mood, check-in, or short message',
                           ),
                           style: AppTextStyles.body.copyWith(

@@ -118,7 +118,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 700));
 
       expect(find.text('Đã điểm danh!'), findsOneWidget);
-      expect(find.text('Bộ đếm đã reset'), findsOneWidget);
+      expect(find.text('Bộ đếm đã đặt lại'), findsOneWidget);
 
       // Drain checkin return timer
       await tester.pump(const Duration(milliseconds: 1500));

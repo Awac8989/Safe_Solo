@@ -245,7 +245,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
                       icon: Icons.notifications_active_outlined,
                       title: strings.text('Thông báo', 'Notifications'),
                       description: strings.text(
-                        'Nhận nhắc check-in và thông báo SOS gần bạn.',
+                        'Nhận nhắc nhở điểm danh và thông báo SOS gần bạn.',
                         'Receive check-in reminders and nearby SOS alerts.',
                       ),
                       granted: _notificationGranted,

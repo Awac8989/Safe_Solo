@@ -1,23 +1,25 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_strings.dart';
+import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../models/watch_protocol.dart';
 import '../../services/api_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
-import 'widgets/add_smartwatch_sheet.dart';
+import '../../services/ble_watch_service.dart';
 
 /// ============================================================================
-/// SAFESOLO - QUẢN LÝ THIẾT BỊ ĐEO & ĐỒNG BỘ ĐỒNG HỒ THÔNG MINH (WEAR OS)
-/// Thiết kế 3 Tab chuyên nghiệp theo phong cách Galaxy Wearable & Apple Watch
-/// Tab 1: Tổng quan thiết bị & Sinh tồn BioActive
-/// Tab 2: Cảm biến gia tốc IMU & Bảo vệ chống té ngã
-/// Tab 3: Giao thức 2 chiều SSWP & Nhật ký gói tin
+/// SAFESOLO - QUẢN LÝ ĐỒNG HỒ THÔNG MINH
+/// Giao diện thân thiện, trực quan, dễ hiểu cho người dùng
+/// Tab 1: Sức khỏe
+/// Tab 2: Phát hiện ngã
+/// Tab 3: Kết nối & Đồng bộ
 /// ============================================================================
 class SmartwatchConnectionPage extends StatefulWidget {
   const SmartwatchConnectionPage({super.key});
@@ -38,8 +40,61 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
   late Timer _refreshTimer;
   bool _isSyncing = false;
   bool _isMeasuring = false;
-  final String _rssiText = '-54 dBm (Rất tốt)';
+  final String _rssiText = 'Rất tốt';
   final List<Map<String, dynamic>> _telemetryLogs = [];
+
+  String _getFriendlyActionName(String action) {
+    switch (action) {
+      case WatchAction.vitalsUpdate:
+        return 'Cập nhật sức khỏe';
+      case WatchAction.fallDetected:
+        return 'Cảnh báo té ngã';
+      case WatchAction.hardwareSos:
+        return 'Báo động cứu hộ';
+      case WatchAction.findPhonePing:
+        return 'Tìm điện thoại';
+      case WatchAction.findWatchPing:
+        return 'Tìm đồng hồ';
+      case WatchAction.precisionMeasureResult:
+        return 'Đo nhịp tim';
+      case WatchAction.deadmanCheckin:
+        return 'Điểm danh an toàn';
+      case WatchAction.pairRequest:
+      case WatchAction.pairConfirmed:
+        return 'Ghép nối đồng hồ';
+      default:
+        return 'Đồng bộ dữ liệu';
+    }
+  }
+
+  String _getFriendlyActionDetail(String action, Map<String, dynamic> payload) {
+    switch (action) {
+      case WatchAction.vitalsUpdate:
+        final hr = payload['heartRate'];
+        final sp = payload['spO2'];
+        final bat = payload['battery'];
+        final st = payload['steps'];
+        return 'Nhịp tim: ${hr ?? '--'} nhịp/phút · SpO2: ${sp ?? '--'}% · Pin: ${bat ?? '--'}% · Bước: ${st ?? 0}';
+      case WatchAction.fallDetected:
+        return 'Phát hiện va chạm mạnh, đã kích hoạt đếm ngược cứu hộ!';
+      case WatchAction.hardwareSos:
+        return 'Đã kích hoạt cuộc gọi/tin nhắn SOS khẩn cấp tới người thân!';
+      case WatchAction.findPhonePing:
+        return 'Đồng hồ vừa phát chuông rung tìm điện thoại.';
+      case WatchAction.findWatchPing:
+        return 'Điện thoại vừa gửi lệnh rung chuông tìm kiếm đồng hồ.';
+      case WatchAction.precisionMeasureResult:
+        final hr = payload['heartRate'];
+        final sp = payload['spO2'];
+        return 'Đo trực tiếp: $hr nhịp/phút, SpO2 $sp%. Sức khỏe ổn định.';
+      case WatchAction.deadmanCheckin:
+        return 'Người dùng đã bấm xác nhận an toàn trên đồng hồ.';
+      case WatchAction.pairConfirmed:
+        return 'Đồng hồ và điện thoại đã kết nối và đồng bộ hoàn tất.';
+      default:
+        return 'Dữ liệu được cập nhật tự động từ đồng hồ.';
+    }
+  }
 
   @override
   void initState() {
@@ -48,28 +103,76 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     _wearOs.initialize();
     _syncManager.initialize();
 
-    // Lắng nghe gói tin hai chiều từ Watch qua SafeSolo Watch Protocol
+    // Lắng nghe dữ liệu gửi nhận hai chiều giữa Đồng hồ và Điện thoại
     _packetSub = _syncManager.packetStream.listen((packet) {
       if (!mounted) return;
       _addTelemetryLog(
-        type: packet.action,
-        source: packet.sender == WatchSender.watch ? 'Galaxy Watch 5 (SSWP)' : 'Phone Controller',
-        detail: 'Gói tin ${packet.type.name.toUpperCase()}: ${packet.payload}',
+        type: _getFriendlyActionName(packet.action),
+        source: packet.sender == WatchSender.watch ? 'Đồng hồ thông minh' : 'Ứng dụng điện thoại',
+        detail: _getFriendlyActionDetail(packet.action, packet.payload),
         isSuccess: true,
       );
+
+      // Phản hồi chuông rung khi đồng hồ bấm "Tìm điện thoại"
+      if (packet.action == WatchAction.findPhonePing) {
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            duration: Duration(seconds: 4),
+            backgroundColor: Color(0xFF0284C7),
+            content: Row(
+              children: [
+                Icon(Icons.ring_volume_rounded, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '🔔 ĐỒNG HỒ ĐANG TÌM ĐIỆN THOẠI!',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else if (packet.action == WatchAction.precisionMeasureResult) {
+        final bpm = packet.payload['heartRate'];
+        final spo2 = packet.payload['spO2'];
+        if (mounted) setState(() => _isMeasuring = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF059669),
+            content: Text('✓ Đã đo xong nhịp tim: $bpm nhịp/phút, Oxy máu: $spo2%'),
+          ),
+        );
+      } else if (packet.action == WatchAction.deadmanCheckin) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF059669),
+            content: Text('✓ Đã nhận điểm danh an toàn từ đồng hồ!'),
+          ),
+        );
+      } else if (packet.action == WatchAction.findPhonePing) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF0284C7),
+            content: Text('📱 Đồng hồ đang kích hoạt tìm kiếm điện thoại của bạn!'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
     });
 
-    // Khởi tạo các log mẫu ban đầu
+    // Khởi tạo các thông báo ban đầu thân thiện
     _addTelemetryLog(
-      type: 'BLE_HANDSHAKE',
-      source: 'Galaxy Watch 5 (SM-R900)',
-      detail: 'Kết nối Bluetooth Low Energy 5.2 thành công. Mã hóa AES-128.',
+      type: 'Kết nối thành công',
+      source: 'Samsung Galaxy Watch 5',
+      detail: 'Đồng hồ và điện thoại đã kết nối an toàn.',
       isSuccess: true,
     );
     _addTelemetryLog(
-      type: 'SENSOR_INIT',
-      source: 'BioActive Sensor PPG',
-      detail: 'Đã hiệu chuẩn cảm biến nhịp tim quang học và gia tốc 3 trục MEMS.',
+      type: 'Cảm biến sẵn sàng',
+      source: 'Cảm biến sức khỏe',
+      detail: 'Cảm biến đo nhịp tim và nhận biết chuyển động đã sẵn sàng theo dõi.',
       isSuccess: true,
     );
 
@@ -107,7 +210,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     }
   }
 
-  /// Đồng bộ gói tin thông số hiện tại lên Cloud Backend
+  /// Đồng bộ thông số sức khỏe hiện tại lên hệ thống
   Future<void> _syncTelemetryToCloud() async {
     final user = context.read<AppProvider>().user;
     if (user == null) {
@@ -137,9 +240,9 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       );
 
       _addTelemetryLog(
-        type: 'TELEMETRY_SYNC',
-        source: 'Cloud Dispatch Gateway',
-        detail: 'Đã truyền thành công gói tin sinh tồn (${_wearOs.heartRate} bpm, ${_wearOs.spO2}% SpO2, ${_wearOs.battery}% PIN)',
+        type: 'Đồng bộ dữ liệu',
+        source: 'Trung tâm SafeSolo',
+        detail: 'Đã lưu trữ dữ liệu sức khỏe (${_wearOs.heartRate} nhịp/phút, ${_wearOs.spO2}% SpO2, ${_wearOs.battery}% Pin)',
         isSuccess: true,
       );
 
@@ -147,15 +250,15 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF0284C7),
-            content: Text('✓ Đã đồng bộ thông số đồng hồ lên Trung tâm Điều phối an toàn!'),
+            content: Text('✓ Đã đồng bộ thông số sức khỏe lên hệ thống thành công!'),
           ),
         );
       }
     } catch (e) {
       _addTelemetryLog(
-        type: 'SYNC_ERROR',
-        source: 'API Gateway',
-        detail: 'Lỗi gửi gói tin: $e',
+        type: 'Lỗi đồng bộ',
+        source: 'Hệ thống kết nối',
+        detail: 'Không thể gửi dữ liệu: $e',
         isSuccess: false,
       );
     } finally {
@@ -167,90 +270,116 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
   void _pingFindWatch() {
     _syncManager.sendFindWatchPing();
     _addTelemetryLog(
-      type: 'FIND_MY_WATCH',
-      source: 'Phone -> Galaxy Watch 5',
-      detail: 'Đã truyền lệnh FIND_WATCH_PING kích hoạt chuông rung Haptic cảnh báo vị trí đồng hồ.',
+      type: 'Tìm đồng hồ',
+      source: 'Điện thoại ➔ Đồng hồ',
+      detail: 'Đã phát tín hiệu rung tìm đồng hồ Samsung Galaxy Watch 5.',
       isSuccess: true,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: Color(0xFF059669),
-        content: Text('🔔 Đã gửi tín hiệu rung tìm đồng hồ Samsung Galaxy Watch 5!'),
+        content: Text('🔔 Đã gửi tín hiệu rung tìm đồng hồ!'),
       ),
     );
   }
 
-  /// Yêu cầu đồng hồ đo nhịp tim BioActive tức thời
+  /// Yêu cầu đồng hồ đo nhịp tim tức thời (10 giây)
   Future<void> _triggerInstantMeasurement() async {
+    if (_wearOs.isOffWrist) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFF59E0B),
+          content: Text('⚠ Lưu ý: Hãy áp sát mặt dưới đồng hồ vào cổ tay để đo chính xác nhất.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
     setState(() => _isMeasuring = true);
     _syncManager.sendInstantMeasureRequest();
 
-    await Future.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-
-    setState(() {
-      _isMeasuring = false;
-    });
-
     _addTelemetryLog(
-      type: 'PPG_MEASUREMENT',
-      source: 'BioActive PPG Sensor',
-      detail: 'Kết quả đo tức thời: ${_wearOs.heartRate} bpm (Nhịp tim xoang đều).',
+      type: 'Đo nhịp tim',
+      source: 'Cảm biến đồng hồ',
+      detail: 'Đang gửi lệnh yêu cầu đồng hồ đo nhịp tim và oxy trong máu...',
       isSuccess: true,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: const Color(0xFF0284C7),
-        content: Text('✓ Đã đồng bộ dữ liệu đo mới nhất: ${_wearOs.heartRate} BPM'),
+      const SnackBar(
+        backgroundColor: Color(0xFF0284C7),
+        content: Text('🩺 Đang yêu cầu Galaxy Watch 5 đo nhịp tim, vui lòng giữ yên tay...'),
       ),
+    );
+
+    // Chờ chu kỳ đo 10 giây hoàn thành
+    await Future.delayed(const Duration(seconds: 10));
+    if (!mounted) return;
+
+    setState(() => _isMeasuring = false);
+
+    _addTelemetryLog(
+      type: 'Kết quả đo nhịp tim',
+      source: 'Cảm biến đồng hồ',
+      detail: 'Kết quả: ${_wearOs.heartRate} nhịp/phút, ${_wearOs.spO2}% SpO2 (Chỉ số ổn định).',
+      isSuccess: true,
     );
   }
 
-  /// Mô phỏng té ngã khẩn cấp để kiểm tra hệ thống
+  /// Thử nghiệm tính năng báo ngã để kiểm tra hệ thống
   void _simulateFallTest() {
     _syncManager.emitFallAlert(svm: 3.4, tilt: 75.0, isSimulated: true);
     _addTelemetryLog(
-      type: 'FALL_TEST',
-      source: 'Simulated IMU Event',
-      detail: 'Đã phát hiện va chạm giả lập 3.4g và độ nghiêng 75° (Test mode).',
+      type: 'Thử nghiệm báo ngã',
+      source: 'Thử nghiệm hệ thống',
+      detail: 'Đã tạo tình huống ngã giả định để kiểm tra tính năng báo cứu hộ.',
       isSuccess: true,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: Color(0xFFD97706),
-        content: Text('⚠️ Đã phát tín hiệu kiểm tra rơi tự do (Fall Test Triggered)!'),
+        content: Text('⚠️ Đã phát tín hiệu thử nghiệm tính năng báo ngã!'),
       ),
     );
   }
 
-  /// Kích hoạt phím SOS từ đồng hồ khẩn cấp
+  /// Gửi tín hiệu cứu hộ khẩn cấp từ đồng hồ
   void _triggerHardwareSos() {
     final user = context.read<AppProvider>().user;
     _syncManager.emitHardwareSos(userId: user?.id);
     _wearOs.triggerHardwareSos(userId: user?.id);
 
     _addTelemetryLog(
-      type: 'EMERGENCY_SOS',
-      source: 'Galaxy Watch 5 Hardware Button',
-      detail: 'BÁO ĐỘNG ĐỎ CẤP 3: Phát tín hiệu SOS khẩn cấp tới Trung tâm Cứu nạn!',
+      type: 'Báo động cứu hộ',
+      source: 'Nút khẩn cấp đồng hồ',
+      detail: 'Đã phát tín hiệu cứu hộ khẩn cấp tới người thân bảo hộ!',
       isSuccess: true,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         backgroundColor: Colors.red,
-        content: Text('🚨 ĐÃ PHÁT TÍN HIỆU SOS KHẨN CẤP TỪ THIẾT BỊ ĐEO!'),
+        content: Text('🚨 ĐÃ PHÁT TÍN HIỆU CỨU HỘ KHẨN CẤP!'),
       ),
     );
   }
 
-  /// Hộp thoại ghép nối Smartwatch bằng mã PIN 6 số
+  /// Hộp thoại thiết lập ghép nối Smartwatch thủ công với 3 tùy chọn:
+  /// 1. Nhập mã PIN 6 số hiển thị trên đồng hồ
+  /// 2. Cài đặt IP mạng Wi-Fi máy chủ & Kiểm tra Ping
+  /// 3. Quét tìm thiết bị qua sóng Bluetooth
   void _showPairingDialog() {
-    final textController = TextEditingController(text: _syncManager.pairingCode);
     final user = context.read<AppProvider>().user;
+    final pinController = TextEditingController(text: _syncManager.pairingCode);
+    final ipController = TextEditingController(
+      text: AppConstants.backendBaseUrl.replaceAll('http://', '').replaceAll('/api', '').split(':').first,
+    );
+    int selectedTab = 0; // 0: Mã 6 số, 1: Mạng Wi-Fi, 2: Bluetooth
+    bool isProcessing = false;
+    String? pingResult;
+    bool isPingSuccess = false;
 
     showModalBottomSheet(
       context: context,
@@ -260,99 +389,498 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.sync_alt_rounded, color: Color(0xFF38BDF8), size: 22),
-                      SizedBox(width: 8),
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            final ble = BleWatchService.instance;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Thanh kéo nhỏ
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Tiêu đề & Nút đóng
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.phonelink_setup_rounded, color: Color(0xFF38BDF8), size: 24),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Ghép nối đồng hồ thủ công',
+                                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Chọn cách kết nối phù hợp nhất với bạn',
+                                      style: TextStyle(color: Colors.white60, fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: Colors.white60),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Thanh chuyển Tab thủ công: [Mã 6 số] | [Mạng Wi-Fi] | [Bluetooth]
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setModalState(() => selectedTab = 0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 0 ? const Color(0xFF0284C7) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Mã 6 số',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: selectedTab == 0 ? Colors.white : Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: selectedTab == 0 ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setModalState(() => selectedTab = 1),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 1 ? const Color(0xFF0284C7) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Mạng Wi-Fi',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: selectedTab == 1 ? Colors.white : Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: selectedTab == 1 ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setModalState(() => selectedTab = 2);
+                                if (!WatchSyncManager.kIsTesting && !ble.isScanning) {
+                                  ble.startScan(timeout: const Duration(seconds: 10));
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 2 ? const Color(0xFF0284C7) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Bluetooth',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: selectedTab == 2 ? Colors.white : Colors.white60,
+                                    fontSize: 12,
+                                    fontWeight: selectedTab == 2 ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // TAB 0: NHẬP MÃ PIN 6 SỐ
+                    if (selectedTab == 0) ...[
+                      const Text(
+                        '1. Nhập mã số hiển thị trên mặt đồng hồ:',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
-                        'Ghép nối Galaxy Watch 5',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        'Mở đồng hồ của bạn lên, xem mã gồm 6 chữ số đang hiển thị và nhập vào ô dưới đây.',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: pinController,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 5,
+                          fontFamily: 'monospace',
+                        ),
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          hintText: 'VD: 742-891',
+                          hintStyle: const TextStyle(color: Colors.white24, letterSpacing: 2),
+                          filled: true,
+                          fillColor: const Color(0xFF1E293B),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xFF0284C7)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Mã hiện tại: ${_syncManager.pairingCode}',
+                            style: const TextStyle(color: Colors.white54, fontSize: 11),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                pinController.text = _syncManager.pairingCode;
+                              });
+                            },
+                            child: const Text(
+                              'Điền nhanh mã này',
+                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: isProcessing
+                              ? null
+                              : () async {
+                                  final code = pinController.text.trim();
+                                  if (code.isEmpty) return;
+                                  setModalState(() => isProcessing = true);
+                                  final ok = await _syncManager.verifyPairingCode(code, userId: user?.id ?? 'user_default');
+                                  setModalState(() => isProcessing = false);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
+                                        content: Text(ok
+                                            ? '✓ Ghép nối thành công! Đồng hồ và điện thoại đã đồng bộ.'
+                                            : 'Không thể ghép nối. Vui lòng kiểm tra lại mã số trên đồng hồ.'),
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: isProcessing
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Text('KẾT NỐI BẰNG MÃ SỐ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
                       ),
                     ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.white60),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Nhập mã số 6 chữ số hiển thị trên mặt đồng hồ Samsung Galaxy Watch 5 để kích hoạt luồng đồng bộ cứu hộ thời gian thực hai chiều.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13, height: 1.4),
-              ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: textController,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF38BDF8),
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 5,
-                  fontFamily: 'monospace',
-                ),
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  hintText: '742-891',
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  filled: true,
-                  fillColor: const Color(0xFF1E293B),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFF0284C7)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0284C7),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+                    // TAB 1: MẠNG WI-FI & MÁY CHỦ
+                    if (selectedTab == 1) ...[
+                      const Text(
+                        '2. Cài đặt địa chỉ máy chủ (Mạng Wi-Fi):',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                      onPressed: () async {
-                        final code = textController.text.trim();
-                        if (code.isNotEmpty) {
+                      const SizedBox(height: 6),
+                      Text(
+                        'Khi điện thoại và đồng hồ cùng kết nối một mạng Wi-Fi, dữ liệu sẽ được truyền qua địa chỉ mạng nội bộ:',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Địa chỉ IP máy chủ:',
+                              style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: ipController,
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
+                              decoration: const InputDecoration(
+                                hintText: 'VD: 192.168.1.5 hoặc 10.0.2.2',
+                                hintStyle: TextStyle(color: Colors.white30, fontSize: 12),
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (pingResult != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isPingSuccess ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFEF4444).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  pingResult!,
+                                  style: TextStyle(
+                                    color: isPingSuccess ? const Color(0xFF34D399) : const Color(0xFFF87171),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF38BDF8),
+                                      side: const BorderSide(color: Color(0xFF0284C7)),
+                                      padding: const EdgeInsets.symmetric(vertical: 11),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () async {
+                                      setModalState(() => isProcessing = true);
+                                      final ok = await _syncManager.pingHost();
+                                      setModalState(() {
+                                        isProcessing = false;
+                                        isPingSuccess = ok;
+                                        pingResult = ok
+                                            ? '✓ Kết nối mạng rất tốt (${_syncManager.latencyMs}ms)'
+                                            : '✗ Không thể kết nối. Kiểm tra mạng Wi-Fi.';
+                                      });
+                                    },
+                                    icon: const Icon(Icons.network_check_rounded, size: 16),
+                                    label: const Text('Kiểm tra mạng', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0284C7),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 11),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    onPressed: () async {
+                                      final ip = ipController.text.trim();
+                                      if (ip.isNotEmpty) {
+                                        await AppConstants.setHostIp(ip);
+                                        await _syncManager.pingHost();
+                                        if (ctx.mounted) {
+                                          setModalState(() {
+                                            pingResult = '✓ Đã lưu địa chỉ mạng: $ip';
+                                            isPingSuccess = true;
+                                          });
+                                        }
+                                      }
+                                    },
+                                    child: const Text('Lưu địa chỉ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // TAB 2: BLUETOOTH
+                    if (selectedTab == 2) ...[
+                      const Text(
+                        '3. Tìm đồng hồ qua sóng Bluetooth:',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Bật Bluetooth trên cả điện thoại và đồng hồ, đặt chúng ở gần nhau để quét:',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            ble.isScanning ? 'Đang dò tìm đồng hồ...' : 'Đã dừng quét',
+                            style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              if (ble.isScanning) {
+                                ble.stopScan();
+                              } else {
+                                ble.startScan(timeout: const Duration(seconds: 10));
+                              }
+                              setModalState(() {});
+                            },
+                            icon: Icon(ble.isScanning ? Icons.stop_rounded : Icons.refresh_rounded, size: 16),
+                            label: Text(ble.isScanning ? 'Dừng' : 'Quét lại', style: const TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (ble.discoveredWatches.isNotEmpty) ...[
+                        ...ble.discoveredWatches.map((w) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF0284C7)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(w.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0284C7),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  ),
+                                  onPressed: () async {
+                                    setModalState(() => isProcessing = true);
+                                    final ok = await ble.connectToWatch(w.device);
+                                    setModalState(() => isProcessing = false);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
+                                          content: Text(ok ? '✓ Đã kết nối Bluetooth với ${w.name}!' : 'Không thể kết nối Bluetooth.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: const Text('Kết nối', style: TextStyle(fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Chưa phát hiện thiết bị qua Bluetooth.\nBạn có thể dùng Tab "Mã 6 số" để ghép nối ngay.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.4),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+
+                    const SizedBox(height: 20),
+                    const Divider(color: Colors.white12, height: 1),
+                    const SizedBox(height: 14),
+
+                    // Nút kết nối tự động 1 chạm nếu đồng hồ đang mở
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF34D399),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                        onPressed: () async {
                           Navigator.pop(ctx);
-                          final ok = await _syncManager.verifyPairingCode(code, userId: user?.id ?? 'user_default');
+                          final ok = await _syncManager.quickPairDevice(userId: user?.id ?? 'user_default');
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
                                 content: Text(ok
-                                    ? '✓ Đã ghép nối thành công với Samsung Galaxy Watch 5!'
-                                    : 'Lỗi ghép nối. Vui lòng kiểm tra lại mã số.'),
+                                    ? '✓ Đã kết nối tự động với đồng hồ thành công!'
+                                    : 'Không thể kết nối tự động. Hãy thử nhập mã 6 số.'),
                               ),
                             );
                           }
-                        }
-                      },
-                      child: const Text('XÁC NHẬN GHÉP NỐI', style: TextStyle(fontWeight: FontWeight.bold)),
+                        },
+                        icon: const Icon(Icons.bolt_rounded, size: 20),
+                        label: const Text(
+                          'Hoặc bấm vào đây để kết nối tự động (1-chạm)',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -379,7 +907,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
               style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
             Text(
-              'Samsung Galaxy Watch 5 · Wear OS 4.0',
+              'Samsung Galaxy Watch 5 · Sẵn sàng bảo vệ',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
             ),
           ],
@@ -410,9 +938,9 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           unselectedLabelColor: Colors.white60,
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           tabs: const [
-            Tab(icon: Icon(Icons.monitor_heart_rounded, size: 18), text: 'Sinh tồn'),
-            Tab(icon: Icon(Icons.sensors_rounded, size: 18), text: 'Cảm biến & Ngã'),
-            Tab(icon: Icon(Icons.sync_alt_rounded, size: 18), text: 'Đồng bộ & SSWP'),
+            Tab(icon: Icon(Icons.favorite_rounded, size: 18), text: 'Sức khỏe'),
+            Tab(icon: Icon(Icons.warning_amber_rounded, size: 18), text: 'Phát hiện ngã'),
+            Tab(icon: Icon(Icons.sync_alt_rounded, size: 18), text: 'Kết nối & Đồng bộ'),
           ],
         ),
       ),
@@ -426,7 +954,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             controller: _tabController,
             children: [
               // ===============================================================
-              // TAB 1: TỔNG QUAN THIẾT BỊ & CHỈ SỐ SINH TỒN
+              // TAB 1: TỔNG QUAN THIẾT BỊ & CHỈ SỐ SỨC KHỎE
               // ===============================================================
               SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -438,7 +966,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     _buildDirectActionsRow(),
                     const SizedBox(height: 20),
                     Text(
-                      strings.text('THÔNG SỐ SINH TỒN BIOACTIVE TRỰC TIẾP', 'LIVE BIOACTIVE TELEMETRY'),
+                      strings.text('CHỈ SỐ SỨC KHỎE TRỰC TIẾP', 'LIVE HEALTH VITALS'),
                       style: const TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 12,
@@ -456,7 +984,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
               ),
 
               // ===============================================================
-              // TAB 2: CẢM BIẾN IMU & CHỐNG TÉ NGÃ
+              // TAB 2: TỰ ĐỘNG PHÁT HIỆN TÉ NGÃ
               // ===============================================================
               SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -464,7 +992,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      strings.text('GIÁM SÁT GIA TỐC KÉ VÀ TƯ THẾ (IMU)', 'INERTIAL MOTION SENSING (IMU)'),
+                      strings.text('TỰ ĐỘNG PHÁT HIỆN TÉ NGÃ', 'AUTOMATIC FALL DETECTION'),
                       style: const TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 12,
@@ -475,7 +1003,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     const SizedBox(height: 10),
                     _buildMotionSensorCard(),
                     const SizedBox(height: 16),
-                    // Nút mô phỏng té ngã
+                    // Nút thử nghiệm tính năng báo ngã
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -488,14 +1016,14 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                         onPressed: _simulateFallTest,
                         icon: const Icon(Icons.warning_amber_rounded, size: 20),
                         label: const Text(
-                          'MÔ PHỎNG SỰ KIỆN TÉ NGÃ (FALL TEST)',
+                          'THỬ NGHIỆM TÍNH NĂNG BÁO NGÃ',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      strings.text('CẤU HÌNH NGƯỠNG AN TOÀN SINH TỒN', 'SAFETY THRESHOLD CONFIGURATION'),
+                      strings.text('CÀI ĐẶT CẢNH BÁO AN TOÀN', 'SAFETY ALERTS CONFIGURATION'),
                       style: const TextStyle(
                         color: Color(0xFF94A3B8),
                         fontSize: 12,
@@ -511,29 +1039,36 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
               ),
 
               // ===============================================================
-              // TAB 3: GIAO THỨC SSWP & NHẬT KÝ GÓI TIN ĐỒNG BỘ 2 CHIỀU
+              // TAB 3: KẾT NỐI & ĐỒNG BỘ DỮ LIỆU
               // ===============================================================
               SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildManualPairingBanner(),
+                    const SizedBox(height: 16),
                     _buildBiDirectionalSyncModelCard(),
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          strings.text('NHẬT KÝ TRUYỀN TIN (SSWP PACKET STREAM)', 'SENSOR TELEMETRY STREAM'),
-                          style: const TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
+                        Expanded(
+                          child: Text(
+                            strings.text('LỊCH SỬ HOẠT ĐỘNG GẦN ĐÂY', 'RECENT ACTIVITY LOGS'),
+                            style: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
-                          '${_telemetryLogs.length} gói tin',
+                          '${_telemetryLogs.length} hoạt động',
                           style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
                         ),
                       ],
@@ -551,7 +1086,61 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Thẻ trạng thái kết nối phần cứng Bluetooth LE
+  /// Banner hỗ trợ thiết lập kết nối thủ công trên Tab 3
+  Widget _buildManualPairingBanner() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F2642), Color(0xFF1E293B)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF0284C7)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.phonelink_setup_rounded, color: Color(0xFF38BDF8), size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ghép nối thủ công',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Nhập mã 6 số, kiểm tra IP mạng Wi-Fi hoặc quét tìm đồng hồ Bluetooth.',
+                  style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: _showPairingDialog,
+            child: const Text('CÀI ĐẶT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Thẻ trạng thái kết nối đồng hồ
   Widget _buildConnectionStatusCard(bool isConnected, bool isOffWrist) {
     return Container(
       decoration: BoxDecoration(
@@ -650,7 +1239,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'SM-R900 · BLE 5.2 · UUID: 0000180D',
+                      'Samsung Galaxy Watch 5 · Kết nối an toàn',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                     ),
                     const SizedBox(height: 8),
@@ -658,17 +1247,21 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     Row(
                       children: [
                         Icon(
-                          isOffWrist ? Icons.cancel_outlined : Icons.check_circle_rounded,
+                          isOffWrist ? Icons.info_outline_rounded : Icons.check_circle_rounded,
                           size: 14,
                           color: isOffWrist ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          isOffWrist ? 'Đã tháo khỏi cổ tay (Off-wrist)' : 'Đang đeo trên cổ tay (BioActive On)',
-                          style: TextStyle(
-                            color: isOffWrist ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: Text(
+                            isOffWrist ? 'Đang tháo đồng hồ ra ngoài' : 'Đang đeo trên cổ tay an toàn',
+                            style: TextStyle(
+                              color: isOffWrist ? const Color(0xFFFBBF24) : const Color(0xFF34D399),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -681,27 +1274,32 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           const SizedBox(height: 16),
           const Divider(color: Color(0xFF334155), height: 1),
           const SizedBox(height: 14),
-          // Hàng chỉ số nhanh: Pin, Sóng BLE, Lần đồng bộ
+          // Hàng chỉ số nhanh: Pin, Sóng kết nối, Tốc độ phản hồi
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildQuickStat(
-                icon: Icons.battery_charging_full_rounded,
-                iconColor: const Color(0xFF10B981),
-                label: 'Pin đồng hồ',
-                value: '${_wearOs.battery}%',
+              Expanded(
+                child: _buildQuickStat(
+                  icon: Icons.battery_charging_full_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  label: 'Pin đồng hồ',
+                  value: '${_wearOs.battery}%',
+                ),
               ),
-              _buildQuickStat(
-                icon: Icons.bluetooth_audio_rounded,
-                iconColor: const Color(0xFF38BDF8),
-                label: 'Cường độ sóng',
-                value: _rssiText,
+              Expanded(
+                child: _buildQuickStat(
+                  icon: Icons.wifi_rounded,
+                  iconColor: const Color(0xFF38BDF8),
+                  label: 'Sóng kết nối',
+                  value: _rssiText,
+                ),
               ),
-              _buildQuickStat(
-                icon: Icons.sync_rounded,
-                iconColor: const Color(0xFFA78BFA),
-                label: 'Độ trễ (${_syncManager.connectionType == WatchConnectionType.localBle ? 'BLE' : 'Sync'})',
-                value: '${_syncManager.latencyMs} ms',
+              Expanded(
+                child: _buildQuickStat(
+                  icon: Icons.speed_rounded,
+                  iconColor: const Color(0xFFA78BFA),
+                  label: 'Tốc độ phản hồi',
+                  value: '${_syncManager.latencyMs} ms',
+                ),
               ),
             ],
           ),
@@ -716,30 +1314,37 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _syncManager.isPaired ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (_syncManager.isPaired ? const Color(0xFF10B981) : const Color(0xFFEF4444))
-                                .withValues(alpha: 0.5),
-                            blurRadius: 6,
-                          ),
-                        ],
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _syncManager.isPaired ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_syncManager.isPaired ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+                                  .withValues(alpha: 0.5),
+                              blurRadius: 6,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Kênh: ${_syncManager.connectionStatusLabel}',
-                      style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w600),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Kênh: ${_syncManager.connectionStatusLabel}',
+                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: _showPairingDialog,
                   child: Container(
@@ -752,7 +1357,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.sync_alt_rounded, color: Color(0xFF38BDF8), size: 12),
+                        const Icon(Icons.phonelink_setup_rounded, color: Color(0xFF38BDF8), size: 12),
                         const SizedBox(width: 4),
                         Text(
                           'Mã: ${_syncManager.pairingCode}',
@@ -777,15 +1382,21 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     required String value,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: iconColor, size: 16),
             const SizedBox(width: 4),
-            Text(
-              value,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            Flexible(
+              child: Text(
+                value,
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -793,6 +1404,9 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         Text(
           label,
           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -808,8 +1422,10 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF38BDF8),
+                  disabledForegroundColor: const Color(0xFF38BDF8),
+                  disabledIconColor: const Color(0xFF38BDF8),
                   side: const BorderSide(color: Color(0xFF0284C7)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: _isMeasuring ? null : _triggerInstantMeasurement,
@@ -817,8 +1433,10 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)))
                     : const Icon(Icons.favorite_rounded, size: 18),
                 label: Text(
-                  _isMeasuring ? 'Đang đọc PPG...' : 'Đo nhịp tim tức thì',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  _isMeasuring ? 'Đang đo...' : 'Đo nhịp tim ngay',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -828,39 +1446,41 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF34D399),
                   side: const BorderSide(color: Color(0xFF059669)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 onPressed: _pingFindWatch,
                 icon: const Icon(Icons.vibration_rounded, size: 18),
                 label: const Text(
-                  'Tìm đồng hồ (Rung)',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  'Rung tìm đồng hồ',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-        if (!_syncManager.isPaired)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0284C7),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: () => AddSmartwatchSheet.show(context),
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text(
-                'Thêm & Ghép Nối Đồng Hồ (Add Watch)',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-              ),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-          )
-        else
+            onPressed: _showPairingDialog,
+            icon: const Icon(Icons.phonelink_setup_rounded, size: 20),
+            label: Text(
+              _syncManager.isPaired ? 'CÀI ĐẶT & GHÉP NỐI THỦ CÔNG' : 'GHÉP NỐI ĐỒNG HỒ THỦ CÔNG',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        if (_syncManager.isPaired) ...[
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -874,17 +1494,18 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                 await _syncManager.unpairDevice();
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã ngắt kết nối đồng hồ thành công.')),
+                    const SnackBar(content: Text('Đã ngắt kết nối đồng hồ.')),
                   );
                 }
               },
               icon: const Icon(Icons.link_off_rounded, size: 18),
               label: const Text(
-                'Ngắt Kết Nối Galaxy Watch 5',
+                'Ngắt kết nối đồng hồ',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
           ),
+        ],
         const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
@@ -899,7 +1520,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
             icon: const Icon(Icons.watch_rounded, size: 20),
             label: const Text(
-              'Xem Mô Phỏng Mặt Đồng Hồ (WearOS Interface)',
+              'Xem màn hình đồng hồ',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           ),
@@ -908,7 +1529,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Lưới thông số sinh tồn đo từ cảm biến BioActive
+  /// Lưới thông số sinh tồn đo từ cảm biến sức khỏe
   Widget _buildBiometricGrid() {
     return GridView.count(
       crossAxisCount: 2,
@@ -916,58 +1537,58 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       mainAxisSpacing: 12,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.35,
+      childAspectRatio: 1.10,
       children: [
-        // NHỊP TIM (PPG)
+        // NHỊP TIM
         _buildMetricTile(
           icon: Icons.favorite_rounded,
           iconColor: const Color(0xFFEF4444),
-          title: 'Nhịp tim PPG',
+          title: 'Nhịp tim',
           value: '${_wearOs.heartRate}',
-          unit: 'BPM',
+          unit: 'nhịp/phút',
           status: _wearOs.heartRate > 100
               ? 'Nhịp nhanh'
               : _wearOs.heartRate < 55
                   ? 'Nhịp chậm'
                   : 'Bình thường',
           statusColor: _wearOs.heartRate > 100 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-          extra: 'Đo liên tục qua quang học',
+          extra: 'Theo dõi liên tục',
         ),
 
         // SPO2 OXY TRONG MÁU
         _buildMetricTile(
           icon: Icons.water_drop_rounded,
           iconColor: const Color(0xFF38BDF8),
-          title: 'Oxy máu SpO2',
+          title: 'Oxy máu (SpO2)',
           value: '${_wearOs.spO2}',
           unit: '%',
-          status: _wearOs.spO2 >= 95 ? 'Tối ưu' : 'Cần chú ý (<95%)',
+          status: _wearOs.spO2 >= 95 ? 'Tốt (≥95%)' : 'Cần chú ý (<95%)',
           statusColor: _wearOs.spO2 >= 95 ? const Color(0xFF10B981) : const Color(0xFFFBBF24),
-          extra: 'Cảm biến hồng ngoại đỏ',
+          extra: 'Cảm biến đo tự động',
         ),
 
         // BƯỚC CHÂN TRONG NGÀY
         _buildMetricTile(
           icon: Icons.directions_walk_rounded,
           iconColor: const Color(0xFFF59E0B),
-          title: 'Vận động hôm nay',
+          title: 'Bước chân hôm nay',
           value: NumberFormat('#,###').format(_wearOs.steps),
           unit: 'bước',
           status: '${_wearOs.distanceKm} km',
           statusColor: const Color(0xFF94A3B8),
-          extra: '${_wearOs.calories} kcal tiêu hao',
+          extra: '${_wearOs.calories} kcal đã tiêu hao',
         ),
 
         // MỨC PIN THIẾT BỊ
         _buildMetricTile(
           icon: Icons.battery_full_rounded,
           iconColor: const Color(0xFF10B981),
-          title: 'Năng lượng pin',
+          title: 'Pin đồng hồ',
           value: '${_wearOs.battery}',
           unit: '%',
-          status: _wearOs.battery > 20 ? 'Bình thường' : 'Pin yếu',
+          status: _wearOs.battery > 20 ? 'Pin tốt' : 'Pin yếu',
           statusColor: _wearOs.battery > 20 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-          extra: 'Ước tính còn ~32 giờ',
+          extra: 'Dùng được cả ngày',
         ),
       ],
     );
@@ -997,10 +1618,15 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 4),
               Icon(icon, color: iconColor, size: 18),
             ],
           ),
@@ -1020,22 +1646,31 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             ],
           ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  status,
-                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-              Text(
-                extra,
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  extra,
+                  style: const TextStyle(color: Color(0xFF64748B), fontSize: 9),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                ),
               ),
             ],
           ),
@@ -1044,7 +1679,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Cảm biến gia tốc & Phát hiện té ngã
+  /// Cảm biến chuyển động & Tự động phát hiện té ngã
   Widget _buildMotionSensorCard() {
     final svm = _wearOs.currentSvmG;
     final tilt = _wearOs.currentTiltAngle;
@@ -1063,32 +1698,41 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0284C7).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.sensors_rounded, color: Color(0xFF38BDF8), size: 20),
                     ),
-                    child: const Icon(Icons.sensors_rounded, color: Color(0xFF38BDF8), size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Cảm biến quán tính 6 trục (IMU)',
-                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cảm biến nhận biết chuyển động',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Theo dõi va chạm và tư thế cơ thể',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      Text(
-                        'Gia tốc kế 3D + Con quay hồi chuyển',
-                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -1096,7 +1740,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isMonitoring ? 'ĐANG GIÁM SÁT' : 'TẠM TẮT',
+                  isMonitoring ? 'ĐANG BẢO VỆ' : 'TẠM TẮT',
                   style: TextStyle(
                     color: isMonitoring ? const Color(0xFF34D399) : const Color(0xFFF87171),
                     fontSize: 10,
@@ -1107,7 +1751,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             ],
           ),
           const SizedBox(height: 16),
-          // Chỉ số Vector tổng hợp SVM & Góc nghiêng
+          // Chỉ số Lực chuyển động & Góc nghiêng tư thế
           Row(
             children: [
               Expanded(
@@ -1120,7 +1764,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Gia tốc SVM (g)', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const Text('Lực chuyển động', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                       const SizedBox(height: 4),
                       Text(
                         '${svm.toStringAsFixed(2)} g',
@@ -1128,7 +1772,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        svm > 2.5 ? '⚠️ Va đập mạnh' : 'Trọng lực 1.0g tĩnh',
+                        svm > 2.5 ? '⚠️ Va chạm mạnh' : 'Bình thường (1.0g)',
                         style: TextStyle(color: svm > 2.5 ? Colors.red : const Color(0xFF64748B), fontSize: 10),
                       ),
                     ],
@@ -1146,7 +1790,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Góc nghiêng thân', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                      const Text('Tư thế cơ thể', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
                       const SizedBox(height: 4),
                       Text(
                         '${tilt.toStringAsFixed(1)}°',
@@ -1154,7 +1798,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        tilt > 60 ? '⚠️ Tư thế nằm ngang' : 'Tư thế đứng chuẩn',
+                        tilt > 60 ? '⚠️ Tư thế nằm / nghiêng' : 'Đang đứng hoặc ngồi',
                         style: TextStyle(color: tilt > 60 ? Colors.amber : const Color(0xFF64748B), fontSize: 10),
                       ),
                     ],
@@ -1165,15 +1809,15 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           ),
           const SizedBox(height: 12),
           Text(
-            'Thuật toán lọc Kalman và ngưỡng rơi tự do Kinematic Fall Trigger: Khi phát hiện SVM > 2.5g kèm theo góc nghiêng > 60° bất động, hệ thống lập tức đếm ngược 30 giây kích hoạt cứu hộ khẩn cấp.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, height: 1.4),
+            'Khi phát hiện bạn bị ngã mạnh và cơ thể bất động, đồng hồ sẽ tự động đếm ngược 30 giây và phát tín hiệu cứu hộ khẩn cấp đến người thân.',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12, height: 1.4),
           ),
         ],
       ),
     );
   }
 
-  /// Cấu hình ngưỡng an toàn
+  /// Cài đặt các mức cảnh báo an toàn
   Widget _buildSafetyThresholdsCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1185,21 +1829,21 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       child: Column(
         children: [
           _buildThresholdRow(
-            title: 'Cảnh báo nhịp tim quá cao',
-            valueText: '> 120 BPM',
-            description: 'Kích hoạt cảnh báo khi nhịp tim duy trì cao bất thường',
+            title: 'Cảnh báo khi nhịp tim quá nhanh',
+            valueText: '> 120 nhịp/phút',
+            description: 'Nhắc nhở bạn nghỉ ngơi khi nhịp tim tăng cao bất thường',
           ),
           const Divider(color: Color(0xFF334155), height: 20),
           _buildThresholdRow(
-            title: 'Cảnh báo nồng độ oxy nguy cấp',
+            title: 'Cảnh báo khi oxy máu thấp',
             valueText: '< 90% SpO2',
-            description: 'Tự động gọi cấp cứu khi SpO2 hạ dưới ngưỡng sinh tồn',
+            description: 'Báo động ngay nếu nồng độ oxy giảm xuống mức cần chú ý',
           ),
           const Divider(color: Color(0xFF334155), height: 20),
           _buildThresholdRow(
-            title: 'Độ nhạy phát hiện té ngã (IMU)',
-            valueText: '2.5 g (Chuẩn)',
-            description: 'Phát hiện va chạm rơi tự do chuẩn xác, hạn chế báo động giả',
+            title: 'Độ nhạy phát hiện té ngã',
+            valueText: 'Tiêu chuẩn',
+            description: 'Nhận diện chính xác cú ngã thật và tránh báo nhầm khi vận động',
           ),
         ],
       ),
@@ -1246,7 +1890,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Sơ đồ trực quan luồng đồng bộ 2 chiều SSWP
+  /// Sơ đồ trực quan cách thức trao đổi dữ liệu
   Widget _buildBiDirectionalSyncModelCard() {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1262,13 +1906,17 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             children: [
               Icon(Icons.swap_horiz_rounded, color: Color(0xFF38BDF8), size: 22),
               SizedBox(width: 8),
-              Text(
-                'MÔ HÌNH ĐỒNG BỘ 2 CHIỀU (SSWP)',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
+              Expanded(
+                child: Text(
+                  'CÁCH THỨC TRAO ĐỔI DỮ LIỆU',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1281,10 +1929,10 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             icon: Icons.arrow_downward_rounded,
             color: const Color(0xFF10B981),
             items: [
-              'Chỉ số sinh tồn PPG (Nhịp tim) & SpO2',
-              'Cảm biến IMU phát hiện té ngã (Shockwave g)',
-              'Sự kiện bấm phím cứng SOS cứu hộ',
-              'Số bước chân Pedometer và lượng Calo',
+              'Nhịp tim, lượng oxy trong máu (SpO2) và mức pin',
+              'Tín hiệu tự động nhận biết té ngã',
+              'Tín hiệu khi bấm nút cứu hộ khẩn cấp',
+              'Số bước chân và năng lượng vận động hàng ngày',
             ],
           ),
           const SizedBox(height: 14),
@@ -1297,10 +1945,10 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             icon: Icons.arrow_upward_rounded,
             color: const Color(0xFF38BDF8),
             items: [
-              'Lệnh rung Haptic tìm đồng hồ (Find My Watch)',
-              'Yêu cầu đo nhịp tim BioActive tức thời',
-              'Đồng bộ danh bạ người bảo hộ & Hạn chót điểm danh',
-              'Cập nhật tình trạng kết nối Cloud Relay',
+              'Gửi tín hiệu rung để tìm kiếm đồng hồ',
+              'Yêu cầu đo nhịp tim ngay từ điện thoại',
+              'Đồng bộ danh bạ người thân và lịch điểm danh an toàn',
+              'Cập nhật trạng thái kết nối mạng Internet',
             ],
           ),
         ],
@@ -1356,7 +2004,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Danh sách nhật ký truyền tin cảm biến BLE
+  /// Danh sách nhật ký hoạt động
   Widget _buildTelemetryLogsList() {
     if (_telemetryLogs.isEmpty) {
       return Container(
@@ -1367,7 +2015,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         ),
         child: const Center(
           child: Text(
-            'Chưa có dữ liệu truyền tin nào.',
+            'Chưa có dữ liệu hoạt động nào.',
             style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
           ),
         ),
@@ -1407,10 +2055,15 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            log['type'] as String,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: Text(
+                              log['type'] as String,
+                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             log['time'] as String,
                             style: const TextStyle(color: Color(0xFF64748B), fontSize: 10),
@@ -1433,25 +2086,28 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
     );
   }
 
-  /// Nút phát SOS khẩn cấp
+  /// Nút phát tín hiệu cứu hộ khẩn cấp
   Widget _buildSosTriggerButton(AppStrings strings) {
     return SizedBox(
       width: double.infinity,
-      height: 52,
       child: ElevatedButton.icon(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFDC2626),
           foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 4,
         ),
         onPressed: _triggerHardwareSos,
-        icon: const Icon(Icons.sos_rounded, size: 28),
+        icon: const Icon(Icons.sos_rounded, size: 26),
         label: Text(
-          strings.text('KÍCH HOẠT SOS KHẨN CẤP TỪ ĐỒNG HỒ', 'TRIGGER EMERGENCY SOS FROM WATCH'),
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          strings.text('GỬI BÁO ĐỘNG CỨU HỘ KHẨN CẤP', 'TRIGGER EMERGENCY SOS'),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
     );
   }
 }
+

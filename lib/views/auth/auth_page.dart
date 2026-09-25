@@ -1093,7 +1093,7 @@ class _AuthPageState extends State<AuthPage> {
           ),
           const SizedBox(height: 18),
           Text(
-            strings.text('Chu kỳ check-in mặc định', 'Default check-in cycle'),
+            strings.text('Chu kỳ điểm danh mặc định', 'Default check-in cycle'),
             style: AppTextStyles.title,
           ),
           const SizedBox(height: 8),
@@ -1136,7 +1136,7 @@ class _AuthPageState extends State<AuthPage> {
           const SizedBox(height: 12),
           Text(
             strings.text(
-              'Nếu số điện thoại đã tồn tại, SafeSolo sẽ đăng nhập và đồng bộ dữ liệu backend. Nếu chưa tồn tại, hệ thống sẽ tạo hồ sơ mới và mốc check-in đầu tiên cho bạn.',
+              'Nếu số điện thoại đã tồn tại, SafeSolo sẽ đăng nhập và đồng bộ dữ liệu máy chủ. Nếu chưa tồn tại, hệ thống sẽ tạo hồ sơ mới và mốc điểm danh đầu tiên cho bạn.',
               'If the phone number already exists, SafeSolo signs in and syncs backend data. Otherwise, it creates a new profile and your first check-in deadline.',
             ),
             style: AppTextStyles.body.copyWith(color: AppColors.textMuted),

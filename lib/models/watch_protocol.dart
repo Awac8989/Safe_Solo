@@ -34,6 +34,11 @@ class WatchAction {
   static const String instantMeasureReq = 'INSTANT_MEASURE_REQ';
   static const String timerSync = 'TIMER_SYNC';
 
+  // Commands from Watch
+  static const String findPhonePing = 'FIND_PHONE_PING';
+  static const String precisionMeasureStart = 'PRECISION_MEASURE_START';
+  static const String precisionMeasureResult = 'PRECISION_MEASURE_RESULT';
+
   // Pairing
   static const String pairRequest = 'PAIR_REQUEST';
   static const String pairConfirmed = 'PAIR_CONFIRMED';

@@ -55,8 +55,8 @@ Hệ thống được tổ chức thành 6 phân hệ cốt lõi với 35 Use Ca
 - **UC01:** Điểm danh an toàn qua Quả cầu trạng thái (Chọn tâm trạng, kèm ảnh khoảnh khắc).
 - **UC02:** Tạm hoãn điểm danh 30 phút (Khi đang họp, lái xe hoặc bận việc).
 - **UC03:** Điểm danh nhanh 1 chạm trên mặt đồng hồ Wear OS.
-- **UC04:** Tự động đếm lùi chu kỳ ân hạn (Dead-man switch countdown 1h - 72h).
-- **UC05:** Kích hoạt cảnh báo tự động quá hạn ân hạn (Báo động đa tầng).
+- **UC04:** Tự động đếm lùi hạn điểm danh an toàn (Dead-man switch countdown 1h - 72h).
+- **UC05:** Kích hoạt cảnh báo tự động quá hạn điểm danh (Báo động đa tầng).
 - **UC06:** Đặt lịch nhắc uống thuốc & Lịch trình sinh hoạt định kỳ.
 
 ### Phân hệ 2: Vòng tròn Thân yêu Alive Circle & Hộ tống Ảo (Circle & Live Journey)
@@ -208,7 +208,7 @@ flowchart TD
     UC01_Moment["UC01.2: Đính kèm ảnh khoảnh khắc"]
     UC02["UC02: Hoãn điểm danh 30 phút"]
     UC03["UC03: Điểm danh trên Smartwatch"]
-    UC04["UC04: Tự động đếm lùi ân hạn"]
+    UC04["UC04: Tự động đếm lùi hạn điểm danh"]
     UC05["UC05: Báo động quá hạn đa tầng"]
     UC06["UC06: Nhắc uống thuốc định kỳ"]
   end
@@ -226,7 +226,7 @@ flowchart TD
   UC03 -.->|Reset timer| UC04
 
   SystemTimer --> UC04
-  UC04 -.->|Quá hạn ân hạn| UC05
+  UC04 -.->|Quá hạn điểm danh| UC05
   UC05 -->|Gửi cảnh báo| Guardian
 ```
 

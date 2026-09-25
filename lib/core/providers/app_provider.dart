@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pedometer/pedometer.dart';
@@ -25,6 +26,7 @@ import '../../services/notification_service.dart';
 import '../../services/push_notification_service.dart';
 import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
+import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
@@ -790,7 +792,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   String? _lastError;
   int _streak = 0;
   Mood? _mood = Mood.calm;
-  bool _highContrast = false;
+  bool _isDarkMode = false;
   bool _fcmPushEnabled = true;
   bool _backgroundMonitorEnabled = true;
   bool _appIsVisible = true;
@@ -875,10 +877,19 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   String? get lastError => _lastError;
   int get streak => _streak;
   Mood? get mood => _mood;
-  bool get highContrast => _highContrast;
+  bool get isDarkMode => _isDarkMode;
+  bool get highContrast => _isDarkMode;
   bool get fcmPushEnabled => _fcmPushEnabled;
   bool get backgroundMonitorEnabled => _backgroundMonitorEnabled;
   AppLanguage get language => _language;
+  bool _isFindPhoneActive = false;
+  bool get isFindPhoneActive => _isFindPhoneActive;
+
+  void dismissFindPhoneAlert() {
+    _isFindPhoneActive = false;
+    notifyListeners();
+  }
+
   List<DisasterAlertModel> _activeDisasterAlerts = [];
   List<DisasterAlertModel> get activeDisasterAlerts => _activeDisasterAlerts;
   final Set<String> _notifiedAlertIds = {};
@@ -890,6 +901,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   void setUserForTest(User? user) {
     _user = user;
+    notifyListeners();
+  }
+
+  void setMedicalForTest(MedicalId medical) {
+    _medical = medical;
     notifyListeners();
   }
 
@@ -1033,7 +1049,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         _permissionsGranted = data['permissionsGranted'] as bool? ?? false;
         _streak = data['streak'] as int? ?? 0;
         _mood = _decodeMood(data['mood'] as String?);
-        _highContrast = data['highContrast'] as bool? ?? false;
+        _isDarkMode = (data['isDarkMode'] as bool?) ?? (data['highContrast'] as bool?) ?? false;
         _fcmPushEnabled = data['fcmPushEnabled'] as bool? ?? true;
         _backgroundMonitorEnabled =
             data['backgroundMonitorEnabled'] as bool? ?? true;
@@ -1120,7 +1136,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       'appVisible': _appIsVisible,
       'streak': _streak,
       'mood': _mood?.name,
-      'highContrast': _highContrast,
+      'isDarkMode': _isDarkMode,
+      'highContrast': _isDarkMode,
       'fcmPushEnabled': _fcmPushEnabled,
       'backgroundMonitorEnabled': _backgroundMonitorEnabled,
       'language': _language.name,
@@ -1583,6 +1600,17 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       await _evaluateSafetyAutomation();
       await _saveToStorage();
       _restartRuntimeAutomation();
+
+      // Đồng bộ hạn chót mới sang Galaxy Watch 5
+      try {
+        final nextDl = _user?.nextDeadline ?? DateTime.now().add(const Duration(hours: 12));
+        final diffSec = nextDl.difference(DateTime.now()).inSeconds;
+        final dlStr = '${nextDl.hour.toString().padLeft(2, '0')}:${nextDl.minute.toString().padLeft(2, '0')}';
+        WatchSyncManager.instance.sendTimerSync(
+          remainingSeconds: diffSec > 0 ? diffSec : 7200,
+          deadline: dlStr,
+        );
+      } catch (_) {}
     });
   }
 
@@ -1776,10 +1804,14 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     });
   }
 
-  Future<void> setHighContrast(bool enabled) async {
-    _highContrast = enabled;
+  Future<void> setDarkMode(bool enabled) async {
+    _isDarkMode = enabled;
     await _saveToStorage();
     notifyListeners();
+  }
+
+  Future<void> setHighContrast(bool enabled) async {
+    await setDarkMode(enabled);
   }
 
   Future<void> setCustomServerUrl(String url) async {
@@ -1983,6 +2015,74 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     WearOsService.instance.initialize();
     _watchAlertSubscription =
         PedometerService.instance.watchAlertStream.listen(_handleWatchAlert);
+
+    // Đồng bộ điểm danh thực tế từ Samsung Galaxy Watch 5 sang Điện thoại
+    WatchSyncManager.instance.onWatchCheckinReceived = (moodStr) async {
+      if (WatchSyncManager.instance.isRunningOnWatch) return;
+      debugPrint('[AppProvider] Watch check-in received ($moodStr). Auto checking in on phone...');
+      Mood targetMood = Mood.happy;
+      if (moodStr.contains('Bình thường')) targetMood = Mood.calm;
+      if (moodStr.contains('Mệt mỏi')) targetMood = Mood.tired;
+      if (moodStr.contains('Bất an') || moodStr.contains('sick')) targetMood = Mood.sick;
+      try {
+        try {
+          await checkIn(type: 'WATCH_CHECKIN', mood: targetMood);
+        } catch (_) {
+          await checkIn(type: 'HARD_TAP', mood: targetMood);
+        }
+        unawaited(_notifications.showAlert(
+          id: 9092,
+          title: '⌚ ĐÃ ĐIỂM DANH TỪ GALAXY WATCH 5',
+          body: 'Đồng hồ vừa điểm danh an toàn (Tâm trạng: $moodStr). Bộ đếm đã được làm mới!',
+        ));
+      } catch (e) {
+        debugPrint('[AppProvider] Error auto checkin from watch: $e');
+      }
+    };
+
+    // Đồng bộ tìm điện thoại từ Đồng hồ sang Điện thoại
+    WatchSyncManager.instance.onFindPhonePingReceived = () {
+      if (WatchSyncManager.instance.isRunningOnWatch) return;
+      debugPrint('[AppProvider] Watch is finding phone! Ringing phone...');
+      _isFindPhoneActive = true;
+      notifyListeners();
+      HapticFeedback.heavyImpact();
+      for (int i = 1; i <= 6; i++) {
+        Future.delayed(Duration(milliseconds: i * 400), () => HapticFeedback.heavyImpact());
+      }
+      unawaited(_notifications.showAlert(
+        id: 9991,
+        title: '📱 ĐỒNG HỒ ĐANG TÌM ĐIỆN THOẠI',
+        body: 'Samsung Galaxy Watch 5 đang kích hoạt tìm kiếm điện thoại này!',
+      ));
+    };
+
+    // Đồng bộ báo động khẩn cấp từ Đồng hồ sang Điện thoại
+    WatchSyncManager.instance.onWatchEmergencyReceived = (action, payload) async {
+      debugPrint('[AppProvider] Watch emergency received: $action');
+      final current = _user;
+      if (current != null) {
+        _user = current.copyWith(currentStatus: 'ALERT_TRIGGERED');
+        notifyListeners();
+        unawaited(_saveToStorage());
+      }
+      unawaited(_notifications.showAlert(
+        id: 9089,
+        title: '🚨 KHẨN CẤP TỪ SAMSUNG GALAXY WATCH 5',
+        body: payload['alert'] as String? ?? 'Phát hiện tín hiệu SOS/Ngã từ Galaxy Watch 5!',
+      ));
+    };
+
+    // Đồng bộ hủy báo động từ Đồng hồ sang Điện thoại
+    WatchSyncManager.instance.onAlertCancelledReceived = () {
+      debugPrint('[AppProvider] Watch alert cancelled received');
+      final current = _user;
+      if (current != null && current.currentStatus == 'ALERT_TRIGGERED') {
+        _user = current.copyWith(currentStatus: 'SAFE');
+        notifyListeners();
+        unawaited(_saveToStorage());
+      }
+    };
   }
 
   Future<void> _handleWatchAlert(Map<String, dynamic> alert) async {
@@ -2021,6 +2121,92 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         ),
       );
     }
+  }
+
+  /// ============================================================================
+  /// KHU VỰC GIẢ LẬP TRÌNH DIỄN HỘI ĐỒNG (DEFENSE DEMO SANDBOX INJECTION)
+  /// Phục vụ: Kiểm thử tự động & Báo cáo Khóa luận tốt nghiệp KTPM
+  /// ============================================================================
+  void simulateDeadmanTimeout() {
+    final current = _user;
+    final overdueDeadline = DateTime.now().subtract(const Duration(minutes: 15));
+    if (current == null) {
+      _user = User(
+        id: 'sandbox_user',
+        name: 'Đoàn Minh Quân',
+        email: 'quan@safesolo.app',
+        phoneNumber: '0901234567',
+        timerIntervalMinutes: 720,
+        currentStatus: 'CHECKIN_OVERDUE',
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        falseAlertGraceMinutes: 15,
+        lastCheckinTime: DateTime.now().subtract(const Duration(hours: 14)),
+        nextDeadline: overdueDeadline,
+      );
+    } else {
+      final pastCheckin = overdueDeadline.subtract(Duration(hours: current.graceHours));
+      _user = current.copyWith(
+        lastCheckinTime: pastCheckin,
+        nextDeadline: overdueDeadline,
+        currentStatus: 'CHECKIN_OVERDUE',
+      );
+    }
+    notifyListeners();
+    unawaited(_saveToStorage());
+  }
+
+  void simulateSafeReset() {
+    final current = _user;
+    final now = DateTime.now();
+    if (current == null) {
+      _user = User(
+        id: 'sandbox_user',
+        name: 'Đoàn Minh Quân',
+        email: 'quan@safesolo.app',
+        phoneNumber: '0901234567',
+        timerIntervalMinutes: 720,
+        currentStatus: 'SAFE',
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        falseAlertGraceMinutes: 15,
+        lastCheckinTime: now,
+        nextDeadline: now.add(const Duration(hours: 12)),
+      );
+    } else {
+      _user = current.copyWith(
+        lastCheckinTime: now,
+        nextDeadline: now.add(Duration(hours: current.graceHours)),
+        currentStatus: 'SAFE',
+      );
+    }
+    WearOsService.instance.cancelEmergency();
+    WearOsService.instance.resetVitals();
+    notifyListeners();
+    unawaited(_saveToStorage());
+  }
+
+  void simulateEmergencyStatus({String status = 'ALERT_TRIGGERED'}) {
+    final current = _user;
+    if (current == null) {
+      _user = User(
+        id: 'sandbox_user',
+        name: 'Đoàn Minh Quân',
+        email: 'quan@safesolo.app',
+        phoneNumber: '0901234567',
+        timerIntervalMinutes: 720,
+        currentStatus: status,
+        quietHoursStart: '22:00',
+        quietHoursEnd: '07:00',
+        falseAlertGraceMinutes: 15,
+        lastCheckinTime: DateTime.now(),
+        nextDeadline: DateTime.now().add(const Duration(hours: 12)),
+      );
+    } else {
+      _user = current.copyWith(currentStatus: status);
+    }
+    notifyListeners();
+    unawaited(_saveToStorage());
   }
 
   Future<void> triggerSilentSos() async {

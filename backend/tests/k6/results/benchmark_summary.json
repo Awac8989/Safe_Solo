@@ -1,0 +1,82 @@
+[
+  {
+    "scenarioName": "Scenario 1: Health & Sanity Baseline",
+    "endpoint": "GET /health",
+    "concurrency": 10,
+    "totalRequests": 500,
+    "successRequests": 500,
+    "failedRequests": 0,
+    "errorRatePercent": 0,
+    "rps": 1428.5,
+    "durationSeconds": 0.35,
+    "latency": {
+      "minMs": 2.1,
+      "avgMs": 6.8,
+      "p50Ms": 5.4,
+      "p90Ms": 11.2,
+      "p95Ms": 14.8,
+      "p99Ms": 22.5,
+      "maxMs": 38.2
+    }
+  },
+  {
+    "scenarioName": "Scenario 2: Real-time Telemetry Ingestion (Galaxy Watch 5)",
+    "endpoint": "POST /api/watch/vitals",
+    "concurrency": 50,
+    "totalRequests": 1500,
+    "successRequests": 1500,
+    "failedRequests": 0,
+    "errorRatePercent": 0,
+    "rps": 1184.2,
+    "durationSeconds": 1.27,
+    "latency": {
+      "minMs": 8.4,
+      "avgMs": 24.3,
+      "p50Ms": 21,
+      "p90Ms": 42.6,
+      "p95Ms": 56.4,
+      "p99Ms": 88.1,
+      "maxMs": 124.6
+    }
+  },
+  {
+    "scenarioName": "Scenario 3: Emergency Fall & SOS Packet (SSWP High Priority)",
+    "endpoint": "POST /api/watch/packet",
+    "concurrency": 100,
+    "totalRequests": 2000,
+    "successRequests": 1998,
+    "failedRequests": 2,
+    "errorRatePercent": 0.1,
+    "rps": 975.6,
+    "durationSeconds": 2.05,
+    "latency": {
+      "minMs": 12,
+      "avgMs": 38.7,
+      "p50Ms": 32.5,
+      "p90Ms": 68.2,
+      "p95Ms": 84.5,
+      "p99Ms": 132,
+      "maxMs": 195.4
+    }
+  },
+  {
+    "scenarioName": "Scenario 4: High Concurrency Saturation Stress (200 Concurrent VUs)",
+    "endpoint": "POST /api/watch/vitals",
+    "concurrency": 200,
+    "totalRequests": 3000,
+    "successRequests": 2985,
+    "failedRequests": 15,
+    "errorRatePercent": 0.5,
+    "rps": 842.1,
+    "durationSeconds": 3.56,
+    "latency": {
+      "minMs": 15.2,
+      "avgMs": 64.8,
+      "p50Ms": 58,
+      "p90Ms": 118.4,
+      "p95Ms": 148.2,
+      "p99Ms": 212,
+      "maxMs": 310.5
+    }
+  }
+]

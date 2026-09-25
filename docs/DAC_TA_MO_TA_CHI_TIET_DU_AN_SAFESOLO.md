@@ -60,7 +60,7 @@ Ba nhóm đối tượng đặc biệt dễ tổn thương trong xã hội bao g
 
 ## 1.3. Ý tưởng và Giải pháp đột phá của SafeSolo
 Đề tài **SafeSolo** ra đời nhằm giải quyết triệt để bài toán trên bằng cách kết hợp sức mạnh của:
-- **Nguyên lý Công tắc An toàn (Dead-man Switch):** Thay vì đợi người dùng kêu cứu, hệ thống định kỳ yêu cầu xác nhận an toàn. Nếu quá hạn ân hạn mà người dùng không phản hồi, hệ thống sẽ **tự động kích hoạt chuỗi cứu nạn đa tầng**.
+- **Nguyên lý Công tắc An toàn (Dead-man Switch):** Thay vì đợi người dùng kêu cứu, hệ thống định kỳ yêu cầu xác nhận an toàn. Nếu quá hạn điểm danh an toàn mà người dùng không phản hồi, hệ thống sẽ **tự động kích hoạt chuỗi cứu nạn đa tầng**.
 - **Cơ chế Chịu lỗi Ngoại tuyến (Offline Resilience):** Hoạt động ngay cả khi rơi vào tầng hầm, phòng kín mất toàn bộ sóng 4G/Wifi thông qua còi âm học 115dB mã Morse SOS và SMS vệ tinh GPS.
 - **Hệ sinh thái liên kết 4 phân hệ:** Mobile App (Flutter) + Đồng hồ Galaxy Watch 5 (Wear OS) + Web Admin điều phối GIS + Mạng lưới Hiệp sĩ cứu hộ cộng đồng đã xác minh KYC.
 
@@ -106,8 +106,8 @@ graph TD
 - **Quả cầu Trạng thái (Safety Orb):**
   - 🟢 **Xanh lá (Safe):** Người dùng an toàn, vừa điểm danh gần đây.
   - 🟡 **Vàng (Warning):** Còn dưới 2 giờ trước hạn chót điểm danh hoặc đến lịch uống thuốc. Nhấp nháy nhẹ nhắc nhở.
-  - 🔴 **Đỏ (Emergency / Overdue):** Quá hạn thời gian ân hạn mà người dùng không phản hồi, hệ thống chuyển sang chế độ báo động khẩn cấp.
-- **Thời gian ân hạn linh hoạt (Grace Period):** Tùy chỉnh từ **1 giờ đến 72 giờ** tùy thói quen người dùng (mặc định 24h).
+  - 🔴 **Đỏ (Emergency / Overdue):** Quá hạn điểm danh an toàn mà người dùng không phản hồi, hệ thống chuyển sang chế độ báo động khẩn cấp.
+- **Hạn điểm danh an toàn linh hoạt (Grace Period):** Tùy chỉnh từ **1 giờ đến 72 giờ** tùy thói quen người dùng (mặc định 24h).
 - **Điểm danh 1 chạm (Quick Check-in):** Chọn trạng thái tâm trạng (Vui vẻ, Bình an, Hơi mệt, Cần lưu ý), chia sẻ kèm ảnh khoảnh khắc và ghi nhận uống thuốc.
 - **Nút "Hoãn 30 phút" (Snooze):** Cho phép kéo dài thời gian đếm lùi khi người dùng đang họp, lái xe hoặc bận việc đột xuất mà không làm phiền người thân.
 

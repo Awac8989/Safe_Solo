@@ -16,6 +16,7 @@ class NightShieldBar extends StatelessWidget {
     final strings = AppStrings.of(context);
     final isShieldActive = provider.isNightShieldActive;
     final isMorningCheckedIn = provider.isMorningCheckinDone;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
@@ -29,26 +30,38 @@ class NightShieldBar extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
-            : const LinearGradient(
-                colors: [Color(0xFFE8F8F0), Color(0xFFD3EFE1)],
+            : LinearGradient(
+                colors: isDark
+                    ? const [Color(0xFF111C2E), Color(0xFF0D1726)]
+                    : const [Color(0xFFE8F8F0), Color(0xFFD3EFE1)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
         border: Border.all(
           color: isShieldActive
               ? const Color(0xFF818CF8).withValues(alpha: 0.5)
-              : AppColors.primary.withValues(alpha: 0.3),
+              : (isDark ? AppDarkColors.border : AppColors.primary.withValues(alpha: 0.3)),
           width: 1.5,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: isShieldActive
-                ? const Color(0xFF4338CA).withValues(alpha: 0.25)
-                : AppColors.primary.withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: isDark
+            ? (isShieldActive
+                ? [
+                    const BoxShadow(
+                      color: Color(0x334338CA),
+                      blurRadius: 18,
+                      offset: Offset(0, 6),
+                    ),
+                  ]
+                : const [])
+            : [
+                BoxShadow(
+                  color: isShieldActive
+                      ? const Color(0xFF4338CA).withValues(alpha: 0.25)
+                      : AppColors.primary.withValues(alpha: 0.12),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       child: Row(
         children: [
@@ -58,14 +71,16 @@ class NightShieldBar extends StatelessWidget {
             decoration: BoxDecoration(
               color: isShieldActive
                   ? const Color(0xFF4F46E5)
-                  : AppColors.primary.withValues(alpha: 0.2),
+                  : (isDark ? AppDarkColors.primarySoft : AppColors.primary.withValues(alpha: 0.2)),
               shape: BoxShape.circle,
             ),
             child: Icon(
               isShieldActive
                   ? Icons.shield_moon_rounded
                   : (isMorningCheckedIn ? Icons.wb_sunny_rounded : Icons.shield_outlined),
-              color: isShieldActive ? const Color(0xFFFDE047) : AppColors.primary,
+              color: isShieldActive
+                  ? const Color(0xFFFDE047)
+                  : (isDark ? AppDarkColors.primaryGlow : AppColors.primary),
               size: 24,
             ),
           ),
@@ -84,7 +99,7 @@ class NightShieldBar extends StatelessWidget {
                       style: AppTextStyles.caption.copyWith(
                         color: isShieldActive
                             ? const Color(0xFFC7D2FE)
-                            : AppColors.textSecondary,
+                            : (isDark ? AppDarkColors.textSecondary : AppColors.textSecondary),
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                         fontSize: 10.5,
@@ -97,7 +112,9 @@ class NightShieldBar extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: isShieldActive
                             ? const Color(0xFF4ADE80)
-                            : (isMorningCheckedIn ? AppColors.primary : AppColors.warning),
+                            : (isMorningCheckedIn
+                                ? (isDark ? AppDarkColors.primary : AppColors.primary)
+                                : AppColors.warning),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -114,7 +131,9 @@ class NightShieldBar extends StatelessWidget {
                           ? strings.text('Đã điểm danh thức dậy hôm nay', 'Morning check-in completed')
                           : strings.text('Chưa bật khiên đêm', 'Night shield standby')),
                   style: AppTextStyles.bodyStrong.copyWith(
-                    color: isShieldActive ? Colors.white : AppColors.textPrimary,
+                    color: isShieldActive
+                        ? Colors.white
+                        : (isDark ? AppDarkColors.textPrimary : AppColors.textPrimary),
                     fontSize: 13,
                   ),
                 ),

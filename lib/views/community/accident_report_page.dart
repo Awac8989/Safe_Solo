@@ -5,11 +5,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/api_service.dart';
+import '../../services/offline_sos_service.dart';
 
 /// Màn hình Báo Cáo Tai Nạn / Cấp Cứu Nạn Nhân Hiện Trường Kèm Ảnh TimeMark
 class AccidentReportPage extends StatefulWidget {
@@ -34,6 +36,9 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
   bool _useSamplePhoto = false;
   bool _isLocating = true;
   bool _isSubmitting = false;
+  int _pendingQueueCount = 0;
+  bool _isSyncingQueue = false;
+  String _imageFileSize = '';
 
   double? _lat;
   double? _lng;
@@ -47,6 +52,7 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
   void initState() {
     super.initState();
     _refreshTimeMark();
+    _loadPendingQueueCount();
     _addressController.text = 'Đang dò vị trí GPS thực tế...';
     _addressController.addListener(_onAddressChanged);
     _notesController.text = 'Va chạm giao thông tại hiện trường, nạn nhân cần xe cứu thương 115 tiếp cận khẩn cấp.';
@@ -225,16 +231,116 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
     }
   }
 
+  Future<void> _loadPendingQueueCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('safesolo_offline_accident_reports') ?? [];
+      if (mounted) {
+        setState(() => _pendingQueueCount = list.length);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveToOfflineQueue(Map<String, dynamic> reportData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList('safesolo_offline_accident_reports') ?? [];
+      list.add(jsonEncode(reportData));
+      await prefs.setStringList('safesolo_offline_accident_reports', list);
+      if (mounted) {
+        setState(() => _pendingQueueCount = list.length);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncOfflineReports() async {
+    if (_isSyncingQueue) return;
+    setState(() => _isSyncingQueue = true);
+    int successCount = 0;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList('safesolo_offline_accident_reports') ?? [];
+      if (rawList.isEmpty) {
+        if (mounted) {
+          setState(() => _isSyncingQueue = false);
+          TopToast.show(context, message: 'Hàng đợi ngoại tuyến đang trống', icon: Icons.check_circle_outline_rounded);
+        }
+        return;
+      }
+
+      final remainingList = <String>[];
+      for (final item in rawList) {
+        try {
+          final data = jsonDecode(item) as Map<String, dynamic>;
+          await _api.reportAccidentWithTimemark(
+            title: data['title'] as String,
+            description: data['description'] as String,
+            category: data['category'] as String,
+            lat: (data['lat'] as num).toDouble(),
+            lng: (data['lng'] as num).toDouble(),
+            address: data['address'] as String,
+            severity: data['severity'] as String,
+            victimCount: data['victimCount'] as String,
+            victimCondition: data['victimCondition'] as String,
+            photoPath: data['photoPath'] as String?,
+            timemarkMeta: data['timemarkMeta'] != null ? Map<String, dynamic>.from(data['timemarkMeta'] as Map) : null,
+            userId: data['userId'] as String?,
+            reportedByPhone: data['reportedByPhone'] as String?,
+            isAnonymous: data['isAnonymous'] as bool? ?? false,
+          );
+          successCount++;
+        } catch (_) {
+          remainingList.add(item);
+        }
+      }
+
+      await prefs.setStringList('safesolo_offline_accident_reports', remainingList);
+      if (mounted) {
+        setState(() {
+          _pendingQueueCount = remainingList.length;
+          _isSyncingQueue = false;
+        });
+        if (successCount > 0) {
+          TopToast.show(
+            context,
+            message: 'Đã đồng bộ thành công $successCount báo cáo ngoại tuyến lên máy chủ!',
+            icon: Icons.cloud_done_rounded,
+          );
+        } else {
+          TopToast.show(
+            context,
+            message: 'Chưa thể kết nối tới máy chủ. Báo cáo vẫn được lưu an toàn.',
+            icon: Icons.cloud_off_rounded,
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSyncingQueue = false);
+        TopToast.show(context, message: 'Lỗi đồng bộ: $e', icon: Icons.error_outline_rounded);
+      }
+    }
+  }
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
         source: source,
-        imageQuality: 85,
-        maxWidth: 1400,
+        imageQuality: 75,
+        maxWidth: 1280,
+        maxHeight: 960,
       );
       if (picked != null) {
+        final file = File(picked.path);
+        String sizeText = '';
+        try {
+          final bytes = await file.length();
+          sizeText = '${(bytes / 1024).toStringAsFixed(0)} KB';
+        } catch (_) {}
+
         setState(() {
-          _capturedImage = File(picked.path);
+          _capturedImage = file;
+          _imageFileSize = sizeText;
           _useSamplePhoto = false;
         });
         _refreshTimeMark();
@@ -269,38 +375,38 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
     setState(() => _isSubmitting = true);
     _refreshTimeMark();
 
+    final categoryLabel = _selectedCategory == 'ACCIDENT'
+        ? 'Tai nạn giao thông'
+        : _selectedCategory == 'MEDICAL'
+            ? 'Cấp cứu y tế'
+            : _selectedCategory == 'FIRE'
+                ? 'Cháy nổ'
+                : 'Hiểm họa đường phố';
+
+    final realAddress = _addressController.text.trim().isNotEmpty
+        ? _addressController.text.trim()
+        : 'Tọa độ GPS thực: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}';
+
+    final title = '[$categoryLabel] $_victimCondition tại $realAddress';
+    final description = _notesController.text.trim();
+
+    final timemarkMeta = {
+      'timestamp': _timeMarkString,
+      'lat': _lat!,
+      'lng': _lng!,
+      'address': realAddress,
+      'hash': _timeMarkHash,
+      'accuracyMeters': _accuracy != null ? double.parse(_accuracy!.toStringAsFixed(1)) : 4.0,
+      'isRealGps': _isRealGps,
+      'deviceModel': Platform.isAndroid
+          ? 'Android Device (GPS Hardware Sensor)'
+          : (Platform.isIOS ? 'iOS Device (CoreLocation)' : 'Device GPS Sensor'),
+      'reportedBy': user?.name ?? 'Người đi đường',
+      'victimCount': _victimCount,
+      'victimCondition': _victimCondition,
+    };
+
     try {
-      final categoryLabel = _selectedCategory == 'ACCIDENT'
-          ? 'Tai nạn giao thông'
-          : _selectedCategory == 'MEDICAL'
-              ? 'Cấp cứu y tế'
-              : _selectedCategory == 'FIRE'
-                  ? 'Cháy nổ'
-                  : 'Hiểm họa đường phố';
-
-      final realAddress = _addressController.text.trim().isNotEmpty
-          ? _addressController.text.trim()
-          : 'Tọa độ GPS thực: ${_lat!.toStringAsFixed(5)}, ${_lng!.toStringAsFixed(5)}';
-
-      final title = '[$categoryLabel] $_victimCondition tại $realAddress';
-      final description = _notesController.text.trim();
-
-      final timemarkMeta = {
-        'timestamp': _timeMarkString,
-        'lat': _lat!,
-        'lng': _lng!,
-        'address': realAddress,
-        'hash': _timeMarkHash,
-        'accuracyMeters': _accuracy != null ? double.parse(_accuracy!.toStringAsFixed(1)) : 4.0,
-        'isRealGps': _isRealGps,
-        'deviceModel': Platform.isAndroid
-            ? 'Android Device (GPS Hardware Sensor)'
-            : (Platform.isIOS ? 'iOS Device (CoreLocation)' : 'Device GPS Sensor'),
-        'reportedBy': user?.name ?? 'Người đi đường',
-        'victimCount': _victimCount,
-        'victimCondition': _victimCondition,
-      };
-
       await _api.reportAccidentWithTimemark(
         title: title,
         description: description,
@@ -393,8 +499,156 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
     } catch (err) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      TopToast.show(context, message: 'Lỗi gửi báo cáo: $err', icon: Icons.error_outline_rounded);
+
+      // Tự động lưu bản ghi vào Hàng Đợi Ngoại Tuyến (Offline Resilience Queue)
+      final offlineData = {
+        'title': title,
+        'description': description,
+        'category': _selectedCategory,
+        'lat': _lat!,
+        'lng': _lng!,
+        'address': realAddress,
+        'severity': _selectedSeverity,
+        'victimCount': _victimCount,
+        'victimCondition': _victimCondition,
+        'photoPath': _capturedImage?.path,
+        'timemarkMeta': timemarkMeta,
+        'userId': user?.id,
+        'reportedByPhone': user?.phoneNumber,
+        'isAnonymous': false,
+        'queuedAt': DateTime.now().toIso8601String(),
+      };
+      await _saveToOfflineQueue(offlineData);
+
+      // Hiển thị Dialog cứu hộ Ngoại tuyến thông minh
+      if (!mounted) return;
+      await _showOfflineFallbackDialog(
+        categoryLabel: categoryLabel,
+        victimCondition: _victimCondition,
+        realAddress: realAddress,
+        lat: _lat!,
+        lng: _lng!,
+      );
     }
+  }
+
+  Future<void> _showOfflineFallbackDialog({
+    required String categoryLabel,
+    required String victimCondition,
+    required String realAddress,
+    required double lat,
+    required double lng,
+  }) async {
+    final provider = context.read<AppProvider>();
+    final med = provider.medical;
+    final guardianPhone = med.emergencyPhone.isNotEmpty ? med.emergencyPhone : '115';
+    final mapLink = 'https://maps.google.com/?q=${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)}';
+    final smsContent = '[SAFESOLO CẤP CỨU] $categoryLabel: $victimCondition. Vị trí: $realAddress. Google Maps: $mapLink';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF0F172A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.wifi_off_rounded, color: Color(0xFFF59E0B), size: 24),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'MẤT KẾT NỐI · ĐÃ LƯU NGOẠI TUYẾN',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Máy chủ không phản hồi hoặc mất sóng Internet. Báo cáo hiện trường và ảnh chụp đã được tự động lưu vào HÀNG ĐỢI NGOẠI TUYẾN trên máy.',
+                style: TextStyle(color: Colors.white70, fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory_2_outlined, color: Color(0xFFF59E0B), size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Hàng đợi ngoại tuyến: $_pendingQueueCount ca chờ gửi',
+                          style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Hệ thống sẽ tự động đồng bộ lên TOC ngay khi thiết bị có lại kết nối 4G/Wifi.',
+                      style: TextStyle(color: Colors.white54, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Trong tình huống khẩn cấp, bạn có thể phát tín hiệu qua SMS cứu nạn (không cần 4G) hoặc gọi 115:',
+                style: TextStyle(color: Colors.amberAccent, fontSize: 11.5, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _call115();
+              },
+              icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFFEF4444), size: 18),
+              label: const Text('GỌI 115', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF59E0B),
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final sent = await OfflineSosService.instance.sendEmergencySms(
+                  phoneNumber: guardianPhone,
+                  message: smsContent,
+                );
+                if (!sent && mounted) {
+                  TopToast.show(context, message: 'Không thể mở trình nhắn tin SMS', icon: Icons.sms_failed_rounded);
+                }
+              },
+              icon: const Icon(Icons.sms_rounded, size: 18),
+              label: const Text('GỬI QUA SMS PDR', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.pop(context);
+              },
+              child: const Text('ĐÓNG', style: TextStyle(color: Colors.white60)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -442,6 +696,50 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // BANNER HÀNG ĐỢI NGOẠI TUYẾN KHI CÓ BÁO CÁO CHỜ ĐỒNG BỘ
+          if (_pendingQueueCount > 0)
+            Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.cloud_off_rounded, color: Color(0xFFF59E0B), size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$_pendingQueueCount báo cáo đang chờ đồng bộ ngoại tuyến',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Đã lưu an toàn trên máy. Bấm để gửi lên máy chủ.',
+                          style: TextStyle(color: Colors.white60, fontSize: 10.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _isSyncingQueue ? null : _syncOfflineReports,
+                    icon: _isSyncingQueue
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)))
+                        : const Icon(Icons.sync_rounded, color: Color(0xFFF59E0B), size: 16),
+                    label: Text(
+                      _isSyncingQueue ? '...' : 'ĐỒNG BỘ',
+                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // 1. KHUNG ẢNH HIỆN TRƯỜNG VỚI TIMEMARK HUD OVERLAY
           _buildTimeMarkPhotoSection(),
           const SizedBox(height: 16),
@@ -510,6 +808,21 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
                   ),
                   child: const Text('BẰNG CHỨNG SỐ', style: TextStyle(color: Color(0xFF10B981), fontSize: 9, fontWeight: FontWeight.bold)),
                 ),
+                if (_imageFileSize.isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
+                    ),
+                    child: Text(
+                      '$_imageFileSize · ĐÃ NÉN TỐI ƯU',
+                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

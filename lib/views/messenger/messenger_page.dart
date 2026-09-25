@@ -110,7 +110,9 @@ class MessengerPage extends StatelessWidget {
                     showModalBottomSheet<void>(
                       context: context,
                       isScrollControlled: true,
-                      backgroundColor: AppColors.surface,
+                      backgroundColor: Theme.of(context).brightness == Brightness.dark
+                          ? AppDarkColors.surface
+                          : AppColors.surface,
                       shape: const RoundedRectangleBorder(
                         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                       ),
@@ -120,19 +122,33 @@ class MessengerPage extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppDarkColors.card
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? AppDarkColors.border
+                            : AppColors.border,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: AppColors.primarySoft,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? AppDarkColors.primarySoft
+                                : AppColors.primarySoft,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.phone_in_talk_rounded, color: AppColors.primary, size: 20),
+                          child: Icon(
+                            Icons.phone_in_talk_rounded,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? AppDarkColors.primary
+                                : AppColors.primary,
+                            size: 20,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -141,12 +157,22 @@ class MessengerPage extends StatelessWidget {
                             children: [
                               Text(
                                 strings.text('Gọi thoát hiểm', 'Fake Call'),
-                                style: AppTextStyles.title.copyWith(fontSize: 13),
+                                style: AppTextStyles.title.copyWith(
+                                  fontSize: 13,
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? AppDarkColors.textPrimary
+                                      : null,
+                                ),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 strings.text('Ngụy trang cứu nguy', 'Escape tool'),
-                                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, fontSize: 11),
+                                style: AppTextStyles.caption.copyWith(
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? AppDarkColors.textSecondary
+                                      : AppColors.textSecondary,
+                                  fontSize: 11,
+                                ),
                               ),
                             ],
                           ),
@@ -211,10 +237,24 @@ class _ChatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = chat.highlight
+        ? (isDark ? const Color(0xFF261D0F) : const Color(0xFFFFFBF2))
+        : (isDark ? AppDarkColors.card : AppColors.card);
+    final avatarBg = chat.highlight
+        ? (isDark ? const Color(0xFF3F2B12) : const Color(0xFFFFF1D7))
+        : (isDark ? AppDarkColors.primarySoft : AppColors.primarySoft);
+    final avatarTextColor = chat.highlight
+        ? AppColors.warning
+        : (isDark ? AppDarkColors.primaryGlow : AppColors.primary);
+
     return GestureDetector(
       onTap: () => _openThread(context),
       child: AppCard(
-        color: chat.highlight ? const Color(0xFFFFFBF2) : AppColors.card,
+        color: cardBg,
+        borderColor: isDark
+            ? (chat.highlight ? const Color(0xFF6A481B) : AppDarkColors.border)
+            : null,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -222,16 +262,14 @@ class _ChatCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: chat.highlight
-                    ? const Color(0xFFFFF1D7)
-                    : AppColors.primarySoft,
+                color: avatarBg,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
               child: Text(
                 chat.name.substring(0, 1).toUpperCase(),
                 style: AppTextStyles.title.copyWith(
-                  color: chat.highlight ? AppColors.warning : AppColors.primary,
+                  color: avatarTextColor,
                 ),
               ),
             ),
@@ -243,29 +281,43 @@ class _ChatCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(chat.name, style: AppTextStyles.title)),
-                      Text(_formatTime(chat.updatedAt), style: AppTextStyles.caption),
+                      Expanded(
+                        child: Text(
+                          chat.name,
+                          style: AppTextStyles.title.copyWith(
+                            color: isDark ? AppDarkColors.textPrimary : null,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatTime(chat.updatedAt),
+                        style: AppTextStyles.caption.copyWith(
+                          color: isDark ? AppDarkColors.textSecondary : null,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
                     chat.preview,
                     style: AppTextStyles.bodyLarge.copyWith(
-                      color: AppColors.textSecondary,
+                      color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.forum_outlined,
                         size: 14,
-                        color: AppColors.textSecondary,
+                        color: isDark ? AppDarkColors.textMuted : AppColors.textSecondary,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${chat.messages.length} ${strings.text('tin nhắn', 'messages')}',
-                        style: AppTextStyles.caption,
+                        style: AppTextStyles.caption.copyWith(
+                          color: isDark ? AppDarkColors.textMuted : null,
+                        ),
                       ),
                     ],
                   ),
@@ -273,13 +325,18 @@ class _ChatCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.call_outlined,
                           size: 14,
-                          color: AppColors.primary,
+                          color: isDark ? AppDarkColors.primary : AppColors.primary,
                         ),
                         const SizedBox(width: 4),
-                        Text(chat.contactPhone!, style: AppTextStyles.caption),
+                        Text(
+                          chat.contactPhone!,
+                          style: AppTextStyles.caption.copyWith(
+                            color: isDark ? AppDarkColors.primary : null,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -292,7 +349,7 @@ class _ChatCard extends StatelessWidget {
                           size: 14,
                           color: chat.battery == '12%'
                               ? AppColors.destructive
-                              : AppColors.textSecondary,
+                              : (isDark ? AppDarkColors.textMuted : AppColors.textSecondary),
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -300,7 +357,7 @@ class _ChatCard extends StatelessWidget {
                           style: AppTextStyles.caption.copyWith(
                             color: chat.battery == '12%'
                                 ? AppColors.destructive
-                                : AppColors.textSecondary,
+                                : (isDark ? AppDarkColors.textMuted : AppColors.textSecondary),
                           ),
                         ),
                       ],
@@ -453,8 +510,10 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
       );
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: isDark ? AppDarkColors.background : AppColors.background,
       appBar: AppBar(
         title: Text(thread.name),
         actions: [
@@ -467,7 +526,11 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppDarkColors.backgroundGradient
+              : AppColors.backgroundGradient,
+        ),
         child: SafeArea(
           top: false,
           child: Column(
@@ -477,14 +540,16 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: thread.highlight ? const Color(0xFFFFFBF2) : AppColors.card,
+                    color: thread.highlight
+                        ? (isDark ? const Color(0xFF261D0F) : const Color(0xFFFFFBF2))
+                        : (isDark ? AppDarkColors.card : AppColors.card),
                     borderRadius: BorderRadius.circular(AppRadius.xl),
                     border: Border.all(
                       color: thread.highlight
-                          ? const Color(0xFFFFD8A1)
-                          : AppColors.border,
+                          ? (isDark ? const Color(0xFF6A481B) : const Color(0xFFFFD8A1))
+                          : (isDark ? AppDarkColors.border : AppColors.border),
                     ),
-                    boxShadow: AppShadows.card,
+                    boxShadow: isDark ? const [] : AppShadows.card,
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,13 +564,15 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                                 thread.groupLabel,
                                 thread.id,
                               ),
-                              style: AppTextStyles.caption,
+                              style: AppTextStyles.caption.copyWith(
+                                color: isDark ? AppDarkColors.textSecondary : null,
+                              ),
                             ),
                             const SizedBox(height: 6),
                             Text(
                               thread.preview,
                               style: AppTextStyles.body.copyWith(
-                                color: AppColors.textSecondary,
+                                color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                               ),
                             ),
                           ],
@@ -529,9 +596,15 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 12),
                   padding: const EdgeInsets.only(top: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.78),
+                    color: isDark
+                        ? AppDarkColors.card.withValues(alpha: 0.5)
+                        : Colors.white.withValues(alpha: 0.78),
                     borderRadius: BorderRadius.circular(AppRadius.xl),
-                    border: Border.all(color: AppColors.border.withValues(alpha: 0.95)),
+                    border: Border.all(
+                      color: isDark
+                          ? AppDarkColors.border
+                          : AppColors.border.withValues(alpha: 0.95),
+                    ),
                   ),
                   child: thread.messages.isEmpty
                       ? Center(
@@ -544,7 +617,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                               ),
                               textAlign: TextAlign.center,
                               style: AppTextStyles.bodyLarge.copyWith(
-                                color: AppColors.textSecondary,
+                                color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -572,17 +645,21 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
           decoration: BoxDecoration(
-            color: AppColors.card,
+            color: isDark ? AppDarkColors.surface : AppColors.card,
             border: Border(
-              top: BorderSide(color: AppColors.border.withValues(alpha: 0.9)),
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0F000000),
-                blurRadius: 18,
-                offset: Offset(0, -6),
+              top: BorderSide(
+                color: isDark ? AppDarkColors.border : AppColors.border.withValues(alpha: 0.9),
               ),
-            ],
+            ),
+            boxShadow: isDark
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x0F000000),
+                      blurRadius: 18,
+                      offset: Offset(0, -6),
+                    ),
+                  ],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -609,7 +686,7 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   decoration: InputDecoration(
                     hintText: strings.text('Nhập tin nhắn phản hồi...', 'Type a reply...'),
                     filled: true,
-                    fillColor: AppColors.backgroundAlt,
+                    fillColor: isDark ? AppDarkColors.card : AppColors.backgroundAlt,
                   ),
                 ),
               ),
@@ -643,18 +720,21 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     if (message.isSystem) {
       return Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.secondary,
+            color: isDark ? AppDarkColors.surface : AppColors.secondary,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             message.content,
             textAlign: TextAlign.center,
-            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.caption.copyWith(
+              color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+            ),
           ),
         ),
       );
@@ -668,7 +748,12 @@ class _MessageBubble extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 290),
           child: AppCard(
             padding: const EdgeInsets.all(14),
-            color: alignEnd ? AppColors.primary : AppColors.card,
+            color: alignEnd
+                ? AppColors.primary
+                : (isDark ? AppDarkColors.card : AppColors.card),
+            borderColor: alignEnd
+                ? null
+                : (isDark ? AppDarkColors.border : null),
             shadow: const [],
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,7 +764,7 @@ class _MessageBubble extends StatelessWidget {
                     child: Text(
                       message.sender,
                       style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textSecondary,
+                        color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                       ),
                     ),
                   ),
@@ -689,7 +774,9 @@ class _MessageBubble extends StatelessWidget {
                   Text(
                     message.content,
                     style: AppTextStyles.bodyLarge.copyWith(
-                      color: alignEnd ? Colors.white : AppColors.textPrimary,
+                      color: alignEnd
+                          ? Colors.white
+                          : (isDark ? AppDarkColors.textPrimary : AppColors.textPrimary),
                     ),
                   ),
                 const SizedBox(height: 6),
@@ -698,7 +785,7 @@ class _MessageBubble extends StatelessWidget {
                   style: AppTextStyles.caption.copyWith(
                     color: alignEnd
                         ? Colors.white.withValues(alpha: 0.85)
-                        : AppColors.textMuted,
+                        : (isDark ? AppDarkColors.textMuted : AppColors.textMuted),
                   ),
                 ),
               ],
@@ -824,10 +911,13 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = widget.alignEnd ? Colors.white : AppColors.textPrimary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = widget.alignEnd
+        ? Colors.white
+        : (isDark ? AppDarkColors.textPrimary : AppColors.textPrimary);
     final muted = widget.alignEnd
         ? Colors.white.withValues(alpha: 0.78)
-        : AppColors.textSecondary;
+        : (isDark ? AppDarkColors.textSecondary : AppColors.textSecondary);
     final liveProgress = _duration.inMilliseconds > 0
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
         : _progress;
@@ -843,7 +933,7 @@ class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
             decoration: BoxDecoration(
               color: widget.alignEnd
                   ? Colors.white.withValues(alpha: 0.18)
-                  : AppColors.primarySoft,
+                  : (isDark ? AppDarkColors.primarySoft : AppColors.primarySoft),
               shape: BoxShape.circle,
             ),
             child: Icon(

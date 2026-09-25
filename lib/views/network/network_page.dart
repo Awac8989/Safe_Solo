@@ -293,15 +293,18 @@ class _GuardianCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priorityColor = _priorityColor();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: isDark ? AppDarkColors.card : AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.xl),
-        boxShadow: AppShadows.card,
+        boxShadow: isDark ? const [] : AppShadows.card,
         border: Border.all(
-          color: contact.priority == 1 ? priorityColor.withValues(alpha: 0.3) : Colors.transparent,
+          color: contact.priority == 1
+              ? priorityColor.withValues(alpha: 0.3)
+              : (isDark ? AppDarkColors.border : Colors.transparent),
           width: 1.5,
         ),
       ),
@@ -330,7 +333,10 @@ class _GuardianCard extends StatelessWidget {
                     Flexible(
                       child: Text(
                         contact.name,
-                        style: AppTextStyles.title.copyWith(fontSize: 15),
+                        style: AppTextStyles.title.copyWith(
+                          fontSize: 15,
+                          color: isDark ? AppDarkColors.textPrimary : null,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -356,7 +362,10 @@ class _GuardianCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   '${contact.relation} · ${contact.phone}',
-                  style: AppTextStyles.body.copyWith(fontSize: 12, color: AppColors.textSecondary),
+                  style: AppTextStyles.body.copyWith(
+                    fontSize: 12,
+                    color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),

@@ -7,19 +7,17 @@ const hazardService = require('../services/hazardService');
 
 const router = express.Router();
 router.use((req, res, next) => {
-  // Allow public emergency and hazard endpoints to be accessible without auth
+  // Allow public emergency and hazard endpoints to be accessible without mandatory auth (for bystanders/anonymous)
   if (req.path.startsWith('/disaster-alerts') || req.path.startsWith('/hazards')) {
+    const header = req.headers.authorization || '';
+    if (header.startsWith('Bearer ')) {
+      return auth(req, res, next);
+    }
+    req.user = null;
     return next();
   }
-  const header = req.headers.authorization || '';
-  if (header.startsWith('Bearer ')) {
-    return auth(req, res, next);
-  }
-  const userId = req.headers['x-user-id'] || req.query.userId;
-  if (userId) {
-    req.user = { id: userId };
-    return next();
-  }
+
+  // All other community endpoints require valid JWT authentication
   return auth(req, res, next);
 });
 

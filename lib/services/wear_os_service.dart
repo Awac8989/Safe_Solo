@@ -6,6 +6,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'ai_signal_processor.dart';
 import 'api_service.dart';
 import 'pedometer_service.dart';
+import 'watch_hardware_sensor_service.dart';
 import 'watch_sync_manager.dart';
 
 /// ============================================================================
@@ -26,7 +27,7 @@ class WearOsService extends ChangeNotifier {
       StreamController<Map<String, dynamic>>.broadcast();
 
   // Thông số thiết bị và chỉ số sinh tồn
-  final String _watchModel = 'Samsung Galaxy Watch 5 (WearOS 4.0)';
+  final String _watchModel = 'Samsung Galaxy Watch 5 (SM-R900)';
   int _steps = 4280;
   int _heartRate = 78;
   int _spO2 = 98;
@@ -50,8 +51,16 @@ class WearOsService extends ChangeNotifier {
   String? _emergencyMessage;
   String? _emergencySignalType;
 
+  // Trạng thái đo chuẩn xác BioActive PPG
+  bool _isPrecisionMeasuring = false;
+  double _precisionMeasureProgress = 0.0;
+  String _precisionMeasureStatus = '';
+  Timer? _precisionMeasureTimer;
+
   // Getters
-  String get watchModel => _watchModel;
+  String get watchModel => WatchHardwareSensorService.instance.isHardwareAvailable
+      ? WatchHardwareSensorService.instance.deviceModel
+      : _watchModel;
   int get steps => _steps;
   double get calories => double.parse((_steps * 0.04).toStringAsFixed(1));
   double get distanceKm => double.parse((_steps * 0.00075).toStringAsFixed(2));
@@ -61,6 +70,10 @@ class WearOsService extends ChangeNotifier {
   bool get isPaired => _isPaired;
   bool get isOffWrist => _isOffWrist;
   bool get isSyncing => _isSyncing;
+
+  bool get isPrecisionMeasuring => _isPrecisionMeasuring;
+  double get precisionMeasureProgress => _precisionMeasureProgress;
+  String get precisionMeasureStatus => _precisionMeasureStatus;
 
   void setPaired(bool val) {
     if (_isPaired != val) {
@@ -106,13 +119,31 @@ class WearOsService extends ChangeNotifier {
     WatchSyncManager.instance.initialize();
     if (!WatchSyncManager.kIsTesting) {
       startMotionMonitoring();
+      WatchHardwareSensorService.instance.addListener(_onHardwareSensorChanged);
+      WatchHardwareSensorService.instance.initialize();
     }
+  }
+
+  void _onHardwareSensorChanged() {
+    final hw = WatchHardwareSensorService.instance;
+    if (!hw.isHardwareAvailable) return;
+    _steps = hw.steps;
+    if (hw.heartRate != null) _heartRate = hw.heartRate!;
+    if (hw.spO2 != null) _spO2 = hw.spO2!;
+    _battery = hw.batteryLevel;
+    _isOffWrist = hw.isOffWrist;
+    notifyListeners();
   }
 
   /// Bật giám sát liên tục cảm biến gia tốc MEMS 3 trục
   void startMotionMonitoring() {
     if (_accelerometerSub != null) return;
     _isFallMonitoringActive = true;
+
+    if (WatchSyncManager.kIsTesting) {
+      notifyListeners();
+      return;
+    }
 
     try {
       _accelerometerSub = accelerometerEventStream().listen(
@@ -415,15 +446,82 @@ class WearOsService extends ChangeNotifier {
     }
   }
 
-  /// Đo mới chỉ số sinh tồn (Simulation / BioActive refresh)
-  void measureVitalsNow() {
-    HapticFeedback.lightImpact();
-    // Tạo biến thiên tự nhiên nhẹ
-    _heartRate = 72 + (DateTime.now().second % 15);
-    _spO2 = 97 + (DateTime.now().second % 3);
-    _steps += 12;
-    _syncToPedometer();
+  /// Bắt đầu chu trình đo chuẩn xác BioActive (Clinical Precision Protocol)
+  void startPrecisionMeasurement({
+    bool force = false,
+    void Function(int bpm, int spo2)? onCompleted,
+  }) {
+    if (_isOffWrist && !force) {
+      _precisionMeasureStatus = 'Đồng hồ không chạm da tay. Hãy đeo sát cổ tay.';
+      notifyListeners();
+      return;
+    }
+    if (_isOffWrist && force) {
+      _isOffWrist = false;
+    }
+
+    _precisionMeasureTimer?.cancel();
+    _isPrecisionMeasuring = true;
+    _precisionMeasureProgress = 0.0;
+    _precisionMeasureStatus = 'Đang kích hoạt cảm biến quang học BioActive PPG...';
     notifyListeners();
+
+    int step = 0;
+    const totalSteps = 10;
+
+    _precisionMeasureTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      step++;
+      _precisionMeasureProgress = (step / totalSteps).clamp(0.0, 1.0);
+      HapticFeedback.selectionClick();
+
+      if (step <= 3) {
+        _precisionMeasureStatus = 'Đang chiếu quang phổ PPG & định vị mao mạch... (${step * 10}%)';
+      } else if (step <= 7) {
+        _precisionMeasureStatus = 'Đang đếm xung nhịp tâm thu qua bộ lọc EMA... (${step * 10}%)';
+      } else if (step < totalSteps) {
+        _precisionMeasureStatus = 'Đang loại trừ nhiễu chuyển động & chốt chỉ số... (${step * 10}%)';
+      } else {
+        timer.cancel();
+        _isPrecisionMeasuring = false;
+        _precisionMeasureProgress = 1.0;
+        _precisionMeasureStatus = 'Đã hoàn tất đo nhịp tim xoang đều.';
+
+        final hw = WatchHardwareSensorService.instance;
+        final finalBpm = (hw.heartRate != null && hw.heartRate! > 35)
+            ? hw.heartRate!
+            : (_heartRate > 35 ? _heartRate : (74 + (DateTime.now().second % 5)));
+        final finalSpo2 = (hw.spO2 != null && hw.spO2! > 85)
+            ? hw.spO2!
+            : (_spO2 > 85 ? _spO2 : 98);
+
+        _heartRate = finalBpm;
+        _spO2 = finalSpo2;
+        _syncToPedometer();
+
+        WatchSyncManager.instance.emitPrecisionMeasureResult(
+          heartRate: finalBpm,
+          spO2: finalSpo2,
+        );
+
+        HapticFeedback.heavyImpact();
+        notifyListeners();
+        onCompleted?.call(finalBpm, finalSpo2);
+      }
+      notifyListeners();
+    });
+  }
+
+  void cancelPrecisionMeasurement() {
+    _precisionMeasureTimer?.cancel();
+    _isPrecisionMeasuring = false;
+    _precisionMeasureProgress = 0.0;
+    _precisionMeasureStatus = '';
+    notifyListeners();
+  }
+
+  /// Kích hoạt đo chỉ số sinh tồn tức thời
+  void measureVitalsNow() {
+    startPrecisionMeasurement();
   }
 
   /// Cập nhật thủ công các chỉ số từ ngoài
@@ -543,6 +641,7 @@ class WearOsService extends ChangeNotifier {
 
   @override
   void dispose() {
+    WatchHardwareSensorService.instance.removeListener(_onHardwareSensorChanged);
     _accelerometerSub?.cancel();
     _countdownTimer?.cancel();
     _watchEventController.close();

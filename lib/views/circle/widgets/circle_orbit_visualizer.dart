@@ -39,7 +39,7 @@ class _CircleOrbitVisualizerState extends State<CircleOrbitVisualizer>
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final strings = AppStrings.of(context);
-    final isNight = provider.isNightShieldActive;
+    final isNight = provider.isNightShieldActive || (Theme.of(context).brightness == Brightness.dark);
     final members = provider.orbitMembers;
     final userName = provider.user?.name ?? strings.text('Bạn', 'You');
 

@@ -275,9 +275,9 @@ export const fetchRevenueSummary = async () => {
   return request<{ success: true; data: RevenueSummary }>("/admin/revenue");
 };
 
-export function resolveAssetUrl(value: string) {
+export function resolveAssetUrl(value?: string | null) {
   if (!value) {
-    return value;
+    return "";
   }
   if (
     value.startsWith("http://") ||

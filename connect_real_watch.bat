@@ -74,15 +74,27 @@ if %errorlevel% equ 0 (
 )
 
 echo.
-echo [4/4] Đang khởi chạy SafeSolo trên mặt đồng hồ %WATCH_IP%...
+echo [4/5] Đang cấp quyền cảm biến sinh học (Nhịp tim BioActive, Bước chân, SpO2)...
+"%ADB_PATH%" -s %WATCH_IP% shell pm grant com.example.safesolo android.permission.BODY_SENSORS 2>nul
+"%ADB_PATH%" -s %WATCH_IP% shell pm grant com.example.safesolo android.permission.BODY_SENSORS_BACKGROUND 2>nul
+"%ADB_PATH%" -s %WATCH_IP% shell pm grant com.example.safesolo android.permission.ACTIVITY_RECOGNITION 2>nul
+
+echo.
+echo [5/5] Đang khởi chạy SafeSolo trên mặt đồng hồ SM-R900 (%WATCH_IP%)...
 "%ADB_PATH%" -s %WATCH_IP% shell am start -n com.example.safesolo/.MainActivity
 
 echo.
 echo ===============================================================================
-echo                KẾT NỐI VÀ KHỞI CHẠY ĐỒNG HỒ THÀNH CÔNG!
+echo        KẾT NỐI VÀ THIẾT LẬP CẢM BIẾN SAMSUNG GALAXY WATCH 5 (SM-R900) THÀNH CÔNG!
 echo ===============================================================================
-echo 1. Nhìn lên mặt đồng hồ Galaxy Watch: SafeSolo sẽ tự mở giao diện mặt tròn 1:1.
-echo 2. Mặt đồng hồ sẽ hiển thị mã PIN 6 số (VD: 742-891).
+echo  LƯU Ý ĐỂ ĐO CHỈ SỐ SINH TỒN CHUẨN XÁC:
+echo  - Đeo đồng hồ cách xương cổ tay khoảng 1 - 2 ngón tay.
+echo  - Dây đeo ôm sát vừa vặn, không quá chặt cũng không lỏng lẻo.
+echo  - Cảm biến quang BioActive ở mặt dưới đồng hồ tiếp xúc đều với da.
+echo  - SpO2 và nhịp tim được lọc nhiễu tự động (loại trừ báo động giả khi tháo đồng hồ).
+echo -------------------------------------------------------------------------------
+echo 1. Nhìn lên mặt đồng hồ Galaxy Watch 5: Giao diện tròn 1:1 SafeSolo sẽ kích hoạt.
+echo 2. Mặt đồng hồ hiển thị mã PIN 6 số (VD: 742-891).
 echo 3. Mở app SafeSolo trên điện thoại -> Vào "Thiết bị đeo & Đồng hồ" -> Nhập mã PIN
 echo    hoặc bấm "Ghép nối nhanh (1-Chạm)" để bắt đầu đồng bộ dữ liệu sinh tồn thật!
 echo ===============================================================================

@@ -107,26 +107,26 @@ void main() {
       // Check App Bar and Tab headers
       expect(find.text('Thiết bị đeo & Đồng hồ'), findsOneWidget);
       expect(find.text('Samsung Galaxy Watch 5'), findsWidgets);
-      expect(find.text('Sinh tồn'), findsOneWidget);
-      expect(find.text('Cảm biến & Ngã'), findsOneWidget);
-      expect(find.text('Đồng bộ & SSWP'), findsOneWidget);
+      expect(find.text('Sức khỏe'), findsOneWidget);
+      expect(find.text('Phát hiện ngã'), findsOneWidget);
+      expect(find.text('Kết nối & Đồng bộ'), findsOneWidget);
 
       // Check Tab 1 elements (Mặc định khi chưa kết nối)
       expect(find.text('CHƯA KẾT NỐI'), findsOneWidget);
-      expect(find.text('THÔNG SỐ SINH TỒN BIOACTIVE TRỰC TIẾP'), findsOneWidget);
+      expect(find.text('CHỈ SỐ SỨC KHỎE TRỰC TIẾP'), findsOneWidget);
 
-      // Switch to Tab 2 (Cảm biến & Ngã)
-      await tester.tap(find.text('Cảm biến & Ngã'));
+      // Switch to Tab 2 (Phát hiện ngã)
+      await tester.tap(find.text('Phát hiện ngã'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('MÔ PHỎNG SỰ KIỆN TÉ NGÃ (FALL TEST)'), findsOneWidget);
-      expect(find.text('CẤU HÌNH NGƯỠNG AN TOÀN SINH TỒN'), findsOneWidget);
+      expect(find.text('THỬ NGHIỆM TÍNH NĂNG BÁO NGÃ'), findsOneWidget);
+      expect(find.text('CÀI ĐẶT CẢNH BÁO AN TOÀN'), findsOneWidget);
 
-      // Switch to Tab 3 (Đồng bộ & SSWP)
-      await tester.tap(find.text('Đồng bộ & SSWP'));
+      // Switch to Tab 3 (Kết nối & Đồng bộ)
+      await tester.tap(find.text('Kết nối & Đồng bộ'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('MÔ HÌNH ĐỒNG BỘ 2 CHIỀU (SSWP)'), findsOneWidget);
+      expect(find.text('CÁCH THỨC TRAO ĐỔI DỮ LIỆU'), findsOneWidget);
 
       WatchSyncManager.instance.stopPeriodicChecks();
       await tester.pumpWidget(const SizedBox());
