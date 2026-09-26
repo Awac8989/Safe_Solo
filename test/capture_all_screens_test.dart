@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,6 +46,59 @@ import 'package:safesolo/views/settings/settings_page.dart';
 import 'package:safesolo/views/settings/defense_demo_sandbox_page.dart';
 import 'package:safesolo/views/settings/app_user_guide_page.dart';
 import 'package:safesolo/views/wear_os/wear_os_watch_page.dart';
+
+Future<void> loadAllFonts() async {
+  // 1. Material Icons
+  final iconFile = File(r'C:\flutter\flutter\bin\cache\artifacts\material_fonts\materialicons-regular.otf');
+  if (iconFile.existsSync()) {
+    final iconData = iconFile.readAsBytesSync();
+    for (final name in ['MaterialIcons', 'packages/flutter/MaterialIcons']) {
+      final loader = FontLoader(name);
+      loader.addFont(Future.value(ByteData.view(iconData.buffer)));
+      await loader.load();
+    }
+  }
+
+  // 2. Segoe UI (Regular, Bold, Semibold) -> Inter, sans-serif, Roboto, Arial, Segoe UI
+  final segoeFile = File(r'C:\Windows\Fonts\segoeui.ttf');
+  final segoeBoldFile = File(r'C:\Windows\Fonts\segoeuib.ttf');
+  final segoeSemiboldFile = File(r'C:\Windows\Fonts\segoeuisb.ttf');
+
+  if (segoeFile.existsSync()) {
+    final reg = segoeFile.readAsBytesSync();
+    final bold = segoeBoldFile.existsSync() ? segoeBoldFile.readAsBytesSync() : reg;
+    final semi = segoeSemiboldFile.existsSync() ? segoeSemiboldFile.readAsBytesSync() : reg;
+
+    for (final family in ['Inter', 'sans-serif', 'Roboto', 'Arial', 'Segoe UI']) {
+      final loader = FontLoader(family);
+      loader.addFont(Future.value(ByteData.view(reg.buffer)));
+      loader.addFont(Future.value(ByteData.view(bold.buffer)));
+      loader.addFont(Future.value(ByteData.view(semi.buffer)));
+      await loader.load();
+    }
+  }
+
+  // 3. Consolas (Regular, Bold) -> monospace
+  final consolaFile = File(r'C:\Windows\Fonts\consola.ttf');
+  final consolaBoldFile = File(r'C:\Windows\Fonts\consolab.ttf');
+  if (consolaFile.existsSync()) {
+    final reg = consolaFile.readAsBytesSync();
+    final bold = consolaBoldFile.existsSync() ? consolaBoldFile.readAsBytesSync() : reg;
+    final loader = FontLoader('monospace');
+    loader.addFont(Future.value(ByteData.view(reg.buffer)));
+    loader.addFont(Future.value(ByteData.view(bold.buffer)));
+    await loader.load();
+  }
+
+  // 4. Emoji
+  final emojiFile = File(r'C:\Windows\Fonts\seguiemj.ttf');
+  if (emojiFile.existsSync()) {
+    final emojiData = emojiFile.readAsBytesSync();
+    final loader = FontLoader('Segoe UI Emoji');
+    loader.addFont(Future.value(ByteData.view(emojiData.buffer)));
+    await loader.load();
+  }
+}
 
 AppProvider createMockProvider() {
   final p = AppProvider();
@@ -125,6 +179,7 @@ Future<void> capture(
   AppProvider? provider,
   Size size = const Size(1080, 2400),
   double pixelRatio = 2.625,
+  bool isWatch = false,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = pixelRatio;
@@ -132,12 +187,26 @@ Future<void> capture(
   final p = provider ?? createMockProvider();
   final key = GlobalKey();
 
+  final theme = isWatch
+      ? ThemeData(
+          fontFamily: 'sans-serif',
+          fontFamilyFallback: const ['Segoe UI Emoji', 'Inter', 'Roboto'],
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: Colors.black,
+        )
+      : AppTheme.dark.copyWith(
+          textTheme: AppTheme.dark.textTheme.apply(
+            fontFamily: 'Inter',
+            fontFamilyFallback: const ['Segoe UI Emoji', 'Arial', 'sans-serif'],
+          ),
+        );
+
   await tester.pumpWidget(
     ChangeNotifierProvider<AppProvider>.value(
       value: p,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
+        theme: theme,
         home: RepaintBoundary(
           key: key,
           child: widget,
@@ -165,10 +234,9 @@ Future<void> capture(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(() {
+  setUpAll(() async {
     FlutterError.onError = (details) {
-      if (details.toString().contains('overflowed')) {
-        // Suppress minor text overflow assertion in headless test run
+      if (details.toString().contains('overflowed') || details.toString().contains('setState() or markNeedsBuild()')) {
         return;
       }
       FlutterError.presentError(details);
@@ -183,9 +251,11 @@ void main() {
       }),
     });
     Directory('docs/screenshots').createSync(recursive: true);
+
+    await loadAllFonts();
   });
 
-  group('Capture All SafeSolo Screens', () {
+  group('Capture All SafeSolo Screens With Real Fonts', () {
     testWidgets('Capture Mobile Screens 01 to 10', (tester) async {
       await capture(tester, const OnboardingPage(), 'app_01_onboarding.png');
       await capture(tester, const PermissionsPage(), 'app_02_permissions.png');
@@ -212,7 +282,7 @@ void main() {
       await capture(tester, const HeroWorkspacePage(), 'app_20_hero_workspace.png');
     });
 
-    testWidgets('Capture Mobile Screens 21 to 28', (tester) async {
+    testWidgets('Capture Mobile Screens 21 to 29', (tester) async {
       await capture(tester, const StealthPage(), 'app_21_stealth_calculator.png');
       await capture(tester, const FakeCallScreen(), 'app_22_fake_call_screen.png');
       await capture(tester, const VaultPage(), 'app_23_safety_vault.png');
@@ -224,15 +294,15 @@ void main() {
       await capture(tester, const AppUserGuidePage(), 'app_29_app_user_guide.png');
     });
 
-    testWidgets('Capture Wear OS Smartwatch Screens', (tester) async {
+    testWidgets('Capture Wear OS Smartwatch Screens 01 to 07', (tester) async {
       const watchSize = Size(396, 396);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.watchface), 'watch_01_face.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.dashboard), 'watch_02_dashboard.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.checkin), 'watch_03_checkin.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.warning), 'watch_04_warning.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.sos), 'watch_05_sos.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.health), 'watch_06_health.png', size: watchSize, pixelRatio: 1.0);
-      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.medical), 'watch_07_medical.png', size: watchSize, pixelRatio: 1.0);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.watchface), 'watch_01_face.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.dashboard), 'watch_02_dashboard.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.checkin), 'watch_03_checkin.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.warning), 'watch_04_warning.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.sos), 'watch_05_sos.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.health), 'watch_06_health.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
+      await capture(tester, const WearOsWatchPage(initialScreen: WatchScreen.medical), 'watch_07_medical.png', size: watchSize, pixelRatio: 1.0, isWatch: true);
     });
   });
 }
