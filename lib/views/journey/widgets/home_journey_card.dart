@@ -14,44 +14,55 @@ class HomeJourneyCard extends StatelessWidget {
     final journey = provider.activeJourney;
     final hasActiveJourney = journey != null && journey.isInTransit;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     if (!hasActiveJourney) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.card,
+          color: isDark ? AppDarkColors.card : AppColors.card,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
+          border: Border.all(color: isDark ? AppDarkColors.border : AppColors.border),
+          boxShadow: isDark
+              ? const []
+              : const [
+                  BoxShadow(
+                    color: Color(0x08000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primarySoft,
+                color: isDark ? AppDarkColors.primarySoft : AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.navigation_rounded, color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Live Journey Guard',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                    ),
                   ),
                   Text(
                     'Hộ tống an toàn khi đi đêm hoặc taxi',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -78,15 +89,17 @@ class HomeJourneyCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
-        color: isOverdue ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+        color: isOverdue
+            ? (isDark ? const Color(0xFF2E1214) : const Color(0xFFFEF2F2))
+            : (isDark ? const Color(0xFF0F261C) : const Color(0xFFF0FDF4)),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isOverdue ? AppColors.destructive : AppColors.success,
+          color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isOverdue ? AppColors.destructive : AppColors.success).withValues(alpha: 0.15),
+            color: (isOverdue ? AppColors.destructive : AppColors.success).withValues(alpha: isDark ? 0.25 : 0.15),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -116,7 +129,7 @@ class HomeJourneyCard extends StatelessWidget {
                   ),
                   child: Icon(
                     isOverdue ? Icons.warning_amber_rounded : Icons.radar_rounded,
-                    color: isOverdue ? AppColors.destructive : AppColors.success,
+                    color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
                     size: 22,
                   ),
                 ),
@@ -132,7 +145,7 @@ class HomeJourneyCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: isOverdue ? AppColors.destructive : AppColors.success,
+                              color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
                               letterSpacing: 0.5,
                             ),
                           ),
@@ -142,7 +155,7 @@ class HomeJourneyCard extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w900,
-                              color: isOverdue ? AppColors.destructive : AppColors.success,
+                              color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
                             ),
                           ),
                         ],
@@ -150,10 +163,10 @@ class HomeJourneyCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         journey.destinationLabel,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                          color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -162,7 +175,11 @@ class HomeJourneyCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                  size: 20,
+                ),
               ],
             ),
           ),

@@ -169,7 +169,7 @@ Trong kỷ nguyên đô thị hóa và xu hướng sống độc thân (solo liv
 ---
 
 ### 3.5. Tab 5: Cài đặt Hệ thống & Thiết bị Đeo Thông minh (Settings)
-* **Thời gian Ân hạn Điểm danh:** Thanh trượt trực quan cho phép tùy chỉnh chu kỳ đếm ngược từ 1 giờ đến 72 giờ (mặc định 12h/lần).
+* **Hạn Điểm Danh An Toàn:** Thanh trượt trực quan cho phép tùy chỉnh chu kỳ đếm ngược từ 1 giờ đến 72 giờ (mặc định 12h/lần).
 * **Khung giờ Yên tĩnh (Quiet Hours):** Cấu hình khung giờ ngủ (23:00 - 06:00) để không làm phiền ban đêm.
 * **Chế độ Nghỉ phép (Vacation Mode):** Tạm dừng đếm ngược khi đi du lịch hoặc có người thân ở bên cạnh.
 * **Cảm biến & Tự động hóa:** Tích hợp đếm bước chân, tính lượng calo tiêu hao, phát hiện té ngã và kết nối đồng hồ thông minh Wear OS.
@@ -339,7 +339,7 @@ Trong kỷ nguyên đô thị hóa và xu hướng sống độc thân (solo liv
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/app_13_home_health_glance.png" width="240px" alt="Check-in Home" /> | <img src="docs/screenshots/app_11_health_vitals_hub.png" width="240px" alt="Alive Circle" /> | <img src="docs/screenshots/app_06_guardian_network.png" width="240px" alt="Messenger" /> |
 
-| 4. Bàn Tác chiến Hiệp sĩ | 5. Cài đặt & Chu kỳ Ân hạn | 6. Trợ lý Sơ cứu SoloCare AI |
+| 4. Bàn Tác chiến Hiệp sĩ | 5. Cài đặt & Hạn điểm danh | 6. Trợ lý Sơ cứu SoloCare AI |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/app_10_achievements.png" width="240px" alt="Heroes" /> | <img src="docs/screenshots/app_05_settings_quiet_hours.png" width="240px" alt="Settings" /> | <img src="docs/screenshots/app_07_medical_id.png" width="240px" alt="SoloCare AI" /> |
 
@@ -453,6 +453,8 @@ flutter test
   - `fake_call_test.dart`: Kiểm thử bộ đếm giây và kịch bản cuộc gọi thoát hiểm.
   - `watch_sync_manager_test.dart`: Kiểm thử giao thức SSWP v1.0 và đồng bộ hóa hai chiều.
   - `galaxy_watch5_interface_test.dart`: Kiểm thử 7 màn hình tròn Wear OS One UI Watch.
+  - `defense_demo_sandbox_test.dart`: Kiểm thử Hộp cát Trình diễn Hội đồng (Defense Demo Sandbox), ma trận viễn thám HUD, 4 kịch bản bơm sự kiện khẩn cấp và bảng số liệu khoa học.
+  - `lockscreen_medical_and_offline_sos_test.dart`: Kiểm thử Thẻ Y tế Cấp cứu Màn hình Khóa chuẩn ICE, Mã QR Cấp cứu 115 độ tương phản cao, và cơ chế phát SMS GSM Ngoại tuyến khi mất mạng.
 
 ### 2. Phân tích Chất lượng Mã nguồn Tĩnh (Static Code Analysis)
 ```bash
@@ -497,7 +499,7 @@ SafeSolo/
 │       ├── circle/                  # Tab 2: Quỹ đạo The Orbit, Khóa đêm, Buồng lái hộ tống ảo
 │       ├── messenger/               # Tab 3: Hộp thư, Bộ đàm PTT, Cuộc gọi thoát hiểm
 │       ├── heroes/                  # Tab 4: Mạng lưới Hiệp sĩ, Bàn tác chiến, Bảng vàng vinh danh
-│       ├── settings/                # Tab 5: Cài đặt, Chu kỳ ân hạn, Khung giờ yên tĩnh
+│       ├── settings/                # Tab 5: Cài đặt, Hạn điểm danh an toàn, Khung giờ yên tĩnh
 │       ├── emergency/               # Bảng trợ lý sơ cứu SoloCare AI Thuần Việt 24/7
 │       ├── auth/                    # Đăng nhập & Thiết lập hồ sơ an toàn ban đầu
 │       ├── community/               # Báo cáo tai nạn & dòng sự kiện hiểm họa

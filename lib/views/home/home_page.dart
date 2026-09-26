@@ -243,14 +243,65 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             DisasterAlertCard(alerts: appProvider.activeDisasterAlerts),
             const SizedBox(height: 10),
           ],
+          if (appProvider.isFindPhoneActive) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [BoxShadow(color: Color(0x660284C7), blurRadius: 12)],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.ring_volume_rounded, color: Colors.white, size: 26),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          strings.text('ĐỒNG HỒ ĐANG TÌM BẠN!', 'WATCH IS FINDING PHONE!'),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          strings.text('Galaxy Watch 5 đang phát chuông rung tìm điện thoại.', 'Galaxy Watch 5 is ringing this phone.'),
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFF0284C7),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                    onPressed: () => appProvider.dismissFindPhoneAlert(),
+                    child: Text(
+                      strings.text('TÔI ĐÂY', 'DISMISS'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           _buildFamilyPingBanner(context, appProvider, strings),
           if (appProvider.isVacation) ...[
             MaterialBanner(
-              backgroundColor: const Color(0xFFE8F1FF),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF132238)
+                  : const Color(0xFFE8F1FF),
               content: Text(
                 strings.text(
                   'Chế độ nghỉ dưỡng đang bật. Đồng hồ điểm danh đang được tạm dừng.',
                   'Vacation mode is on. The check-in countdown is currently paused.',
+                ),
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppDarkColors.textPrimary
+                      : AppColors.textPrimary,
                 ),
               ),
               leading: const Icon(Icons.hotel_rounded, color: Color(0xFF3A7AFE)),
@@ -260,7 +311,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ],
           if (guardians.isNotEmpty)
             AppCard(
-              color: const Color(0xFFFFFBF4),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? AppDarkColors.card
+                  : const Color(0xFFFFFBF4),
               child: Row(
                 children: [
                   const Icon(Icons.phone_outlined, color: AppColors.primary),
@@ -274,7 +327,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       style: AppTextStyles.bodyStrong,
                     ),
                   ),
-                  Text(guardians.first.phone, style: AppTextStyles.caption),
+                  Text(
+                    guardians.first.phone,
+                    style: AppTextStyles.caption.copyWith(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? AppDarkColors.textSecondary
+                          : AppColors.textMuted,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1714,10 +1774,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             child: InkWell(
               borderRadius: BorderRadius.circular(22),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HealthHistoryPage()),
-                );
+                Navigator.pushNamed(context, '/smartwatch');
               },
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -1759,12 +1816,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    pedometer.watchModel,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
+                                  Expanded(
+                                    child: Text(
+                                      pedometer.watchModel,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   const SizedBox(width: 6),
@@ -1929,15 +1990,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildAccidentReportingBanner(BuildContext context, AppStrings strings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: isDark ? AppDarkColors.card : AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: AppColors.border,
+          color: isDark ? AppDarkColors.border : AppColors.border,
           width: 1.2,
         ),
-        boxShadow: AppShadows.card,
+        boxShadow: isDark ? const [] : AppShadows.card,
       ),
       child: Material(
         color: Colors.transparent,
@@ -1955,10 +2017,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
+                        color: isDark ? const Color(0xFF3B1219) : const Color(0xFFFEF2F2),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(0xFFFECDD3),
+                          color: isDark ? const Color(0xFF6B1D28) : const Color(0xFFFECDD3),
                           width: 1.2,
                         ),
                       ),
@@ -1974,9 +2036,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       child: Container(
                         padding: const EdgeInsets.all(2.5),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? AppDarkColors.surface : Colors.white,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                          border: Border.all(
+                            color: isDark ? AppDarkColors.border : const Color(0xFFE2E8F0),
+                            width: 1,
+                          ),
                         ),
                         child: const Icon(
                           Icons.verified_rounded,
@@ -2003,7 +2068,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               ),
                               style: AppTextStyles.bodyStrong.copyWith(
                                 fontSize: 13.5,
-                                color: AppColors.textPrimary,
+                                color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -2013,10 +2078,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFEF2F2),
+                              color: isDark ? const Color(0xFF351518) : const Color(0xFFFEF2F2),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: const Color(0xFFFCA5A5),
+                                color: isDark ? const Color(0xFF6B2028) : const Color(0xFFFCA5A5),
                                 width: 0.8,
                               ),
                             ),
@@ -2039,7 +2104,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           'Snap verified GPS & time-stamped photo to dispatch',
                         ),
                         style: AppTextStyles.caption.copyWith(
-                          color: AppColors.textSecondary,
+                          color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                           fontSize: 11.5,
                           height: 1.25,
                         ),
@@ -2053,13 +2118,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Container(
                   width: 32,
                   height: 32,
-                  decoration: const BoxDecoration(
-                    color: AppColors.cardSoft,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppDarkColors.surface : AppColors.cardSoft,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.arrow_forward_ios_rounded,
-                    color: AppColors.primary,
+                    color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
                     size: 13,
                   ),
                 ),

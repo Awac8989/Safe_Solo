@@ -33,6 +33,11 @@ class AuthService {
     return crypto.randomInt(100000, 999999).toString();
   }
 
+  includeOtpPreview(otp) {
+    const isAllowed = process.env.ALLOW_OTP_PREVIEW === 'true';
+    return isAllowed ? { otpPreview: otp } : {};
+  }
+
   async sendOTP(email, otp) {
     return {
       channel: 'mock-email',
@@ -154,7 +159,7 @@ class AuthService {
         ...sanitizeUser(user),
         security: this.mergeSecurity(user, null),
       },
-      otpPreview: otp,
+      ...this.includeOtpPreview(otp),
       message: 'Registration successful. Please verify OTP to complete sign in.',
     };
   }
@@ -178,7 +183,7 @@ class AuthService {
         ...sanitizeUser(user),
         security: this.mergeSecurity(user, await this.ensureSecurity(user._id)),
       },
-      otpPreview: otp,
+      ...this.includeOtpPreview(otp),
       message: 'OTP sent successfully.',
     };
   }
@@ -309,7 +314,7 @@ class AuthService {
     return {
       success: true,
       identifier: cleanId,
-      otpPreview: otp,
+      ...this.includeOtpPreview(otp),
       message: 'Mã xác thực OTP đã được gửi đến Telegram của bạn.',
       telegram: teleResult,
     };
@@ -388,7 +393,7 @@ class AuthService {
     return {
       success: true,
       email: normalizedEmail,
-      otpPreview: otp,
+      ...this.includeOtpPreview(otp),
       message: `Đã gửi mã xác minh OTP đến địa chỉ Gmail: ${normalizedEmail}`,
     };
   }

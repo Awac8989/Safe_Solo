@@ -165,6 +165,8 @@ class _VaultPageState extends State<VaultPage> {
     final entries = app.vaultEntries;
     final releaseAt = app.vaultUnlockAt;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Két sắt sinh tử'),
@@ -176,7 +178,11 @@ class _VaultPageState extends State<VaultPage> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.backgroundGradient),
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppDarkColors.backgroundGradient
+              : AppColors.backgroundGradient,
+        ),
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
@@ -197,10 +203,10 @@ class _VaultPageState extends State<VaultPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Cơ chế dead-man switch', style: AppTextStyles.title),
+                    Text('Cơ chế công tắc an toàn', style: AppTextStyles.title),
                     const SizedBox(height: 8),
                     Text(
-                      'Mỗi lần bạn check-in, đồng hồ an toàn được reset. Nếu quá ${app.graceHours} giờ mà không check-in và không ở chế độ nghỉ dưỡng, hệ thống coi là mất liên lạc. Sau 72 giờ mất liên lạc liên tiếp, két tự mở và gửi nội dung cho Guardian.',
+                      'Mỗi lần bạn điểm danh, đồng hồ an toàn được đặt lại. Nếu quá ${app.graceHours} giờ mà không điểm danh và không ở chế độ nghỉ phép, hệ thống coi là mất liên lạc. Sau 72 giờ mất liên lạc liên tiếp, két tự mở và gửi nội dung cho Người bảo hộ.',
                       style: AppTextStyles.body,
                     ),
                   ],
@@ -381,10 +387,10 @@ class _VaultSummaryCard extends StatelessWidget {
               spacing: 10,
               runSpacing: 10,
               children: [
-                _StatusPill(label: 'Guardian', value: '$guardians người'),
-                _StatusPill(label: 'Grace', value: '$graceHours giờ'),
+                _StatusPill(label: 'Người bảo hộ', value: '$guardians người'),
+                _StatusPill(label: 'Hạn điểm danh', value: '$graceHours giờ'),
                 _StatusPill(
-                  label: 'Check-in cuối',
+                  label: 'Điểm danh cuối',
                   value: lastCheckIn == null ? 'Chưa có' : _formatDateTime(lastCheckIn),
                 ),
                 _StatusPill(

@@ -127,7 +127,7 @@
 * **TC_APP_SEC_03 [P1]:** Két sắt sinh tử (Dead Man's Switch Vault): Chỉ mở bằng Real PIN, lưu trữ di chúc số và mật khẩu an toàn.
 
 ### 10. Cài đặt hệ thống & Chẩn đoán mạng
-* **TC_APP_SET_01 [P2]:** Thanh trượt điều chỉnh thời gian ân hạn điểm danh từ 1 giờ đến 72 giờ.
+* **TC_APP_SET_01 [P2]:** Thanh trượt điều chỉnh hạn điểm danh an toàn từ 1 giờ đến 72 giờ.
 * **TC_APP_SET_02 [P2]:** Bật chế độ Nghỉ phép (Vacation Mode) tạm dừng điểm danh khi đi du lịch.
 * **TC_APP_SET_03 [P3]:** Bật chế độ Tương phản cao (High Contrast Mode) cho người lớn tuổi.
 * **TC_APP_SET_04 [P3]:** Chẩn đoán kết nối mạng, đo độ trễ Ping máy chủ và trạng thái cổng SMS Gateway.

@@ -73,9 +73,10 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
 
   void _showNavigationOptions() {
     final strings = _strings(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.card,
+      backgroundColor: isDark ? AppDarkColors.surface : AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -143,9 +144,10 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
 
   Future<File?> _pickImageWithPrompt(BuildContext context, {required bool isFront}) async {
     final strings = _strings(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: AppColors.card,
+      backgroundColor: isDark ? AppDarkColors.surface : AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -204,10 +206,11 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
     File? backImage;
     bool isUploading = false;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.card,
+      backgroundColor: isDark ? AppDarkColors.surface : AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -402,9 +405,16 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
-                        color: AppColors.card.withValues(alpha: 0.94),
+                        color: (Theme.of(context).brightness == Brightness.dark
+                                ? AppDarkColors.card
+                                : AppColors.card)
+                            .withValues(alpha: 0.94),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? AppDarkColors.border
+                              : AppColors.border,
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -428,9 +438,11 @@ class _CommunityRadarPageState extends State<CommunityRadarPage>
             ),
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: const BoxDecoration(
-                color: AppColors.card,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? AppDarkColors.card
+                    : AppColors.card,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

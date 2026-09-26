@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { fetchHazards, verifyHazard, createHazard, fetchDangerGeofences, type HazardItem } from "@/lib/api";
+import { fetchHazards, verifyHazard, createHazard, fetchDangerGeofences, resolveAssetUrl, type HazardItem } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 import { DangerGeofenceModal } from "@/components/DangerGeofenceModal";
 import { DisasterBroadcastModal } from "@/components/DisasterBroadcastModal";
@@ -311,9 +311,12 @@ function HazardsPage() {
                         className="relative cursor-pointer overflow-hidden rounded-lg border border-rose-500/40 bg-black/60 group shadow-md"
                       >
                         <img
-                          src={item.timemarkPhotoUrl || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80"}
+                          src={resolveAssetUrl(item.timemarkPhotoUrl) || "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80"}
                           alt="TimeMark Evidence"
                           className="h-28 w-full object-cover transition duration-300 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80";
+                          }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-black/40" />
                         <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded bg-rose-950/80 border border-rose-500/50 px-2 py-0.5 text-[10px] font-bold text-rose-300 backdrop-blur-sm shadow">
@@ -548,11 +551,14 @@ function HazardsPage() {
               <div className="relative overflow-hidden rounded-xl border border-border bg-black shadow-inner">
                 <img
                   src={
-                    selectedTimemarkHazard.timemarkPhotoUrl ||
+                    resolveAssetUrl(selectedTimemarkHazard.timemarkPhotoUrl) ||
                     "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80"
                   }
                   alt="TimeMark Evidence Full"
                   className="max-h-80 w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&auto=format&fit=crop&q=80";
+                  }}
                 />
 
                 {/* Real-time TimeMark Watermark HUD Overlay */}

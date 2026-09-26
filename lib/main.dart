@@ -23,6 +23,9 @@ import 'views/community/safety_guides_page.dart';
 import 'views/audio/fake_call_screen.dart';
 import 'views/heroes/hero_workspace_page.dart';
 import 'views/community/accident_report_page.dart';
+import 'views/settings/app_user_guide_page.dart';
+import 'views/settings/defense_demo_sandbox_page.dart';
+import 'views/medical/lockscreen_medical_card_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
@@ -62,9 +65,9 @@ class SafeSoloApp extends StatelessWidget {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'SafeSolo',
-            theme: provider.highContrast ? AppTheme.highContrast : AppTheme.light,
-            darkTheme: provider.highContrast ? AppTheme.highContrast : AppTheme.light,
-            themeMode: ThemeMode.light,
+            theme: AppTheme.light,
+            darkTheme: AppTheme.dark,
+            themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
             home: const _AppGate(),
             routes: {
               '/auth': (_) => const AuthPage(),
@@ -89,6 +92,9 @@ class SafeSoloApp extends StatelessWidget {
               '/fake-call': (_) => const FakeCallScreen(),
               '/hero-workspace': (_) => const HeroWorkspacePage(),
               '/report-accident': (_) => const AccidentReportPage(),
+              '/user-guide': (_) => const AppUserGuidePage(),
+              '/demo-sandbox': (_) => const DefenseDemoSandboxPage(),
+              '/lockscreen-medical': (_) => const LockscreenMedicalCardPage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),

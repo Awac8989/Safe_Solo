@@ -44,7 +44,7 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
+      extendBody: false,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),

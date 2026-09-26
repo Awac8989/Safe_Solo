@@ -218,26 +218,29 @@ class _DisasterFeedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final alertColor = alert.severityColor;
     final strings = AppStrings.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: isDark ? AppDarkColors.card : AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
           color: alert.isCritical
               ? const Color(0xFFEF4444).withValues(alpha: 0.4)
-              : AppColors.border,
+              : (isDark ? AppDarkColors.border : AppColors.border),
           width: alert.isCritical ? 1.4 : 1.0,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: alert.isCritical
-                ? const Color(0xFFEF4444).withValues(alpha: 0.10)
-                : AppColors.shadowSafe,
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: isDark
+            ? const []
+            : [
+                BoxShadow(
+                  color: alert.isCritical
+                      ? const Color(0xFFEF4444).withValues(alpha: 0.10)
+                      : AppColors.shadowSafe,
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(
@@ -399,14 +402,18 @@ class _DisasterFeedCard extends StatelessWidget {
                     // Thời gian cập nhật từ Admin
                     Row(
                       children: [
-                        const Icon(Icons.schedule_rounded, size: 14, color: AppColors.textSecondary),
+                        Icon(
+                          Icons.schedule_rounded,
+                          size: 14,
+                          color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                        ),
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             '${strings.text('Thời gian phát lệnh:', 'Broadcast time:')} $timeFormatted',
                             overflow: TextOverflow.ellipsis,
                             style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
+                              color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                               fontWeight: FontWeight.w600,
                               fontSize: 11.5,
                             ),
@@ -429,7 +436,7 @@ class _DisasterFeedCard extends StatelessWidget {
                                 : strings.text('Khu vực cảnh báo diện rộng', 'Wide alert area'),
                             style: AppTextStyles.bodyStrong.copyWith(
                               fontSize: 13,
-                              color: AppColors.textPrimary,
+                              color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -452,16 +459,21 @@ class _DisasterFeedCard extends StatelessWidget {
                     ],
 
                     const SizedBox(height: 10),
-                    const Divider(height: 1, color: AppColors.border),
+                    Divider(
+                      height: 1,
+                      color: isDark ? AppDarkColors.border : AppColors.border,
+                    ),
                     const SizedBox(height: 10),
 
                     // Lời khuyên an toàn & Lộ trình sơ tán
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: isDark ? AppDarkColors.surface : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                          color: isDark ? AppDarkColors.border : const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,7 +502,7 @@ class _DisasterFeedCard extends StatelessWidget {
                                 : alert.description,
                             style: AppTextStyles.caption.copyWith(
                               fontSize: 11.5,
-                              color: AppColors.textPrimary,
+                              color: isDark ? AppDarkColors.textSecondary : AppColors.textPrimary,
                               height: 1.35,
                             ),
                           ),

@@ -273,6 +273,38 @@ class AiSignalProcessor {
   }
 
   // ---------------------------------------------------------------------------
+  // 9B. AI VOICE SAFE INTENT SPOTTING (XÁC NHẬN AN TOÀN & KHỬ BÁO ĐỘNG GIẢ)
+  // Nhận dạng từ khóa xác nhận an toàn rảnh tay ("Tôi ổn", "Nhầm rồi", "Không sao")
+  // ---------------------------------------------------------------------------
+  bool matchSafeVoiceKeyword(String spokenText) {
+    final text = spokenText.toLowerCase().trim();
+    const safeKeywords = [
+      'tôi ổn',
+      'tôi không sao',
+      'không sao',
+      'không sao đâu',
+      'nhầm rồi',
+      'bấm nhầm',
+      'lỡ tay',
+      'hủy',
+      'hủy bỏ',
+      'an toàn',
+      'bình thường',
+      'i am safe',
+      'im safe',
+      'false alarm',
+      'cancel',
+    ];
+
+    for (final kw in safeKeywords) {
+      if (text.contains(kw)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------------------
   // 10. THUẬT TOÁN PHÂN TÍCH BIẾN THIÊN NHỊP TIM (HRV - HEART RATE VARIABILITY)
   // Tính toán các chỉ số miền thời gian: Mean RR, SDNN, RMSSD, pNN50, Baevsky Stress Index
   // ---------------------------------------------------------------------------

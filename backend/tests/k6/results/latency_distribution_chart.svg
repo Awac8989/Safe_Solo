@@ -1,0 +1,112 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 450" width="850" height="450" style="background-color: #0F172A; font-family: 'Segoe UI', Arial, sans-serif;">
+  <style>
+    .title { font-size: 16px; font-weight: bold; fill: #FFFFFF; }
+    .subtitle { font-size: 11px; fill: #94A3B8; }
+    .axis { stroke: #334155; stroke-width: 1; }
+    .grid { stroke: #1E293B; stroke-dasharray: 3,3; }
+    .label { font-size: 10px; fill: #94A3B8; }
+    .val-text { font-size: 9px; font-weight: bold; fill: #FFFFFF; text-anchor: middle; }
+    .legend-text { font-size: 11px; fill: #E2E8F0; }
+  </style>
+
+  <!-- Tiêu đề biểu đồ -->
+  <text x="80" y="30" class="title">BIỂU ĐỒ 4.1: PHÂN BỐ ĐỘ TRỄ PHÂN VỊ THEO KỊCH BẢN (LATENCY PERCENTILES)</text>
+  <text x="80" y="48" class="subtitle">Khóa luận Tốt nghiệp KTPM - SV: Đoàn Minh Quân (MSSV: 2224801030137) - SafeSolo Backend</text>
+
+  <!-- Lưới tọa độ trục Y -->
+
+  <line x1="80" y1="370" x2="670" y2="370" class="grid" />
+  <text x="70" y="374" class="label" text-anchor="end">0 ms</text>
+
+  <line x1="80" y1="308" x2="670" y2="308" class="grid" />
+  <text x="70" y="312" class="label" text-anchor="end">50 ms</text>
+
+  <line x1="80" y1="246" x2="670" y2="246" class="grid" />
+  <text x="70" y="250" class="label" text-anchor="end">100 ms</text>
+
+  <line x1="80" y1="184" x2="670" y2="184" class="grid" />
+  <text x="70" y="188" class="label" text-anchor="end">150 ms</text>
+
+  <line x1="80" y1="122" x2="670" y2="122" class="grid" />
+  <text x="70" y="126" class="label" text-anchor="end">200 ms</text>
+
+  <line x1="80" y1="60" x2="670" y2="60" class="grid" />
+  <text x="70" y="64" class="label" text-anchor="end">250 ms</text>
+
+  <line x1="80" y1="60" x2="80" y2="370" class="axis" />
+  <line x1="80" y1="370" x2="670" y2="370" class="axis" />
+
+  <line x1="80" y1="246" x2="670" y2="246" stroke="#EF4444" stroke-width="1.5" stroke-dasharray="4,4" />
+  <text x="678" y="250" fill="#EF4444" font-size="10px" font-weight="bold">Ngưỡng Khẩn Cấp (100ms)</text>
+
+  <rect x="122.75" y="363.304" width="14" height="6.696000000000001" fill="#10B981" rx="2" />
+  <text x="129.75" y="359.304" class="val-text">5.4</text>
+
+  <rect x="138.75" y="356.112" width="14" height="13.888" fill="#3B82F6" rx="2" />
+  <text x="145.75" y="352.112" class="val-text">11.2</text>
+
+  <rect x="154.75" y="351.648" width="14" height="18.352" fill="#F59E0B" rx="2" />
+  <text x="161.75" y="347.648" class="val-text">14.8</text>
+
+  <rect x="170.75" y="342.1" width="14" height="27.9" fill="#EF4444" rx="2" />
+  <text x="177.75" y="338.1" class="val-text">22.5</text>
+
+  <text x="153.75" y="390" class="label" text-anchor="middle" font-weight="bold">Kịch bản 1 (10 VUs)</text>
+
+  <rect x="270.25" y="343.96" width="14" height="26.040000000000003" fill="#10B981" rx="2" />
+  <text x="277.25" y="339.96" class="val-text">21</text>
+
+  <rect x="286.25" y="317.176" width="14" height="52.824" fill="#3B82F6" rx="2" />
+  <text x="293.25" y="313.176" class="val-text">42.6</text>
+
+  <rect x="302.25" y="300.064" width="14" height="69.93599999999999" fill="#F59E0B" rx="2" />
+  <text x="309.25" y="296.064" class="val-text">56.4</text>
+
+  <rect x="318.25" y="260.756" width="14" height="109.244" fill="#EF4444" rx="2" />
+  <text x="325.25" y="256.756" class="val-text">88.1</text>
+
+  <text x="301.25" y="390" class="label" text-anchor="middle" font-weight="bold">Kịch bản 2 (50 VUs)</text>
+
+  <rect x="417.75" y="329.7" width="14" height="40.300000000000004" fill="#10B981" rx="2" />
+  <text x="424.75" y="325.7" class="val-text">32.5</text>
+
+  <rect x="433.75" y="285.432" width="14" height="84.568" fill="#3B82F6" rx="2" />
+  <text x="440.75" y="281.432" class="val-text">68.2</text>
+
+  <rect x="449.75" y="265.22" width="14" height="104.78" fill="#F59E0B" rx="2" />
+  <text x="456.75" y="261.22" class="val-text">84.5</text>
+
+  <rect x="465.75" y="206.32" width="14" height="163.68" fill="#EF4444" rx="2" />
+  <text x="472.75" y="202.32" class="val-text">132</text>
+
+  <text x="448.75" y="390" class="label" text-anchor="middle" font-weight="bold">Kịch bản 3 (100 VUs)</text>
+
+  <rect x="565.25" y="298.08" width="14" height="71.92" fill="#10B981" rx="2" />
+  <text x="572.25" y="294.08" class="val-text">58</text>
+
+  <rect x="581.25" y="223.184" width="14" height="146.816" fill="#3B82F6" rx="2" />
+  <text x="588.25" y="219.184" class="val-text">118.4</text>
+
+  <rect x="597.25" y="186.232" width="14" height="183.768" fill="#F59E0B" rx="2" />
+  <text x="604.25" y="182.232" class="val-text">148.2</text>
+
+  <rect x="613.25" y="107.12" width="14" height="262.88" fill="#EF4444" rx="2" />
+  <text x="620.25" y="103.12" class="val-text">212</text>
+
+  <text x="596.25" y="390" class="label" text-anchor="middle" font-weight="bold">Kịch bản 4 (200 VUs)</text>
+
+  <g transform="translate(690, 110)">
+    <rect x="0" y="0" width="12" height="12" fill="#10B981" rx="2" />
+    <text x="18" y="10" class="legend-text">p50 (Median)</text>
+
+    <rect x="0" y="24" width="12" height="12" fill="#3B82F6" rx="2" />
+    <text x="18" y="34" class="legend-text">p90 Latency</text>
+
+    <rect x="0" y="48" width="12" height="12" fill="#F59E0B" rx="2" />
+    <text x="18" y="58" class="legend-text">p95 Latency</text>
+
+    <rect x="0" y="72" width="12" height="12" fill="#EF4444" rx="2" />
+    <text x="18" y="82" class="legend-text">p99 Latency</text>
+  </g>
+</svg>

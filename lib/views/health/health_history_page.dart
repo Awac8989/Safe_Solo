@@ -197,7 +197,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
             return _HealthStateCard(
               title: strings.text('Chưa có dữ liệu', 'No data yet'),
               message: strings.text(
-                'Báo cáo sẽ xuất hiện sau khi có check-in, mood hoặc cảnh báo.',
+                'Báo cáo sẽ xuất hiện sau khi có điểm danh, cảm xúc hoặc cảnh báo.',
                 'The report appears once you have check-ins, mood entries, or alerts.',
               ),
             );
@@ -496,7 +496,7 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                   children: [
                     _HealthStatCard(
                       icon: Icons.check_circle_rounded,
-                      label: strings.text('Tổng check-in', 'Total check-ins'),
+                      label: strings.text('Tổng lượt điểm danh', 'Total check-ins'),
                       value: report.totalCheckIns.toString(),
                       tone: AppColors.primary,
                     ),

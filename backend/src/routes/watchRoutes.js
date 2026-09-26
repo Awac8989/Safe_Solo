@@ -215,6 +215,11 @@ router.get('/vitals/:deviceId', (req, res) => {
   });
 });
 
+// Hàng đợi gói tin hai chiều (Command Queue) giữa Đồng hồ và Điện thoại
+const pendingPacketsForWatch = new Map(); // deviceId -> [packets]
+const pendingPacketsForPhone = new Map(); // deviceId -> [packets]
+const deviceTimers = new Map(); // deviceId -> { remainingSeconds, deadline, updatedAt }
+
 // 4. Truyền gói tin SafeSolo Watch Protocol (SSWP) qua HTTP Fallback
 router.post('/packet', (req, res) => {
   const packet = req.body;
@@ -223,6 +228,7 @@ router.post('/packet', (req, res) => {
   }
 
   const deviceId = packet.payload?.deviceId || 'watch_galaxy_5';
+  console.log(`[WatchRoutes] /packet: ${packet.action} (sender=${packet.sender}, deviceId=${deviceId})`);
 
   // Tự động lưu vitals nếu gói tin chứa telemetry
   if (packet.payload && (packet.payload.heartRate !== undefined || packet.action === 'VITALS_UPDATE')) {
@@ -237,6 +243,32 @@ router.post('/packet', (req, res) => {
       tiltAngle: packet.payload.tiltAngle ?? 0.0,
       updatedAt: Date.now(),
     });
+  }
+
+  // Tự động cập nhật timer nếu là gói tin TIMER_SYNC
+  if (packet.action === 'TIMER_SYNC' && packet.payload) {
+    deviceTimers.set(deviceId, {
+      remainingSeconds: packet.payload.remainingSeconds,
+      deadline: packet.payload.deadline,
+      updatedAt: Date.now(),
+    });
+  }
+
+  // Phân luồng hàng đợi: Gói tin từ Phone gửi cho Watch, từ Watch gửi cho Phone
+  if (packet.sender === 'phone') {
+    if (!pendingPacketsForWatch.has(deviceId)) {
+      pendingPacketsForWatch.set(deviceId, []);
+    }
+    const q = pendingPacketsForWatch.get(deviceId);
+    q.push(packet);
+    if (q.length > 20) q.shift();
+  } else if (packet.sender === 'watch') {
+    if (!pendingPacketsForPhone.has(deviceId)) {
+      pendingPacketsForPhone.set(deviceId, []);
+    }
+    const q = pendingPacketsForPhone.get(deviceId);
+    q.push(packet);
+    if (q.length > 20) q.shift();
   }
 
   try {
@@ -263,6 +295,45 @@ router.post('/packet', (req, res) => {
   } catch (_) {}
 
   return res.json({ success: true, messageId: packet.messageId, receivedAt: new Date() });
+});
+
+// 5. Thiết bị lấy các lệnh chờ (Commands Polling: target = 'watch' | 'phone')
+router.get('/commands/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const target = req.query.target || 'watch';
+
+  const map = target === 'phone' ? pendingPacketsForPhone : pendingPacketsForWatch;
+  const packets = map.get(deviceId) || [];
+  map.set(deviceId, []); // Lấy xong làm trống hàng đợi (drain queue)
+  if (packets.length > 0) {
+    console.log(`[WatchRoutes] /commands: target=${target}, deviceId=${deviceId}, returning ${packets.length} commands: ${packets.map(p => p.action).join(', ')}`);
+  }
+
+  const timerInfo = deviceTimers.get(deviceId) || null;
+
+  return res.json({
+    success: true,
+    target,
+    deviceId,
+    commands: packets,
+    timer: timerInfo,
+    timestamp: Date.now(),
+  });
+});
+
+// 6. Lấy hồ sơ y tế người dùng cho đồng hồ
+router.get('/medical-profile/:deviceId', (req, res) => {
+  return res.json({
+    success: true,
+    medical: {
+      fullName: 'Đoàn Minh Quân',
+      bloodType: 'O+',
+      allergies: 'Penicillin',
+      conditions: 'Tăng HA nhẹ',
+      emergencyContactName: 'Mẹ Lan',
+      emergencyContactPhone: '0901112222',
+    },
+  });
 });
 
 module.exports = router;
