@@ -331,29 +331,62 @@ Trong kỷ nguyên đô thị hóa và xu hướng sống độc thân (solo liv
 
 ## 📸 BỘ SƯU TẬP ẢNH CHỤP THỰC TẾ CHỨC NĂNG (DEMO SCREENSHOTS GALLERY)
 
-> 💡 Toàn bộ ảnh chụp thực tế đã được chuẩn hóa độ phân giải cao và lưu trữ trong thư mục `docs/screenshots/`.
+> 💡 **Tài liệu đặc tả siêu chi tiết toàn bộ 45 màn hình:** Xem chi tiết tại [**`docs/DANH_SACH_TINH_NANG_VA_MAN_HINH_CHI_TIET.md`**](docs/DANH_SACH_TINH_NANG_VA_MAN_HINH_CHI_TIET.md).  
+> Toàn bộ ảnh chụp thực tế đã được chuẩn hóa độ phân giải cao và lưu trữ trong thư mục [`docs/screenshots/`](docs/screenshots/).
 
-### A. Giao diện Ứng dụng Di động SafeSolo (Flutter Mobile App)
+### A. Giao diện Ứng dụng Di động SafeSolo (Flutter Mobile App - 29 Màn hình)
 
-| 1. Điểm danh & Quả cầu An toàn | 2. Quỹ đạo Alive Circle | 3. Hộp thư & Bộ đàm PTT |
+| 1. Bảng điều khiển & SOS | 2. Quỹ đạo Alive Circle | 3. Hộ tống Live Journey |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/app_13_home_health_glance.png" width="240px" alt="Check-in Home" /> | <img src="docs/screenshots/app_11_health_vitals_hub.png" width="240px" alt="Alive Circle" /> | <img src="docs/screenshots/app_06_guardian_network.png" width="240px" alt="Messenger" /> |
+| <img src="docs/screenshots/app_05_home_dashboard.png" width="240px" alt="Home Dashboard" /> | <img src="docs/screenshots/app_06_circle_orbit.png" width="240px" alt="Circle Orbit" /> | <img src="docs/screenshots/app_07_live_journey.png" width="240px" alt="Live Journey" /> |
 
-| 4. Bàn Tác chiến Hiệp sĩ | 5. Cài đặt & Hạn điểm danh | 6. Trợ lý Sơ cứu SoloCare AI |
+| 4. Trung tâm Sức khỏe Sinh trắc | 5. Ghép đôi Galaxy Watch 5 | 6. Băng thử nghiệm Cảm biến Ảo |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/app_10_achievements.png" width="240px" alt="Heroes" /> | <img src="docs/screenshots/app_05_settings_quiet_hours.png" width="240px" alt="Settings" /> | <img src="docs/screenshots/app_07_medical_id.png" width="240px" alt="SoloCare AI" /> |
+| <img src="docs/screenshots/app_08_health_vitals_hub.png" width="240px" alt="Health Hub" /> | <img src="docs/screenshots/app_09_smartwatch_companion.png" width="240px" alt="Smartwatch Companion" /> | <img src="docs/screenshots/app_10_watch_simulator.png" width="240px" alt="Watch Simulator" /> |
+
+| 7. Thẻ Y tế Màn hình khóa 115 | 8. Trợ lý Sơ cứu & Máy đếm CPR | 9. Bản đồ Tác chiến Cứu hộ SOS |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/app_12_lockscreen_medical.png" width="240px" alt="Lockscreen Medical" /> | <img src="docs/screenshots/app_13_first_aid_guide.png" width="240px" alt="SoloCare First Aid" /> | <img src="docs/screenshots/app_14_sos_interactive_map.png" width="240px" alt="SOS Tactical Map" /> |
+
+| 10. Radar Phòng hộ Cộng đồng | 11. Báo cáo Tai nạn Hiện trường | 12. Mạng lưới Hiệp sĩ Cứu nạn |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/app_15_community_radar.png" width="240px" alt="Community Radar" /> | <img src="docs/screenshots/app_17_accident_report.png" width="240px" alt="Accident Report" /> | <img src="docs/screenshots/app_19_heroes_network.png" width="240px" alt="Heroes Network" /> |
+
+| 13. Ngụy trang Máy tính & Mã ngầm | 14. Cuộc gọi Giải vây Khẩn cấp | 15. Két An toàn Hộp đen TimeMark |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/app_21_stealth_calculator.png" width="240px" alt="Stealth Calculator" /> | <img src="docs/screenshots/app_22_fake_call_screen.png" width="240px" alt="Fake Incoming Call" /> | <img src="docs/screenshots/app_23_safety_vault.png" width="240px" alt="Safety Vault" /> |
+
+| 16. Hộp thư & Bộ đàm PTT | 17. Sandbox Phòng thủ Luận văn | 18. Sổ tay Hướng dẫn Chi tiết |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/app_24_messenger_walkie_talkie.png" width="240px" alt="Messenger PTT" /> | <img src="docs/screenshots/app_28_defense_demo_sandbox.png" width="240px" alt="Defense Sandbox" /> | <img src="docs/screenshots/app_29_app_user_guide.png" width="240px" alt="User Guide" /> |
 
 ---
 
-### B. Giao diện Trung tâm Điều phối Web Admin (Web Admin Dispatch Portal)
+### B. Giao diện Đồng hồ Thông minh Samsung Galaxy Watch 5 (Wear OS Smartwatch - 7 Màn hình)
 
-| 1. Bản đồ Cứu hộ Thời gian thực (Live Map SOS) | 2. Điều phối Cứu hộ Đa kênh (Omnichannel Console) |
-| :---: | :---: |
-| <img src="docs/screenshots/01_live_map_dispatch.png" width="480px" alt="Live Map" /> | <img src="docs/screenshots/03_omnichannel_dispatch.png" width="480px" alt="Omnichannel" /> |
+| 1. Mặt Đồng Hồ (Watch Face) | 2. Bảng Đếm Ngược (Dashboard) | 3. Điểm Danh Tâm Trạng (Check-in) |
+| :---: | :---: | :---: |
+| <img src="docs/screenshots/watch_01_face.png" width="200px" alt="Watch Face" /> | <img src="docs/screenshots/watch_02_dashboard.png" width="200px" alt="Watch Dashboard" /> | <img src="docs/screenshots/watch_03_checkin.png" width="200px" alt="Watch Checkin" /> |
 
-| 3. Quản lý & Phê duyệt Danh tính KYC CCCD | 4. Thống kê & Phân tích Sự cố 30 Ngày |
+| 4. Cảnh Báo Sắp Hạn (Warning) | 5. Báo Động Khẩn Cấp (Active SOS) | 6. Giám Sát Nhịp Tim (Health) | 7. Thẻ Y Tế Cổ Tay (Medical ID) |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/watch_04_warning.png" width="180px" alt="Watch Warning" /> | <img src="docs/screenshots/watch_05_sos.png" width="180px" alt="Watch Active SOS" /> | <img src="docs/screenshots/watch_06_health.png" width="180px" alt="Watch Health" /> | <img src="docs/screenshots/watch_07_medical.png" width="180px" alt="Watch Medical" /> |
+
+---
+
+### C. Giao diện Trung tâm Điều phối Web Admin (Web Admin Dispatch Portal - 9 Màn hình)
+
+| 1. Bản đồ Cứu hộ Thời gian thực (Live Map SOS) | 2. Điều khiển Viễn thông Galaxy Watch 5 |
 | :---: | :---: |
-| <img src="docs/screenshots/04_kyc_verification.png" width="480px" alt="KYC" /> | <img src="docs/screenshots/06_analytics_revenue.png" width="480px" alt="Analytics" /> |
+| <img src="docs/screenshots/01_live_map_dispatch.png" width="480px" alt="Live Map" /> | <img src="docs/screenshots/02_galaxy_watch_simulator.png" width="480px" alt="Watch Telemetry" /> |
+
+| 3. Điều phối Cứu hộ Đa kênh (Omnichannel Console) | 4. Quản lý & Phê duyệt Danh tính KYC CCCD |
+| :---: | :---: |
+| <img src="docs/screenshots/03_omnichannel_dispatch.png" width="480px" alt="Omnichannel" /> | <img src="docs/screenshots/04_kyc_verification.png" width="480px" alt="KYC Verification" /> |
+
+| 5. Quản trị Danh bạ & Mạng lưới Người giám hộ | 6. Thống kê & Phân tích Sự cố 30 Ngày (SLA) |
+| :---: | :---: |
+| <img src="docs/screenshots/05_users_guardians.png" width="480px" alt="Users and Guardians" /> | <img src="docs/screenshots/06_analytics_revenue.png" width="480px" alt="Analytics and SLA" /> |
 
 ---
 

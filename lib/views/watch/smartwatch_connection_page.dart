@@ -1634,9 +1634,12 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                value,
-                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+              Flexible(
+                child: Text(
+                  value,
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               const SizedBox(width: 4),
               Text(

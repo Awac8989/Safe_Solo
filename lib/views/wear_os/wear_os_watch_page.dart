@@ -54,14 +54,19 @@ const Map<WatchScreen, String> kScreenLabels = {
 /// Mẫu thiết kế gốc: https://github.com/Awac8989/SamsungGalaxyWatch5Interface
 /// ============================================================================
 class WearOsWatchPage extends StatefulWidget {
-  const WearOsWatchPage({super.key});
+  const WearOsWatchPage({
+    super.key,
+    this.initialScreen = WatchScreen.watchface,
+  });
+
+  final WatchScreen initialScreen;
 
   @override
   State<WearOsWatchPage> createState() => _WearOsWatchPageState();
 }
 
 class _WearOsWatchPageState extends State<WearOsWatchPage> {
-  WatchScreen _screen = WatchScreen.watchface;
+  late WatchScreen _screen;
   late final PageController _pageController;
   Timer? _clockTimer;
   DateTime _now = DateTime.now();
@@ -115,6 +120,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   @override
   void initState() {
     super.initState();
+    _screen = widget.initialScreen;
     _pageController = PageController(initialPage: kWatchScreens.indexOf(_screen));
     WearOsService.instance.initialize();
     WearOsService.instance.addListener(_onWearOsChanged);

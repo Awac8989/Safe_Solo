@@ -909,6 +909,11 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  void setActiveJourneyForTest(LiveJourneyModel? journey) {
+    _activeJourney = journey;
+    notifyListeners();
+  }
+
   Future<void> refreshDisasterAlerts() async {
     try {
       final alerts = await _api.getActiveDisasterAlerts(
