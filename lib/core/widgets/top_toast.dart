@@ -77,6 +77,7 @@ class _TopToastViewState extends State<_TopToastView>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return IgnorePointer(
       child: SafeArea(
         child: Align(
@@ -96,32 +97,49 @@ class _TopToastViewState extends State<_TopToastView>
                       vertical: 14,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       borderRadius: BorderRadius.circular(AppRadius.lg),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: AppShadows.card,
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : AppColors.border,
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 32,
-                          height: 32,
+                          width: 36,
+                          height: 36,
                           decoration: BoxDecoration(
-                            color: AppColors.primarySoft,
+                            color: isDark ? const Color(0xFF0F172A) : AppColors.primarySoft,
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark
+                                  ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                                  : AppColors.primary.withValues(alpha: 0.2),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Icon(
                             widget.icon,
-                            size: 18,
-                            color: AppColors.primary,
+                            size: 20,
+                            color: isDark ? const Color(0xFF34D399) : AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             widget.message,
-                            style: AppTextStyles.bodyStrong,
+                            style: AppTextStyles.bodyStrong.copyWith(
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                              fontSize: 13.5,
+                            ),
                           ),
                         ),
                       ],

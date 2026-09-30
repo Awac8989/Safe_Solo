@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_strings.dart';
+import '../../core/app_theme.dart';
 import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../models/watch_protocol.dart';
@@ -967,12 +968,21 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           indicatorColor: const Color(0xFF38BDF8),
           indicatorWeight: 3,
           labelColor: const Color(0xFF38BDF8),
-          unselectedLabelColor: Colors.white60,
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          unselectedLabelColor: const Color(0xFF94A3B8),
+          labelStyle: const TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontFamily: AppTextStyles.fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
           tabs: const [
-            Tab(icon: Icon(Icons.favorite_rounded, size: 18), text: 'Sức khỏe'),
-            Tab(icon: Icon(Icons.warning_amber_rounded, size: 18), text: 'Phát hiện ngã'),
-            Tab(icon: Icon(Icons.sync_alt_rounded, size: 18), text: 'Kết nối & Đồng bộ'),
+            Tab(icon: Icon(Icons.favorite_rounded, size: 20), text: 'Sức khỏe'),
+            Tab(icon: Icon(Icons.warning_amber_rounded, size: 20), text: 'Phát hiện ngã'),
+            Tab(icon: Icon(Icons.sync_alt_rounded, size: 20), text: 'Kết nối & Đồng bộ'),
           ],
         ),
       ),

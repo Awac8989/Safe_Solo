@@ -69,8 +69,8 @@ class CustomBottomNav extends StatelessWidget {
         ? AppDarkColors.primaryGlow
         : AppColors.primary;
     final inactiveColor = isDark
-        ? AppDarkColors.textSecondary
-        : AppColors.textSecondary;
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF475569);
 
     return SafeArea(
       top: false,
@@ -115,7 +115,7 @@ class CustomBottomNav extends StatelessWidget {
                             curve: Curves.easeOut,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
-                              vertical: 8,
+                              vertical: 7,
                             ),
                             decoration: BoxDecoration(
                               color: isActive
@@ -129,7 +129,7 @@ class CustomBottomNav extends StatelessWidget {
                             ),
                             child: Icon(
                               isActive ? item.activeIcon : item.icon,
-                              size: 20,
+                              size: 22,
                               color: isActive
                                   ? activeColor
                                   : inactiveColor,
@@ -142,7 +142,8 @@ class CustomBottomNav extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTextStyles.caption.copyWith(
-                            fontSize: 10,
+                            fontSize: 10.5,
+                            letterSpacing: 0.1,
                             color: isActive
                                 ? activeColor
                                 : inactiveColor,

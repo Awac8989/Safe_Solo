@@ -155,7 +155,7 @@ class _DisasterAlertCardState extends State<DisasterAlertCard>
                         alert.safetyAdvice.isNotEmpty
                             ? alert.safetyAdvice
                             : (alert.address.isNotEmpty ? alert.address : alert.description),
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                        style: const TextStyle(color: Color(0xFFF1F5F9), fontSize: 11.5, height: 1.25),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

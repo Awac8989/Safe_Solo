@@ -165,6 +165,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
     final strings = AppStrings.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = appProvider.user;
     final userName = user?.name ?? strings.text('Bạn', 'You');
     final lastCheckIn = user?.lastCheckinTime ?? DateTime.now();
@@ -192,7 +193,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Text(
                       _formatDate(_now, strings),
                       style: AppTextStyles.bodyStrong.copyWith(
-                        color: AppColors.textSecondary,
+                        color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -209,8 +210,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1D7),
+                      color: isDark ? const Color(0xFF2D1B00) : const Color(0xFFFFF1D7),
                       borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF78350F) : const Color(0xFFFFD599),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -223,7 +228,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Text(
                           '${appProvider.streak}',
                           style: AppTextStyles.bodyStrong.copyWith(
-                            color: AppColors.warning,
+                            color: isDark ? const Color(0xFFFBBF24) : AppColors.warning,
                           ),
                         ),
                       ],
@@ -266,7 +271,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                         Text(
                           strings.text('Galaxy Watch 5 đang phát chuông rung tìm điện thoại.', 'Galaxy Watch 5 is ringing this phone.'),
-                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          style: const TextStyle(color: Color(0xFFE0F2FE), fontSize: 11.5, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -449,23 +454,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 'Last check-in: ${_formatTime(lastCheckIn)}${mood == null ? '' : ' · Mood ${_emojiForMood(mood)}'}',
               ),
               style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
+                color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
               ),
             ),
           ),
           const SizedBox(height: 14),
           AppCard(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            color: _statusStripColor(state).withValues(alpha: 0.12),
+            color: isDark
+                ? const Color(0xFF0F1E2E)
+                : _statusStripColor(state).withValues(alpha: 0.12),
             border: Border.all(
-              color: _statusStripColor(state).withValues(alpha: 0.24),
+              color: isDark
+                  ? _statusStripColor(state).withValues(alpha: 0.5)
+                  : _statusStripColor(state).withValues(alpha: 0.24),
+              width: 1.2,
             ),
             shadow: const [],
             child: Row(
               children: [
                 Icon(
                   mood == null ? Icons.info_outline_rounded : _moodIcon(mood),
-                  color: _statusStripColor(state),
+                  color: isDark ? AppDarkColors.primaryGlow : _statusStripColor(state),
+                  size: 22,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -480,7 +491,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             'Current mood: ${strings.moodLabel(mood)}',
                           ),
                     style: AppTextStyles.bodyStrong.copyWith(
-                      color: AppColors.textPrimary,
+                      color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -506,8 +517,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Container(
                           width: 42,
                           height: 42,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primarySoft,
+                          decoration: BoxDecoration(
+                            color: isDark ? AppDarkColors.primarySoft : AppColors.primarySoft,
                             shape: BoxShape.circle,
                           ),
                           alignment: Alignment.center,
@@ -516,7 +527,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 ? guardian.name.trim().substring(0, 1).toUpperCase()
                                 : '?',
                             style: AppTextStyles.bodyStrong.copyWith(
-                              color: AppColors.primary,
+                              color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
                             ),
                           ),
                         ),
@@ -530,13 +541,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ],
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.battery_5_bar_rounded,
                           size: 18,
-                          color: AppColors.primary,
+                          color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
                         ),
                         const SizedBox(width: 4),
-                        Text(_guardianBattery(guardian.phone), style: AppTextStyles.caption),
+                        Text(
+                          _guardianBattery(guardian.phone),
+                          style: AppTextStyles.caption.copyWith(
+                            color: isDark ? AppDarkColors.textSecondary : AppColors.textMuted,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         const CircleAvatar(
                           radius: 5,
@@ -561,7 +577,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             children: Mood.values
                 .map(
                   (moodValue) => ActionChip(
-                    label: Text(strings.moodLabel(moodValue)),
+                    backgroundColor: isDark ? const Color(0xFF1E293B) : AppColors.secondary,
+                    side: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : AppColors.border,
+                    ),
+                    label: Text(
+                      strings.moodLabel(moodValue),
+                      style: TextStyle(
+                        color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                     avatar: Text(_emojiForMood(moodValue)),
                     onPressed: () => _shareMood(moodValue),
                   ),
@@ -955,7 +982,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Text(
                   '"$message"',
                   style: const TextStyle(
-                    color: Colors.white70,
+                    color: Color(0xFFFCE7F3),
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
                   ),
@@ -1458,9 +1485,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         'Tư vấn vết thương · Kiểm tra dị ứng thuốc · Trấn an hoảng sợ',
                         'Wound care · Drug allergy check · Calming support',
                       ),
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 11,
+                      style: const TextStyle(
+                        color: Color(0xFFE2E8F0),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1470,12 +1498,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 16),
+                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
               ),
             ],
           ),
@@ -2238,7 +2266,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       const SizedBox(height: 3),
                       const Text(
                         'Đang trực thám ca SOS bán kính 3km · Chạm mở Bàn Tác Chiến',
-                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                        style: TextStyle(color: Color(0xFFD1FAE5), fontSize: 11.5, fontWeight: FontWeight.w500),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2276,14 +2304,16 @@ class _MoodOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Ink(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.secondary,
+          color: isDark ? AppDarkColors.cardSoft : AppColors.secondary,
           borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: isDark ? Border.all(color: AppDarkColors.border) : null,
         ),
         child: Column(
           children: [
@@ -2292,7 +2322,9 @@ class _MoodOption extends StatelessWidget {
             Text(
               label,
               textAlign: TextAlign.center,
-              style: AppTextStyles.bodyStrong,
+              style: AppTextStyles.bodyStrong.copyWith(
+                color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+              ),
             ),
           ],
         ),
@@ -2314,6 +2346,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
       child: Column(
@@ -2321,20 +2354,31 @@ class _StatCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: AppColors.textSecondary),
+              Icon(
+                icon,
+                size: 20,
+                color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
+              ),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
                   label,
                   style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
+                    color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(value, style: AppTextStyles.h3.copyWith(fontSize: 18)),
+          Text(
+            value,
+            style: AppTextStyles.h3.copyWith(
+              fontSize: 18,
+              color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+            ),
+          ),
         ],
       ),
     );

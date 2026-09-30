@@ -94,7 +94,7 @@ class DisasterAlertDetailSheet extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
                   onPressed: () => Navigator.pop(context),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -122,7 +122,7 @@ class DisasterAlertDetailSheet extends StatelessWidget {
                 Expanded(
                   child: Text(
                     alert.address.isNotEmpty ? alert.address : '${alert.lat}, ${alert.lng}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -156,7 +156,7 @@ class DisasterAlertDetailSheet extends StatelessWidget {
                 ),
                 child: Text(
                   alert.description,
-                  style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4),
+                  style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, height: 1.4),
                 ),
               ),
               const SizedBox(height: 14),

@@ -330,6 +330,13 @@ class _PermissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDark ? AppDarkColors.primaryGlow : AppColors.primary;
+    final primaryBg = isDark ? AppDarkColors.primarySoft : AppColors.primarySoft;
+    final textColor = isDark ? AppDarkColors.textPrimary : AppColors.textPrimary;
+    final textSubColor = isDark ? AppDarkColors.textSecondary : AppColors.textSecondary;
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : AppColors.textMuted;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -343,21 +350,28 @@ class _PermissionCard extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
+                  color: primaryBg,
                   borderRadius: BorderRadius.circular(14),
+                  border: isDark ? Border.all(color: AppDarkColors.border) : null,
                 ),
-                child: Icon(icon, color: AppColors.primary, size: 24),
+                child: Icon(icon, color: primaryColor, size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: AppTextStyles.title),
+                    Text(
+                      title,
+                      style: AppTextStyles.title.copyWith(color: textColor),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       description,
-                      style: AppTextStyles.body.copyWith(height: 1.55),
+                      style: AppTextStyles.body.copyWith(
+                        color: textSubColor,
+                        height: 1.55,
+                      ),
                     ),
                   ],
                 ),
@@ -367,14 +381,15 @@ class _PermissionCard extends StatelessWidget {
                 children: [
                   Icon(
                     granted ? Icons.check_rounded : Icons.add_rounded,
-                    color: granted ? AppColors.primary : AppColors.textMuted,
+                    color: granted ? primaryColor : mutedColor,
                     size: 24,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     granted ? 'OK' : 'Cấp',
                     style: AppTextStyles.caption.copyWith(
-                      color: granted ? AppColors.primary : AppColors.textMuted,
+                      color: granted ? primaryColor : mutedColor,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
