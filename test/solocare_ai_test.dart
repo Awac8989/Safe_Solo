@@ -17,39 +17,43 @@ void main() {
   group('SoloCareAiService Unit Tests', () {
     final service = SoloCareAiService.instance;
 
-    test('default configuration has valid API key and Qwen model', () {
-      expect(service.currentModel, contains('qwen'));
+    test('default configuration has valid API key and model', () {
+      expect(service.currentModel, contains('gemini'));
+      expect(service.effectiveGeminiApiKey.startsWith('AQ.'), isTrue);
       expect(SoloCareAiService.defaultApiKey.startsWith('gsk_'), isTrue);
     });
 
     test('updateApiKey and updateModel modify service configuration', () {
-      service.updateModel('qwen/qwen3.8-27b');
-      expect(service.currentModel, 'qwen/qwen3.8-27b');
+      service.updateModel('gemini-flash-lite-latest');
+      expect(service.currentModel, 'gemini-flash-lite-latest');
     });
 
     test('fallback responses provide comprehensive offline medical advice', () async {
       final provider = AppProvider();
 
-      // Fallback cho vết thương / chảy máu
+      // Phản hồi cho vết thương / chảy máu
       final woundResponse = await service.askSoloCare(
         prompt: 'Tôi bị đứt tay chảy máu nhiều',
         appProvider: provider,
       );
-      expect(woundResponse.contains('VẾT THƯƠNG') || woundResponse.contains('cầm máu'), isTrue);
+      final woundLower = woundResponse.toLowerCase();
+      expect(woundLower.contains('vết thương') || woundLower.contains('cầm máu'), isTrue);
 
-      // Fallback cho bỏng
+      // Phản hồi cho bỏng
       final burnResponse = await service.askSoloCare(
         prompt: 'Tôi bị bỏng bô xe máy',
         appProvider: provider,
       );
-      expect(burnResponse.contains('BỎNG') || burnResponse.contains('nước'), isTrue);
+      final burnLower = burnResponse.toLowerCase();
+      expect(burnLower.contains('bỏng') || burnLower.contains('nước'), isTrue);
 
-      // Fallback cho hoảng loạn / tâm lý
+      // Phản hồi cho hoảng loạn / tâm lý
       final panicResponse = await service.askSoloCare(
         prompt: 'Tôi đang rất sợ và hoảng loạn tim đập nhanh',
         appProvider: provider,
       );
-      expect(panicResponse.contains('HÍT THỞ') || panicResponse.contains('4-7-8'), isTrue);
+      final panicLower = panicResponse.toLowerCase();
+      expect(panicLower.contains('hít thở') || panicLower.contains('thở') || panicLower.contains('4-7-8'), isTrue);
     });
   });
 

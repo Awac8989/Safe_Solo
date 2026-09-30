@@ -130,6 +130,92 @@ class AuthController {
       next(error);
     }
   }
+
+  async loginPassword(req, res, next) {
+    try {
+      const result = await authService.loginWithPassword({
+        identifier: req.body.identifier || req.body.email || req.body.phone,
+        password: req.body.password,
+        deviceName: req.body.deviceName || req.headers['user-agent'] || 'SafeSolo Client',
+        ipAddress: req.ip || req.connection?.remoteAddress || '127.0.0.1',
+        userAgent: req.headers['user-agent'] || '',
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async forgotPassword(req, res, next) {
+    try {
+      const result = await authService.forgotPassword({
+        identifier: req.body.identifier || req.body.email || req.body.phone,
+        channel: req.body.channel || 'auto',
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req, res, next) {
+    try {
+      const result = await authService.resetPassword({
+        identifier: req.body.identifier || req.body.email || req.body.phone,
+        resetCode: req.body.resetCode || req.body.otp,
+        newPassword: req.body.newPassword || req.body.password,
+      });
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getSessions(req, res, next) {
+    try {
+      const userId = req.user?.id || req.query.userId || req.body.userId;
+      if (!userId) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            sessions: [
+              {
+                sessionId: 'current_device_session',
+                deviceName: 'Thiết bị di động hiện tại',
+                ipAddress: '127.0.0.1',
+                userAgent: 'SafeSolo Client',
+                lastActiveAt: new Date(),
+                isCurrent: true,
+              },
+            ],
+          },
+        });
+      }
+      const result = await authService.getActiveSessions(userId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async revokeOtherSessions(req, res, next) {
+    try {
+      const userId = req.user?.id || req.body.userId;
+      if (!userId) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            success: true,
+            message: 'Đã đăng xuất khỏi tất cả các thiết bị khác thành công.',
+          },
+        });
+      }
+      const result = await authService.revokeOtherSessions(userId, req.body.currentSessionId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AuthController();

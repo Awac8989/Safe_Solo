@@ -13,6 +13,7 @@ import '../../services/pedometer_service.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/ble_watch_service.dart';
+import '../../services/real_watch_task_engine.dart';
 
 /// ============================================================================
 /// SAFESOLO - QUẢN LÝ ĐỒNG HỒ THÔNG MINH
@@ -341,6 +342,42 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       const SnackBar(
         backgroundColor: Color(0xFFD97706),
         content: Text('⚠️ Đã phát tín hiệu thử nghiệm tính năng báo ngã!'),
+      ),
+    );
+  }
+
+  /// Thử nghiệm tính năng báo tai nạn giao thông xung lực mạnh
+  void _simulateCrashTest() {
+    _wearOs.simulateAccidentCrash();
+    _addTelemetryLog(
+      type: 'Thử nghiệm tai nạn xe',
+      source: 'Cảm biến IMU High-G',
+      detail: 'Mô phỏng va chạm giao thông 6.5g kèm bất động 78° để kích hoạt cấp cứu 115.',
+      isSuccess: true,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFFEF4444),
+        content: Text('🚨 Đã phát tín hiệu tai nạn giao thông va chạm mạnh (6.5g)!'),
+      ),
+    );
+  }
+
+  /// Thử nghiệm tính năng rơi tự do ngã độ cao / cầu thang
+  void _simulateFreeFallTest() {
+    _wearOs.simulateFreeFall();
+    _addTelemetryLog(
+      type: 'Thử nghiệm rơi tự do',
+      source: 'Cảm biến gia tốc IMU',
+      detail: 'Mô phỏng pha không trọng lượng rơi tự do kéo theo va đập 5.2g.',
+      isSuccess: true,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        backgroundColor: Color(0xFFF97316),
+        content: Text('⚠️ Đã phát tín hiệu thử nghiệm rơi tự do & va đập (5.2g)!'),
       ),
     );
   }
@@ -924,11 +961,6 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                 : const Icon(Icons.sync_rounded, color: Color(0xFF38BDF8)),
             onPressed: _isSyncing ? null : _syncTelemetryToCloud,
           ),
-          IconButton(
-            tooltip: 'Mở màn hình đồng hồ',
-            icon: const Icon(Icons.watch_rounded, color: Colors.white70),
-            onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
-          ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -964,6 +996,8 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     _buildConnectionStatusCard(isConnected, isOffWrist),
                     const SizedBox(height: 16),
                     _buildDirectActionsRow(),
+                    const SizedBox(height: 16),
+                    _buildRealWatchTasksSection(),
                     const SizedBox(height: 20),
                     Text(
                       strings.text('CHỈ SỐ SỨC KHỎE TRỰC TIẾP', 'LIVE HEALTH VITALS'),
@@ -1021,6 +1055,44 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                         ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    // Nút thử nghiệm tai nạn va chạm xe (6.5g)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _simulateCrashTest,
+                        icon: const Icon(Icons.car_crash_rounded, size: 20),
+                        label: const Text(
+                          '🚨 THỬ NGHIỆM TAI NẠN XE (CRASH 6.5g)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // Nút thử nghiệm rơi tự do & va đập (5.2g)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFF97316),
+                          side: const BorderSide(color: Color(0xFFF97316)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _simulateFreeFallTest,
+                        icon: const Icon(Icons.arrow_downward_rounded, size: 20),
+                        label: const Text(
+                          '⚠️ THỬ NGHIỆM RƠI TỰ DO & VA ĐẬP (5.2g)',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     Text(
                       strings.text('CÀI ĐẶT CẢNH BÁO AN TOÀN', 'SAFETY ALERTS CONFIGURATION'),
@@ -1047,6 +1119,8 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildManualPairingBanner(),
+                    const SizedBox(height: 16),
+                    _buildWatchPinSecurityCard(),
                     const SizedBox(height: 16),
                     _buildBiDirectionalSyncModelCard(),
                     const SizedBox(height: 20),
@@ -1134,6 +1208,187 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             ),
             onPressed: _showPairingDialog,
             child: const Text('CÀI ĐẶT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Thẻ bảo mật mã PIN đồng hồ (Safe PIN & Duress PIN)
+  Widget _buildWatchPinSecurityCard() {
+    final appProvider = context.watch<AppProvider>();
+    final safePin = appProvider.security.realPin.isNotEmpty ? appProvider.security.realPin : WearOsService.instance.safePin;
+    final duressPin = appProvider.security.duressPin.isNotEmpty ? appProvider.security.duressPin : WearOsService.instance.duressPin;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.pin_rounded, color: Color(0xFF38BDF8), size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bảo mật mã PIN đồng hồ (2 tầng)',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Cơ chế chống cưỡng bức & hủy còi hú an toàn',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'SAFE PIN',
+                            style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        safePin,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 3,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Hủy còi hú an toàn khi đã ổn định.',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'DURESS PIN',
+                            style: TextStyle(color: Color(0xFFEF4444), fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        duressPin,
+                        style: const TextStyle(
+                          color: Color(0xFFFCA5A5),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 3,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Bị ép: Giả vờ tắt nhưng gửi SOS ngầm.',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF38BDF8),
+                side: const BorderSide(color: Color(0xFF0284C7)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onPressed: () {
+                _syncManager.sendPinConfigSync(safePin: safePin, duressPin: duressPin);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    backgroundColor: const Color(0xFF0284C7),
+                    content: Text('✓ Đã đồng bộ mã PIN ($safePin / $duressPin) sang Galaxy Watch 5!'),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.sync_lock_rounded, size: 16),
+              label: const Text('ĐỒNG BỘ MÃ PIN SANG ĐỒNG HỒ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+            ),
           ),
         ],
       ),
@@ -1462,22 +1717,44 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           ],
         ),
         const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0284C7),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _showPairingDialog,
+                icon: const Icon(Icons.phonelink_setup_rounded, size: 18),
+                label: Text(
+                  _syncManager.isPaired ? 'CÀI ĐẶT & GHÉP NỐI' : 'GHÉP NỐI ĐỒNG HỒ',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
-            onPressed: _showPairingDialog,
-            icon: const Icon(Icons.phonelink_setup_rounded, size: 20),
-            label: Text(
-              _syncManager.isPaired ? 'CÀI ĐẶT & GHÉP NỐI THỦ CÔNG' : 'GHÉP NỐI ĐỒNG HỒ THỦ CÔNG',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  await _syncTelemetryToCloud();
+                },
+                icon: const Icon(Icons.sync_rounded, size: 18),
+                label: const Text(
+                  'ĐỒNG BỘ 2 CHIỀU',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         if (_syncManager.isPaired) ...[
           const SizedBox(height: 10),
@@ -1506,26 +1783,226 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             ),
           ),
         ],
-        const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00C853),
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 13),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 4,
+      ],
+    );
+  }
+
+  /// Danh mục 5 Tác vụ chạy ngầm độc lập trên Đồng hồ thật (Samsung Galaxy Watch 5 - Wear OS)
+  Widget _buildRealWatchTasksSection() {
+    final engine = RealWatchTaskEngine.instance;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.memory_rounded, color: Color(0xFF38BDF8), size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'TÁC VỤ ĐỘC LẬP TRÊN ĐỒNG HỒ THẬT',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      'Galaxy Watch 5 (Wear OS) vận hành 5 tác vụ chạy nền 24/7',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF10B981), width: 1),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, color: Color(0xFF10B981), size: 6),
+                    SizedBox(width: 4),
+                    Text(
+                      '5 TÁC VỤ ON',
+                      style: TextStyle(color: Color(0xFF34D399), fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Divider(color: Color(0xFF334155), height: 1),
+          const SizedBox(height: 12),
+
+          // Lặp qua 5 tác vụ thực tế
+          ...engine.tasks.map((task) => _buildTaskTile(task)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskTile(WatchTaskInfo task) {
+    Color statusBg;
+    Color statusColor;
+    String statusLabel;
+
+    switch (task.status) {
+      case WatchTaskStatus.active:
+        statusBg = const Color(0xFF10B981).withValues(alpha: 0.15);
+        statusColor = const Color(0xFF34D399);
+        statusLabel = 'ĐANG CHẠY';
+        break;
+      case WatchTaskStatus.warning:
+        statusBg = const Color(0xFFF59E0B).withValues(alpha: 0.15);
+        statusColor = const Color(0xFFFBBF24);
+        statusLabel = 'CẢNH BÁO';
+        break;
+      case WatchTaskStatus.critical:
+        statusBg = const Color(0xFFEF4444).withValues(alpha: 0.15);
+        statusColor = const Color(0xFFF87171);
+        statusLabel = 'KHẨN CẤP';
+        break;
+      case WatchTaskStatus.paused:
+        statusBg = const Color(0xFF64748B).withValues(alpha: 0.15);
+        statusColor = const Color(0xFF94A3B8);
+        statusLabel = 'TẠM DỪNG';
+        break;
+      case WatchTaskStatus.idle:
+        statusBg = const Color(0xFF334155).withValues(alpha: 0.3);
+        statusColor = const Color(0xFF64748B);
+        statusLabel = 'CHỜ KẾT NỐI';
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: task.activeColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(task.icon, color: task.activeColor, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      task.category,
+                      style: TextStyle(
+                        color: task.activeColor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            task.description,
+            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, height: 1.3),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
             ),
-            onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
-            icon: const Icon(Icons.watch_rounded, size: 20),
-            label: const Text(
-              'Xem màn hình đồng hồ',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.speed_rounded, color: Color(0xFF38BDF8), size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      task.samplingRate,
+                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+                Flexible(
+                  child: Text(
+                    task.currentMetric,
+                    style: const TextStyle(color: Color(0xFFF1F5F9), fontSize: 10, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

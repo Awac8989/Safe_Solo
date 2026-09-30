@@ -349,6 +349,13 @@ class _SettingsPageState extends State<SettingsPage> {
           _SectionCard(
             children: [
               _ActionRow(
+                icon: Icons.phonelink_lock_rounded,
+                title: strings.text('Bảo mật tài khoản & Phiên đăng nhập', 'Account security & Active sessions'),
+                subtitle: strings.text('Đổi mật khẩu, 2FA, quản lý thiết bị đang đăng nhập', 'Password, 2FA, session management'),
+                onTap: () => Navigator.pushNamed(context, '/security'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
                 icon: Icons.key_rounded,
                 title: strings.text('Mã PIN thật và PIN giả', 'Real PIN & duress PIN'),
                 onTap: () => Navigator.pushNamed(context, '/security'),
@@ -475,13 +482,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   valueText: AppConstants.backendBaseUrl,
                   onTap: () => _showServerConfigDialog(context),
                 ),
-                const _SectionDivider(),
-                _ActionRow(
-                  icon: Icons.watch_rounded,
-                  title: strings.text('Giả lập WearOS (Galaxy Watch 5)', 'WearOS Simulator (Galaxy Watch 5)'),
-                  valueText: strings.text('Mở test', 'Open'),
-                  onTap: () => Navigator.pushNamed(context, '/wear-os'),
-                ),
+
                 const _SectionDivider(),
                 _ActionRow(
                   icon: Icons.biotech_rounded,

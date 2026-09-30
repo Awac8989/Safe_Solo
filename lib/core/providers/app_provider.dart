@@ -30,6 +30,7 @@ import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
+import '../../views/emergency/watch_accident_alert_dialog.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
 
@@ -1236,6 +1237,60 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     });
   }
 
+  Future<UserModel?> findUserByPhone(String phone) async {
+    try {
+      final users = await _api.listUsers();
+      final normalized = phone.startsWith('+84')
+          ? '0${phone.substring(3)}'
+          : (phone.startsWith('84') ? '0${phone.substring(2)}' : phone);
+      final match = users.where((u) => u.phoneNumber == normalized || u.phoneNumber == phone).toList();
+      return match.isNotEmpty ? match.first : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> signInWithExistingUser(UserModel userModel, {String? email}) async {
+    await _runBusy(() async {
+      _user = User.fromUserModel(userModel, email: email ?? '');
+      _medical.fullName = _user!.name;
+      _streak = (_streak == 0) ? 1 : _streak;
+      try {
+        _medical = _fromMedicalProfile(
+          await _api.getMedicalProfile(_user!.id),
+          citizenId: _medical.citizenId,
+          permanentAddress: _medical.permanentAddress,
+        );
+      } catch (_) {}
+      try {
+        _automation = _fromAutomationSettings(
+          await _api.getAutomationSettings(_user!.id),
+          stepTrackingEnabled: _automation.stepTrackingEnabled,
+        );
+      } catch (_) {}
+      try {
+        _security = _mergeSecuritySettings(
+          _security,
+          await _api.getSecuritySettings(_user!.id),
+        );
+      } catch (_) {}
+      try {
+        _alertPolicy = await _api.getAlertPolicy(_user!.id);
+      } catch (_) {}
+      try {
+        _interactionEvents = await _api.listInteractions(_user!.id);
+      } catch (_) {}
+      _seedDemoCollections();
+      _homeAnchor ??= _user?.lastKnownLocation;
+      _updateBadges();
+      await _saveToStorage();
+      _restartRuntimeAutomation();
+      await _syncPushTokenIfNeeded();
+      await _syncBackgroundSafetyService();
+      notifyListeners();
+    });
+  }
+
   Future<void> completeProfileSetup({
     required String fullName,
     required String phoneNumber,
@@ -1347,6 +1402,98 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       await _saveToStorage();
       _restartRuntimeAutomation();
     });
+  }
+
+  Future<void> loginWithPassword({
+    required String identifier,
+    required String password,
+    bool rememberMe = true,
+  }) async {
+    await _runBusy(() async {
+      final res = await _api.loginWithPassword(
+        identifier: identifier,
+        password: password,
+        deviceName: 'Android Pixel 6 (SafeSolo)',
+      );
+      final data = res['data'] as Map<String, dynamic>?;
+      final userData = data?['user'] as Map<String, dynamic>?;
+      if (userData != null) {
+        final userModel = UserModel.fromJson(userData);
+        final userEmail = userData['email'] as String? ?? (identifier.contains('@') ? identifier : '');
+        _user = User.fromUserModel(userModel, email: userEmail);
+      } else {
+        throw Exception('Không nhận được dữ liệu người dùng từ máy chủ.');
+      }
+
+      _medical.fullName = _user!.name;
+      _streak = (_streak == 0) ? 1 : _streak;
+      _seedDemoCollections();
+      _homeAnchor ??= _user?.lastKnownLocation;
+      _updateBadges();
+      if (rememberMe) {
+        await _saveToStorage();
+      }
+      _restartRuntimeAutomation();
+      await _syncPushTokenIfNeeded();
+      await _syncBackgroundSafetyService();
+      notifyListeners();
+    });
+  }
+
+  Future<String> forgotPassword({
+    required String identifier,
+    String channel = 'auto',
+  }) async {
+    final res = await _api.forgotPassword(
+      identifier: identifier,
+      channel: channel,
+    );
+    final data = res['data'] as Map<String, dynamic>?;
+    final msg = data?['message'] as String? ?? 'Đã gửi yêu cầu khôi phục mật khẩu.';
+    final codePreview = data?['resetCodePreview'] as String?;
+    return codePreview != null ? '$msg (Mã khôi phục thử nghiệm: $codePreview)' : msg;
+  }
+
+  Future<void> resetPassword({
+    required String identifier,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    await _api.resetPassword(
+      identifier: identifier,
+      resetCode: resetCode,
+      newPassword: newPassword,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getActiveSessions() async {
+    try {
+      final userId = _user?.id;
+      final res = await _api.getActiveSessions(userId: userId);
+      final data = res['data'] as Map<String, dynamic>?;
+      final rawList = data?['sessions'] as List<dynamic>? ?? [];
+      return rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [
+        {
+          'sessionId': 'local_current_session',
+          'deviceName': 'Pixel 6 (Thiết bị hiện tại)',
+          'ipAddress': '127.0.0.1',
+          'userAgent': 'SafeSolo Android Mobile App',
+          'lastActiveAt': DateTime.now().toIso8601String(),
+          'isCurrent': true,
+        },
+      ];
+    }
+  }
+
+  Future<void> revokeOtherSessions(String currentSessionId) async {
+    final userId = _user?.id;
+    await _api.revokeOtherSessions(
+      currentSessionId: currentSessionId,
+      userId: userId,
+    );
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>> sendTelegramOtp(String identifier) async {
@@ -2071,11 +2218,40 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         notifyListeners();
         unawaited(_saveToStorage());
       }
+
+      final alertTitle = payload['title'] as String? ??
+          payload['alert'] as String? ??
+          '🚨 CẢNH BÁO TAI NẠN TỪ SAMSUNG GALAXY WATCH 5';
+      final alertBody = payload['alert'] as String? ??
+          payload['message'] as String? ??
+          'Phát hiện tín hiệu SOS/Tai nạn va chạm từ Galaxy Watch 5!';
+
+      // Rung còi báo động khẩn cấp trên điện thoại
+      HapticFeedback.heavyImpact();
+      for (int i = 1; i <= 4; i++) {
+        Future.delayed(Duration(milliseconds: i * 400), () => HapticFeedback.heavyImpact());
+      }
+
       unawaited(_notifications.showAlert(
         id: 9089,
-        title: '🚨 KHẨN CẤP TỪ SAMSUNG GALAXY WATCH 5',
-        body: payload['alert'] as String? ?? 'Phát hiện tín hiệu SOS/Ngã từ Galaxy Watch 5!',
+        title: alertTitle,
+        body: alertBody,
       ));
+
+      // Mở ngay Hộp thoại Cảnh báo Tai nạn & Rủi ro trên màn hình Smartphone
+      final navContext = AppConstants.navigatorKey.currentContext;
+      if (navContext != null && !WatchAccidentAlertDialog.isShowing) {
+        unawaited(
+          WatchAccidentAlertDialog.show(
+            navContext,
+            signalType: action,
+            title: alertTitle,
+            message: alertBody,
+            payload: payload,
+            initialSeconds: 30,
+          ),
+        );
+      }
     };
 
     // Đồng bộ hủy báo động từ Đồng hồ sang Điện thoại
@@ -2108,6 +2284,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
 
     if (type == 'WATCH_FALL_DETECTED' ||
+        type == 'WATCH_ACCIDENT_CRASH' ||
+        type == 'WATCH_FREE_FALL_IMPACT' ||
+        type == 'WATCH_CARDIAC_DISTRESS' ||
         type == 'WATCH_EMERGENCY_SOS' ||
         type == 'WATCH_CRITICAL_SPO2') {
       if (current != null) {
@@ -2125,6 +2304,20 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           body: message,
         ),
       );
+
+      final navContext = AppConstants.navigatorKey.currentContext;
+      if (navContext != null && !WatchAccidentAlertDialog.isShowing) {
+        unawaited(
+          WatchAccidentAlertDialog.show(
+            navContext,
+            signalType: type,
+            title: '🚨 CẢNH BÁO TỪ SAMSUNG GALAXY WATCH 5',
+            message: message,
+            payload: alert,
+            initialSeconds: 30,
+          ),
+        );
+      }
     }
   }
 

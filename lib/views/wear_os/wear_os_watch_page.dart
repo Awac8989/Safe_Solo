@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants.dart';
@@ -92,6 +91,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   bool _sosBlink = true;
   bool _pinMode = false;
   String _enteredPin = '';
+  String _pinErrorMessage = '';
   Timer? _sosBlinkTimer;
 
   // State cho Health Monitor
@@ -487,16 +487,8 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isNativeWatch = constraints.maxWidth <= 454 &&
-            constraints.maxHeight <= 454 &&
-            (constraints.maxWidth / constraints.maxHeight >= 0.8) &&
-            (constraints.maxWidth / constraints.maxHeight <= 1.25);
-        if (isNativeWatch) {
-          final watchSize = math.min(constraints.maxWidth, constraints.maxHeight);
-          return _buildNativeWatchLayout(context, watchSize > 0 ? watchSize : 192.0);
-        }
-
-        return _buildSimulatorLayout(context, constraints);
+        final watchSize = math.min(constraints.maxWidth, constraints.maxHeight);
+        return _buildNativeWatchLayout(context, watchSize > 0 ? watchSize : 384.0);
       },
     );
   }
@@ -670,347 +662,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     );
   }
 
-  /// GIAO DIỆN SIMULATOR TRÊN WEB / DESKTOP / PHONE THEO FIGMA GITHUB (CÓ KHUNG BEZEL & CROWN)
-  Widget _buildSimulatorLayout(BuildContext context, BoxConstraints constraints) {
-    Widget content = _buildFullGalaxyWatch5Layout(context);
-    if (constraints.maxWidth < 460) {
-      content = FittedBox(
-        fit: BoxFit.contain,
-        alignment: Alignment.center,
-        child: SizedBox(
-          width: 460,
-          child: content,
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0A0A),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0A0A0A), Color(0xFF111111), Color(0xFF0D0D0D)],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: SizedBox(
-                width: constraints.maxWidth < 460 ? constraints.maxWidth : 460,
-                child: content,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFullGalaxyWatch5Layout(BuildContext context) {
-    final currentIdx = kWatchScreens.indexOf(_screen);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Thanh tiêu đề trên cùng (theo mẫu GitHub Figma)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (Navigator.of(context).canPop())
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF555555), size: 14),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                ),
-              const Text(
-                'SAMSUNG GALAXY WATCH 5',
-                style: TextStyle(
-                  fontFamily: 'sans-serif',
-                  fontSize: 10,
-                  color: Color(0xFF555555),
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Text(
-                ' · ',
-                style: TextStyle(fontSize: 10, color: Color(0xFF555555)),
-              ),
-              const Text(
-                'SAFE-SOLO',
-                style: TextStyle(
-                  fontFamily: 'sans-serif',
-                  fontSize: 10,
-                  color: Color(0xFF555555),
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Cụm đồng hồ Galaxy Watch 5 và 2 phím điều hướng Left/Right
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Nút lùi trang trái
-            GestureDetector(
-              onTap: _prev,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.04),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-                alignment: Alignment.center,
-                child: const Text('‹', style: TextStyle(color: Color(0xFF555555), fontSize: 20, height: 1)),
-              ),
-            ),
-
-            const SizedBox(width: 20),
-
-            // WatchFrame: Khung bezel 340px & Màn hình 300px (chuẩn mẫu GitHub)
-            _buildWatchFrame(340, 300),
-
-            const SizedBox(width: 20),
-
-            // Nút tới trang phải
-            GestureDetector(
-              onTap: _next,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.04),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                ),
-                alignment: Alignment.center,
-                child: const Text('›', style: TextStyle(color: Color(0xFF555555), fontSize: 20, height: 1)),
-              ),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 20),
-
-        // Tên màn hình hiện tại (SCREEN_LABELS)
-        Text(
-          (kScreenLabels[_screen] ?? '').toUpperCase(),
-          style: const TextStyle(
-            fontFamily: 'sans-serif',
-            fontSize: 11,
-            color: Color(0xFF555555),
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // 7 Chấm chỉ báo màn hình (Screen Dots)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(kWatchScreens.length, (i) {
-            final isCurrent = i == currentIdx;
-            return GestureDetector(
-              onTap: () => _nav(kWatchScreens[i]),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: isCurrent ? 20 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: isCurrent ? const Color(0xFF00C853) : Colors.white.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(3),
-                  boxShadow: isCurrent
-                      ? [
-                          const BoxShadow(
-                            color: Color(0x8000C853),
-                            blurRadius: 8,
-                          ),
-                        ]
-                      : null,
-                ),
-              ),
-            );
-          }),
-        ),
-
-        const SizedBox(height: 14),
-
-        // Danh sách liên kết chuyển màn hình nhanh (Screen Guide Links)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Wrap(
-            spacing: 16,
-            runSpacing: 6,
-            alignment: WrapAlignment.center,
-            children: kWatchScreens.map((s) {
-              final isCurrent = _screen == s;
-              return GestureDetector(
-                onTap: () => _nav(s),
-                child: Text(
-                  kScreenLabels[s] ?? '',
-                  style: TextStyle(
-                    fontFamily: 'sans-serif',
-                    fontSize: 10,
-                    color: isCurrent ? const Color(0xFF00C853) : const Color(0xFF444444),
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  /// Khung viền kim loại Galaxy Watch 5 Bezel với 2 phím Crown bên phải (chuẩn 340px / 300px)
-  Widget _buildWatchFrame(double outerSize, double innerSize) {
-    return SizedBox(
-      width: outerSize,
-      height: outerSize,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.center,
-        children: [
-          // Vành Bezel kim loại tròn 340px
-          Container(
-            width: outerSize,
-            height: outerSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF2A2A2A), Color(0xFF111111), Color(0xFF1E1E1E)],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.9),
-                  blurRadius: 36,
-                  spreadRadius: 8,
-                  offset: const Offset(0, 16),
-                ),
-                const BoxShadow(color: Color(0xFF333333), spreadRadius: 3),
-                const BoxShadow(color: Color(0xFF1A1A1A), spreadRadius: 6),
-              ],
-              border: Border.all(color: const Color(0xFF333333), width: 1.5),
-            ),
-          ),
-
-          // Phím Crown trên (Home/Power Button)
-          Positioned(
-            right: -4,
-            top: (outerSize / 2) - 16,
-            child: GestureDetector(
-              onTap: () => _nav(WatchScreen.watchface),
-              child: Container(
-                width: 8,
-                height: 32,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(2)),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF333333), Color(0xFF555555), Color(0xFF333333)],
-                  ),
-                  border: const Border(
-                    top: BorderSide(color: Color(0xFFEF4444), width: 1),
-                    right: BorderSide(color: Color(0xFFEF4444), width: 1),
-                    bottom: BorderSide(color: Color(0xFFEF4444), width: 1),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Phím Crown dưới (Back Button)
-          Positioned(
-            right: -4,
-            top: (outerSize / 2) + 26,
-            child: GestureDetector(
-              onTap: _prev,
-              child: Container(
-                width: 8,
-                height: 20,
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.horizontal(right: Radius.circular(2)),
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF333333), Color(0xFF555555), Color(0xFF333333)],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Màn hình cảm ứng tròn AMOLED Black 300px
-          SizedBox(
-            width: innerSize,
-            height: innerSize,
-            child: Listener(
-              onPointerSignal: (signal) {
-                if (signal is PointerScrollEvent) {
-                  if (signal.scrollDelta.dy > 0) {
-                    _next();
-                  } else if (signal.scrollDelta.dy < 0) {
-                    _prev();
-                  }
-                }
-              },
-              child: GestureDetector(
-                key: const Key('watch_gesture_detector'),
-                behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (_) => _dragDelta = 0,
-                onHorizontalDragUpdate: (details) => _dragDelta += details.delta.dx,
-                onHorizontalDragEnd: (details) {
-                  final vx = details.primaryVelocity ?? 0;
-                  if (vx < -50 || _dragDelta < -35) {
-                    _next();
-                  } else if (vx > 50 || _dragDelta > 35) {
-                    _prev();
-                  }
-                  _dragDelta = 0;
-                },
-                child: ClipOval(
-                  child: Container(
-                    width: innerSize,
-                    height: innerSize,
-                    color: Colors.black,
-                    child: RepaintBoundary(
-                      child: SizedBox(
-                        width: innerSize,
-                        height: innerSize,
-                        child: _buildScreenContent(_screen, innerSize, isNativeWatch: false),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildScreenContent(WatchScreen screen, double size, {required bool isNativeWatch}) {
     Widget child;
     switch (screen) {
@@ -1147,12 +798,12 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
             SizedBox(height: isNativeWatch ? (size <= 200 ? 4 : 6) : 8),
 
-            // Huy hiệu SafeSolo giờ đến hạn
+            // Huy hiệu SafeSolo giờ đến hạn (Tap mở thẳng trang Điểm danh)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
-                debugPrint('WATCH_TAP: deadline badge tapped');
-                _nav(WatchScreen.dashboard);
+                debugPrint('WATCH_TAP: deadline badge tapped -> opening checkin');
+                _nav(WatchScreen.checkin);
               },
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: badgePaddingH, vertical: badgePaddingV),
@@ -1608,10 +1259,11 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
 
             SizedBox(height: isNativeWatch ? 6 : 10),
 
-            // Nút ĐIỂM DANH
+            // Nút ĐIỂM DANH (Tap để điểm danh ngay, Giữ để mở trang cảm xúc)
             GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => _nav(WatchScreen.checkin),
+              onTap: _performInstantCheckin,
+              onLongPress: () => _nav(WatchScreen.checkin),
               child: Container(
                 width: btnWidth,
                 height: btnHeight,
@@ -1717,114 +1369,385 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   }
 
   // ===========================================================================
-  // SCREEN 3: MOOD CHECK-IN (4 CẢM XÚC THEO GITHUB FIGMA)
+  // SCREEN 3: MOOD CHECK-IN (TRANG ĐIỂM DANH TỔNG HỢP DUY NHẤT 1 TRANG)
   // ===========================================================================
   Widget _buildCheckinScreen(double size, {required bool isNativeWatch}) {
     if (_checkinDone) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      return Stack(
+        alignment: Alignment.center,
         children: [
-          Text('✓', style: TextStyle(fontSize: isNativeWatch ? 34 : 40, color: const Color(0xFF00C853), fontWeight: FontWeight.bold)),
-          SizedBox(height: isNativeWatch ? 4 : 6),
-          Text('Đã điểm danh!', style: TextStyle(fontSize: isNativeWatch ? 12 : 13, color: const Color(0xFF00C853), fontWeight: FontWeight.w600)),
-          const SizedBox(height: 2),
-          Text('Bộ đếm đã đặt lại', style: TextStyle(fontSize: isNativeWatch ? 9 : 10, color: const Color(0xFF94A3B8))),
+          CustomPaint(
+            size: Size(size, size),
+            painter: _CircularArcPainter(
+              progress: 1.0,
+              strokeWidth: isNativeWatch ? (size <= 200 ? 5.0 : 6.0) : 7.0,
+              color: const Color(0xFF00C853),
+              backgroundColor: const Color(0xFF0A1A0A),
+            ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: isNativeWatch ? (size <= 200 ? 38.0 : 46.0) : 54.0,
+                height: isNativeWatch ? (size <= 200 ? 38.0 : 46.0) : 54.0,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x2200C853),
+                  boxShadow: [
+                    BoxShadow(color: Color(0x6600C853), blurRadius: 16),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '✓',
+                  style: TextStyle(
+                    fontSize: isNativeWatch ? (size <= 200 ? 26 : 32) : 38,
+                    color: const Color(0xFF00C853),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: isNativeWatch ? 3 : 5),
+              Text(
+                'Đã điểm danh!',
+                style: TextStyle(
+                  fontSize: isNativeWatch ? (size <= 200 ? 11 : 12.5) : 13.5,
+                  color: const Color(0xFF00C853),
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Bộ đếm đã đặt lại',
+                style: TextStyle(
+                  fontSize: isNativeWatch ? (size <= 200 ? 8.5 : 9.5) : 10.5,
+                  color: const Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: isNativeWatch ? 4 : 6),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isNativeWatch ? 6 : 8,
+                  vertical: isNativeWatch ? 1.5 : 2.5,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00C853).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF00C853).withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  'Hạn mới: ${_formatDeadlineBadge()}',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: isNativeWatch ? 7.5 : 9.0,
+                    color: const Color(0xFF00C853),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       );
     }
 
-    final cardSize = isNativeWatch ? 52.0 : 62.0;
-    final emojiSize = isNativeWatch ? 18.0 : 22.0;
-    final labelSize = isNativeWatch ? 7.5 : 8.0;
+    final progress = (_dashboardSeconds / _dashboardTotal).clamp(0.0, 1.0);
+    final arcColor = progress > 0.5
+        ? const Color(0xFF00C853)
+        : progress > 0.2
+            ? const Color(0xFFFFB300)
+            : const Color(0xFFF44336);
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    final hh = (_dashboardSeconds ~/ 3600).toString().padLeft(2, '0');
+    final mm = ((_dashboardSeconds % 3600) ~/ 60).toString().padLeft(2, '0');
+    final ss = (_dashboardSeconds % 60).toString().padLeft(2, '0');
+
+    final arcStroke = isNativeWatch ? (size <= 200 ? 5.0 : 6.0) : 7.0;
+    final topStatusSize = isNativeWatch ? (size <= 200 ? 7.0 : 8.0) : 9.0;
+    final timerFontSize = isNativeWatch ? (size <= 200 ? 15.0 : 18.0) : 22.0;
+    final deadlineFontSize = isNativeWatch ? (size <= 200 ? 7.0 : 8.0) : 9.5;
+    final btnWidth = isNativeWatch ? (size <= 200 ? 68.0 : 78.0) : 92.0;
+    final btnHeight = isNativeWatch ? (size <= 200 ? 22.0 : 25.0) : 28.0;
+    final btnFontSize = isNativeWatch ? (size <= 200 ? 8.0 : 9.0) : 10.5;
+    final cardW = isNativeWatch ? (size <= 200 ? 34.0 : 42.0) : 52.0;
+    final cardH = isNativeWatch ? (size <= 200 ? 32.0 : 38.0) : 46.0;
+    final emojiSize = isNativeWatch ? (size <= 200 ? 12.0 : 14.0) : 16.0;
+    final labelSize = isNativeWatch ? (size <= 200 ? 6.0 : 7.0) : 7.5;
+    final bottomFontSize = isNativeWatch ? (size <= 200 ? 6.5 : 7.5) : 8.5;
+
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        Text(
-          'CẢM XÚC HÔM NAY?',
-          style: TextStyle(fontFamily: 'sans-serif', fontSize: isNativeWatch ? 10 : 11, color: const Color(0xFFCBD5E1), letterSpacing: 1),
+        // Vòng cung chu vi CircularArc biểu thị thời gian sống còn
+        CustomPaint(
+          size: Size(size, size),
+          painter: _CircularArcPainter(
+            progress: progress,
+            strokeWidth: arcStroke,
+            color: arcColor,
+            backgroundColor: const Color(0xFF0F1E13),
+          ),
         ),
 
-        SizedBox(height: isNativeWatch ? 8 : 12),
-
-        // Grid 2x2: 4 Moods
-        Wrap(
-          spacing: isNativeWatch ? 8 : 10,
-          runSpacing: isNativeWatch ? 8 : 10,
-          children: List.generate(_moods.length, (i) {
-            final m = _moods[i];
-            final isSelected = _selectedMood == i;
-            final color = m['color'] as Color;
-
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() {
-                  _selectedMood = i;
-                  _dashboardSeconds = _dashboardTotal;
-                });
-                WatchSyncManager.instance.emitDeadmanCheckin(mood: m['label'] as String? ?? 'Tuyệt vời');
-                _checkinTimer1?.cancel();
-                _checkinTimer2?.cancel();
-                _checkinTimer1 = Timer(const Duration(milliseconds: 600), () {
-                  if (mounted) setState(() => _checkinDone = true);
-                });
-                _checkinTimer2 = Timer(const Duration(milliseconds: 1600), () {
-                  if (mounted) {
-                    setState(() {
-                      _checkinDone = false;
-                      _selectedMood = null;
-                    });
-                    _nav(WatchScreen.dashboard);
-                  }
-                });
-              },
-              child: Container(
-                width: cardSize,
-                height: cardSize,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(isNativeWatch ? 14 : 16),
-                  color: isSelected ? color.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.05),
-                  border: Border.all(
-                    color: isSelected ? color : Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        // Cụm nội dung trung tâm tích hợp toàn bộ thao tác điểm danh 1 trang duy nhất
+        SizedBox(
+          width: size * 0.90,
+          height: size * 0.90,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 1. Thanh trạng thái phía trên (BT, GPS, Pin)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(m['emoji'] as String, style: TextStyle(fontSize: emojiSize)),
-                    const SizedBox(height: 2),
-                    Text(m['label'] as String, style: TextStyle(fontSize: labelSize, color: const Color(0xFFE2E8F0))),
+                    Text(
+                      '⟳ BT',
+                      style: TextStyle(
+                        fontSize: topStatusSize,
+                        color: WatchSyncManager.instance.isPaired ? const Color(0xFF00C853) : const Color(0xFF888888),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(width: isNativeWatch ? 5 : 8),
+                    Text('📍 GPS', style: TextStyle(fontSize: topStatusSize, color: const Color(0xFF00C853), fontWeight: FontWeight.bold)),
+                    SizedBox(width: isNativeWatch ? 5 : 8),
+                    Text('🔋 $_battery%', style: TextStyle(fontSize: topStatusSize, color: const Color(0xFF888888), fontWeight: FontWeight.w500)),
                   ],
                 ),
-              ),
-            );
-          }),
-        ),
 
-        SizedBox(height: isNativeWatch ? 8 : 12),
+                SizedBox(height: isNativeWatch ? 2 : 3),
 
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _dashboardSeconds = _dashboardTotal;
-              _checkinDone = true;
-            });
-            WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Bình thường');
-            Future.delayed(const Duration(milliseconds: 1000), () {
-              if (mounted) {
-                setState(() {
-                  _checkinDone = false;
-                  _selectedMood = null;
-                });
-                _nav(WatchScreen.dashboard);
-              }
-            });
-          },
-          child: Text('Chỉ điểm danh', style: TextStyle(fontSize: isNativeWatch ? 9 : 10, color: const Color(0xFF94A3B8))),
+                // 2. Đồng hồ đếm ngược và hạn chót (xếp dọc tránh tràn ngang)
+                Text(
+                  '$hh:$mm:$ss',
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: timerFontSize,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                Text(
+                  _formatDeadlineBadge(),
+                  style: TextStyle(
+                    fontFamily: 'sans-serif',
+                    fontSize: deadlineFontSize,
+                    color: const Color(0xFF00C853),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                SizedBox(height: isNativeWatch ? 3 : 5),
+
+                // 3. NÚT ĐIỂM DANH CHÍNH 1-CHẠM (TÔI AN TOÀN)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.heavyImpact();
+                    setState(() {
+                      _dashboardSeconds = _dashboardTotal;
+                      _checkinDone = true;
+                    });
+                    WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Tuyệt vời');
+                    _checkinTimer2?.cancel();
+                    _checkinTimer2 = Timer(const Duration(milliseconds: 1600), () {
+                      if (mounted) {
+                        setState(() {
+                          _checkinDone = false;
+                          _selectedMood = null;
+                        });
+                      }
+                    });
+                  },
+                  child: Container(
+                    width: btnWidth,
+                    height: btnHeight,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(btnHeight / 2),
+                      color: const Color(0xFF00C853),
+                      boxShadow: const [BoxShadow(color: Color(0x6600C853), blurRadius: 14)],
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'ĐIỂM DANH',
+                      style: TextStyle(
+                        fontFamily: 'sans-serif',
+                        fontSize: btnFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isNativeWatch ? 3 : 5),
+
+                // 4. TIÊU ĐỀ CẢM XÚC HÔM NAY?
+                Text(
+                  'CẢM XÚC HÔM NAY?',
+                  style: TextStyle(
+                    fontFamily: 'sans-serif',
+                    fontSize: isNativeWatch ? (size <= 200 ? 7.0 : 8.0) : 9.0,
+                    color: const Color(0xFFCBD5E1),
+                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+
+                SizedBox(height: isNativeWatch ? 3 : 4),
+
+                // 5. Grid 4 cảm xúc (Tuyệt vời · Bình thường · Mệt mỏi · Bất an)
+                Wrap(
+                  spacing: isNativeWatch ? 4 : 6,
+                  runSpacing: isNativeWatch ? 3 : 4,
+                  alignment: WrapAlignment.center,
+                  children: List.generate(_moods.length, (i) {
+                    final m = _moods[i];
+                    final isSelected = _selectedMood == i;
+                    final color = m['color'] as Color;
+
+                    return GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _selectedMood = i;
+                          _dashboardSeconds = _dashboardTotal;
+                        });
+                        WatchSyncManager.instance.emitDeadmanCheckin(mood: m['label'] as String? ?? 'Tuyệt vời');
+                        _checkinTimer1?.cancel();
+                        _checkinTimer2?.cancel();
+                        _checkinTimer1 = Timer(const Duration(milliseconds: 600), () {
+                          if (mounted) setState(() => _checkinDone = true);
+                        });
+                        _checkinTimer2 = Timer(const Duration(milliseconds: 1600), () {
+                          if (mounted) {
+                            setState(() {
+                              _checkinDone = false;
+                              _selectedMood = null;
+                            });
+                          }
+                        });
+                      },
+                      child: Container(
+                        width: cardW,
+                        height: cardH,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(isNativeWatch ? 8 : 10),
+                          color: isSelected ? color.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.06),
+                          border: Border.all(
+                            color: isSelected ? color : Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(m['emoji'] as String, style: TextStyle(fontSize: emojiSize)),
+                            const SizedBox(height: 1),
+                            Text(
+                              m['label'] as String,
+                              style: TextStyle(
+                                fontSize: labelSize,
+                                color: isSelected ? Colors.white : const Color(0xFFE2E8F0),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                SizedBox(height: isNativeWatch ? 2 : 4),
+
+                // 6. Tùy chọn "Chỉ điểm danh"
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() {
+                      _dashboardSeconds = _dashboardTotal;
+                      _checkinDone = true;
+                    });
+                    WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Bình thường');
+                    _checkinTimer2?.cancel();
+                    _checkinTimer2 = Timer(const Duration(milliseconds: 1500), () {
+                      if (mounted) {
+                        setState(() {
+                          _checkinDone = false;
+                          _selectedMood = null;
+                        });
+                      }
+                    });
+                  },
+                  child: Text(
+                    'Chỉ điểm danh',
+                    style: TextStyle(
+                      fontSize: isNativeWatch ? (size <= 200 ? 6.5 : 7.5) : 8.5,
+                      color: const Color(0xFF94A3B8),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: isNativeWatch ? 3 : 5),
+
+                // 7. Thanh dưới: SOS KHẨN & Chỉ số sức khỏe nhịp tim / SpO2
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _nav(WatchScreen.warning),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isNativeWatch ? 5 : 7,
+                          vertical: isNativeWatch ? 2 : 3,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFFF44336).withValues(alpha: 0.15),
+                          border: Border.all(color: const Color(0xFFF44336).withValues(alpha: 0.6)),
+                        ),
+                        child: Text(
+                          'SOS KHẨN',
+                          style: TextStyle(
+                            fontFamily: 'sans-serif',
+                            fontSize: bottomFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFF44336),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: isNativeWatch ? 6 : 8),
+                    Text(
+                      '♥ ${_healthBpm > 0 ? _healthBpm : 74}',
+                      style: TextStyle(fontSize: bottomFontSize, color: const Color(0xFFF87171), fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(width: isNativeWatch ? 5 : 7),
+                    Text(
+                      'SpO₂ ${_healthSpo2 > 0 ? _healthSpo2 : 98}%',
+                      style: TextStyle(fontSize: bottomFontSize, color: const Color(0xFF60A5FA), fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1962,67 +1885,169 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   // ===========================================================================
   Widget _buildSosScreen(double size, {required bool isNativeWatch}) {
     if (_pinMode) {
-      final dialBtnSize = isNativeWatch ? 30.0 : 38.0;
-      final dialFontSize = isNativeWatch ? 12.0 : 14.0;
-      final pinDotSize = isNativeWatch ? 11.0 : 14.0;
+      final dialBtnSize = isNativeWatch ? (size <= 200 ? 28.0 : 32.0) : 38.0;
+      final dialFontSize = isNativeWatch ? (size <= 200 ? 11.0 : 12.0) : 14.0;
+      final pinDotSize = isNativeWatch ? 9.0 : 12.0;
+
+      final isError = _pinErrorMessage.isNotEmpty;
 
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('NHẬP MÃ PIN', style: TextStyle(fontSize: isNativeWatch ? 9 : 10, color: const Color(0xFFCBD5E1))),
+          Text(
+            isError ? _pinErrorMessage : 'NHẬP MÃ PIN',
+            style: TextStyle(
+              fontSize: isNativeWatch ? (size <= 200 ? 7.5 : 8.5) : 9.5,
+              fontWeight: FontWeight.w700,
+              color: isError ? const Color(0xFFFF5252) : const Color(0xFF94A3B8),
+              letterSpacing: 0.8,
+            ),
+          ),
 
-          SizedBox(height: isNativeWatch ? 4 : 8),
+          SizedBox(height: isNativeWatch ? 3 : 5),
 
+          // 4 Dots
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(4, (i) {
               final filled = _enteredPin.length > i;
+              Color dotColor = Colors.white.withValues(alpha: 0.1);
+              if (filled) {
+                dotColor = isError ? const Color(0xFFFF1744) : const Color(0xFF38BDF8);
+              }
               return Container(
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 width: pinDotSize,
                 height: pinDotSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: filled ? const Color(0xFFF44336) : Colors.white.withValues(alpha: 0.1),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  color: dotColor,
+                  border: Border.all(
+                    color: isError
+                        ? const Color(0xFFFF5252)
+                        : (filled ? const Color(0xFF38BDF8) : Colors.white.withValues(alpha: 0.2)),
+                    width: 1.2,
+                  ),
+                  boxShadow: filled
+                      ? [
+                          BoxShadow(
+                            color: isError ? const Color(0x66FF1744) : const Color(0x6638BDF8),
+                            blurRadius: 4,
+                          )
+                        ]
+                      : null,
                 ),
               );
             }),
           ),
 
-          SizedBox(height: isNativeWatch ? 4 : 8),
+          SizedBox(height: isNativeWatch ? 3 : 5),
 
-          // 3x4 Dialpad
+          // 3x4 Dialpad (1-9, [✕], 0, [⌫])
           Wrap(
-            spacing: isNativeWatch ? 6 : 8,
-            runSpacing: isNativeWatch ? 4 : 6,
+            spacing: isNativeWatch ? (size <= 200 ? 4 : 6) : 8,
+            runSpacing: isNativeWatch ? (size <= 200 ? 2 : 3) : 5,
             alignment: WrapAlignment.center,
-            children: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'].map((d) {
+            children: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '✕', '0', '⌫'].map((d) {
+              final isActionKey = d == '✕' || d == '⌫';
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  if (RegExp(r'\d').hasMatch(d) && _enteredPin.length < 4) {
+
+                  if (d == '✕') {
+                    // Trở về màn hình SOS
+                    setState(() {
+                      _pinMode = false;
+                      _enteredPin = '';
+                      _pinErrorMessage = '';
+                    });
+                    return;
+                  }
+
+                  if (d == '⌫') {
+                    // Xóa 1 ký tự
+                    if (_enteredPin.isNotEmpty) {
+                      setState(() {
+                        _enteredPin = _enteredPin.substring(0, _enteredPin.length - 1);
+                        _pinErrorMessage = '';
+                      });
+                    }
+                    return;
+                  }
+
+                  if (_enteredPin.length < 4 && RegExp(r'\d').hasMatch(d)) {
                     setState(() {
                       _enteredPin += d;
-                      if (_enteredPin.length == 4) {
-                        Future.delayed(const Duration(milliseconds: 300), () {
-                          WearOsService.instance.cancelEmergency();
-                          setState(() {
-                            _enteredPin = '';
-                            _pinMode = false;
-                            _dashboardSeconds = _dashboardTotal;
-                            _showCheckinSuccessToast = true;
-                          });
-                          WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Đã hủy SOS');
-                          _nav(WatchScreen.watchface);
-                          _toastTimer?.cancel();
-                          _toastTimer = Timer(const Duration(milliseconds: 2500), () {
-                            if (mounted) setState(() => _showCheckinSuccessToast = false);
-                          });
+                      _pinErrorMessage = '';
+                    });
+
+                    if (_enteredPin.length == 4) {
+                      final wearOs = WearOsService.instance;
+                      final safePin = wearOs.safePin;
+                      final duressPin = wearOs.duressPin;
+
+                      if (_enteredPin == safePin) {
+                        // KỊCH BẢN 1: MÃ PIN AN TOÀN (1234) -> HỦY CÒI HÚ
+                        HapticFeedback.mediumImpact();
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          wearOs.cancelEmergency();
+                          WatchSyncManager.instance.sendAlertCancelled();
+                          WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Đã hủy SOS bằng Safe PIN');
+                          if (mounted) {
+                            setState(() {
+                              _enteredPin = '';
+                              _pinMode = false;
+                              _pinErrorMessage = '';
+                              _dashboardSeconds = _dashboardTotal;
+                              _toastMessage = '✓ ĐÃ HỦY BÁO ĐỘNG SOS';
+                              _showCheckinSuccessToast = true;
+                            });
+                            _nav(WatchScreen.watchface);
+                            _toastTimer?.cancel();
+                            _toastTimer = Timer(const Duration(milliseconds: 2500), () {
+                              if (mounted) setState(() => _showCheckinSuccessToast = false);
+                            });
+                          }
+                        });
+                      } else if (_enteredPin == duressPin) {
+                        // KỊCH BẢN 2: MÃ PIN CƯỠNG BỨC (9999) -> GIẢ VỜ TẮT NHƯNG GỬI SOS NGẦM
+                        HapticFeedback.lightImpact();
+                        Future.delayed(const Duration(milliseconds: 200), () {
+                          wearOs.triggerDuressSilentSos();
+                          if (mounted) {
+                            setState(() {
+                              _enteredPin = '';
+                              _pinMode = false;
+                              _pinErrorMessage = '';
+                              _dashboardSeconds = _dashboardTotal;
+                              // Giả vờ tắt báo động bình thường để đối tượng đe dọa không nghi ngờ
+                              _toastMessage = '✓ HỆ THỐNG ĐÃ TẮT BÁO ĐỘNG';
+                              _showCheckinSuccessToast = true;
+                            });
+                            _nav(WatchScreen.watchface);
+                            _toastTimer?.cancel();
+                            _toastTimer = Timer(const Duration(milliseconds: 2500), () {
+                              if (mounted) setState(() => _showCheckinSuccessToast = false);
+                            });
+                          }
+                        });
+                      } else {
+                        // KỊCH BẢN 3: SAI MÃ PIN -> RUNG CẢNH BÁO VÀ RESET
+                        HapticFeedback.heavyImpact();
+                        setState(() {
+                          _pinErrorMessage = 'MÃ PIN KHÔNG ĐÚNG!';
+                        });
+                        Future.delayed(const Duration(milliseconds: 700), () {
+                          if (mounted) {
+                            setState(() {
+                              _enteredPin = '';
+                              _pinErrorMessage = '';
+                            });
+                          }
                         });
                       }
-                    });
+                    }
                   }
                 },
                 child: Container(
@@ -2030,11 +2055,26 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                   height: dialBtnSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.06),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    color: isActionKey
+                        ? (d == '✕' ? const Color(0x33EF4444) : const Color(0x2264748B))
+                        : Colors.white.withValues(alpha: 0.08),
+                    border: Border.all(
+                      color: isActionKey
+                          ? (d == '✕' ? const Color(0x66EF4444) : const Color(0x4494A3B8))
+                          : Colors.white.withValues(alpha: 0.12),
+                    ),
                   ),
                   alignment: Alignment.center,
-                  child: Text(d, style: TextStyle(fontSize: dialFontSize, fontWeight: FontWeight.w600, color: Colors.white)),
+                  child: Text(
+                    d,
+                    style: TextStyle(
+                      fontSize: dialFontSize,
+                      fontWeight: isActionKey ? FontWeight.w400 : FontWeight.w600,
+                      color: isActionKey
+                          ? (d == '✕' ? const Color(0xFFFCA5A5) : const Color(0xFFCBD5E1))
+                          : Colors.white,
+                    ),
+                  ),
                 ),
               );
             }).toList(),

@@ -364,36 +364,19 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF38BDF8),
-                                    side: BorderSide(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                  onPressed: () => Navigator.of(context).pushNamed('/smartwatch'),
-                                  icon: const Icon(Icons.settings_input_component_rounded, size: 16),
-                                  label: const Text('Quản lý đồng hồ', style: TextStyle(fontSize: 12)),
-                                ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF38BDF8),
+                                side: BorderSide(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                padding: const EdgeInsets.symmetric(vertical: 9),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
-                                  ),
-                                  onPressed: () => Navigator.of(context).pushNamed('/wear-os'),
-                                  icon: const Icon(Icons.watch_rounded, size: 16),
-                                  label: const Text('Mặt WearOS', style: TextStyle(fontSize: 12)),
-                                ),
-                              ),
-                            ],
+                              onPressed: () => Navigator.of(context).pushNamed('/smartwatch'),
+                              icon: const Icon(Icons.settings_input_component_rounded, size: 16),
+                              label: const Text('Quản lý kết nối đồng hồ thật (Galaxy Watch 5)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
                           ),
                         ],
                       ),

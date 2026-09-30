@@ -8,6 +8,9 @@ const router = express.Router();
 // Public routes
 router.post('/register', validate(userSchemas.register), authController.register);
 router.post('/login', validate(userSchemas.login), authController.login);
+router.post('/login-password', authController.loginPassword);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 router.post('/verify-otp', validate(userSchemas.verifyOtp), authController.verifyOTP);
 router.post('/google-mock', validate(userSchemas.googleMock), authController.googleMock);
 router.post('/google', authController.googleAuth);
@@ -15,6 +18,8 @@ router.post('/gmail/send-otp', authController.gmailSendOtp);
 router.post('/telegram/send-otp', authController.telegramSendOtp);
 router.post('/telegram/verify-otp', authController.telegramVerifyOtp);
 router.post('/telegram/webhook', authController.telegramWebhook);
+router.get('/sessions', authController.getSessions);
+router.post('/sessions/revoke-others', authController.revokeOtherSessions);
 
 // Protected routes
 router.use(auth); // All routes below require authentication

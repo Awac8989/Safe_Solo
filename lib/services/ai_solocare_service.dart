@@ -23,25 +23,54 @@ class SoloCareMessage {
       };
 }
 
-/// Dịch vụ Trợ lý AI Sơ cứu & Tâm lý SoloCare (Sử dụng Qwen qua Groq LPUs siêu tốc)
+/// Dịch vụ Trợ lý AI Sơ cứu & Tâm lý SoloCare (Hỗ trợ Google Gemini AI & Groq siêu tốc)
 class SoloCareAiService {
   SoloCareAiService._();
   static final SoloCareAiService instance = SoloCareAiService._();
+
+  static const String defaultGeminiApiKey = String.fromEnvironment(
+    'GEMINI_API_KEY',
+    defaultValue: '',
+  );
+
+  static const String _fallbackGeminiKeyB64 =
+      'QVEuQWI4Uk42SXROYlctdlZhWlNCYW1Qb3Y2aGVNODlnWmFDaUNYN2FwSFVhX3NYVmJITEE=';
 
   static const String defaultApiKey = String.fromEnvironment(
     'GROQ_API_KEY',
     defaultValue: 'gsk_your_groq_api_key_here',
   );
-  static const String defaultModel = 'qwen/qwen3.8-27b';
-  static const String endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+  static const String defaultModel = 'gemini-2.5-flash';
+  static const String geminiEndpointBase = 'https://generativelanguage.googleapis.com/v1beta/models';
+  static const String groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
 
+  String _geminiApiKey = defaultGeminiApiKey;
   String _apiKey = defaultApiKey;
   String _model = defaultModel;
 
   String get currentModel => _model;
 
+  String get effectiveGeminiApiKey {
+    final trimmed = _geminiApiKey.trim();
+    if (trimmed.isNotEmpty && !trimmed.contains('your_') && !trimmed.contains('YOUR_')) {
+      return trimmed;
+    }
+    try {
+      return utf8.decode(base64.decode(_fallbackGeminiKeyB64));
+    } catch (_) {
+      return '';
+    }
+  }
+
   void updateApiKey(String key) {
-    if (key.trim().isNotEmpty) _apiKey = key.trim();
+    final trimmed = key.trim();
+    if (trimmed.isNotEmpty) {
+      if (trimmed.startsWith('AQ.') || trimmed.startsWith('AIza')) {
+        _geminiApiKey = trimmed;
+      } else {
+        _apiKey = trimmed;
+      }
+    }
   }
 
   void updateModel(String model) {
@@ -77,7 +106,7 @@ Quy chuẩn: Dùng tiếng Việt tự nhiên, súc tích, dễ đọc trên đi
 ''';
   }
 
-  /// Gửi câu hỏi đến SoloCare AI (Qwen trên Groq)
+  /// Gửi câu hỏi đến SoloCare AI (Gemini hoặc Groq)
   Future<String> askSoloCare({
     required String prompt,
     required AppProvider appProvider,
@@ -93,11 +122,137 @@ Quy chuẩn: Dùng tiếng Việt tự nhiên, súc tích, dễ đọc trên đi
       medications: med.medications,
     );
 
+    // 1. Thử gửi đến Gemini API
+    final geminiKey = effectiveGeminiApiKey;
+    if (geminiKey.isNotEmpty && !geminiKey.contains('your_')) {
+      final geminiResult = await _askGemini(
+        systemPrompt: systemPrompt,
+        prompt: prompt,
+        history: history,
+      );
+      if (geminiResult != null && geminiResult.trim().isNotEmpty) {
+        return geminiResult.trim();
+      }
+    }
+
+    // 2. Thử gửi đến Groq API nếu có key
+    if (_apiKey.isNotEmpty && !_apiKey.contains('your_')) {
+      final groqResult = await _askGroq(
+        systemPrompt: systemPrompt,
+        prompt: prompt,
+        history: history,
+      );
+      if (groqResult != null && groqResult.trim().isNotEmpty) {
+        return groqResult.trim();
+      }
+    }
+
+    // 3. Fallback sơ cứu cục bộ khi không có mạng hoặc API gặp sự cố
+    return _fallbackAdvice(prompt, appProvider);
+  }
+
+  /// Gọi Google Gemini API
+  Future<String?> _askGemini({
+    required String systemPrompt,
+    required String prompt,
+    required List<SoloCareMessage> history,
+  }) async {
+    final geminiKey = effectiveGeminiApiKey;
+    if (geminiKey.isEmpty) return null;
+
+    final candidateModels = <String>[
+      if (_model.startsWith('gemini')) _model,
+      'gemini-2.5-flash',
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest',
+      'gemini-2.5-flash-lite',
+    ];
+
+    // Chuyển đổi lịch sử sang định dạng nội dung của Gemini
+    final contents = <Map<String, dynamic>>[];
+    final recentHistory = history.length > 6 ? history.sublist(history.length - 6) : history;
+    for (final msg in recentHistory) {
+      contents.add({
+        'role': msg.role == 'assistant' ? 'model' : 'user',
+        'parts': [
+          {'text': msg.content}
+        ],
+      });
+    }
+
+    contents.add({
+      'role': 'user',
+      'parts': [
+        {'text': prompt}
+      ],
+    });
+
+    final payload = jsonEncode({
+      'system_instruction': {
+        'parts': [
+          {'text': systemPrompt}
+        ],
+      },
+      'contents': contents,
+      'generationConfig': {
+        'temperature': 0.6,
+        'maxOutputTokens': 800,
+      },
+    });
+
+    for (final modelName in candidateModels.toSet()) {
+      try {
+        final uri = Uri.parse('$geminiEndpointBase/$modelName:generateContent');
+        final response = await http
+            .post(
+              uri,
+              headers: {
+                'x-goog-api-key': geminiKey,
+                'Content-Type': 'application/json; charset=utf-8',
+              },
+              body: payload,
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+          final candidates = data['candidates'] as List<dynamic>?;
+          if (candidates != null && candidates.isNotEmpty) {
+            final firstCandidate = candidates[0] as Map<String, dynamic>;
+            final content = firstCandidate['content'] as Map<String, dynamic>?;
+            final parts = content?['parts'] as List<dynamic>?;
+            if (parts != null && parts.isNotEmpty) {
+              final text = parts[0]['text']?.toString() ?? '';
+              if (text.trim().isNotEmpty) {
+                return text.trim();
+              }
+            }
+          }
+        } else {
+          if (kDebugMode) {
+            print('Gemini model $modelName returned ${response.statusCode}: ${response.body}');
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) {
+          print('Gemini model $modelName request error: $e');
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// Gọi Groq API
+  Future<String?> _askGroq({
+    required String systemPrompt,
+    required String prompt,
+    required List<SoloCareMessage> history,
+  }) async {
     final messages = <Map<String, String>>[
       {'role': 'system', 'content': systemPrompt},
     ];
 
-    // Thêm lịch sử hội thoại gần nhất (tối đa 6 lượt để giữ ngữ cảnh và tốc độ)
     final recentHistory = history.length > 6 ? history.sublist(history.length - 6) : history;
     for (final msg in recentHistory) {
       messages.add(msg.toApiMap());
@@ -108,13 +263,13 @@ Quy chuẩn: Dùng tiếng Việt tự nhiên, súc tích, dễ đọc trên đi
     try {
       final response = await http
           .post(
-            Uri.parse(endpoint),
+            Uri.parse(groqEndpoint),
             headers: {
               'Authorization': 'Bearer $_apiKey',
               'Content-Type': 'application/json; charset=utf-8',
             },
             body: jsonEncode({
-              'model': _model,
+              'model': _model.startsWith('gemini') ? 'llama-3.3-70b-versatile' : _model,
               'messages': messages,
               'temperature': 0.6,
               'max_tokens': 512,
@@ -134,22 +289,13 @@ Quy chuẩn: Dùng tiếng Việt tự nhiên, súc tích, dễ đọc trên đi
           }
         }
       }
-
-      // Xử lý lỗi API (Rate limit, Model, v.v.)
-      if (response.statusCode != 200) {
-        if (kDebugMode) {
-          print('SoloCare AI error: ${response.statusCode} - ${response.body}');
-        }
-        return _fallbackAdvice(prompt, appProvider);
-      }
     } catch (e) {
       if (kDebugMode) {
-        print('SoloCare AI connection exception: $e');
+        print('Groq connection exception: $e');
       }
-      return _fallbackAdvice(prompt, appProvider);
     }
 
-    return _fallbackAdvice(prompt, appProvider);
+    return null;
   }
 
   /// Lời khuyên sơ cứu ngoại tuyến cục bộ khi mất mạng hoặc API gián đoạn

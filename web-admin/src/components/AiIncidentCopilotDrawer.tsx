@@ -60,7 +60,7 @@ export function AiIncidentCopilotDrawer({ incidentId, onClose }: AiIncidentCopil
       void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
       setActiveStepAction(null);
       setSupervisorNote("");
-      setActionSuccessNotice(`Thực thi thành công bước: ${res.data.updatedStep.label}`);
+      setActionSuccessNotice(`Thực thi thành công bước: ${res.updatedStep.label}`);
       setTimeout(() => setActionSuccessNotice(null), 3000);
     },
   });

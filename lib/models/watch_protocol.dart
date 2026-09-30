@@ -23,16 +23,22 @@ class WatchAction {
   static const String vitalsUpdate = 'VITALS_UPDATE';
   static const String deadmanCheckin = 'DEADMAN_CHECKIN';
 
-  // Emergency
+  // Emergency & Accidents
   static const String fallDetected = 'FALL_DETECTED';
+  static const String accidentCrash = 'ACCIDENT_CRASH';
+  static const String freeFallImpact = 'FREE_FALL_IMPACT';
+  static const String cardiacDistress = 'CARDIAC_DISTRESS';
+  static const String hypoxiaRisk = 'HYPOXIA_RISK';
   static const String hardwareSos = 'HARDWARE_SOS';
   static const String criticalSpo2 = 'CRITICAL_SPO2';
   static const String alertCancelled = 'ALERT_CANCELLED';
+  static const String duressSos = 'DURESS_SOS';
 
   // Commands from Phone
   static const String findWatchPing = 'FIND_WATCH_PING';
   static const String instantMeasureReq = 'INSTANT_MEASURE_REQ';
   static const String timerSync = 'TIMER_SYNC';
+  static const String pinConfigSync = 'PIN_CONFIG_SYNC';
 
   // Commands from Watch
   static const String findPhonePing = 'FIND_PHONE_PING';

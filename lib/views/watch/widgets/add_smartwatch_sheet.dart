@@ -655,19 +655,6 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
                 ),
               ),
             ],
-
-            const SizedBox(height: 14),
-
-            // Nút mở màn hình đồng hồ WearOS
-            TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: Colors.white60),
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/wear-os');
-              },
-              icon: const Icon(Icons.watch_rounded, size: 16),
-              label: const Text('Xem giao diện đồng hồ WearOS', style: TextStyle(fontSize: 12)),
-            ),
           ],
         ),
       ),

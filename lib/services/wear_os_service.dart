@@ -57,6 +57,18 @@ class WearOsService extends ChangeNotifier {
   String _precisionMeasureStatus = '';
   Timer? _precisionMeasureTimer;
 
+  // Bảo mật mã PIN đồng hồ: Safe PIN (1234) hủy còi hú; Duress PIN (9999) gửi SOS im lặng
+  String _safePin = '1234';
+  String _duressPin = '9999';
+  String get safePin => _safePin;
+  String get duressPin => _duressPin;
+
+  void setPins({String? safePin, String? duressPin}) {
+    if (safePin != null && safePin.isNotEmpty) _safePin = safePin;
+    if (duressPin != null && duressPin.isNotEmpty) _duressPin = duressPin;
+    notifyListeners();
+  }
+
   // Getters
   String get watchModel => WatchHardwareSensorService.instance.isHardwareAvailable
       ? WatchHardwareSensorService.instance.deviceModel
@@ -197,6 +209,24 @@ class WearOsService extends ChangeNotifier {
     final ayG = event.y / 9.80665;
     final azG = event.z / 9.80665;
 
+    // 1. Kiểm tra va chạm tai nạn giao thông xung lực mạnh (Vehicular Crash >= 4.5g)
+    final crashResult = _ai.evaluateVehicularCrash(
+      ax: axG,
+      ay: ayG,
+      az: azG,
+    );
+
+    if (crashResult.isSevereCrash && !_isCountdownActive) {
+      _triggerAccidentCrashAlert(
+        svm: crashResult.svmG,
+        tilt: crashResult.tiltAngleDegrees,
+        accidentType: crashResult.accidentType,
+        isSimulated: false,
+      );
+      return;
+    }
+
+    // 2. Kiểm tra ngã thông thường
     final result = _ai.evaluateKinematicFall(
       ax: axG,
       ay: ayG,
@@ -215,6 +245,117 @@ class WearOsService extends ChangeNotifier {
         isSimulated: false,
       );
     }
+  }
+
+  /// Kích hoạt chu kỳ cảnh báo tai nạn va chạm giao thông xung lực cực mạnh
+  void _triggerAccidentCrashAlert({
+    required double svm,
+    required double tilt,
+    String? accidentType,
+    bool isSimulated = false,
+  }) {
+    if (_isOffWrist && !isSimulated) return;
+
+    _lastFallDetectedAt = DateTime.now();
+    _currentSvmG = svm;
+    _currentTiltAngle = tilt;
+    _heartRate = 138; // Tim đập mạnh sau cú va chạm sốc
+
+    _syncToPedometer();
+    WatchSyncManager.instance.emitAccidentCrashAlert(
+      svm: svm,
+      tilt: tilt,
+      heartRate: _heartRate,
+      spO2: _spO2,
+      accidentType: accidentType,
+      isSimulated: isSimulated,
+    );
+    _startEmergencyCountdown(
+      title: '🚨 PHÁT HIỆN TAI NẠN VA CHẠM TỪ GALAXY WATCH 5',
+      message:
+          'Cảm biến IMU phát hiện va chạm xung lực cực lớn (${svm}g) và góc nghiêng ${tilt}°. Hệ thống đang gửi dữ liệu về điện thoại và đếm ngược 30s trước khi tự động gọi cấp cứu 115.',
+      signalType: 'WATCH_ACCIDENT_CRASH',
+      extraPayload: {
+        'svm': svm,
+        'svmG': svm,
+        'tilt': tilt,
+        'tiltAngle': tilt,
+        'heartRate': _heartRate,
+        'spO2': _spO2,
+        'accidentType': accidentType ?? 'VEHICULAR_CRASH',
+        'isSimulated': isSimulated,
+      },
+    );
+  }
+
+  /// Kích hoạt chu kỳ cảnh báo rơi tự do & va đập độ cao / cầu thang
+  void _triggerFreeFallAlert({
+    required double svm,
+    required double tilt,
+    bool isSimulated = false,
+  }) {
+    if (_isOffWrist && !isSimulated) return;
+
+    _lastFallDetectedAt = DateTime.now();
+    _currentSvmG = svm;
+    _currentTiltAngle = tilt;
+    _heartRate = 132;
+
+    _syncToPedometer();
+    WatchSyncManager.instance.emitFreeFallAlert(
+      svm: svm,
+      tilt: tilt,
+      heartRate: _heartRate,
+      isSimulated: isSimulated,
+    );
+    _startEmergencyCountdown(
+      title: '⚠️ PHÁT HIỆN RƠI TỰ DO & VA ĐẬP TỪ GALAXY WATCH 5',
+      message:
+          'Cảm biến phát hiện rơi ngã độ cao/cầu thang với lực va chạm (${svm}g). Hệ thống đang đếm ngược 30 giây để xác nhận an toàn hoặc điều phối cấp cứu.',
+      signalType: 'WATCH_FREE_FALL_IMPACT',
+      extraPayload: {
+        'svm': svm,
+        'svmG': svm,
+        'tilt': tilt,
+        'tiltAngle': tilt,
+        'heartRate': _heartRate,
+        'spO2': _spO2,
+        'accidentType': 'FREE_FALL_IMPACT',
+        'isSimulated': isSimulated,
+      },
+    );
+  }
+
+  /// Kích hoạt chu kỳ cảnh báo rủi ro nhịp tim / SpO2 cấp tính
+  void _triggerCardiacRiskAlert({
+    required int heartRate,
+    required int spO2,
+    bool isSimulated = false,
+  }) {
+    if (_isOffWrist && !isSimulated) return;
+
+    _heartRate = heartRate;
+    _spO2 = spO2;
+    _syncToPedometer();
+
+    WatchSyncManager.instance.emitCardiacDistressAlert(
+      heartRate: heartRate,
+      spO2: spO2,
+      condition: 'Loạn nhịp tim cấp tính & Thiếu oxy máu',
+      isSimulated: isSimulated,
+    );
+    _startEmergencyCountdown(
+      title: '💓 CẢNH BÁO RỦI RO SINH TỒN NGUY CẤP',
+      message:
+          'Cảm biến BioActive trên Galaxy Watch 5 phát hiện nhịp tim $heartRate BPM và SpO2 $spO2%. Nguy cơ loạn nhịp thất / thiếu máu não cao.',
+      signalType: 'WATCH_CARDIAC_DISTRESS',
+      extraPayload: {
+        'heartRate': heartRate,
+        'spO2': spO2,
+        'alert': 'Nhịp tim tăng vọt $heartRate BPM, SpO2 hạ còn $spO2%',
+        'isSimulated': isSimulated,
+      },
+    );
   }
 
   /// Kích hoạt chu kỳ cảnh báo té ngã
@@ -249,6 +390,29 @@ class WearOsService extends ChangeNotifier {
     );
   }
 
+  /// Mô phỏng sự kiện tai nạn va chạm giao thông 6.5g có chủ đích để kiểm thử
+  void simulateAccidentCrash() {
+    _isOffWrist = false;
+    _triggerAccidentCrashAlert(
+      svm: 6.5,
+      tilt: 78.0,
+      accidentType: 'VEHICULAR_HIGH_G_CRASH',
+      isSimulated: true,
+    );
+  }
+
+  /// Mô phỏng sự kiện rơi tự do & ngã độ cao 5.2g
+  void simulateFreeFall() {
+    _isOffWrist = false;
+    _triggerFreeFallAlert(svm: 5.2, tilt: 82.0, isSimulated: true);
+  }
+
+  /// Mô phỏng loạn nhịp tim / rủi ro tim mạch cấp tính (156 BPM, SpO2 86%)
+  void simulateAcuteCardiacRisk() {
+    _isOffWrist = false;
+    _triggerCardiacRiskAlert(heartRate: 156, spO2: 86, isSimulated: true);
+  }
+
   /// Mô phỏng sự kiện té ngã 4.8g có chủ đích để kiểm thử
   void simulateFall() {
     _isOffWrist = false;
@@ -274,6 +438,7 @@ class WearOsService extends ChangeNotifier {
       },
     );
   }
+
 
   /// Nhấn phím SOS khẩn cấp phần cứng/màn hình trên đồng hồ
   void triggerHardwareSos({String? userId}) {
@@ -375,6 +540,58 @@ class WearOsService extends ChangeNotifier {
       'message': 'Người dùng đã xác nhận an toàn ("Tôi ổn").',
       'timestamp': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Kích hoạt Báo động Cưỡng bức Ngầm (Duress Silent SOS) khi bị khống chế nhập PIN giả (9999)
+  void triggerDuressSilentSos({String? userId}) {
+    // 1. Dập tắt ngay còi hú và màn hình SOS để đánh lừa kẻ khống chế là đã hủy thành công
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    _isCountdownActive = false;
+    _emergencyTitle = null;
+    _emergencyMessage = null;
+    _emergencySignalType = null;
+    notifyListeners();
+
+    HapticFeedback.lightImpact();
+
+    // 2. Phát gói tin Duress SOS ngầm qua WatchSyncManager
+    WatchSyncManager.instance.emitDuressSos(userId: userId);
+
+    // 3. Đưa sự kiện vào luồng khẩn cấp ngầm
+    _pedometer.emitWatchEmergencyAlert(
+      type: 'SILENT_DURESS',
+      message: '🚨 CẢNH BÁO BÁO ĐỘNG NGẦM (DURESS PIN): Người dùng bị cưỡng bức mở khóa trên Galaxy Watch 5!',
+      extra: {
+        'isDuress': true,
+        'silent': true,
+        'spO2': _spO2,
+        'heartRate': _heartRate,
+        'battery': _battery,
+      },
+    );
+
+    _watchEventController.add({
+      'type': 'WATCH_DURESS_SILENT_SOS',
+      'title': 'BÁO ĐỘNG CƯỠNG BỨC (DURESS)',
+      'message': 'Đã gửi tọa độ ngầm lên TOC Web Admin & kích hoạt ghi nhận bằng chứng.',
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    // 4. Bắn trực tiếp lên TOC Web Admin
+    if (userId != null && userId.isNotEmpty) {
+      _sendSignalToBackend(
+        userId: userId,
+        signalType: 'WATCH_DURESS_SILENT_SOS',
+        payload: {
+          'title': 'BÁO ĐỘNG CƯỠNG BỨC (DURESS SOS)',
+          'message': 'Phát hiện nhập Duress PIN từ Galaxy Watch 5. Cứu hộ âm thầm, không hú còi.',
+          'isDuress': true,
+          'silent': true,
+          'source': 'SAMSUNG_GALAXY_WATCH_5',
+        },
+      );
+    }
   }
 
   /// Thực thi phát báo động khẩn cấp khi hết thời gian đếm ngược hoặc khi bấm "CỨU HỘ NGAY"

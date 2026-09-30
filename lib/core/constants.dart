@@ -1,8 +1,11 @@
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppConstants {
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   static const String _defaultLanBaseUrl = 'http://192.168.1.5:4000/api';
   static const String _localhostBaseUrl = 'http://localhost:4000/api';
   static const String _defaultMapTilerStyle = 'streets-v2';

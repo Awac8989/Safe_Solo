@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_theme.dart';
+import 'core/constants.dart';
 import 'core/providers/app_provider.dart';
 import 'views/achievements/achievements_page.dart';
 import 'views/auth/auth_page.dart';
@@ -63,6 +64,7 @@ class SafeSoloApp extends StatelessWidget {
       child: Consumer<AppProvider>(
         builder: (context, provider, _) {
           return MaterialApp(
+            navigatorKey: AppConstants.navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'SafeSolo',
             theme: AppTheme.light,
@@ -83,8 +85,8 @@ class SafeSoloApp extends StatelessWidget {
               '/settings': (_) => const SettingsPage(),
               '/smartwatch': (_) => const SmartwatchConnectionPage(),
               '/watch-details': (_) => const SmartwatchConnectionPage(),
-              '/watch-simulator': (_) => const WearOsWatchPage(),
-              '/wear-os': (_) => const WearOsWatchPage(),
+              '/watch-simulator': (_) => const SmartwatchConnectionPage(),
+              '/wear-os': (_) => const SmartwatchConnectionPage(),
               '/first-aid': (_) => const FirstAidGuidePage(),
               '/live-journey': (_) => const ActiveJourneyPage(),
               '/hazard-feed': (_) => const HazardFeedPage(),

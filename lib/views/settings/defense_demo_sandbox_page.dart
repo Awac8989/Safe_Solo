@@ -148,6 +148,38 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
   // CÁC TÁC VỤ INJECT KỊCH BẢN THỰC CHIẾN
   // ===========================================================================
 
+  void _injectVehicularCrash() {
+    HapticFeedback.heavyImpact();
+    WearOsService.instance.simulateAccidentCrash();
+    _addLog(
+      tag: 'CRASH_INJECT',
+      message:
+          'Bơm xung lực va chạm giao thông SVM=6.5g (> 4.5g), Góc nghiêng 78° (Bất động), Tim 138 BPM. Kích hoạt đếm ngược sinh tồn 30s & Cảnh báo toàn màn hình.',
+      type: SandboxLogType.danger,
+    );
+    TopToast.show(
+      context,
+      message: '🚨 Đã kích hoạt giả lập Tai nạn xe (SVM 6.5g, Tilt 78°)',
+      icon: Icons.car_crash_rounded,
+    );
+  }
+
+  void _injectFreeFall() {
+    HapticFeedback.heavyImpact();
+    WearOsService.instance.simulateFreeFall();
+    _addLog(
+      tag: 'FREEFALL_INJECT',
+      message:
+          'Bơm chuỗi rơi tự do độ cao & va đập mạnh SVM=5.2g (> 3.5g), Góc nghiêng 82°. Đang đếm ngược cấp cứu.',
+      type: SandboxLogType.danger,
+    );
+    TopToast.show(
+      context,
+      message: '⚠️ Đã kích hoạt giả lập Rơi tự do (SVM 5.2g, Tilt 82°)',
+      icon: Icons.arrow_downward_rounded,
+    );
+  }
+
   void _injectHardFall() {
     HapticFeedback.heavyImpact();
     WearOsService.instance.simulateFall();
@@ -789,6 +821,32 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
               ],
             ),
           ),
+
+        // KỊCH BẢN ĐẶC BIỆT: TAI NẠN VA CHẠM GIAO THÔNG (VEHICULAR CRASH)
+        _buildScenarioCard(
+          icon: Icons.car_crash_rounded,
+          accentColor: const Color(0xFFEF4444),
+          title: '🚨 Tai Nạn Va Chạm Giao Thông (Vehicular Crash)',
+          formula: 'SVM = 6.5g (High-G Impact)  •  Tilt = 78° (Bất động)  •  HR = 138 bpm',
+          description:
+              'Mô phỏng va chạm giao thông xe máy/ô tô xung lực cực mạnh từ cảm biến IMU Galaxy Watch 5. Lập tức truyền gói tin SSWP sang điện thoại và mở Hộp thoại Cảnh báo Cấp cứu 115.',
+          buttonText: '🚗 Bơm Xung Lực Tai Nạn Xe (6.5g)',
+          onTap: _injectVehicularCrash,
+        ),
+        const SizedBox(height: 12),
+
+        // KỊCH BẢN ĐẶC BIỆT: RƠI TỰ DO & VA ĐẬP ĐỘ CAO
+        _buildScenarioCard(
+          icon: Icons.arrow_downward_rounded,
+          accentColor: const Color(0xFFF97316),
+          title: '⚠️ Rơi Tự Do & Va Đập Độ Cao / Cầu Thang (Free Fall)',
+          formula: 'Pha không trọng lượng (< 0.35g) -> Cú va đập shock 5.2g',
+          description:
+              'Mô phỏng trượt chân ngã từ trên cao, ngã cầu thang hoặc sạt lở. Cảm biến phát hiện pha không trọng lượng tức thời trước cú va đập.',
+          buttonText: '🧗 Bơm Rơi Tự Do & Va Đập (5.2g)',
+          onTap: _injectFreeFall,
+        ),
+        const SizedBox(height: 12),
 
         // KỊCH BẢN 1: TÉ NGÃ
         _buildScenarioCard(

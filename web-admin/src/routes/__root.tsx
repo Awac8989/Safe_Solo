@@ -1,4 +1,4 @@
-﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -87,19 +87,36 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { AdminAuthProvider, useAdminAuth } from "@/context/AdminAuthContext";
+import { AdminLogin } from "@/components/AdminLogin";
+
+function AdminRootLayout() {
+  const { isAuthenticated, login } = useAdminAuth();
+
+  if (!isAuthenticated) {
+    return <AdminLogin onLoginSuccess={login} />;
+  }
+
+  return (
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background text-foreground">
+        <AppSidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Outlet />
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full bg-background text-foreground">
-          <AppSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <Outlet />
-          </div>
-        </div>
-      </SidebarProvider>
+      <AdminAuthProvider>
+        <AdminRootLayout />
+      </AdminAuthProvider>
     </QueryClientProvider>
   );
 }

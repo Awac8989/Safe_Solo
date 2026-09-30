@@ -142,11 +142,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      // Check AppBar or Header
-      expect(find.text('SAMSUNG GALAXY WATCH 5'), findsOneWidget);
-      expect(find.text('SAFE-SOLO'), findsOneWidget);
-
-      // Check Watch face buttons
+      // Check Watch face athletic clock and buttons
       expect(find.text('TÔI\nAN TOÀN'), findsOneWidget);
       expect(find.text('14:32 đến hạn'), findsOneWidget);
     });

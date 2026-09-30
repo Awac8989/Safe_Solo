@@ -648,10 +648,33 @@ class WatchSyncManager extends ChangeNotifier {
         onWatchEmergencyReceived?.call(packet.action, packet.payload);
         break;
 
+      // Nhận sự kiện từ đồng hồ: Tai nạn giao thông / Va chạm mạnh
+      case WatchAction.accidentCrash:
+      case WatchAction.freeFallImpact:
+      case WatchAction.cardiacDistress:
+      case WatchAction.hypoxiaRisk:
+        debugPrint('[WatchSyncManager] Received ${packet.action} from watch: ${packet.payload}');
+        onWatchEmergencyReceived?.call(packet.action, packet.payload);
+        break;
+
       // Nhận sự kiện từ đồng hồ: SOS khẩn cấp
       case WatchAction.hardwareSos:
         debugPrint('[WatchSyncManager] Received HARDWARE_SOS from watch');
         onWatchEmergencyReceived?.call(packet.action, packet.payload);
+        break;
+
+      // Nhận sự kiện từ đồng hồ: Duress SOS ngầm (Silent Duress Alarm)
+      case WatchAction.duressSos:
+        debugPrint('[WatchSyncManager] Received DURESS_SOS from watch: Silent emergency triggered!');
+        onWatchEmergencyReceived?.call(packet.action, packet.payload);
+        break;
+
+      // Nhận đồng bộ cấu hình PIN từ điện thoại sang đồng hồ
+      case WatchAction.pinConfigSync:
+        final sPin = packet.payload['safePin'] as String?;
+        final dPin = packet.payload['duressPin'] as String?;
+        wearOs.setPins(safePin: sPin, duressPin: dPin);
+        debugPrint('[WatchSyncManager] Received PIN_CONFIG_SYNC: safePin=$sPin, duressPin=$dPin');
         break;
 
       // Nhận đồng bộ thời gian từ điện thoại sang đồng hồ
@@ -771,6 +794,83 @@ class WatchSyncManager extends ChangeNotifier {
     ));
   }
 
+  /// Watch phát sự kiện Tai nạn va chạm giao thông xung lực mạnh
+  void emitAccidentCrashAlert({
+    required double svm,
+    required double tilt,
+    required int heartRate,
+    required int spO2,
+    String? accidentType,
+    bool isSimulated = false,
+  }) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.emergency,
+      action: WatchAction.accidentCrash,
+      payload: {
+        'deviceId': _deviceId,
+        'svmG': svm,
+        'tiltAngle': tilt,
+        'heartRate': heartRate,
+        'spO2': spO2,
+        'accidentType': accidentType ?? 'VEHICULAR_CRASH',
+        'isSimulated': isSimulated,
+        'title': '🚨 PHÁT HIỆN TAI NẠN VA CHẠM TỪ GALAXY WATCH 5',
+        'alert': 'Cảm biến IMU phát hiện va chạm cực mạnh ($svm g) và góc nghiêng $tilt°!',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
+  /// Watch phát sự kiện Rơi tự do & Va đập độ cao
+  void emitFreeFallAlert({
+    required double svm,
+    required double tilt,
+    required int heartRate,
+    bool isSimulated = false,
+  }) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.emergency,
+      action: WatchAction.freeFallImpact,
+      payload: {
+        'deviceId': _deviceId,
+        'svmG': svm,
+        'tiltAngle': tilt,
+        'heartRate': heartRate,
+        'accidentType': 'FREE_FALL_IMPACT',
+        'isSimulated': isSimulated,
+        'title': '⚠️ PHÁT HIỆN RƠI TỰ DO & VA ĐẬP TỪ GALAXY WATCH 5',
+        'alert': 'Cảm biến phát hiện rơi ngã độ cao/cầu thang với lực va chạm $svm g!',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
+  /// Watch phát sự kiện Rủi ro nhịp tim / SpO2 cấp tính
+  void emitCardiacDistressAlert({
+    required int heartRate,
+    required int spO2,
+    required String condition,
+    bool isSimulated = false,
+  }) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.emergency,
+      action: WatchAction.cardiacDistress,
+      payload: {
+        'deviceId': _deviceId,
+        'heartRate': heartRate,
+        'spO2': spO2,
+        'condition': condition,
+        'isSimulated': isSimulated,
+        'title': '💓 CẢNH BÁO RỦI RO SINH TỒN NGUY CẤP (GALAXY WATCH 5)',
+        'alert': 'Cảm biến BioActive phát hiện $condition: Nhịp tim $heartRate BPM, SpO2 $spO2%!',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
   /// Watch phát phím cứng SOS
   void emitHardwareSos({String? userId}) {
     sendPacket(WatchPacket.create(
@@ -781,6 +881,37 @@ class WatchSyncManager extends ChangeNotifier {
         'deviceId': _deviceId,
         'userId': userId,
         'alert': 'Kích hoạt phím SOS phần cứng trên Samsung Galaxy Watch 5',
+      },
+    ));
+  }
+
+  /// Watch phát tín hiệu Duress SOS ngầm (Mã PIN cưỡng bức 9999)
+  void emitDuressSos({String? userId}) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.emergency,
+      action: WatchAction.duressSos,
+      payload: {
+        'deviceId': _deviceId,
+        'userId': userId,
+        'isDuress': true,
+        'silent': true,
+        'alert': 'BÁO ĐỘNG CƯỠNG BỨC (DURESS): Người dùng bị ép nhập mã PIN giải phóng trên đồng hồ!',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
+  /// Phone gửi lệnh đồng bộ cấu hình PIN sang đồng hồ
+  void sendPinConfigSync({required String safePin, required String duressPin}) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.phone,
+      type: WatchPacketType.command,
+      action: WatchAction.pinConfigSync,
+      payload: {
+        'deviceId': _deviceId,
+        'safePin': safePin,
+        'duressPin': duressPin,
       },
     ));
   }

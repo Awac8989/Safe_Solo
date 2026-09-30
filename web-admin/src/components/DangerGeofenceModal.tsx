@@ -97,7 +97,7 @@ export function DangerGeofenceModal({ onClose, defaultCoordinates }: DangerGeofe
     onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: ["danger-geofences"] });
       setBroadcastTarget(null);
-      setActionSuccessNotice(`Đã phát thông báo khẩn cấp tới ${res.data.recipientsCount} người dùng trong vùng!`);
+      setActionSuccessNotice(`Đã phát thông báo khẩn cấp tới ${res.recipientsCount} người dùng trong vùng!`);
       setTimeout(() => setActionSuccessNotice(null), 3500);
     },
   });

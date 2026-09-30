@@ -25,7 +25,6 @@ import 'package:safesolo/views/circle/circle_page.dart';
 import 'package:safesolo/views/journey/active_journey_page.dart';
 import 'package:safesolo/views/health/health_history_page.dart';
 import 'package:safesolo/views/watch/smartwatch_connection_page.dart';
-import 'package:safesolo/views/watch/watch_simulator_page.dart';
 import 'package:safesolo/views/medical/medical_page.dart';
 import 'package:safesolo/views/medical/lockscreen_medical_card_page.dart';
 import 'package:safesolo/views/emergency/first_aid_guide_page.dart';
@@ -266,7 +265,6 @@ void main() {
       await capture(tester, const ActiveJourneyPage(), 'app_07_live_journey.png');
       await capture(tester, const HealthHistoryPage(), 'app_08_health_vitals_hub.png');
       await capture(tester, const SmartwatchConnectionPage(), 'app_09_smartwatch_companion.png');
-      await capture(tester, const WatchSimulatorPage(), 'app_10_watch_simulator.png');
     });
 
     testWidgets('Capture Mobile Screens 11 to 20', (tester) async {

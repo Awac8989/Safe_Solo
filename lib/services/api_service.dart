@@ -874,6 +874,94 @@ class ApiService {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> loginWithPassword({
+    required String identifier,
+    required String password,
+    String? deviceName,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/login-password');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'identifier': identifier,
+          'password': password,
+          'deviceName': deviceName ?? 'Android Device',
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> forgotPassword({
+    required String identifier,
+    String channel = 'auto',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/forgot-password');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'identifier': identifier,
+          'channel': channel,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> resetPassword({
+    required String identifier,
+    required String resetCode,
+    required String newPassword,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/reset-password');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'identifier': identifier,
+          'resetCode': resetCode,
+          'newPassword': newPassword,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getActiveSessions({String? userId}) async {
+    final query = userId != null ? '?userId=${Uri.encodeComponent(userId)}' : '';
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/sessions$query');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> revokeOtherSessions({
+    required String currentSessionId,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/auth/sessions/revoke-others');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'currentSessionId': currentSessionId,
+          if (userId != null) 'userId': userId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<List<DisasterAlertModel>> getActiveDisasterAlerts({
     double? lat,
     double? lng,

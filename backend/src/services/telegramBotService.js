@@ -228,6 +228,67 @@ class TelegramBotService {
   }
 
   /**
+   * Send Password Reset OTP Code via Telegram
+   */
+  async sendPasswordResetCode(targetIdentifier, resetCode, recipientName = 'Bạn') {
+    this.reloadConfig();
+    const resolvedChatId = await this.resolveChatId(targetIdentifier);
+
+    const text = [
+      `🔐 <b>[SAFESOLO] KHÔI PHỤC MẬT KHẨU TÀI KHOẢN</b>`,
+      ``,
+      `Xin chào <b>${recipientName}</b>,`,
+      `Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản SafeSolo của bạn.`,
+      ``,
+      `Mã khôi phục 6 chữ số:`,
+      `👉 <code>${resetCode}</code> 👈`,
+      ``,
+      `⏱️ <i>Mã có hiệu lực trong vòng 15 phút.</i>`,
+      `⚠️ <b>Cảnh báo:</b> Tuyệt đối không chia sẻ mã này cho bất kỳ ai để đảm bảo an toàn.`,
+    ].join('\n');
+
+    const logEntry = {
+      chatId: resolvedChatId,
+      recipientName,
+      resetCode,
+      text,
+      timestamp: new Date().toISOString(),
+    };
+    this.mockInbox.unshift(logEntry);
+    if (this.mockInbox.length > 50) this.mockInbox.pop();
+
+    console.log(`[TelegramBotService] Dispatching Password Reset Code ${resetCode} to Telegram ChatId: ${resolvedChatId}`);
+
+    if (this.isConfigured && resolvedChatId && /^-?\d+$/.test(resolvedChatId)) {
+      const result = await this._callTelegramApi('sendMessage', {
+        chat_id: resolvedChatId,
+        text,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🛡️ Mở SafeSolo App', url: 'https://safesolo.vn' }],
+          ],
+        },
+      });
+      return {
+        success: result?.ok ?? true,
+        channel: 'telegram-live',
+        chatId: resolvedChatId,
+        telegramResult: result,
+      };
+    }
+
+    return {
+      success: true,
+      channel: 'telegram-sandbox',
+      chatId: resolvedChatId,
+      resetCodePreview: resetCode,
+      message: `Đã gửi mã khôi phục mật khẩu qua Telegram Bot (@${this.botUsername}).`,
+      botLink: `https://t.me/${this.botUsername}?start=reset`,
+    };
+  }
+
+  /**
    * Send Check-in Reminder with 1-Tap Inline Buttons
    */
   async sendCheckinReminder(user, minutesUntilDeadline) {

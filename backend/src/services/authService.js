@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 const User = require('../models/User');
 const GuardianRelationship = require('../models/GuardianRelationship');
@@ -13,6 +14,7 @@ const { createAlertEvent } = require('./alertEventService');
 const { hashPin, isHashedPin } = require('../lib/securityCrypto');
 const { buildEncryptedUserSensitiveUpdate, decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 const telegramBotService = require('./telegramBotService');
+const emailService = require('./emailService');
 
 class AuthService {
   generateToken(user) {
@@ -390,11 +392,14 @@ class AuthService {
       await user.save();
     }
 
+    const emailDelivery = await emailService.sendLoginOtpEmail(normalizedEmail, otp, fullName(user));
+
     return {
       success: true,
       email: normalizedEmail,
       ...this.includeOtpPreview(otp),
       message: `Đã gửi mã xác minh OTP đến địa chỉ Gmail: ${normalizedEmail}`,
+      emailDelivery,
     };
   }
 
@@ -548,6 +553,296 @@ class AuthService {
     user.isActive = false;
     await user.save();
     return { message: 'Account deactivated successfully' };
+  }
+
+  async loginWithPassword({ identifier, password, deviceName, ipAddress, userAgent }) {
+    ensure(identifier && String(identifier).trim(), 'Vui lòng nhập Email, Số điện thoại hoặc Tên tài khoản');
+    ensure(password, 'Vui lòng nhập mật khẩu');
+
+    const cleanId = String(identifier).trim();
+    const normalized = normalizeEmail(cleanId);
+
+    const user = await User.findOne({
+      $or: [
+        { email: normalized },
+        { phoneNumber: cleanId },
+        { fullName: cleanId },
+      ],
+    });
+
+    if (!user) {
+      throw new AppError('Tài khoản không tồn tại trong hệ sinh thái SafeSolo', 404);
+    }
+
+    ensure(user.isActive !== false, 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.', 403);
+
+    // Kiểm tra tự động tạm khóa do Brute-force
+    if (user.lockUntil && new Date(user.lockUntil).getTime() > Date.now()) {
+      const remainingMinutes = Math.max(1, Math.ceil((new Date(user.lockUntil).getTime() - Date.now()) / 60000));
+      throw new AppError(
+        `Tài khoản đang bị tạm khóa an ninh do nhập sai mật khẩu quá 5 lần liên tiếp. Vui lòng thử lại sau ${remainingMinutes} phút hoặc dùng tính năng 'Quên mật khẩu'.`,
+        423,
+      );
+    }
+
+    let isValid = false;
+    if (user.password) {
+      isValid = await bcrypt.compare(password, user.password);
+    } else {
+      // Đối với tài khoản chưa thiết lập mật khẩu lần đầu (hoặc tài khoản demo)
+      // Cho phép mật khẩu khởi tạo mặc định 123456 hoặc safesolo123
+      if (password === '123456' || password === 'safesolo123' || (user.phoneNumber && password === user.phoneNumber)) {
+        user.password = await bcrypt.hash(password, 10);
+        isValid = true;
+      }
+    }
+
+    if (!isValid) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+        await user.save();
+        await createAlertEvent({
+          userId: user._id,
+          level: 'WARNING',
+          status: 'LOCKED',
+          source: 'SYSTEM',
+          title: 'Khóa tài khoản tạm thời',
+          message: `Tài khoản ${fullName(user)} bị tạm khóa 15 phút do nhập sai mật khẩu 5 lần`,
+          metadata: { ipAddress, deviceName },
+        });
+        throw new AppError(
+          'Tài khoản đã bị tạm khóa 15 phút do nhập sai mật khẩu 5 lần liên tiếp để ngăn chặn dò quét tự động.',
+          423,
+        );
+      }
+      await user.save();
+      const remaining = 5 - user.failedLoginAttempts;
+      throw new AppError(
+        `Mật khẩu không chính xác. Bạn còn ${remaining} lần thử trước khi tài khoản bị tạm khóa.`,
+        401,
+      );
+    }
+
+    // Đăng nhập thành công -> Reset brute-force counter
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    user.lastLoginAt = new Date();
+
+    // Ghi nhận phiên làm việc đa thiết bị
+    const currentSessionId = crypto.randomUUID();
+    const devName = deviceName || 'Thiết bị di động';
+    const existingSessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
+    const isNewDevice = !existingSessions.some((s) => s.deviceName === devName);
+
+    user.activeSessions = [
+      {
+        sessionId: currentSessionId,
+        deviceName: devName,
+        ipAddress: ipAddress || '127.0.0.1',
+        userAgent: userAgent || 'SafeSolo Mobile App',
+        lastActiveAt: new Date(),
+        isCurrent: true,
+      },
+      ...existingSessions.slice(0, 9).map((s) => ({
+        sessionId: s.sessionId || crypto.randomUUID(),
+        deviceName: s.deviceName,
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        lastActiveAt: s.lastActiveAt,
+        isCurrent: false,
+      })),
+    ];
+    await user.save();
+
+    // Cảnh báo nếu đăng nhập từ thiết bị mới
+    if (isNewDevice && existingSessions.length > 0) {
+      await createAlertEvent({
+        userId: user._id,
+        level: 'INFO',
+        status: 'NEW_DEVICE_LOGIN',
+        source: 'SYSTEM',
+        title: 'Cảnh báo đăng nhập thiết bị mới',
+        message: `Phát hiện lượt đăng nhập mới từ ${devName} (IP: ${ipAddress || '127.0.0.1'})`,
+        metadata: { deviceName: devName, ipAddress: ipAddress || '127.0.0.1' },
+      });
+    }
+
+    const token = this.generateToken(user);
+    return {
+      user: {
+        ...sanitizeUser(user),
+        security: this.mergeSecurity(user, await this.ensureSecurity(user._id)),
+      },
+      token,
+      sessionId: currentSessionId,
+      message: 'Đăng nhập thành công.',
+    };
+  }
+
+  async forgotPassword({ identifier, channel = 'auto' }) {
+    ensure(identifier && String(identifier).trim(), 'Vui lòng nhập Email, Số điện thoại hoặc tài khoản Telegram để khôi phục');
+    const cleanId = String(identifier).trim();
+    const normalized = normalizeEmail(cleanId);
+
+    const user = await User.findOne({
+      $or: [
+        { email: normalized },
+        { phoneNumber: cleanId },
+        { fullName: cleanId },
+        { telegramChatId: cleanId },
+        { telegramUsername: cleanId.replace(/^@/, '') },
+      ],
+    });
+
+    if (!user) {
+      throw new AppError('Không tìm thấy tài khoản tương ứng với thông tin đã nhập', 404);
+    }
+
+    const resetOtp = this.generateOTP();
+    user.resetPasswordToken = resetOtp;
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+    await user.save();
+
+    await createAlertEvent({
+      userId: user._id,
+      level: 'INFO',
+      status: 'FORGOT_PASSWORD_REQUESTED',
+      source: 'USER',
+      title: 'Yêu cầu khôi phục mật khẩu',
+      message: `Người dùng yêu cầu mã đặt lại mật khẩu cho tài khoản ${fullName(user)}`,
+      metadata: { identifier: cleanId, channel },
+    });
+
+    const dispatchedChannels = [];
+    let emailResult = null;
+    let teleResult = null;
+
+    // 1. Gửi qua Gmail nếu kênh là 'email' hoặc 'auto' (hoặc người dùng nhập email)
+    const targetEmail = user.email || (cleanId.includes('@') ? cleanId : null);
+    if ((channel === 'email' || channel === 'auto' || cleanId.includes('@')) && targetEmail) {
+      emailResult = await emailService.sendPasswordResetEmail(targetEmail, resetOtp, fullName(user));
+      dispatchedChannels.push(`Gmail (${targetEmail})`);
+    }
+
+    // 2. Gửi qua Telegram nếu kênh là 'telegram' hoặc 'auto' (hoặc người dùng nhập @username hoặc có telegramChatId)
+    const targetTele = user.telegramChatId || user.telegramUsername || (cleanId.startsWith('@') || /^-?\d+$/.test(cleanId) ? cleanId : null);
+    if ((channel === 'telegram' || channel === 'auto' || cleanId.startsWith('@') || /^-?\d+$/.test(cleanId)) && targetTele) {
+      teleResult = await telegramBotService.sendPasswordResetCode(targetTele, resetOtp, fullName(user));
+      dispatchedChannels.push(`Telegram (@${telegramBotService.botUsername})`);
+    }
+
+    let channelMsg = '';
+    if (dispatchedChannels.length > 0) {
+      channelMsg = `Mã xác nhận khôi phục 6 số đã được gửi qua ${dispatchedChannels.join(' và ')}.`;
+    } else {
+      channelMsg = `Mã khôi phục đã được tạo (hiệu lực 15 phút). Vui lòng nhập mã để đặt lại mật khẩu.`;
+    }
+
+    return {
+      success: true,
+      message: channelMsg,
+      channels: dispatchedChannels,
+      emailResult,
+      telegramResult: teleResult,
+      resetCodePreview: resetOtp,
+    };
+  }
+
+  async resetPassword({ identifier, resetCode, newPassword }) {
+    ensure(identifier && String(identifier).trim(), 'Vui lòng nhập Email hoặc Số điện thoại');
+    ensure(resetCode && String(resetCode).trim(), 'Vui lòng nhập mã khôi phục 6 số');
+    ensure(newPassword && String(newPassword).length >= 6, 'Mật khẩu mới phải có ít nhất 6 ký tự');
+
+    const cleanId = String(identifier).trim();
+    const normalized = normalizeEmail(cleanId);
+
+    const user = await User.findOne({
+      $or: [
+        { email: normalized },
+        { phoneNumber: cleanId },
+        { fullName: cleanId },
+      ],
+    });
+
+    if (!user) {
+      throw new AppError('Tài khoản không tồn tại', 404);
+    }
+
+    ensure(user.resetPasswordToken, 'Không có yêu cầu khôi phục mật khẩu nào đang chờ xác nhận');
+    ensure(
+      new Date(user.resetPasswordExpires).getTime() >= Date.now(),
+      'Mã khôi phục đã hết hạn (quá 15 phút). Vui lòng gửi lại yêu cầu.',
+    );
+    ensure(
+      String(user.resetPasswordToken).trim() === String(resetCode).trim(),
+      'Mã xác nhận khôi phục không chính xác',
+      400,
+    );
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    user.failedLoginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
+
+    await createAlertEvent({
+      userId: user._id,
+      level: 'INFO',
+      status: 'PASSWORD_RESET_SUCCESS',
+      source: 'USER',
+      title: 'Đặt lại mật khẩu thành công',
+      message: `Mật khẩu tài khoản ${fullName(user)} đã được thay đổi an toàn`,
+      metadata: {},
+    });
+
+    return {
+      success: true,
+      message: 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập ngay với mật khẩu mới.',
+    };
+  }
+
+  async getActiveSessions(userId) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    let sessions = Array.isArray(user.activeSessions) ? user.activeSessions : [];
+    if (sessions.length === 0) {
+      sessions = [
+        {
+          sessionId: crypto.randomUUID(),
+          deviceName: 'Pixel 6 Pro (Thiết bị hiện tại)',
+          ipAddress: '127.0.0.1',
+          userAgent: 'SafeSolo Mobile App (Android 14)',
+          lastActiveAt: user.lastLoginAt || new Date(),
+          isCurrent: true,
+        },
+      ];
+      user.activeSessions = sessions;
+      await user.save();
+    }
+    return {
+      sessions,
+    };
+  }
+
+  async revokeOtherSessions(userId, currentSessionId) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    if (Array.isArray(user.activeSessions)) {
+      user.activeSessions = user.activeSessions.filter(
+        (s) => s.sessionId === currentSessionId || s.isCurrent === true,
+      );
+      await user.save();
+    }
+    return {
+      success: true,
+      message: 'Đã đăng xuất khỏi tất cả các thiết bị khác thành công.',
+    };
   }
 }
 

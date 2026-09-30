@@ -11,7 +11,9 @@ import {
   HeartPulse,
   Briefcase,
   ShieldCheck,
+  LogOut,
 } from "lucide-react";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -49,6 +51,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const { adminUser, logout } = useAdminAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -125,13 +128,51 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border">
-        {!collapsed && (
-          <div className="px-2 py-2 text-[10px] text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-success" />
-              Tất cả hệ thống đang hoạt động
+      <SidebarFooter className="border-t border-sidebar-border p-2 space-y-2">
+        {!collapsed ? (
+          <div className="space-y-2">
+            {adminUser && (
+              <div className="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className="font-semibold text-white truncate max-w-[130px]">
+                    {adminUser.name}
+                  </span>
+                  <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-red-950/80 text-red-400 border border-red-800/40 uppercase">
+                    {adminUser.role === "superadmin" ? "SUPER" : adminUser.role === "dispatcher" ? "115 TOC" : "KYC MOD"}
+                  </span>
+                </div>
+                <div className="text-[10px] text-muted-foreground truncate mb-2">
+                  Ca trực từ: {adminUser.shiftStartTime}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Bạn có chắc chắn muốn kết thúc ca trực và đăng xuất khỏi cổng TOC?")) {
+                      logout();
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md bg-red-950/40 hover:bg-red-900/60 border border-red-800/30 text-red-300 text-[11px] font-medium transition-colors cursor-pointer"
+                >
+                  <LogOut className="h-3 w-3" />
+                  Đăng xuất ca trực
+                </button>
+              </div>
+            )}
+            <div className="px-1 text-[10px] text-muted-foreground flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>Máy chủ TOC sẵn sàng (TLS 1.3)</span>
             </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={logout}
+              title="Đăng xuất ca trực"
+              className="p-2 rounded-md hover:bg-red-950/60 text-red-400 cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         )}
       </SidebarFooter>

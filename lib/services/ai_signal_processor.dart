@@ -130,6 +130,132 @@ class AiSignalProcessor {
   }
 
   // ---------------------------------------------------------------------------
+  // 5b. PHÁT HIỆN TAI NẠN VA CHẠM GIAO THÔNG XUNG LỰC CAO (VEHICULAR CRASH)
+  // Xung lực High-G (>= 4.5g đến 8.0g) kèm tư thế nghiêng chấn thương bất động
+  // ---------------------------------------------------------------------------
+  AccidentDetectionResult evaluateVehicularCrash({
+    required double ax,
+    required double ay,
+    required double az,
+    double highGThreshold = 4.5,
+  }) {
+    final svm = math.sqrt(ax * ax + ay * ay + az * az);
+    final safeSvm = svm > 0.001 ? svm : 0.001;
+    final tiltAngle = math.acos((az.abs() / safeSvm).clamp(0.0, 1.0)) * (180.0 / math.pi);
+
+    final isSevereCrash = svm >= highGThreshold;
+    final isTilted = tiltAngle >= 55.0;
+
+    String accidentType = 'NONE';
+    double severityScore = 0.0;
+
+    if (svm >= 6.5) {
+      accidentType = 'VEHICULAR_HIGH_G_CRASH';
+      severityScore = 95.0;
+    } else if (svm >= 4.5) {
+      accidentType = 'MODERATE_VEHICULAR_IMPACT';
+      severityScore = 80.0;
+    } else if (svm >= 3.0 && isTilted) {
+      accidentType = 'SEVERE_FALL';
+      severityScore = 65.0;
+    }
+
+    return AccidentDetectionResult(
+      svmG: svm,
+      tiltAngleDegrees: tiltAngle,
+      isSevereCrash: isSevereCrash,
+      isPostCrashImmobile: isTilted,
+      accidentType: accidentType,
+      impactSeverityScore: severityScore,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5c. PHÁT HIỆN RƠI TỰ DO & VA ĐẬP ĐỘ CAO / CẦU THANG (FREE FALL & IMPACT)
+  // Giai đoạn không trọng lượng (SVM < 0.35g) kéo theo va đập chấn thương (SVM >= 3.5g)
+  // ---------------------------------------------------------------------------
+  AccidentDetectionResult evaluateFreeFallImpact({
+    required double ax,
+    required double ay,
+    required double az,
+    required bool hadFreeFallPhase,
+  }) {
+    final svm = math.sqrt(ax * ax + ay * ay + az * az);
+    final safeSvm = svm > 0.001 ? svm : 0.001;
+    final tiltAngle = math.acos((az.abs() / safeSvm).clamp(0.0, 1.0)) * (180.0 / math.pi);
+
+    final isImpact = svm >= 3.5;
+    final isFreeFallCrash = hadFreeFallPhase && isImpact;
+
+    return AccidentDetectionResult(
+      svmG: svm,
+      tiltAngleDegrees: tiltAngle,
+      isSevereCrash: isFreeFallCrash,
+      isPostCrashImmobile: tiltAngle >= 60.0,
+      accidentType: isFreeFallCrash ? 'FREE_FALL_IMPACT' : (isImpact ? 'HARD_IMPACT' : 'NONE'),
+      impactSeverityScore: isFreeFallCrash ? 90.0 : (isImpact ? 60.0 : 10.0),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 5d. ĐÁNH GIÁ RỦI RO SINH TỒN CẤP TÍNH (ACUTE VITALS RISK: TIM & SPO2)
+  // Phát hiện nhịp nhanh thất / loạn nhịp cấp / suy hô hấp giảm oxy máu
+  // ---------------------------------------------------------------------------
+  AcuteVitalsRiskAssessment evaluateAcuteVitalsRisk({
+    required int heartRate,
+    required int spO2,
+    bool isOffWrist = false,
+  }) {
+    if (isOffWrist || heartRate <= 0 || spO2 <= 0) {
+      return const AcuteVitalsRiskAssessment(
+        isCritical: false,
+        riskScore: 0,
+        riskType: 'NORMAL',
+        title: 'Chỉ số bình thường',
+        description: 'Đồng hồ không đeo hoặc đang điều chỉnh.',
+      );
+    }
+
+    bool isCritical = false;
+    int riskScore = 0;
+    String riskType = 'NORMAL';
+    String title = 'Chỉ số bình thường';
+    String desc = 'Sinh tồn trong giới hạn an toàn.';
+
+    if (spO2 < 88) {
+      isCritical = true;
+      riskScore = 95;
+      riskType = 'HYPOXIA_CRITICAL';
+      title = 'Suy hô hấp cấp / Thiếu oxy mô não ($spO2%)';
+      desc = 'Nồng độ SpO2 giảm nguy hiểm dưới 88%, cần cấp cứu hô hấp 115 khẩn cấp.';
+    } else if (heartRate >= 145) {
+      isCritical = true;
+      riskScore = 90;
+      riskType = 'TACHYCARDIA_ACUTE';
+      title = 'Cơn tim nhanh kịch phát ($heartRate BPM)';
+      desc = 'Nhịp tim tăng vọt bất thường vượt ngưỡng 145 BPM, nguy cơ loạn nhịp nguy cấp.';
+    } else if (heartRate <= 40) {
+      isCritical = true;
+      riskScore = 88;
+      riskType = 'BRADYCARDIA_ACUTE';
+      title = 'Nhịp tim chậm nguy kịch ($heartRate BPM)';
+      desc = 'Nhịp tim tụt dưới 40 BPM, đe dọa ngừng tuần hoàn não.';
+    } else if (spO2 < 92) {
+      riskScore = 55;
+      riskType = 'HYPOXIA_WARNING';
+      title = 'Cảnh báo SpO2 hạ ($spO2%)';
+      desc = 'Nồng độ oxy máu thấp hơn ngưỡng khuyến cáo.';
+    }
+
+    return AcuteVitalsRiskAssessment(
+      isCritical: isCritical,
+      riskScore: riskScore,
+      riskType: riskType,
+      title: title,
+      description: desc,
+    );
+  }
+
   // 6. MÔ HÌNH MACHINE LEARNING AI (SVM CLASSIFIER) PHÂN LOẠI TÉ NGÃ
   // Phân biệt té ngã thật (True Fall) vs hoạt động ngồi mạnh/cúi gập người (ADL - Activities of Daily Living)
   // ---------------------------------------------------------------------------
@@ -621,5 +747,41 @@ class StrokeCardiacRiskAssessment {
   final bool isAfibSuspected;
   final bool isAutonomicExhaustion;
   final HrvMetrics metrics;
+}
+
+/// Kết quả phát hiện tai nạn va chạm giao thông / rơi tự do
+class AccidentDetectionResult {
+  const AccidentDetectionResult({
+    required this.svmG,
+    required this.tiltAngleDegrees,
+    required this.isSevereCrash,
+    required this.isPostCrashImmobile,
+    required this.accidentType,
+    required this.impactSeverityScore,
+  });
+
+  final double svmG;
+  final double tiltAngleDegrees;
+  final bool isSevereCrash;
+  final bool isPostCrashImmobile;
+  final String accidentType;
+  final double impactSeverityScore; // 0.0 - 100.0
+}
+
+/// Kết quả phân tích rủi ro sinh tồn cấp tính (Tim & Oxy máu)
+class AcuteVitalsRiskAssessment {
+  const AcuteVitalsRiskAssessment({
+    required this.isCritical,
+    required this.riskScore,
+    required this.riskType,
+    required this.title,
+    required this.description,
+  });
+
+  final bool isCritical;
+  final int riskScore;
+  final String riskType;
+  final String title;
+  final String description;
 }
 
