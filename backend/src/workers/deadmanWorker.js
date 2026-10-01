@@ -44,6 +44,14 @@ function startDeadManWorker(io) {
 
   setInterval(async () => {
     try {
+      // 1. Kiểm tra và xử lý khẩn cấp các hành trình lộ trình quá hạn (Journey Check-in)
+      try {
+        const journeyService = require('../services/journeyService');
+        await journeyService.checkAndEscalateOverdueJourneys(io);
+      } catch (journeyErr) {
+        console.warn('[DeadManWorker] Journey escalation check error:', journeyErr.message);
+      }
+
       const users = await User.find({ role: 'user' }).sort({ updatedAt: -1 });
       const now = new Date();
 

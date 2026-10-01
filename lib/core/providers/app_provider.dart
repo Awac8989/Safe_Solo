@@ -36,6 +36,20 @@ enum Mood { calm, happy, tired, sick, focused }
 
 enum CircleScope { family, community }
 
+class VoiceCheckinResult {
+  const VoiceCheckinResult({
+    required this.success,
+    required this.isDuress,
+    required this.message,
+    this.audioRecordingPath,
+  });
+
+  final bool success;
+  final bool isDuress;
+  final String message;
+  final String? audioRecordingPath;
+}
+
 class EmergencyContact {
   const EmergencyContact({
     required this.name,
@@ -784,6 +798,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   final NotificationService _notifications = NotificationService.instance;
   final PushNotificationService _pushNotifications =
       PushNotificationService.instance;
+  final AudioNoteService _audioNoteService = AudioNoteService();
+  bool _isQuietHoursMode = false;
+  bool get isQuietHoursMode => _isQuietHoursMode;
 
   User? _user;
   bool _onboarded = false;
@@ -1190,6 +1207,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     required String emergencyName,
     required String emergencyPhone,
     required int timerIntervalMinutes,
+    String? password,
   }) async {
     await _runBusy(() async {
       final users = await _api.listUsers();
@@ -1199,12 +1217,14 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         final restored = existing.first;
         _user = User.fromUserModel(restored, email: email);
       } else {
-      final created = await _api.registerUser(
+        final created = await _api.registerUser(
           fullName: fullName,
           phoneNumber: phoneNumber,
           timerIntervalMinutes: timerIntervalMinutes,
           emergencyName: emergencyName,
           emergencyPhone: emergencyPhone,
+          email: email,
+          password: password,
         );
         _user = User.fromUserModel(created, email: email);
       }
@@ -1235,6 +1255,26 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       await _syncPushTokenIfNeeded();
       await _syncBackgroundSafetyService();
     });
+  }
+
+  Future<void> registerNewAccount({
+    required String fullName,
+    required String phoneNumber,
+    required String email,
+    required String password,
+    required String emergencyName,
+    required String emergencyPhone,
+    int timerIntervalMinutes = 720,
+  }) async {
+    await authenticate(
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      email: email,
+      emergencyName: emergencyName,
+      emergencyPhone: emergencyPhone,
+      timerIntervalMinutes: timerIntervalMinutes,
+      password: password,
+    );
   }
 
   Future<UserModel?> findUserByPhone(String phone) async {
@@ -1679,6 +1719,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     String? routineType,
     Map<String, dynamic>? mediaSnapshot,
     String? familyPingRef,
+    Map<String, dynamic>? metadata,
   }) async {
     final current = _user;
     if (current == null) {
@@ -1686,27 +1727,52 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
 
     await _runBusy(() async {
-      final position = await _locationService.getBestEffortLocation(
-        fallbackLat: current.lastKnownLocation?.lat,
-        fallbackLng: current.lastKnownLocation?.lng,
-      );
-      final updated = await _api.checkin(
-        userId: current.id,
-        lat: position.lat,
-        lng: position.lng,
-        type: type,
-        passiveSource: passiveSource,
-        isDuress: isDuress,
-        snoozeMinutes: snoozeMinutes,
-        routineType: routineType,
-        mediaSnapshot: mediaSnapshot,
-        familyPingRef: familyPingRef,
-      );
+      double finalLat = current.lastKnownLocation?.lat ?? 10.7769;
+      double finalLng = current.lastKnownLocation?.lng ?? 106.7009;
+      try {
+        final position = await _locationService.getBestEffortLocation(
+          fallbackLat: finalLat,
+          fallbackLng: finalLng,
+        );
+        finalLat = position.lat;
+        finalLng = position.lng;
+      } catch (_) {}
 
-      _user = User.fromUserModel(updated, email: current.email);
+      UserModel? updated;
+      try {
+        updated = await _api.checkin(
+          userId: current.id,
+          lat: finalLat,
+          lng: finalLng,
+          type: type,
+          passiveSource: passiveSource,
+          isDuress: isDuress,
+          snoozeMinutes: snoozeMinutes,
+          routineType: routineType,
+          mediaSnapshot: mediaSnapshot,
+          familyPingRef: familyPingRef,
+          metadata: metadata,
+        );
+      } catch (err) {
+        debugPrint('[AppProvider.checkin] Network/Offline fallback: $err');
+        final isPartial = (type == 'SNOOZE' || type == 'SOFT_PASSIVE');
+        final cycleMinutes = !isPartial
+            ? current.timerIntervalMinutes
+            : (type == 'SNOOZE' ? (snoozeMinutes ?? 30) : 45);
+        _user = current.copyWith(
+          currentStatus: 'SAFE',
+          lastCheckinTime: DateTime.now(),
+          nextDeadline: DateTime.now().add(Duration(minutes: cycleMinutes)),
+          consecutiveSoftCheckins: 0,
+        );
+      }
+
+      if (updated != null) {
+        _user = User.fromUserModel(updated, email: current.email);
+      }
       _homeAnchor = AppLocation(
-        lat: position.lat,
-        lng: position.lng,
+        lat: finalLat,
+        lng: finalLng,
         updatedAt: DateTime.now(),
       );
       _wasOutsideHome = false;
@@ -1717,22 +1783,24 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       if (!isDuress && type != 'SNOOZE' && type != 'SOFT_PASSIVE') {
         _streak += 1;
       }
-      await _api.createInteraction(
-        userId: current.id,
-        type: isDuress
-            ? 'CHECKIN_DURESS'
-            : (type == 'SNOOZE' ? 'CHECKIN_SNOOZE' : 'CHECKIN_COMPLETED'),
-        source: passiveSource != null ? 'DEVICE_SENSOR' : 'MOBILE_APP',
-        metadata: {
-          'mood': (_mood ?? Mood.calm).name,
-          'type': type,
-          'isDuress': isDuress,
-          'location': {
-            'lat': position.lat,
-            'lng': position.lng,
+      try {
+        await _api.createInteraction(
+          userId: current.id,
+          type: isDuress
+              ? 'CHECKIN_DURESS'
+              : (type == 'SNOOZE' ? 'CHECKIN_SNOOZE' : 'CHECKIN_COMPLETED'),
+          source: passiveSource != null ? 'DEVICE_SENSOR' : 'MOBILE_APP',
+          metadata: {
+            'mood': (_mood ?? Mood.calm).name,
+            'type': type,
+            'isDuress': isDuress,
+            'location': {
+              'lat': finalLat,
+              'lng': finalLng,
+            },
           },
-        },
-      );
+        );
+      } catch (_) {}
       if (!isDuress && type != 'SNOOZE' && type != 'SOFT_PASSIVE') {
         _prependOwnPost(
           message: type == 'EMOTIONAL_MOMENT'
@@ -1746,7 +1814,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           'Đã nhận check-in mới của ${_user?.name ?? 'bạn'}',
         );
       }
-      _interactionEvents = await _api.listInteractions(current.id);
+      try {
+        _interactionEvents = await _api.listInteractions(current.id);
+      } catch (_) {}
       _vaultReleaseAt = null;
       _updateBadges();
       await _evaluateSafetyAutomation();
@@ -1768,6 +1838,89 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> performSoftCheckIn({String source = 'SCREEN_UNLOCK'}) async {
     await checkIn(type: 'SOFT_PASSIVE', passiveSource: source);
+  }
+
+  DateTime? _lastSmartPassiveCheckinAt;
+
+  /// Check-in thụ động thông minh (Passive Smart Check-in):
+  /// Tự động ghi nhận "Đang an toàn" và gia hạn 1 chu kỳ đầy đủ (+12h/24h)
+  /// khi phát hiện >200 bước chân, rút sạc buổi sáng hoặc mở khóa màn hình.
+  Future<void> performSmartPassiveCheckIn({
+    required String source,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final now = DateTime.now();
+    if (_lastSmartPassiveCheckinAt != null &&
+        now.difference(_lastSmartPassiveCheckinAt!).inMinutes < 2) {
+      debugPrint('[AppProvider] Smart passive check-in debounced for source $source.');
+      return;
+    }
+    _lastSmartPassiveCheckinAt = now;
+
+    try {
+      await checkIn(
+        type: 'SMART_PASSIVE',
+        passiveSource: source,
+        metadata: {
+          ...?metadata,
+          'smartPassiveRenewal': true,
+          'source': source,
+          'timestamp': now.toIso8601String(),
+        },
+      );
+
+      String alertTitle = '🛡️ CHECK-IN THỤ ĐỘNG THÔNG MINH';
+      String alertBody = 'Đã tự động xác nhận bạn an toàn và gia hạn 1 chu kỳ!';
+      if (source == 'PEDOMETER_BURST') {
+        alertTitle = '🚶 BƯỚC CHÂN TÍCH CỰC (>200 BƯỚC)';
+        alertBody = 'Hệ thống phát hiện vận động thực tế và đã tự gia hạn 1 chu kỳ an toàn!';
+      } else if (source == 'CHARGER_UNPLUGGED') {
+        alertTitle = '⚡ RÚT SẠC PIN BUỔI SÁNG';
+        alertBody = 'Nhận diện bạn bắt đầu ngày mới an toàn. Đã tự động gia hạn 1 chu kỳ!';
+      } else if (source == 'SCREEN_UNLOCK') {
+        alertTitle = '📱 TƯƠNG TÁC MỞ KHÓA MÀN HÌNH';
+        alertBody = 'Ghi nhận người dùng đang sử dụng thiết bị. Đã tự động gia hạn an toàn!';
+      } else if (source == 'WAKE_UP_PULSE') {
+        alertTitle = '💤 NHỊP TIM THỨC GIẤC (BIOACTIVE PPG)';
+        alertBody = 'Nhận diện thức dậy bình an qua nhịp tim & cử động cổ tay. Đã tự gia hạn an toàn!';
+      } else if (source == 'HOME_WIFI' || source == 'SAFE_GEOFENCE') {
+        alertTitle = '🏠 CẮM SẠC & WI-FI NHÀ (DOCKING ANCHOR)';
+        alertBody = 'Đã về nhà an toàn & cắm sạc. Kích hoạt Chế độ Nghỉ ngơi (Quiet Hours), miễn báo động đêm!';
+      }
+
+      unawaited(_notifications.showAlert(
+        id: 9093,
+        title: alertTitle,
+        body: alertBody,
+      ));
+    } catch (e) {
+      debugPrint('[AppProvider] Smart passive check-in error: $e');
+    }
+  }
+
+  /// Xử lý sự kiện rút sạc pin (Morning routine unplug 05:00 - 11:00)
+  Future<void> handleChargerStateChanged({required bool isCharging}) async {
+    final now = DateTime.now();
+    if (!isCharging && now.hour >= 5 && now.hour <= 11) {
+      debugPrint('[AppProvider] Morning charger unplug detected at ${now.hour}:${now.minute}. Auto smart check-in...');
+      await performSmartPassiveCheckIn(
+        source: 'CHARGER_UNPLUGGED',
+        metadata: {'unpluggedAt': now.toIso8601String(), 'morningRoutine': true},
+      );
+    }
+  }
+
+  /// Xử lý sự kiện mở khóa màn hình hoặc resume app
+  Future<void> handleScreenUnlock() async {
+    final lastCheckin = _user?.lastCheckinTime;
+    final now = DateTime.now();
+    if (lastCheckin == null || now.difference(lastCheckin).inMinutes >= 45) {
+      debugPrint('[AppProvider] Screen unlock / active resume detected. Auto smart check-in...');
+      await performSmartPassiveCheckIn(
+        source: 'SCREEN_UNLOCK',
+        metadata: {'unlockedAt': now.toIso8601String()},
+      );
+    }
   }
 
   Future<void> performSnooze({int minutes = 30}) async {
@@ -1797,6 +1950,268 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> performRoutineCheckIn({required String routineType}) async {
     await checkIn(type: 'ROUTINE', routineType: routineType);
+  }
+
+  /// 1. Sleep Wake-up Pulse Check-in (Nhịp tim thức giấc qua PPG BioActive)
+  Future<void> performWakeUpPulseCheckin({
+    required int restingBpm,
+    required int wakeBpm,
+    bool movementDetected = true,
+  }) async {
+    await performSmartPassiveCheckIn(
+      source: 'WAKE_UP_PULSE',
+      metadata: {
+        'restingBpm': restingBpm,
+        'wakeBpm': wakeBpm,
+        'movementDetected': movementDetected,
+        'wakeUpTime': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  /// Đánh giá nhịp tim nguy cấp buổi sáng: Quá 9:30 sáng nhịp tim vẫn ở mức ngủ hoặc biến mất
+  Future<bool> evaluateSleepPulseHealth({
+    required int currentBpm,
+    required DateTime time,
+  }) async {
+    final isPastMorningDeadline = (time.hour > 9 || (time.hour == 9 && time.minute >= 30));
+    final isDangerouslyLow = currentBpm < 55 && currentBpm > 0;
+    final isMissingPulse = currentBpm <= 0;
+
+    if (isPastMorningDeadline && (isDangerouslyLow || isMissingPulse)) {
+      debugPrint('[AppProvider] CẢNH BÁO NGUY CẤP: Quá 9:30 sáng nhịp tim vẫn bất thường ($currentBpm bpm)!');
+      unawaited(_notifications.showAlert(
+        id: 9094,
+        title: '🚨 CẢNH BÁO NGUY CẤP: NHỊP TIM BẤT THƯỜNG',
+        body: 'Quá 9:30 sáng nhịp tim ($currentBpm bpm) ở mức nguy hiểm. Hệ thống đã kích hoạt báo động người thân!',
+      ));
+      if (_user != null) {
+        try {
+          await triggerSilentSos();
+        } catch (_) {}
+      }
+      return false;
+    }
+    return true;
+  }
+
+  /// 2. Cắm sạc & Wi-Fi Nhà (Home Wi-Fi & Docking Anchor)
+  Future<void> handleHomeArrivalAndDocking({
+    required bool isHomeWifi,
+    required bool isCharging,
+    String? ssid,
+  }) async {
+    if (isHomeWifi || isCharging) {
+      _isQuietHoursMode = true;
+      notifyListeners();
+      await performSmartPassiveCheckIn(
+        source: 'HOME_WIFI',
+        metadata: {
+          'isHomeWifi': isHomeWifi,
+          'isCharging': isCharging,
+          'ssid': ssid ?? 'SafeSolo_Home_WiFi',
+          'homeDocking': true,
+          'quietHoursActive': true,
+        },
+      );
+    }
+  }
+
+  /// 3. Wear OS Double Wrist-Twist Gesture (Lắc cổ tay 2 nhịp nhanh khi tay bận/ướt)
+  Future<void> performWristTwistCheckin() async {
+    HapticFeedback.mediumImpact();
+    await Future.delayed(const Duration(milliseconds: 150));
+    HapticFeedback.heavyImpact();
+
+    await checkIn(
+      type: 'GESTURE_WRIST_TWIST',
+      mood: Mood.calm,
+      metadata: {
+        'gesture': 'DOUBLE_WRIST_TWIST',
+        'sensor': 'GYROSCOPE',
+        'hapticFeedback': 'TACK_TACK',
+      },
+    );
+
+    unawaited(_notifications.showAlert(
+      id: 9096,
+      title: '⌚ CỬ CHỈ LẮC CỔ TAY (DOUBLE TWIST)',
+      body: 'Đã điểm danh an toàn tức thì qua con quay hồi chuyển Gyroscope!',
+    ));
+  }
+
+  /// 4. Hardware Key Combo (Bấm Vol Up x2 + Vol Down x1 hoặc giữ Home 1.5s)
+  Future<void> performHardwareKeyComboCheckin() async {
+    HapticFeedback.lightImpact();
+    await Future.delayed(const Duration(milliseconds: 100));
+    HapticFeedback.lightImpact();
+
+    await checkIn(
+      type: 'HARDWARE_KEY_COMBO',
+      metadata: {
+        'combo': 'VOL_UP_UP_DOWN',
+        'screenOff': true,
+        'trigger': 'HARDWARE_KEYS',
+      },
+    );
+
+    unawaited(_notifications.showAlert(
+      id: 9097,
+      title: '🔑 TỔ HỢP PHÍM CỨNG (HARDWARE KEY)',
+      body: 'Đã xác nhận an toàn ngầm (không cần mở màn hình cảm ứng)!',
+    ));
+  }
+
+  /// 5. Voice Safe-Phrase & Stealth Duress Trigger
+  Future<VoiceCheckinResult> processVoiceCheckinPhrase(String phrase) async {
+    final normalized = phrase.toLowerCase().trim();
+    debugPrint('[AppProvider] Processing voice checkin phrase: "$phrase"');
+
+    final duressKeywords = [
+      'rất bận',
+      'rat ban',
+      'đang bận',
+      'dang ban',
+      'trời đẹp',
+      'troi dep',
+      'thời tiết đẹp',
+      'hôm nay trời đẹp',
+      'khẩn cấp',
+      'cứu',
+      'nguy hiểm',
+    ];
+
+    bool isDuress = false;
+    for (final kw in duressKeywords) {
+      if (normalized.contains(kw)) {
+        isDuress = true;
+        break;
+      }
+    }
+
+    if (isDuress) {
+      debugPrint('[AppProvider] DURESS DETECTED in voice: "$phrase"! Secretly activating SOS...');
+      await performDuressCheckIn();
+
+      // Bật ghi âm môi trường xung quanh 30 giây ngầm
+      try {
+        final started = await _audioNoteService.start();
+        if (started) {
+          Future.delayed(const Duration(seconds: 30), () async {
+            try {
+              final note = await _audioNoteService.stop();
+              debugPrint('[AppProvider] Duress 30s audio recording captured at: ${note?.path}');
+            } catch (_) {}
+          });
+        }
+      } catch (e) {
+        debugPrint('[AppProvider] Error starting stealth duress audio: $e');
+      }
+
+      // Đánh lừa kẻ xấu: Màn hình app vẫn hiển thị thông báo tích xanh như bình thường!
+      return const VoiceCheckinResult(
+        success: true,
+        isDuress: true,
+        message: 'Đã check-in an toàn thành công!',
+      );
+    }
+
+    final safeKeywords = [
+      'tôi an toàn',
+      'toi an toan',
+      'safesolo',
+      'an toàn',
+      'an toan',
+      'bình an',
+      'binh an',
+      'im safe',
+      'safe',
+    ];
+
+    bool isSafe = false;
+    for (final kw in safeKeywords) {
+      if (normalized.contains(kw)) {
+        isSafe = true;
+        break;
+      }
+    }
+
+    if (isSafe) {
+      await checkIn(
+        type: 'VOICE_KEYWORD',
+        metadata: {
+          'spokenPhrase': phrase,
+          'normalized': normalized,
+          'aiRecognized': true,
+        },
+      );
+      unawaited(_notifications.showAlert(
+        id: 9098,
+        title: '🎙️ ĐIỂM DANH BẰNG GIỌNG NÓI',
+        body: 'Trợ lý AI: "SafeSolo, tôi an toàn" - Đã gia hạn an toàn thành công!',
+      ));
+      return const VoiceCheckinResult(
+        success: true,
+        isDuress: false,
+        message: 'Trợ lý AI: Đã nhận diện giọng nói và gia hạn chu kỳ an toàn!',
+      );
+    }
+
+    return const VoiceCheckinResult(
+      success: false,
+      isDuress: false,
+      message: 'Không nhận diện được khẩu lệnh. Hãy nói: "SafeSolo, tôi an toàn"',
+    );
+  }
+
+  /// 6. Cặp đôi tương hỗ (Buddy / Couple Cross Check-in)
+  Future<void> performBuddyCrossCheckin({
+    required String buddyId,
+    required String buddyName,
+    String? message,
+  }) async {
+    await checkIn(
+      type: 'BUDDY_CROSS_CHECKIN',
+      metadata: {
+        'buddyId': buddyId,
+        'buddyName': buddyName,
+        'crossReply': true,
+        'message': message ?? 'Tôi cũng an toàn, bạn yên tâm nhé!',
+      },
+    );
+
+    unawaited(_notifications.showAlert(
+      id: 9099,
+      title: '🤝 ĐIỂM DANH CẶP ĐÔI TƯƠNG HỖ',
+      body: 'Đã 1-chạm xác nhận an toàn cho cả hai ($buddyName & bạn)!',
+    ));
+  }
+
+  /// 7. Check-in uống thuốc bằng Camera quét (Medication Vision Check-in)
+  Future<void> performMedicationVisionCheckin({
+    required String pillName,
+    String? photoPath,
+    String? note,
+  }) async {
+    await checkIn(
+      type: 'MEDICATION_VISION',
+      routineType: 'MEDICATION',
+      mediaSnapshot: {
+        if (photoPath != null) 'photoUrl': photoPath,
+        'note': note ?? 'Đã quét và uống thuốc $pillName đúng lịch trình',
+      },
+      metadata: {
+        'pillName': pillName,
+        'visionVerified': true,
+        'medicalSync': true,
+      },
+    );
+
+    unawaited(_notifications.showAlert(
+      id: 9100,
+      title: '💊 ĐIỂM DANH UỐNG THUỐC (MEDICATION VISION)',
+      body: 'Đã hoàn tất điểm danh sinh tử & tự động cập nhật sổ theo dõi y tế ($pillName)!',
+    ));
   }
 
   Future<void> sendFamilyPing({
@@ -2168,6 +2583,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     _watchAlertSubscription =
         PedometerService.instance.watchAlertStream.listen(_handleWatchAlert);
 
+    // Điểm danh thụ động thông minh: Tự động Check-in khi phát hiện người dùng đi bộ >200 bước
+    PedometerService.instance.onStepBurstDetected = (totalSteps, burstSteps) async {
+      debugPrint('[AppProvider] Step burst detected: +$burstSteps steps (Total: $totalSteps). Auto smart passive check-in...');
+      await performSmartPassiveCheckIn(
+        source: 'PEDOMETER_BURST',
+        metadata: {'burstSteps': burstSteps, 'totalSteps': totalSteps},
+      );
+    };
+
     // Đồng bộ điểm danh thực tế từ Samsung Galaxy Watch 5 sang Điện thoại
     WatchSyncManager.instance.onWatchCheckinReceived = (moodStr) async {
       if (WatchSyncManager.instance.isRunningOnWatch) return;
@@ -2177,15 +2601,23 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       if (moodStr.contains('Mệt mỏi')) targetMood = Mood.tired;
       if (moodStr.contains('Bất an') || moodStr.contains('sick')) targetMood = Mood.sick;
       try {
-        try {
-          await checkIn(type: 'WATCH_CHECKIN', mood: targetMood);
-        } catch (_) {
-          await checkIn(type: 'HARD_TAP', mood: targetMood);
+        if (moodStr.contains('Cử chỉ lắc cổ tay') || moodStr.contains('DOUBLE_TWIST')) {
+          await checkIn(type: 'GESTURE_WRIST_TWIST', mood: targetMood);
+        } else if (moodStr.contains('Tự động 200 bước')) {
+          await performSmartPassiveCheckIn(source: 'PEDOMETER_BURST', metadata: {'burstSteps': 200});
+        } else if (moodStr.contains('Nhịp tim thức giấc') || moodStr.contains('WAKE_UP_PULSE')) {
+          await performSmartPassiveCheckIn(source: 'WAKE_UP_PULSE', metadata: {'restingBpm': 56, 'wakeBpm': 78});
+        } else {
+          try {
+            await checkIn(type: 'WATCH_CHECKIN', mood: targetMood);
+          } catch (_) {
+            await checkIn(type: 'HARD_TAP', mood: targetMood);
+          }
         }
         unawaited(_notifications.showAlert(
           id: 9092,
           title: '⌚ ĐÃ ĐIỂM DANH TỪ GALAXY WATCH 5',
-          body: 'Đồng hồ vừa điểm danh an toàn (Tâm trạng: $moodStr). Bộ đếm đã được làm mới!',
+          body: 'Đồng hồ vừa điểm danh an toàn ($moodStr). Bộ đếm đã được làm mới!',
         ));
       } catch (e) {
         debugPrint('[AppProvider] Error auto checkin from watch: $e');
@@ -2481,12 +2913,60 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  bool _hasEscalatedJourneyOverdue = false;
+  bool get hasEscalatedJourneyOverdue => _hasEscalatedJourneyOverdue;
+
+  /// Tự động kích hoạt SOS và gửi định vị cho người thân khi quá hạn lộ trình mà không nhấn "Đã về nhà an toàn"
+  Future<void> escalateOverdueJourney() async {
+    final journey = _activeJourney;
+    if (journey == null || !journey.isInTransit || _hasEscalatedJourneyOverdue) return;
+    _hasEscalatedJourneyOverdue = true;
+
+    _activeJourney = journey.copyWith(status: 'OVERDUE_ALARM');
+    final current = _user;
+    if (current != null) {
+      _user = current.copyWith(currentStatus: 'ALERT_TRIGGERED');
+      unawaited(_saveToStorage());
+    }
+    notifyListeners();
+
+    try {
+      final lat = journey.currentLat ?? current?.lastKnownLocation?.lat;
+      final lng = journey.currentLng ?? current?.lastKnownLocation?.lng;
+
+      if (current != null) {
+        await _api.createInteraction(
+          userId: current.id,
+          type: 'JOURNEY_OVERDUE_SOS',
+          source: 'JOURNEY_GUARD',
+          metadata: {
+            'journeyId': journey.id,
+            'destination': journey.destinationLabel,
+            'lat': lat,
+            'lng': lng,
+            'triggeredAt': DateTime.now().toIso8601String(),
+          },
+        );
+      }
+    } catch (e) {
+      debugPrint('[AppProvider] Error recording SOS for overdue journey: $e');
+    }
+
+    HapticFeedback.heavyImpact();
+    unawaited(_notifications.showAlert(
+      id: 9993,
+      title: '🚨 BÁO ĐỘNG: LỘ TRÌNH QUÁ HẠN!',
+      body: 'Bạn chưa nhấn "Đã về nhà an toàn". Hệ thống đã tự động phát tín hiệu SOS và định vị cho người thân!',
+    ));
+  }
+
   Future<LiveJourneyModel?> startLiveJourney({
     required String destination,
     required int durationMinutes,
     double? destinationLat,
     double? destinationLng,
   }) async {
+    _hasEscalatedJourneyOverdue = false;
     final current = _user;
     final now = DateTime.now();
     final expectedArrival = now.add(Duration(minutes: durationMinutes));
@@ -2555,6 +3035,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> extendLiveJourney({int minutes = 10}) async {
     final journey = _activeJourney;
     if (journey == null) return;
+    _hasEscalatedJourneyOverdue = false;
 
     final current = _user;
     try {

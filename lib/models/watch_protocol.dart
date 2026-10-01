@@ -39,6 +39,7 @@ class WatchAction {
   static const String instantMeasureReq = 'INSTANT_MEASURE_REQ';
   static const String timerSync = 'TIMER_SYNC';
   static const String pinConfigSync = 'PIN_CONFIG_SYNC';
+  static const String medicalProfileSync = 'MEDICAL_PROFILE_SYNC';
 
   // Commands from Watch
   static const String findPhonePing = 'FIND_PHONE_PING';

@@ -321,18 +321,42 @@ router.get('/commands/:deviceId', (req, res) => {
   });
 });
 
+// Bộ nhớ lưu trữ hồ sơ y tế theo từng thiết bị đồng hồ
+const deviceMedicalProfiles = new Map();
+
 // 6. Lấy hồ sơ y tế người dùng cho đồng hồ
 router.get('/medical-profile/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const profile = deviceMedicalProfiles.get(deviceId) || {
+    fullName: 'Đoàn Minh Quân',
+    birthYear: '2003',
+    citizenId: '079203001234',
+    bloodType: 'O+',
+    allergies: 'Penicillin',
+    conditions: 'Tăng HA nhẹ',
+    medications: 'Amlodipine 5mg',
+    emergencyContactName: 'Mẹ Lan',
+    emergencyContactPhone: '0901112222',
+    insuranceProvider: 'BHYT Quân Đội',
+    insuranceNumber: 'DN4791234567890',
+  };
   return res.json({
     success: true,
-    medical: {
-      fullName: 'Đoàn Minh Quân',
-      bloodType: 'O+',
-      allergies: 'Penicillin',
-      conditions: 'Tăng HA nhẹ',
-      emergencyContactName: 'Mẹ Lan',
-      emergencyContactPhone: '0901112222',
-    },
+    medical: profile,
+  });
+});
+
+// 7. Cập nhật hồ sơ y tế từ điện thoại sang đồng hồ
+router.post('/medical-profile/:deviceId', (req, res) => {
+  const { deviceId } = req.params;
+  const { medical } = req.body;
+  if (medical && typeof medical === 'object') {
+    deviceMedicalProfiles.set(deviceId, medical);
+    console.log(`[WatchRoutes] Updated medical profile for device ${deviceId}: ${medical.fullName || 'Unknown'}`);
+  }
+  return res.json({
+    success: true,
+    medical: deviceMedicalProfiles.get(deviceId) || medical,
   });
 });
 

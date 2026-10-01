@@ -1029,6 +1029,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.amber),
+            label: Text(
+              strings.text('⭐ 7 Cơ chế Check-in', '⭐ 7 Check-in Modes'),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => _show7CheckinMechanismsSheet(context, provider, strings),
+          ),
+          const SizedBox(width: 8),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1102,6 +1118,480 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ),
         ],
       ),
+    );
+  }
+
+  void _show7CheckinMechanismsSheet(BuildContext context, AppProvider provider, AppStrings strings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            Widget buildMechanismCard({
+              required String number,
+              required String title,
+              required String badge,
+              required Color badgeColor,
+              required String description,
+              required List<Widget> actions,
+            }) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: badgeColor.withValues(alpha: 0.15),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            number,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: badgeColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: badgeColor.withValues(alpha: 0.12),
+                                ),
+                                child: Text(
+                                  badge,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: badgeColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.4,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actions,
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  const SizedBox(height: 10),
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.shield_rounded, color: Color(0xFF6366F1), size: 22),
+                              const SizedBox(width: 6),
+                              Text(
+                                strings.text('7 CƠ CHẾ ĐIỂM DANH SINH TỒN', '7 SURVIVAL CHECK-IN MODES'),
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            strings.text(
+                              'Bộ sưu tập công nghệ điểm danh đa kênh cho SafeSolo',
+                              'Multi-channel check-in technology suite for SafeSolo',
+                            ),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(sheetContext),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // NHÓM 1: CẢM BIẾN THỤ ĐỘNG (ZERO-TOUCH)
+                  Text(
+                    '💤 NHÓM 1: CHECK-IN THỤ ĐỘNG CẢM BIẾN (ZERO-TOUCH)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  buildMechanismCard(
+                    number: '1',
+                    title: 'Nhịp tim thức giấc (Sleep Wake-up Pulse)',
+                    badge: 'Galaxy Watch 5 PPG + Gia tốc cổ tay',
+                    badgeColor: const Color(0xFF0284C7),
+                    description: 'Tự động phát hiện nhịp tim tăng sinh lý (>70 bpm) kèm cử động tay khi thức giấc để gia hạn an toàn (+12h). Ngược lại nếu quá 9:30 sáng nhịp tim biến mất hoặc ở mức nguy hiểm, tự kích hoạt SOS!',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0284C7),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.wb_sunny_rounded, size: 14),
+                        label: const Text('⚡ Thử Thức dậy (56 -> 78 bpm)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.performWakeUpPulseCheckin(restingBpm: 56, wakeBpm: 78);
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã điểm danh tự động: Nhận diện bạn thức dậy bình an (+1 chu kỳ)!', icon: Icons.wb_sunny_rounded);
+                          }
+                        },
+                      ),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFEF4444),
+                          side: const BorderSide(color: Color(0xFFEF4444)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.warning_amber_rounded, size: 14),
+                        label: const Text('🚨 Giả lập >9:30 AM Nguy cấp', style: TextStyle(fontSize: 11.5)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.evaluateSleepPulseHealth(currentBpm: 46, time: DateTime(2026, 10, 1, 9, 45));
+                        },
+                      ),
+                    ],
+                  ),
+
+                  buildMechanismCard(
+                    number: '2',
+                    title: 'Cắm sạc & Wi-Fi Nhà (Docking Anchor)',
+                    badge: 'Home SSID + Geofence 50m + Sạc pin đêm',
+                    badgeColor: const Color(0xFF10B981),
+                    description: 'Đi làm về cắm sạc pin buổi tối hoặc kết nối Wi-Fi nhà riêng: Tự động ghi nhận "Đã về nhà an toàn", bật Quiet Hours và không rung chuông ban đêm.',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.power_rounded, size: 14),
+                        label: const Text('🔌 Về nhà & Cắm sạc (Bật Quiet Hours)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.handleHomeArrivalAndDocking(isHomeWifi: true, isCharging: true);
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã kích hoạt Quiet Hours: Đã về nhà an toàn & miễn chuông đêm!', icon: Icons.nightlight_round);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // NHÓM 2: CỬ CHỈ & TIỆN ÍCH VẬT LÝ
+                  const SizedBox(height: 6),
+                  Text(
+                    '⌚ NHÓM 2: CỬ CHỈ & TIỆN ÍCH VẬT LÝ (TAY BẬN / MÀN HÌNH ƯỚT)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: isDark ? const Color(0xFFA855F7) : const Color(0xFF9333EA),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  buildMechanismCard(
+                    number: '3',
+                    title: 'Lắc cổ tay (Wear OS Double Wrist-Twist)',
+                    badge: 'Gyroscope xoay 2 nhịp + Rung Tack-tack',
+                    badgeColor: const Color(0xFF9333EA),
+                    description: 'Khi đang nấu ăn dầu mỡ, rửa chén tay ướt, lái xe máy: Xoay/lắc cổ tay 2 nhịp nhanh. Đồng hồ rung "Tack-tack" và chớp xanh hoàn thành điểm danh.',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF9333EA),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.screen_rotation_rounded, size: 14),
+                        label: const Text('🔄 Thử nghiệm Lắc cổ tay (Tack-tack)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.performWristTwistCheckin();
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã điểm danh cử chỉ: Lắc cổ tay 2 nhịp thành công!', icon: Icons.screen_rotation_rounded);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+
+                  buildMechanismCard(
+                    number: '4',
+                    title: 'Tổ hợp phím cứng (Hardware Key Combo)',
+                    badge: 'Vol Up x2 + Vol Down x1 / Giữ Home 1.5s',
+                    badgeColor: const Color(0xFFF59E0B),
+                    description: 'Màn hình nứt cảm ứng, trời mưa ướt không vuốt được hoặc điện thoại trong túi áo: Bấm tổ hợp phím âm lượng để rung xác nhận an toàn ngầm.',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF59E0B),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.hardware_rounded, size: 14),
+                        label: const Text('🔑 Bấm tổ hợp Vol Up x2 + Down x1', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.performHardwareKeyComboCheckin();
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã xác nhận an toàn ngầm qua tổ hợp phím cứng!', icon: Icons.check_circle_outline);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // NHÓM 3: GIỌNG NÓI & BẢO VỆ CHỐNG UY HIẾP
+                  const SizedBox(height: 6),
+                  Text(
+                    '🎙️ NHÓM 3: GIỌNG NÓI & BẢO VỆ CHỐNG BỊ ÉP BUỘC (ANTI-COERCION)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: isDark ? const Color(0xFFF43F5E) : const Color(0xFFE11D48),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  buildMechanismCard(
+                    number: '5',
+                    title: 'Khẩu lệnh giọng nói & Từ khóa ngụy trang',
+                    badge: 'AI Voice Safe-Phrase & Stealth Duress Trigger',
+                    badgeColor: const Color(0xFFE11D48),
+                    description: '• Khẩu lệnh bình thường: "SafeSolo, tôi an toàn" -> gia hạn chu kỳ.\n• BỊ KẺ GIAN ÉP ĐIỂM DANH: Đọc từ khóa ngụy trang "Tôi đang rất bận" -> Màn hình vẫn hiện TÍCH XANH lừa kẻ gian, nhưng ngầm gửi Duress SOS + ghi âm 30s!',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.mic_rounded, size: 14),
+                        label: const Text('🗣️ "SafeSolo, tôi an toàn"', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          final res = await provider.processVoiceCheckinPhrase('SafeSolo, tôi an toàn');
+                          if (context.mounted) {
+                            TopToast.show(context, message: res.message, icon: Icons.mic_rounded);
+                          }
+                        },
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFE11D48),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.security_rounded, size: 14),
+                        label: const Text('⚠️ Bị uy hiếp: "Tôi đang rất bận"', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.processVoiceCheckinPhrase('Tôi đang rất bận');
+                          if (context.mounted) {
+                            showDialog<void>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
+                                    SizedBox(width: 8),
+                                    Text('Đã điểm danh!'),
+                                  ],
+                                ),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('✓ Màn hình giả lập hiển thị an toàn (đánh lừa kẻ xấu)', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                    const SizedBox(height: 8),
+                                    Text('🚨 NGẦM BÍ MẬT: Đã gửi tín hiệu cưỡng ép (Duress SOS) kèm vị trí GPS và kích hoạt ghi âm môi trường 30 giây tới người thân!'),
+                                  ],
+                                ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+                                ],
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+
+                  // NHÓM 4: TƯƠNG HỖ & SỨC KHỎE
+                  const SizedBox(height: 6),
+                  Text(
+                    '🤝 NHÓM 4: CHECK-IN TƯƠNG HỖ & SỨC KHỎE (SOCIAL & ROUTINE)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                      color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  buildMechanismCard(
+                    number: '6',
+                    title: 'Cặp đôi tương hỗ (Buddy / Couple Cross Check-in)',
+                    badge: '1-chạm điểm danh chéo cho cả hai',
+                    badgeColor: const Color(0xFF0D9488),
+                    description: 'Khi con điểm danh an toàn buổi sáng, điện thoại mẹ nhận tín hiệu nhẹ. Mẹ chỉ cần nhấn 1-chạm "Mẹ cũng an toàn" để điểm danh cho cả 2 người, loại bỏ cảm giác đơn độc.',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0D9488),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.people_alt_rounded, size: 14),
+                        label: const Text('🤝 1-chạm: "Mẹ cũng an toàn"', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.performBuddyCrossCheckin(buddyId: 'user_mom_002', buddyName: 'Mẹ Lan (ICE)');
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã điểm danh tương hỗ: Cả Mẹ Lan & bạn đều an toàn!', icon: Icons.favorite_rounded);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+
+                  buildMechanismCard(
+                    number: '7',
+                    title: 'Uống thuốc bằng Camera quét (Medication Vision)',
+                    badge: 'Vision Scanner & Đồng bộ Sổ theo dõi Y tế',
+                    badgeColor: const Color(0xFFF97316),
+                    description: 'Đến giờ uống thuốc (8h sáng/tối), giơ vỉ thuốc trước camera hoặc bấm "Đã uống thuốc": Vừa hoàn tất điểm danh sinh tử, vừa tự động cập nhật sổ tay y tế cho bác sĩ điều trị.',
+                    actions: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF97316),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.medication_liquid_rounded, size: 14),
+                        label: const Text('💊 Quét vỉ thuốc Amlodipine 5mg', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await provider.performMedicationVisionCheckin(pillName: 'Amlodipine 5mg', note: 'Đã uống 1 viên sáng theo toa bác sĩ');
+                          if (context.mounted) {
+                            TopToast.show(context, message: 'Đã hoàn tất an toàn sinh tử & lưu sổ y tế: Amlodipine 5mg!', icon: Icons.medication_rounded);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -1409,6 +1899,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   /// Thẻ Trợ lý SoloCare AI: Tư vấn vết thương, thuốc & tâm lý (Qwen 3.8)
   Widget _buildSoloCareAiCard(BuildContext context, AppStrings strings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1417,21 +1908,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF064E3B), Color(0xFF0F172A)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: isDark
+                ? const LinearGradient(
+                    colors: [Color(0xFF064E3B), Color(0xFF0F172A)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFFFFFFFF), Color(0xFFF0FDF4)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: const Color(0xFF10B981).withValues(alpha: 0.5),
+              color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.5 : 0.4),
               width: 1.2,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x1810B981),
+                color: isDark ? const Color(0x1810B981) : const Color(0x0C10B981),
                 blurRadius: 10,
-                offset: Offset(0, 3),
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -1440,11 +1937,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               Container(
                 padding: const EdgeInsets.all(9),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  color: isDark
+                      ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                      : AppColors.primarySoft,
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFF10B981), width: 1.5),
                 ),
-                child: const Icon(Icons.psychology_rounded, color: Color(0xFF34D399), size: 22),
+                child: Icon(
+                  Icons.psychology_rounded,
+                  color: isDark ? const Color(0xFF34D399) : AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1456,8 +1959,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Flexible(
                           child: Text(
                             strings.text('SoloCare AI Sơ cứu & Tâm lý', 'SoloCare First Aid & Calm AI'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                               fontSize: 13.5,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1469,12 +1972,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                            color: isDark
+                                ? const Color(0xFF10B981).withValues(alpha: 0.25)
+                                : AppColors.primarySoft,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             strings.text('Trợ lý 24/7', '24/7 Helper'),
-                            style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 9.5, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                              color: isDark ? const Color(0xFF6EE7B7) : AppColors.primary,
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -1485,8 +1994,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         'Tư vấn vết thương · Kiểm tra dị ứng thuốc · Trấn an hoảng sợ',
                         'Wound care · Drug allergy check · Calming support',
                       ),
-                      style: const TextStyle(
-                        color: Color(0xFFE2E8F0),
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFFE2E8F0) : AppColors.textSecondary,
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
                       ),
@@ -1500,10 +2009,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white, size: 18),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: isDark ? Colors.white : AppColors.primary,
+                  size: 18,
+                ),
               ),
             ],
           ),
@@ -1514,6 +2029,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   /// Công cụ Khẩn cấp Tác chiến: SOS Ngoại tuyến & Sơ cứu CPR
   Widget _buildTacticalEmergencyTools(BuildContext context, AppStrings strings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         // 1. SOS Ngoại Tuyến (Offline SOS)
@@ -1526,17 +2042,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               child: Ink(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                    color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.35 : 0.45),
                     width: 1.2,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x18F59E0B),
+                      color: isDark ? const Color(0x18F59E0B) : const Color(0x0CF59E0B),
                       blurRadius: 8,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -1545,7 +2061,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                        color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.2 : 0.14),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1561,8 +2077,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         children: [
                           Text(
                             strings.text('SOS Ngoại tuyến', 'Offline SOS'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1571,7 +2087,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Text(
                             strings.text('PDR · Còi · SMS', 'PDR · Siren · SMS'),
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: isDark ? Colors.white.withValues(alpha: 0.6) : AppColors.textSecondary,
                               fontSize: 10.5,
                             ),
                             maxLines: 1,
@@ -1602,17 +2118,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               child: Ink(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.35 : 0.45),
                     width: 1.2,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x1810B981),
+                      color: isDark ? const Color(0x1810B981) : const Color(0x0C10B981),
                       blurRadius: 8,
-                      offset: Offset(0, 2),
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -1621,7 +2137,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.2 : 0.14),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1637,8 +2153,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         children: [
                           Text(
                             strings.text('Sơ cứu & CPR', 'First Aid & CPR'),
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1647,7 +2163,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Text(
                             strings.text('10 Cẩm nang · Nhịp', '10 Guides · Pace'),
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: isDark ? Colors.white.withValues(alpha: 0.6) : AppColors.textSecondary,
                               fontSize: 10.5,
                             ),
                             maxLines: 1,
@@ -1672,6 +2188,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final wearOs = WearOsService.instance;
     final sync = WatchSyncManager.instance;
     final hrv = HrvStrokeService.instance;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnimatedBuilder(
       animation: Listenable.merge([pedometer, wearOs, sync, hrv]),
@@ -1683,19 +2200,27 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              gradient: isDark
+                  ? const LinearGradient(
+                      colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : const LinearGradient(
+                      colors: [Color(0xFFFFFFFF), Color(0xFFF0F9FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: const Color(0xFF334155),
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFBAE6FD),
                 width: 1.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.16),
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.16)
+                      : const Color(0x0C0284C7),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -1715,10 +2240,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF38BDF8).withValues(alpha: 0.12),
+                          color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.12 : 0.15),
                           border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4), width: 1.5),
                         ),
-                        child: const Icon(Icons.watch_outlined, color: Color(0xFF38BDF8), size: 24),
+                        child: const Icon(Icons.watch_outlined, color: Color(0xFF0284C7), size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -1730,8 +2255,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 'Chưa kết nối đồng hồ thông minh',
                                 'No Smartwatch Connected',
                               ),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -1743,7 +2268,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 'Add Galaxy Watch 5 for vitals & auto-SOS',
                               ),
                               style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: isDark ? Colors.white.withValues(alpha: 0.6) : AppColors.textSecondary,
                                 fontSize: 11,
                               ),
                             ),
@@ -1779,19 +2304,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: isDark
+                ? const LinearGradient(
+                    colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : const LinearGradient(
+                    colors: [Color(0xFFFFFFFF), Color(0xFFF1FBF6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: const Color(0xFF38BDF8).withValues(alpha: 0.4),
+              color: isDark
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.4)
+                  : const Color(0xFF33B56F).withValues(alpha: 0.35),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                color: isDark
+                    ? const Color(0xFF0284C7).withValues(alpha: 0.15)
+                    : const Color(0x0E33B56F),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -1818,9 +2353,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               height: 40,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: const Color(0xFF38BDF8).withValues(alpha: 0.18),
+                                color: const Color(0xFF38BDF8).withValues(alpha: isDark ? 0.18 : 0.14),
                               ),
-                              child: const Icon(Icons.watch_rounded, color: Color(0xFF38BDF8), size: 22),
+                              child: const Icon(Icons.watch_rounded, color: Color(0xFF0284C7), size: 22),
                             ),
                             Positioned(
                               top: 2,
@@ -1831,7 +2366,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF10B981),
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                                  border: Border.all(
+                                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
@@ -1847,8 +2385,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   Expanded(
                                     child: Text(
                                       pedometer.watchModel,
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : AppColors.textPrimary,
                                         fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -1866,8 +2404,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   'Đã kết nối · Đang đồng bộ thời gian thực',
                                   'Connected · Live real-time sync',
                                 ),
-                                style: const TextStyle(
-                                  color: Color(0xFF34D399),
+                                style: TextStyle(
+                                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -1877,13 +2415,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                         IconButton(
                           tooltip: 'Quản lý thiết bị',
-                          icon: const Icon(Icons.tune_rounded, color: Colors.white54, size: 18),
+                          icon: Icon(
+                            Icons.tune_rounded,
+                            color: isDark ? Colors.white54 : AppColors.textMuted,
+                            size: 18,
+                          ),
                           onPressed: () => AddSmartwatchSheet.show(context),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    const Divider(color: Colors.white12, height: 1),
+                    Divider(
+                      color: isDark ? Colors.white12 : AppColors.border,
+                      height: 1,
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1893,24 +2438,28 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           color: const Color(0xFFF43F5E),
                           value: '${wearOs.heartRate}',
                           unit: 'BPM',
+                          isDark: isDark,
                         ),
                         _buildGlanceMetric(
                           icon: Icons.bloodtype_rounded,
                           color: const Color(0xFF06B6D4),
                           value: '${wearOs.spO2}%',
                           unit: 'SpO2',
+                          isDark: isDark,
                         ),
                         _buildGlanceMetric(
                           icon: Icons.directions_walk_rounded,
                           color: const Color(0xFF10B981),
                           value: '${wearOs.steps}',
                           unit: strings.text('bước', 'steps'),
+                          isDark: isDark,
                         ),
                         _buildGlanceMetric(
                           icon: Icons.battery_charging_full_rounded,
-                          color: const Color(0xFF38BDF8),
+                          color: const Color(0xFF0284C7),
                           value: '${wearOs.battery}%',
                           unit: 'PIN',
+                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -1923,7 +2472,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 : hrv.assessment.level == HrvRiskLevel.moderate
                                     ? const Color(0xFFF59E0B)
                                     : const Color(0xFF10B981))
-                            .withValues(alpha: 0.14),
+                            .withValues(alpha: isDark ? 0.14 : 0.10),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: (hrv.assessment.level == HrvRiskLevel.critical
@@ -1931,7 +2480,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                   : hrv.assessment.level == HrvRiskLevel.moderate
                                       ? const Color(0xFFF59E0B)
                                       : const Color(0xFF10B981))
-                              .withValues(alpha: 0.35),
+                              .withValues(alpha: isDark ? 0.35 : 0.30),
                         ),
                       ),
                       child: Row(
@@ -1949,8 +2498,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           Expanded(
                             child: Text(
                               'HRV: ${hrv.metrics.rmssdMs}ms · ${hrv.assessment.title}',
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1964,7 +2513,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             style: TextStyle(
                               color: hrv.assessment.level == HrvRiskLevel.critical
                                   ? const Color(0xFFEF4444)
-                                  : const Color(0xFF38BDF8),
+                                  : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
                               fontSize: 10.5,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1987,6 +2536,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required Color color,
     required String value,
     required String unit,
+    required bool isDark,
   }) {
     return Column(
       children: [
@@ -1997,8 +2547,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             const SizedBox(width: 4),
             Text(
               value,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: isDark ? Colors.white : AppColors.textPrimary,
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
               ),
@@ -2009,7 +2559,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         Text(
           unit,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: isDark ? Colors.white.withValues(alpha: 0.5) : AppColors.textSecondary,
             fontSize: 10,
           ),
         ),
@@ -2165,22 +2715,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   Widget _buildHeroDutyStatusCard(BuildContext context, AppStrings strings) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF064E3B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: isDark
+            ? const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF064E3B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFFFFFFFF), Color(0xFFECFDF5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFF10B981).withValues(alpha: 0.6),
+          color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.6 : 0.4),
           width: 1.4,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF10B981).withValues(alpha: 0.2),
+            color: isDark
+                ? const Color(0xFF10B981).withValues(alpha: 0.2)
+                : const Color(0x0C10B981),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -2208,7 +2767,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       height: 44,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.2 : 0.15),
                         border: Border.all(color: const Color(0xFF10B981), width: 1.5),
                       ),
                       child: const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 24),
@@ -2222,7 +2781,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         decoration: BoxDecoration(
                           color: const Color(0xFFF59E0B),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF0F172A), width: 1.5),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            width: 1.5,
+                          ),
                         ),
                       ),
                     ),
@@ -2235,11 +2797,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'CHẾ ĐỘ HIỆP SĨ TRỰC CHIẾN',
                               style: TextStyle(
-                                color: Color(0xFF34D399),
+                                color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.2,
@@ -2264,9 +2826,13 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ],
                       ),
                       const SizedBox(height: 3),
-                      const Text(
+                      Text(
                         'Đang trực thám ca SOS bán kính 3km · Chạm mở Bàn Tác Chiến',
-                        style: TextStyle(color: Color(0xFFD1FAE5), fontSize: 11.5, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFD1FAE5) : AppColors.textSecondary,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -2372,11 +2938,16 @@ class _StatCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: AppTextStyles.h3.copyWith(
-              fontSize: 18,
-              color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: AppTextStyles.h3.copyWith(
+                fontSize: 18,
+                color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+              ),
             ),
           ),
         ],

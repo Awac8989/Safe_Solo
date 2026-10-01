@@ -39,6 +39,8 @@ class ApiService {
     required int timerIntervalMinutes,
     required String emergencyName,
     required String emergencyPhone,
+    String? email,
+    String? password,
   }) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/register');
     final response = await _safeRequest(
@@ -49,6 +51,8 @@ class ApiService {
           'fullName': fullName,
           'phoneNumber': phoneNumber,
           'timerIntervalMinutes': timerIntervalMinutes,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (password != null && password.isNotEmpty) 'password': password,
           'emergencyContacts': [
             {
               'name': emergencyName,
@@ -60,7 +64,8 @@ class ApiService {
       ),
     );
     _throwIfFailed(response);
-    return UserModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return UserModel.fromJson(json);
   }
 
   Future<UserModel> getUserById(String userId) async {

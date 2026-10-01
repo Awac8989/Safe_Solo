@@ -50,7 +50,7 @@ class HomeJourneyCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Live Journey Guard',
+                    'Check-in theo lộ trình (30–60p)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -58,7 +58,7 @@ class HomeJourneyCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Hộ tống an toàn khi đi đêm hoặc taxi',
+                    'Bảo vệ ca đêm & đường vắng · Tự động phát SOS định vị nếu chưa về an toàn',
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
@@ -77,7 +77,7 @@ class HomeJourneyCard extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
-              child: const Text('Bắt đầu'),
+              child: const Text('Bật bảo vệ'),
             ),
           ],
         ),

@@ -14,6 +14,7 @@ class PedometerService extends ChangeNotifier {
 
   int _steps = 4280;
   int _initialSteps = -1;
+  int _lastBurstCheckpoint = 4280;
   String _status = 'stopped';
   bool _isAvailable = false;
   final String _watchModel = 'Samsung Galaxy Watch 5 (WearOS)';
@@ -23,7 +24,11 @@ class PedometerService extends ChangeNotifier {
   bool _isPaired = false;
   bool _isOffWrist = false;
 
+  /// Callback khi phát hiện người dùng đi bộ vượt mốc >200 bước chân tích cực
+  void Function(int totalSteps, int burstSteps)? onStepBurstDetected;
+
   int get steps => _steps;
+  int get lastBurstCheckpoint => _lastBurstCheckpoint;
   double get calories => double.parse((_steps * 0.04).toStringAsFixed(1));
   double get distanceKm => double.parse((_steps * 0.00075).toStringAsFixed(2));
   String get status => _status;
@@ -69,6 +74,18 @@ class PedometerService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _checkStepBurst(int currentSteps) {
+    final delta = currentSteps - _lastBurstCheckpoint;
+    if (delta >= 200) {
+      _lastBurstCheckpoint = currentSteps;
+      onStepBurstDetected?.call(currentSteps, delta);
+    }
+  }
+
+  void resetBurstCheckpoint([int? steps]) {
+    _lastBurstCheckpoint = steps ?? _steps;
+  }
+
   void updateFromWatchSimulator({
     required int steps,
     required int heartRate,
@@ -83,6 +100,7 @@ class PedometerService extends ChangeNotifier {
     _battery = battery;
     _isOffWrist = isOffWrist;
     if (status != null) _status = status;
+    _checkStepBurst(_steps);
     notifyListeners();
   }
 
@@ -140,6 +158,7 @@ class PedometerService extends ChangeNotifier {
     }
     final sessionSteps = event.steps - _initialSteps;
     _steps = 4280 + sessionSteps;
+    _checkStepBurst(_steps);
     notifyListeners();
   }
 
@@ -161,6 +180,16 @@ class PedometerService extends ChangeNotifier {
     _steps += 25;
     _status = 'walking';
     _heartRate = 92;
+    _checkStepBurst(_steps);
+    notifyListeners();
+  }
+
+  /// Mô phỏng người dùng đi bộ vượt mốc >200 bước chân tích cực
+  void simulateWalkingBurst({int burstSteps = 210}) {
+    _steps += burstSteps;
+    _status = 'walking';
+    _heartRate = 96;
+    _checkStepBurst(_steps);
     notifyListeners();
   }
 

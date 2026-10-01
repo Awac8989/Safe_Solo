@@ -236,6 +236,80 @@ class JourneyService {
       })),
     };
   }
+
+  async checkAndEscalateOverdueJourneys(io) {
+    const now = new Date();
+    const overdueJourneys = await LiveJourney.find({
+      status: 'IN_TRANSIT',
+      expectedArrivalAt: { $lt: now },
+    });
+
+    for (const journey of overdueJourneys) {
+      journey.status = 'OVERDUE_ALARM';
+      await journey.save();
+
+      const userDoc = await User.findById(journey.userId);
+      if (userDoc) {
+        if (journey.currentLat != null && journey.currentLng != null) {
+          userDoc.lastKnownLocation = {
+            lat: journey.currentLat,
+            lng: journey.currentLng,
+            updatedAt: now,
+          };
+          await userDoc.save();
+        }
+
+        try {
+          const { triggerSosForUser } = require('./sosService');
+          await triggerSosForUser(io, userDoc);
+        } catch (sosErr) {
+          console.error('[JourneyService] Error triggering SOS for overdue journey:', sosErr.message);
+        }
+
+        try {
+          const { createAlertEvent } = require('./alertEventService');
+          await createAlertEvent({
+            userId: userDoc._id,
+            level: 'CRITICAL',
+            status: 'EMERGENCY_TRIGGERED',
+            source: 'SYSTEM',
+            title: 'HÀNH TRÌNH QUÁ HẠN: Phát tín hiệu định vị khẩn cấp',
+            message: `Người dùng chưa bấm "Đã về nhà an toàn" sau hạn chót lộ trình đến "${journey.destinationLabel}". Hệ thống đã tự động phát tín hiệu SOS và tọa độ định vị tới người thân.`,
+            metadata: {
+              journeyId: journey._id,
+              destination: journey.destinationLabel,
+              lat: journey.currentLat,
+              lng: journey.currentLng,
+              shareToken: journey.shareToken,
+            },
+          });
+        } catch (alertErr) {
+          console.error('[JourneyService] Error creating alert event for overdue journey:', alertErr.message);
+        }
+      }
+
+      if (io) {
+        io.emit('journey:overdue', {
+          journeyId: journey._id,
+          userId: journey.userId,
+          destinationLabel: journey.destinationLabel,
+          lat: journey.currentLat,
+          lng: journey.currentLng,
+          shareToken: journey.shareToken,
+          message: 'Hành trình đã quá hạn dự kiến mà không xác nhận an toàn! Tín hiệu định vị cứu hộ đã được phát tới người thân.',
+        });
+        io.to(`journey_${journey.shareToken}`).emit('journey:update', {
+          lat: journey.currentLat,
+          lng: journey.currentLng,
+          status: 'OVERDUE_ALARM',
+          timestamp: toIso(now),
+        });
+      }
+    }
+
+    return overdueJourneys.length;
+  }
 }
 
 module.exports = new JourneyService();
+

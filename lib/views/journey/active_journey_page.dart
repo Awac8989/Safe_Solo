@@ -30,6 +30,14 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with SingleTicker
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _now = DateTime.now());
+        final provider = context.read<AppProvider>();
+        final journey = provider.activeJourney;
+        if (journey != null &&
+            journey.isInTransit &&
+            !provider.hasEscalatedJourneyOverdue &&
+            journey.expectedArrivalAt.difference(_now).inSeconds <= 0) {
+          provider.escalateOverdueJourney();
+        }
       }
     });
   }

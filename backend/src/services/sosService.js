@@ -177,18 +177,20 @@ async function triggerSosForMongoUser(io, userDoc) {
     },
   };
 
-  io.emit('EMERGENCY_SOS', payload);
-  io.emit('OMNICHANNEL_DISPATCH_UPDATE', {
-    emergencyLogId: emergencyLog._id,
-    userId: user._id,
-    timestamp: new Date(),
-    channels: [
-      { name: 'SMS Gateway', status: successCount > 0 ? 'DELIVERED' : 'FAILED', sentCount: successCount },
-      { name: 'Telegram Bot', status: telegramResult.success ? 'DELIVERED' : 'FAILED' },
-      { name: 'Zalo ZNS', status: zaloResult.success ? 'DELIVERED' : 'FAILED' },
-      { name: 'Voice Auto-Call', status: voiceCallResult.success ? 'QUEUED' : 'FAILED' },
-    ],
-  });
+  if (io) {
+    io.emit('EMERGENCY_SOS', payload);
+    io.emit('OMNICHANNEL_DISPATCH_UPDATE', {
+      emergencyLogId: emergencyLog._id,
+      userId: user._id,
+      timestamp: new Date(),
+      channels: [
+        { name: 'SMS Gateway', status: successCount > 0 ? 'DELIVERED' : 'FAILED', sentCount: successCount },
+        { name: 'Telegram Bot', status: telegramResult.success ? 'DELIVERED' : 'FAILED' },
+        { name: 'Zalo ZNS', status: zaloResult.success ? 'DELIVERED' : 'FAILED' },
+        { name: 'Voice Auto-Call', status: voiceCallResult.success ? 'QUEUED' : 'FAILED' },
+      ],
+    });
+  }
 
   const alertEvent = await createAlertEvent({
     userId: user._id,
@@ -208,7 +210,9 @@ async function triggerSosForMongoUser(io, userDoc) {
       location: user.lastKnownLocation,
     },
   });
-  io.emit('ALERT_EVENT', alertEvent);
+  if (io) {
+    io.emit('ALERT_EVENT', alertEvent);
+  }
 
   return payload;
 }

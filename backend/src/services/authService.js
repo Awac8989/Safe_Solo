@@ -76,93 +76,138 @@ class AuthService {
   }
 
   async register(payload) {
-    const email = normalizeEmail(payload.email);
-    ensure(email, 'Email is required');
+    const rawEmail = payload.email ? normalizeEmail(payload.email) : '';
+    const phone = (payload.phone || payload.phoneNumber || '').trim();
+    const effectiveEmail = rawEmail || (phone ? `${phone}@safesolo.vn` : '');
+
+    ensure(effectiveEmail || phone, 'Vui lòng cung cấp Email hoặc Số điện thoại để đăng ký');
 
     const existing = await User.findOne({
       $or: [
-        { email },
-        ...(payload.phone ? [{ phoneNumber: payload.phone }] : []),
+        ...(effectiveEmail ? [{ email: effectiveEmail }] : []),
+        ...(phone ? [{ phoneNumber: phone }] : []),
       ],
     });
 
     if (existing) {
-      throw new AppError('User already exists with this email or phone', 409);
+      throw new AppError('Số điện thoại hoặc Email này đã được đăng ký trong hệ sinh thái SafeSolo', 409);
     }
 
-    const otp = this.generateOTP();
-    const firstName = String(payload.firstName || payload.name || 'Safe').trim();
-    const lastName = String(payload.lastName || 'Solo').trim();
+    let firstName = payload.firstName ? String(payload.firstName).trim() : '';
+    let lastName = payload.lastName ? String(payload.lastName).trim() : '';
+    if (!firstName && !lastName && payload.fullName) {
+      const parts = splitFullName(payload.fullName);
+      firstName = parts.firstName;
+      lastName = parts.lastName;
+    }
+    firstName = firstName || 'Safe';
+    lastName = lastName || 'Solo';
     const fullNameValue = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+    let hashedPassword = null;
+    if (payload.password) {
+      hashedPassword = await bcrypt.hash(String(payload.password), 10);
+    }
+
+    const emergencyContacts = [];
+    if (payload.emergencyName && payload.emergencyPhone) {
+      emergencyContacts.push({
+        name: String(payload.emergencyName).trim(),
+        phone: String(payload.emergencyPhone).trim(),
+        relation: 'Người thân',
+        priority: 1,
+      });
+    } else if (Array.isArray(payload.emergencyContacts)) {
+      emergencyContacts.push(...payload.emergencyContacts);
+    }
+
+    const interval = Number(payload.timerIntervalMinutes) || 720;
+    const now = new Date();
+
     const user = await User.create({
       fullName: fullNameValue,
       firstName,
       lastName,
-      email,
-      phoneNumber: payload.phone || null,
+      email: effectiveEmail,
+      phoneNumber: phone || null,
+      password: hashedPassword,
       dateOfBirth: payload.dateOfBirth ? new Date(payload.dateOfBirth) : null,
       gender: payload.gender || 'PREFER_NOT_TO_SAY',
       avatar: null,
       isActive: true,
-      isVerified: false,
-      otpCode: otp,
-      otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      lastLoginAt: null,
+      isVerified: true,
+      lastLoginAt: now,
       trustScore: 5,
       rescuesCount: 0,
       isKycVerified: false,
-      timerIntervalMinutes: 24 * 60,
-      lastCheckinTime: new Date(),
-      nextDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      timerIntervalMinutes: interval,
+      lastCheckinTime: now,
+      nextDeadline: new Date(now.getTime() + interval * 60 * 1000),
       currentStatus: 'SAFE',
       lastKnownLocation:
         payload.lat != null && payload.lng != null
-          ? { lat: payload.lat, lng: payload.lng, updatedAt: new Date() }
+          ? { lat: payload.lat, lng: payload.lng, updatedAt: now }
           : null,
       batteryLevel: payload.batteryLevel ?? null,
       role: String(payload.role || 'USER').toLowerCase() === 'admin' ? 'admin' : 'user',
       quietHoursStart: '23:00',
       quietHoursEnd: '06:00',
-      falseAlertGraceMinutes: 7,
+      falseAlertGraceMinutes: 3,
       highContrast: false,
       pillReminder: false,
       pillTime: '08:00',
       realPin: '',
       duressPin: '',
-      ...buildEncryptedUserSensitiveUpdate(email || crypto.randomUUID(), {
+      ...buildEncryptedUserSensitiveUpdate(effectiveEmail || phone || crypto.randomUUID(), {
         approxAddress: payload.approxAddress || null,
         medicalNotes: '',
-        emergencyContacts: [],
+        emergencyContacts,
       }),
     });
 
     user.encryptedSensitive = buildEncryptedUserSensitiveUpdate(user._id, {
       approxAddress: payload.approxAddress || null,
       medicalNotes: '',
-      emergencyContacts: [],
+      emergencyContacts,
     }).encryptedSensitive;
     user.encryptionVersion = 1;
-    user.encryptedAt = new Date();
+    user.encryptedAt = now;
     await user.save();
 
     await this.ensureSecurity(user._id);
+
+    try {
+      await MedicalProfile.findOneAndUpdate(
+        { userId: user._id },
+        {
+          userId: user._id,
+          fullName: fullNameValue,
+          emergencyPhone: emergencyContacts[0]?.phone || '',
+          emergencyContact: emergencyContacts[0] || null,
+          bloodType: 'O+',
+        },
+        { upsert: true, new: true },
+      );
+    } catch (_) {}
+
     await createAlertEvent({
       userId: user._id,
       level: 'INFO',
       status: 'REGISTERED',
       source: 'USER',
-      title: 'Dang ky tai khoan',
-      message: `${fullName(user)} da dang ky SafeSolo`,
-      metadata: {},
+      title: 'Đăng ký tài khoản',
+      message: `${fullName(user)} đã hoàn tất đăng ký tài khoản SafeSolo`,
+      metadata: { timerIntervalMinutes: interval },
     });
 
+    const token = this.generateToken(user);
     return {
       user: {
         ...sanitizeUser(user),
-        security: this.mergeSecurity(user, null),
+        security: this.mergeSecurity(user, await this.ensureSecurity(user._id)),
       },
-      ...this.includeOtpPreview(otp),
-      message: 'Registration successful. Please verify OTP to complete sign in.',
+      token,
+      message: 'Đăng ký tài khoản thành công! Chào mừng bạn gia nhập mạng lưới SafeSolo.',
     };
   }
 

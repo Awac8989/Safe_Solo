@@ -10,7 +10,7 @@ class AppColors {
   static const Color card = Color(0xFFFFFFFF);
   static const Color cardSoft = Color(0xFFF1F8F4);
   static const Color border = Color(0xFFDCEAE2);
-  static const Color input = Color(0xFFFFFFFF);
+  static const Color input = Color(0xFFF8FAFC);
   static const Color ring = Color(0xFF37B874);
 
   static const Color primary = Color(0xFF33B56F);
@@ -168,6 +168,7 @@ class AppTextStyles {
     fontSize: 40,
     height: 1.08,
     fontWeight: FontWeight.w800,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle h2 = TextStyle(
@@ -175,6 +176,7 @@ class AppTextStyles {
     fontSize: 30,
     height: 1.14,
     fontWeight: FontWeight.w800,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle h3 = TextStyle(
@@ -182,6 +184,7 @@ class AppTextStyles {
     fontSize: 24,
     height: 1.2,
     fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle title = TextStyle(
@@ -189,6 +192,7 @@ class AppTextStyles {
     fontSize: 18,
     height: 1.25,
     fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle bodyLarge = TextStyle(
@@ -196,6 +200,7 @@ class AppTextStyles {
     fontSize: 16,
     height: 1.45,
     fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle body = TextStyle(
@@ -203,6 +208,7 @@ class AppTextStyles {
     fontSize: 14,
     height: 1.5,
     fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle bodyStrong = TextStyle(
@@ -210,6 +216,7 @@ class AppTextStyles {
     fontSize: 14,
     height: 1.4,
     fontWeight: FontWeight.w700,
+    color: AppColors.textPrimary,
   );
 
   static const TextStyle caption = TextStyle(
@@ -217,6 +224,7 @@ class AppTextStyles {
     fontSize: 12,
     height: 1.35,
     fontWeight: FontWeight.w600,
+    color: AppColors.textSecondary,
   );
 
   static const TextStyle button = TextStyle(
@@ -232,6 +240,7 @@ class AppTextStyles {
     fontSize: 48,
     height: 1,
     fontWeight: FontWeight.w800,
+    color: AppColors.textPrimary,
   );
 
   static Color textPrimary(BuildContext context) =>
@@ -252,6 +261,15 @@ class AppTextStyles {
 
 class AppTheme {
   AppTheme._();
+
+  static Color textPrimary(BuildContext context) =>
+      AppTextStyles.textPrimary(context);
+
+  static Color textSecondary(BuildContext context) =>
+      AppTextStyles.textSecondary(context);
+
+  static Color textMuted(BuildContext context) =>
+      AppTextStyles.textMuted(context);
 
   static ThemeData get light {
     const colorScheme = ColorScheme(
@@ -290,13 +308,21 @@ class AppTheme {
         labelLarge: AppTextStyles.button,
         bodySmall: AppTextStyles.caption,
         labelSmall: AppTextStyles.caption,
+      ).apply(
+        bodyColor: AppColors.textPrimary,
+        displayColor: AppColors.textPrimary,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: AppTextStyles.title,
+        titleTextStyle: TextStyle(
+          fontFamily: AppTextStyles.fontFamily,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimary,
+        ),
         iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       cardTheme: CardThemeData(
@@ -327,25 +353,30 @@ class AppTheme {
           ),
         ),
       ),
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: AppColors.primary,
+        selectionColor: Color(0x3333B56F),
+        selectionHandleColor: AppColors.primary,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.input,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         hintStyle: AppTextStyles.body.copyWith(color: AppColors.textMuted),
         labelStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
         prefixIconColor: AppColors.textMuted,
         suffixIconColor: AppColors.textMuted,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          borderSide: const BorderSide(color: AppColors.ring, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -457,6 +488,33 @@ class AppTheme {
         foregroundColor: AppColors.primaryForeground,
         elevation: 0,
         shape: CircleBorder(),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primary;
+          }
+          return const Color(0xFF64748B);
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return AppColors.primarySoft;
+          }
+          return const Color(0xFFE2E8F0);
+        }),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return Colors.transparent;
+          }
+          return const Color(0xFFCBD5E1);
+        }),
+      ),
+      sliderTheme: const SliderThemeData(
+        activeTrackColor: AppColors.primary,
+        inactiveTrackColor: Color(0xFFE2E8F0),
+        thumbColor: AppColors.primary,
+        overlayColor: Color(0x2233B56F),
+        trackHeight: 5,
       ),
     );
   }

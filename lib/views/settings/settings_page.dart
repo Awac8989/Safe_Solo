@@ -1140,12 +1140,25 @@ class _SwitchRow extends StatelessWidget {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
+            activeThumbColor: AppColors.primary,
             activeTrackColor: isDark ? AppDarkColors.primarySoft : AppColors.primarySoft,
             thumbColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
                 return isDark ? AppDarkColors.primary : AppColors.primary;
               }
-              return Colors.white70;
+              return isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+            }),
+            trackColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return isDark ? AppDarkColors.primarySoft : AppColors.primarySoft;
+              }
+              return isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+            }),
+            trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.transparent;
+              }
+              return isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
             }),
           ),
         ],
@@ -1211,10 +1224,10 @@ class _SliderRow extends StatelessWidget {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: isDark ? AppDarkColors.primary : AppColors.primary,
-              inactiveTrackColor: isDark ? AppDarkColors.border : AppColors.border,
-              thumbColor: Colors.white,
-              overlayColor: (isDark ? AppDarkColors.primary : AppColors.primary).withValues(alpha: 0.12),
-              trackHeight: 4,
+              inactiveTrackColor: isDark ? AppDarkColors.border : const Color(0xFFE2E8F0),
+              thumbColor: isDark ? Colors.white : AppColors.primary,
+              overlayColor: (isDark ? AppDarkColors.primary : AppColors.primary).withValues(alpha: 0.15),
+              trackHeight: 5,
             ),
             child: Slider(
               value: value,

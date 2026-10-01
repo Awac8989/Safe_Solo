@@ -89,7 +89,14 @@ class _MedicalPageState extends State<MedicalPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(strings.text('Thông tin y tế', 'Medical ID')),
+        title: Text(
+          strings.text('Thông tin y tế', 'Medical ID'),
+          style: TextStyle(
+            color: AppTheme.textPrimary(context),
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: _showQrCode,
@@ -210,6 +217,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _fullNameController,
                       textCapitalization: TextCapitalization.words,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Họ và tên', 'Full name'),
                         prefixIcon: const Icon(Icons.person_outline_rounded),
@@ -219,6 +231,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _birthYearController,
                       keyboardType: TextInputType.number,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Năm sinh', 'Birth year'),
                         prefixIcon: const Icon(Icons.cake_outlined),
@@ -228,6 +245,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _citizenIdController,
                       keyboardType: TextInputType.number,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('CCCD', 'Citizen ID'),
                         prefixIcon: const Icon(Icons.badge_outlined),
@@ -237,6 +259,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _permanentAddressController,
                       maxLines: 2,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Địa chỉ thường trú', 'Permanent address'),
                         prefixIcon: const Icon(Icons.home_work_outlined),
@@ -253,6 +280,12 @@ class _MedicalPageState extends State<MedicalPage> {
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: _normalizedBloodType,
+                      dropdownColor: Theme.of(context).cardColor,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Nhóm máu', 'Blood type'),
                         prefixIcon: const Icon(Icons.bloodtype_outlined),
@@ -261,7 +294,14 @@ class _MedicalPageState extends State<MedicalPage> {
                           .map(
                             (type) => DropdownMenuItem<String>(
                               value: type,
-                              child: Text(type, style: AppTextStyles.bodyLarge),
+                              child: Text(
+                                type,
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary(context),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           )
                           .toList(),
@@ -272,6 +312,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _allergiesController,
                       maxLines: 2,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Dị ứng', 'Allergies'),
                         prefixIcon: const Icon(Icons.warning_amber_rounded),
@@ -281,6 +326,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _conditionsController,
                       maxLines: 2,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Bệnh nền', 'Conditions'),
                         prefixIcon: const Icon(Icons.favorite_border_rounded),
@@ -290,6 +340,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     TextFormField(
                       controller: _medicationsController,
                       maxLines: 2,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Thuốc đang dùng', 'Current medications'),
                         prefixIcon: const Icon(Icons.medication_outlined),
@@ -305,6 +360,11 @@ class _MedicalPageState extends State<MedicalPage> {
                 child: TextFormField(
                   controller: _emergencyPhoneController,
                   keyboardType: TextInputType.phone,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary(context),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                  ),
                   decoration: InputDecoration(
                     labelText: strings.text(
                       'Số điện thoại khẩn cấp',
@@ -322,6 +382,11 @@ class _MedicalPageState extends State<MedicalPage> {
                   children: [
                     TextFormField(
                       controller: _insuranceProviderController,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Nhà bảo hiểm', 'Insurance provider'),
                         prefixIcon: const Icon(Icons.shield_outlined),
@@ -330,6 +395,11 @@ class _MedicalPageState extends State<MedicalPage> {
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _insuranceNumberController,
+                      style: TextStyle(
+                        color: AppTheme.textPrimary(context),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         labelText: strings.text('Số hợp đồng', 'Policy number'),
                         prefixIcon: const Icon(Icons.confirmation_number_outlined),
@@ -490,7 +560,10 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: AppTextStyles.title.copyWith(fontSize: 19),
+      style: AppTextStyles.title.copyWith(
+        fontSize: 19,
+        color: AppTheme.textPrimary(context),
+      ),
     );
   }
 }

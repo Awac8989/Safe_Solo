@@ -16,7 +16,23 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-  int _selectedTab = 0; // 0: Phone, 1: Gmail/Google, 2: Telegram Bot
+  int _authMode = 0; // 0: Đăng nhập (Sign In), 1: Đăng ký tài khoản (Register)
+  int _selectedTab = 0; // 0: Phone, 1: Password, 2: Gmail/Google, 3: Telegram Bot
+
+  // Registration Form State
+  final _regFormKey = GlobalKey<FormState>();
+  final _regFullNameController = TextEditingController();
+  final _regPhoneController = TextEditingController();
+  final _regEmailController = TextEditingController();
+  final _regPasswordController = TextEditingController();
+  final _regConfirmPasswordController = TextEditingController();
+  final _regEmergencyNameController = TextEditingController();
+  final _regEmergencyPhoneController = TextEditingController();
+  int _regTimerInterval = 720;
+  bool _regObscurePassword = true;
+  bool _regObscureConfirmPassword = true;
+  bool _isRegistering = false;
+  String? _regErrorMessage;
 
   // Phone 2-Step Auth State
   int _phoneStep = 0; // 0: Nhập SĐT & Preset Demo, 1: Nhập OTP 6 số, 2: Hoàn tất hồ sơ mới
@@ -89,6 +105,13 @@ class _AuthPageState extends State<AuthPage> {
     _forgotIdentifierController.dispose();
     _forgotOtpController.dispose();
     _forgotNewPasswordController.dispose();
+    _regFullNameController.dispose();
+    _regPhoneController.dispose();
+    _regEmailController.dispose();
+    _regPasswordController.dispose();
+    _regConfirmPasswordController.dispose();
+    _regEmergencyNameController.dispose();
+    _regEmergencyPhoneController.dispose();
     super.dispose();
   }
 
@@ -1137,7 +1160,9 @@ class _AuthPageState extends State<AuthPage> {
               children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white),
                 SizedBox(width: 8),
-                Text('Đăng nhập thành công! Chào mừng bạn trở lại.'),
+                Expanded(
+                  child: Text('Đăng nhập thành công! Chào mừng bạn trở lại.'),
+                ),
               ],
             ),
           ),
@@ -1680,10 +1705,27 @@ class _AuthPageState extends State<AuthPage> {
                 const SizedBox(height: 6),
                 TextField(
                   controller: _pwdIdentifierController,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  cursorColor: const Color(0xFF0284C7),
                   autofillHints: const [AutofillHints.username, AutofillHints.email, AutofillHints.telephoneNumber],
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: Color(0xFF0284C7)),
                     hintText: strings.text('VD: 0913843958 hoặc user@safesolo.vn', 'e.g. 0913843958 or user@safesolo.vn'),
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF0284C7), width: 2.0),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1697,18 +1739,35 @@ class _AuthPageState extends State<AuthPage> {
                 TextField(
                   controller: _pwdPasswordController,
                   obscureText: _obscurePassword,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  cursorColor: const Color(0xFF0284C7),
                   autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: Color(0xFF0284C7)),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                         size: 20,
-                        color: AppColors.textMuted,
+                        color: const Color(0xFF64748B),
                       ),
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     hintText: strings.text('Nhập mật khẩu (Mặc định demo: 123456)', 'Enter password (Demo default: 123456)'),
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF0284C7), width: 2.0),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -1937,6 +1996,510 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  Future<void> _handleRegisterSubmit() async {
+    if (!(_regFormKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    final pass = _regPasswordController.text;
+    final confirmPass = _regConfirmPasswordController.text;
+    if (pass != confirmPass) {
+      setState(() => _regErrorMessage = 'Mật khẩu xác nhận không khớp. Vui lòng kiểm tra lại.');
+      return;
+    }
+
+    setState(() {
+      _isRegistering = true;
+      _regErrorMessage = null;
+    });
+
+    final provider = context.read<AppProvider>();
+    try {
+      await provider.registerNewAccount(
+        fullName: _regFullNameController.text.trim(),
+        phoneNumber: _regPhoneController.text.trim(),
+        email: _regEmailController.text.trim(),
+        password: pass,
+        emergencyName: _regEmergencyNameController.text.trim(),
+        emergencyPhone: _regEmergencyPhoneController.text.trim(),
+        timerIntervalMinutes: _regTimerInterval,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF10B981),
+            content: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Đăng ký tài khoản thành công! Chào mừng bạn gia nhập mạng lưới SafeSolo.'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _regErrorMessage = e.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _isRegistering = false);
+    }
+  }
+
+  Widget _buildRegistrationForm(AppStrings strings, AppProvider appProvider) {
+    return Form(
+      key: _regFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.person_outline_rounded, color: Color(0xFF059669), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.text('Thông tin cá nhân', 'Personal Information'),
+                            style: AppTextStyles.title.copyWith(fontSize: 16),
+                          ),
+                          Text(
+                            strings.text('Họ tên và phương thức liên hệ chính', 'Full name & primary contacts'),
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Họ và tên
+                Text(
+                  strings.text('Họ và tên *', 'Full name *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regFullNameController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập họ và tên';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.badge_outlined, size: 20),
+                    hintText: 'VD: Đoàn Minh Quân',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Số điện thoại
+                Text(
+                  strings.text('Số điện thoại di động *', 'Phone number *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regPhoneController,
+                  keyboardType: TextInputType.phone,
+                  validator: (v) {
+                    if (v == null || v.trim().length < 9) return 'Vui lòng nhập số điện thoại hợp lệ (9-11 số)';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                    hintText: 'VD: 0913843958',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Email
+                Text(
+                  strings.text('Địa chỉ Email *', 'Email address *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || !v.contains('@')) return 'Vui lòng nhập email hợp lệ';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.mail_outline_rounded, size: 20),
+                    hintText: 'VD: quan.doan@safesolo.vn',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Card 2: Mật khẩu
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.text('Mật khẩu bảo mật', 'Account Password'),
+                            style: AppTextStyles.title.copyWith(fontSize: 16),
+                          ),
+                          Text(
+                            strings.text('Mật khẩu đăng nhập vào ứng dụng', 'Password to sign in'),
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Mật khẩu
+                Text(
+                  strings.text('Mật khẩu (tối thiểu 6 ký tự) *', 'Password (min 6 characters) *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regPasswordController,
+                  obscureText: _regObscurePassword,
+                  validator: (v) {
+                    if (v == null || v.length < 6) return 'Mật khẩu cần tối thiểu 6 ký tự';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(_regObscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                      onPressed: () => setState(() => _regObscurePassword = !_regObscurePassword),
+                    ),
+                    hintText: 'Nhập mật khẩu an toàn',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Xác nhận mật khẩu
+                Text(
+                  strings.text('Nhập lại mật khẩu *', 'Confirm password *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regConfirmPasswordController,
+                  obscureText: _regObscureConfirmPassword,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Vui lòng xác nhận mật khẩu';
+                    if (v != _regPasswordController.text) return 'Mật khẩu xác nhận không khớp';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.lock_reset_rounded, size: 20),
+                    suffixIcon: IconButton(
+                      icon: Icon(_regObscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                      onPressed: () => setState(() => _regObscureConfirmPassword = !_regObscureConfirmPassword),
+                    ),
+                    hintText: 'Nhập lại mật khẩu vừa nhập',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Card 3: Người giám hộ / Khẩn cấp (ICE)
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.emergency_rounded, color: Color(0xFFDC2626), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.text('Người bảo hộ khẩn cấp (ICE)', 'Emergency Contact (ICE)'),
+                            style: AppTextStyles.title.copyWith(fontSize: 16),
+                          ),
+                          Text(
+                            strings.text('Nhận thông báo khi xảy ra sự cố khẩn cấp hoặc té ngã', 'Notified on SOS or fall alerts'),
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Tên người thân
+                Text(
+                  strings.text('Họ tên người thân *', 'Contact name *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regEmergencyNameController,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Vui lòng nhập họ tên người thân';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.favorite_outline_rounded, size: 20),
+                    hintText: 'VD: Mẹ Lan, Bố Tuấn, Vợ Mai',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // SĐT người thân
+                Text(
+                  strings.text('Số điện thoại người thân *', 'Contact phone *'),
+                  style: AppTextStyles.bodyStrong.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _regEmergencyPhoneController,
+                  keyboardType: TextInputType.phone,
+                  validator: (v) {
+                    if (v == null || v.trim().length < 9) return 'Vui lòng nhập SĐT người thân (9-11 số)';
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.phone_in_talk_outlined, size: 20),
+                    hintText: 'VD: 0901112222',
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Card 4: Chu kỳ điểm danh
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.timer_outlined, color: Color(0xFF4F46E5), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.text('Chu kỳ an toàn Dead-man Switch', 'Safety Check-in Interval'),
+                            style: AppTextStyles.title.copyWith(fontSize: 16),
+                          ),
+                          Text(
+                            strings.text('Thời gian đếm ngược giữa các lần xác nhận an toàn', 'Countdown timer interval'),
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    for (final item in [
+                      {'label': '12 Giờ\n(Khuyên dùng)', 'val': 720},
+                      {'label': '24 Giờ\n(Mỗi ngày)', 'val': 1440},
+                      {'label': '48 Giờ\n(2 ngày)', 'val': 2880},
+                    ]) ...[
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: InkWell(
+                            onTap: () => setState(() => _regTimerInterval = item['val'] as int),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: _regTimerInterval == item['val']
+                                    ? AppColors.primary.withValues(alpha: 0.1)
+                                    : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _regTimerInterval == item['val']
+                                      ? AppColors.primary
+                                      : const Color(0xFFE2E8F0),
+                                  width: _regTimerInterval == item['val'] ? 2 : 1,
+                                ),
+                              ),
+                              child: Text(
+                                item['label'] as String,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _regTimerInterval == item['val'] ? FontWeight.bold : FontWeight.normal,
+                                  color: _regTimerInterval == item['val'] ? AppColors.primary : AppColors.textPrimary,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Thông báo lỗi nếu có
+          if (_regErrorMessage != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3F0),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFC6BB)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: AppColors.destructive, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _regErrorMessage!,
+                      style: AppTextStyles.caption.copyWith(color: AppColors.destructive, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 20),
+
+          // Nút Đăng ký tài khoản
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF059669),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 2,
+              ),
+              onPressed: _isRegistering ? null : _handleRegisterSubmit,
+              child: _isRegistering
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.how_to_reg_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          strings.text('TẠO TÀI KHOẢN & KÍCH HOẠT', 'CREATE ACCOUNT & ACTIVATE'),
+                          style: AppTextStyles.bodyStrong.copyWith(color: Colors.white, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+
+          // Chuyển sang Đăng nhập
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 16, bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    strings.text('Đã có tài khoản SafeSolo?', 'Already have an account?'),
+                    style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, fontSize: 13.5),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _authMode = 0),
+                    child: Text(
+                      strings.text('Đăng nhập ngay', 'Sign in now'),
+                      style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary, fontSize: 13.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final appProvider = context.watch<AppProvider>();
@@ -1958,52 +2521,199 @@ class _AuthPageState extends State<AuthPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              strings.text('Đăng nhập hoặc tạo hồ sơ', 'Sign in or create profile'),
-              style: AppTextStyles.h1.copyWith(fontSize: 32),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              strings.text(
-                'Chọn phương thức đăng nhập tiện lợi nhất: Số điện thoại OTP, Mật khẩu, Gmail hoặc Telegram.',
-                'Choose your preferred sign-in method: Phone OTP, Password, Gmail, or Telegram.',
-              ),
-              style: AppTextStyles.bodyLarge.copyWith(
-                color: AppColors.textSecondary,
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // Modern Tab Selector with 4 tabs
+            // Top Segmented Bar: [ ĐĂNG NHẬP ] | [ ĐĂNG KÝ MỚI ]
             Container(
+              height: 48,
               decoration: BoxDecoration(
-                color: AppColors.backgroundAlt,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: [
-                  _buildTabItem(0, Icons.phone_android_rounded, strings.text('Điện thoại', 'Phone')),
-                  _buildTabItem(1, Icons.lock_outline_rounded, strings.text('Mật khẩu', 'Password')),
-                  _buildTabItem(2, Icons.mail_outline_rounded, strings.text('Gmail / Google', 'Gmail / Google')),
-                  _buildTabItem(3, Icons.send_rounded, strings.text('Telegram Bot', 'Telegram Bot')),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _authMode = 0),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _authMode == 0 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _authMode == 0
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.login_rounded,
+                              size: 18,
+                              color: _authMode == 0 ? AppColors.primary : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              strings.text('ĐĂNG NHẬP', 'SIGN IN'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _authMode == 0 ? FontWeight.bold : FontWeight.w600,
+                                color: _authMode == 0 ? AppColors.primary : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _authMode = 1),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _authMode == 1 ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _authMode == 1
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  )
+                                ]
+                              : null,
+                        ),
+                        alignment: Alignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_add_rounded,
+                              size: 18,
+                              color: _authMode == 1 ? const Color(0xFF059669) : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              strings.text('ĐĂNG KÝ TÀI KHOẢN', 'REGISTER'),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _authMode == 1 ? FontWeight.bold : FontWeight.w600,
+                                color: _authMode == 1 ? const Color(0xFF059669) : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
-            // Tab Content
-            if (_selectedTab == 0)
-              _buildPhoneForm(strings, appProvider)
-            else if (_selectedTab == 1)
-              _buildPasswordTab(strings, appProvider)
-            else if (_selectedTab == 2)
-              _buildGmailTab(strings, appProvider)
-            else
-              _buildTelegramTab(strings, appProvider),
+            // Header Title & Description
+            if (_authMode == 0) ...[
+              Text(
+                strings.text('Đăng nhập SafeSolo', 'Sign in to SafeSolo'),
+                style: AppTextStyles.h1.copyWith(fontSize: 28),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.text(
+                  'Chọn phương thức thuận tiện nhất: Mật khẩu, Số điện thoại OTP, Gmail hoặc Telegram.',
+                  'Choose your preferred sign-in method: Password, Phone OTP, Gmail, or Telegram.',
+                ),
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Modern Tab Selector with 4 tabs
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundAlt,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    _buildTabItem(0, Icons.phone_android_rounded, strings.text('Điện thoại', 'Phone')),
+                    _buildTabItem(1, Icons.lock_outline_rounded, strings.text('Mật khẩu', 'Password')),
+                    _buildTabItem(2, Icons.mail_outline_rounded, strings.text('Gmail / Google', 'Gmail / Google')),
+                    _buildTabItem(3, Icons.send_rounded, strings.text('Telegram Bot', 'Telegram Bot')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Tab Content
+              if (_selectedTab == 0)
+                _buildPhoneForm(strings, appProvider)
+              else if (_selectedTab == 1)
+                _buildPasswordTab(strings, appProvider)
+              else if (_selectedTab == 2)
+                _buildGmailTab(strings, appProvider)
+              else
+                _buildTelegramTab(strings, appProvider),
+
+              // Bottom register CTA
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        strings.text('Chưa có tài khoản SafeSolo?', "Don't have a SafeSolo account?"),
+                        style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, fontSize: 13.5),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() => _authMode = 1),
+                        child: Text(
+                          strings.text('Đăng ký miễn phí ngay', 'Register now for free'),
+                          style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary, fontSize: 13.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              Text(
+                strings.text('Tạo tài khoản SafeSolo', 'Create SafeSolo Account'),
+                style: AppTextStyles.h1.copyWith(fontSize: 28),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.text(
+                  'Khởi tạo mạng lưới bảo vệ khẩn cấp, liên kết người thân và đồng bộ dữ liệu.',
+                  'Initialize emergency rescue network, link guardians, and sync data.',
+                ),
+                style: AppTextStyles.bodyLarge.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Registration Form Content
+              _buildRegistrationForm(strings, appProvider),
+            ],
 
             if (appProvider.lastError != null) ...[
               const SizedBox(height: 18),
@@ -2212,7 +2922,11 @@ class _AuthPageState extends State<AuthPage> {
                         decoration: const InputDecoration(
                           hintText: '0913 843 958',
                           hintStyle: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
+                          filled: false,
+                          fillColor: Colors.transparent,
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(vertical: 12),
                         ),
                         onSubmitted: (_) => _handlePhoneNext(),
@@ -2280,13 +2994,17 @@ class _AuthPageState extends State<AuthPage> {
               ),
             ),
             const SizedBox(width: 8),
-            const Text(
-              'TÀI KHOẢN MẪU KHÓA LUẬN (1-CHẠM)',
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.8,
+            const Expanded(
+              child: Text(
+                'TÀI KHOẢN MẪU KHÓA LUẬN (1-CHẠM)',
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
               ),
             ),
           ],
@@ -2508,28 +3226,36 @@ class _AuthPageState extends State<AuthPage> {
 
           const SizedBox(height: 10),
 
-          // TextField ẩn hỗ trợ gõ phím hệ thống
-          TextField(
-            controller: _otpInputController,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            textAlign: TextAlign.center,
-            autofocus: true,
-            style: const TextStyle(color: Colors.transparent, height: 0.1),
-            cursorColor: Colors.transparent,
-            decoration: const InputDecoration(
-              counterText: '',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
+          // TextField ẩn hỗ trợ gõ phím hệ thống (giấu gọn gàng không chiếm diện tích)
+          SizedBox(
+            width: 0,
+            height: 0,
+            child: TextField(
+              controller: _otpInputController,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              textAlign: TextAlign.center,
+              autofocus: true,
+              style: const TextStyle(color: Colors.transparent, height: 0.1),
+              cursorColor: Colors.transparent,
+              decoration: const InputDecoration(
+                counterText: '',
+                filled: false,
+                fillColor: Colors.transparent,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _otpErrorMessage = null;
+                });
+                if (val.length == 6) {
+                  _handleVerifyPhoneOtp();
+                }
+              },
             ),
-            onChanged: (val) {
-              setState(() {
-                _otpErrorMessage = null;
-              });
-              if (val.length == 6) {
-                _handleVerifyPhoneOtp();
-              }
-            },
           ),
 
           if (_otpErrorMessage != null) ...[

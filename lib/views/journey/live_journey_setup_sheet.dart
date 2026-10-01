@@ -23,16 +23,17 @@ class LiveJourneySetupSheet extends StatefulWidget {
 
 class _LiveJourneySetupSheetState extends State<LiveJourneySetupSheet> {
   final TextEditingController _destController = TextEditingController(text: 'Về nhà an toàn');
-  int _selectedDuration = 20; // 20 minutes default
+  int _selectedDuration = 30; // 30 phút mặc định
   bool _isStarting = false;
 
-  final List<int> _durations = [15, 20, 30, 45, 60];
+  final List<int> _durations = [15, 30, 45, 60];
 
   final List<String> _quickDestinations = [
     'Về nhà an toàn',
-    'Đi taxi / Grab đêm',
+    'Đi làm ca đêm',
     'Đi bộ qua đoạn vắng',
-    'Đến cơ quan / Trường học',
+    'Đi taxi / Grab đêm',
+    'Đến cơ quan / KTX',
   ];
 
   @override
@@ -203,7 +204,28 @@ class _LiveJourneySetupSheetState extends State<LiveJourneySetupSheet> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.security_update_warning_rounded, color: AppColors.primary, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Nếu sau $_selectedDuration phút không nhấn "Đã về nhà an toàn", hệ thống sẽ tự động phát tín hiệu định vị khẩn cấp cho người thân.',
+                    style: const TextStyle(fontSize: 12, height: 1.35, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 52,

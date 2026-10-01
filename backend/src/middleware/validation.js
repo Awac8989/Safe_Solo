@@ -4,10 +4,16 @@ const hhmm = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const userSchemas = {
   register: Joi.object({
-    email: Joi.string().email().required(),
+    email: Joi.string().email().allow(null, '').optional(),
     phone: Joi.string().allow(null, '').optional(),
-    firstName: Joi.string().min(1).max(50).required(),
-    lastName: Joi.string().min(1).max(80).required(),
+    phoneNumber: Joi.string().allow(null, '').optional(),
+    fullName: Joi.string().min(1).max(120).optional(),
+    firstName: Joi.string().min(1).max(50).optional(),
+    lastName: Joi.string().min(1).max(80).optional(),
+    password: Joi.string().min(6).max(100).allow(null, '').optional(),
+    emergencyName: Joi.string().allow(null, '').optional(),
+    emergencyPhone: Joi.string().allow(null, '').optional(),
+    timerIntervalMinutes: Joi.number().optional(),
     dateOfBirth: Joi.string().isoDate().allow(null, '').optional(),
     gender: Joi.string().valid('MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY').optional(),
   }),

@@ -16,6 +16,14 @@ const {
 } = require('../services/alertPolicyService');
 const { triggerSosForUser } = require('../services/sosService');
 const { getIo } = require('../sockets/socketServer');
+
+function safeGetIo() {
+  try {
+    return getIo();
+  } catch (_) {
+    return null;
+  }
+}
 const {
   nowIso,
   computeDeadlineIso,
@@ -33,6 +41,8 @@ const {
   buildEncryptedUserSensitiveUpdate,
   decryptUserSensitivePayload,
 } = require('../lib/userSensitiveCodec');
+const bcrypt = require('bcryptjs');
+const authService = require('../services/authService');
 const {
   registerPushToken: registerFcmPushToken,
   removePushToken: removeFcmPushToken,
@@ -361,6 +371,10 @@ async function registerUser(req, res) {
   const {
     fullName,
     phoneNumber,
+    email,
+    password,
+    emergencyName,
+    emergencyPhone,
     medicalNotes,
     emergencyContacts,
     timerIntervalMinutes,
@@ -374,14 +388,32 @@ async function registerUser(req, res) {
 
   const existed = await ensureUserByPhone(phoneNumber);
   if (existed) {
-    return res.status(409).json({ message: 'phoneNumber already exists' });
+    return res.status(409).json({ message: 'Số điện thoại này đã được đăng ký trong SafeSolo' });
   }
 
   const interval = Number(timerIntervalMinutes) || 720;
   const now = new Date();
+
+  let hashedPassword = null;
+  if (password) {
+    hashedPassword = await bcrypt.hash(String(password), 10);
+  }
+
+  const contacts = Array.isArray(emergencyContacts) ? [...emergencyContacts] : [];
+  if (contacts.length === 0 && emergencyName && emergencyPhone) {
+    contacts.push({
+      name: String(emergencyName).trim(),
+      phone: String(emergencyPhone).trim(),
+      relation: 'Người thân',
+      priority: 1,
+    });
+  }
+
   const userDoc = await User.create({
     fullName: fullName.trim(),
     phoneNumber: phoneNumber.trim(),
+    email: email ? String(email).trim().toLowerCase() : `${phoneNumber.trim()}@safesolo.vn`,
+    password: hashedPassword,
     role: role === 'admin' ? 'admin' : 'user',
     timerIntervalMinutes: interval,
     lastCheckinTime: now,
@@ -395,7 +427,7 @@ async function registerUser(req, res) {
     falseAlertGraceMinutes: 3,
     ...buildEncryptedUserSensitiveUpdate(phoneNumber.trim(), {
       medicalNotes: medicalNotes || '',
-      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
+      emergencyContacts: contacts,
       approxAddress: null,
     }),
   });
@@ -404,7 +436,7 @@ async function registerUser(req, res) {
     userDoc,
     buildEncryptedUserSensitiveUpdate(userDoc._id, {
       medicalNotes: medicalNotes || '',
-      emergencyContacts: Array.isArray(emergencyContacts) ? emergencyContacts : [],
+      emergencyContacts: contacts,
       approxAddress: null,
     }),
   );
@@ -414,7 +446,8 @@ async function registerUser(req, res) {
     ensureAlertPolicy(userDoc._id),
     ensureMedicalProfile(userDoc._id, {
       fullName: fullName.trim(),
-      emergencyPhone: emergencyContacts?.[0]?.phone || '',
+      emergencyPhone: contacts?.[0]?.phone || emergencyPhone || '',
+      emergencyContact: contacts?.[0] || null,
     }),
     ensureAutomationSettings(userDoc._id),
     ensureSecuritySettings(userDoc._id),
@@ -436,7 +469,12 @@ async function registerUser(req, res) {
     metadata: { timerIntervalMinutes: interval },
   });
 
-  return res.status(201).json(mapUserDoc(userDoc));
+  const token = authService.generateToken(userDoc);
+  const mapped = mapUserDoc(userDoc);
+  return res.status(201).json({
+    ...mapped,
+    token,
+  });
 }
 
 async function checkin(req, res) {
@@ -487,6 +525,7 @@ async function checkin(req, res) {
       'SAFE_GEOFENCE',
       'HOME_WIFI',
       'DEVICE_ACTIVITY',
+      'WAKE_UP_PULSE',
       'NONE',
     ];
     const normalizedPassiveSource = passiveSource && validPassiveSources.includes(String(passiveSource).toUpperCase())
@@ -539,7 +578,7 @@ async function checkin(req, res) {
         metadata: { location: checkinLocation, isDuress: true },
       });
 
-      const io = getIo();
+      const io = safeGetIo();
       triggerSosForUser(io, mapUserDoc(userDoc)).catch((err) => {
         console.error('[Duress] Failed to trigger silent SOS:', err);
       });
@@ -614,8 +653,106 @@ async function checkin(req, res) {
       });
     }
 
-    // Branch 3: SOFT_PASSIVE (Zero-touch: screen unlock, pedometer, charger, safe home geofence)
-    if (normalizedType === 'SOFT_PASSIVE') {
+    // Branch 3: SMART_PASSIVE & SOFT_PASSIVE (Passive Smart Check-in)
+    if (normalizedType === 'SMART_PASSIVE' || normalizedType === 'SOFT_PASSIVE') {
+      const isSmartPassiveTrigger =
+        normalizedType === 'SMART_PASSIVE' ||
+        metadata.smartPassiveRenewal === true ||
+        ['PEDOMETER_BURST', 'CHARGER_UNPLUGGED', 'SCREEN_UNLOCK', 'WAKE_UP_PULSE', 'HOME_WIFI', 'SAFE_GEOFENCE'].includes(normalizedPassiveSource);
+
+      if (isSmartPassiveTrigger) {
+        // Check-in thụ động thông minh: Tự động ghi nhận là "Đang an toàn" và tự gia hạn timer thêm 1 chu kỳ đầy đủ (12h/24h/48h)
+        const cycleMinutes = Number(userDoc.timerIntervalMinutes) || 720;
+        const newDeadline = new Date(Date.now() + cycleMinutes * 60 * 1000);
+
+        userDoc.consecutiveSoftCheckins = 0; // Reset soft check-in counter vì người dùng đã có dấu hiệu sinh tồn thực tế
+        userDoc.snoozeCountToday = 0;
+        userDoc.lastCheckinTime = now;
+        userDoc.nextDeadline = newDeadline;
+        userDoc.currentStatus = 'SAFE';
+        userDoc.lastWarningAt = null;
+        userDoc.lastReminderAt = null;
+        await userDoc.save();
+
+        let passiveTitle = 'Check-in thụ động thông minh';
+        let passiveMsg = `Hệ thống tự động gia hạn 1 chu kỳ an toàn (${cycleMinutes / 60}h) qua ${normalizedPassiveSource}`;
+        if (normalizedPassiveSource === 'WAKE_UP_PULSE') {
+          passiveTitle = 'Check-in nhịp tim thức giấc (BioActive PPG)';
+          passiveMsg = `Đã tự động xác nhận người dùng thức dậy bình an qua cảm biến nhịp tim & cử động cổ tay (+${cycleMinutes / 60}h)`;
+        } else if (normalizedPassiveSource === 'HOME_WIFI' || normalizedPassiveSource === 'SAFE_GEOFENCE') {
+          passiveTitle = 'Check-in Cắm sạc & Wi-Fi Nhà (Docking Anchor)';
+          passiveMsg = `Đã về nhà an toàn & kết nối sạc pin: Tự động kích hoạt Chế độ Nghỉ ngơi (Quiet Hours), miễn báo động đêm (+${cycleMinutes / 60}h)`;
+        } else if (normalizedPassiveSource === 'PEDOMETER_BURST') {
+          passiveTitle = 'Vận động tích cực (>200 bước chân)';
+          passiveMsg = `Hệ thống phát hiện vận động thực tế và đã tự động gia hạn 1 chu kỳ an toàn (+${cycleMinutes / 60}h)`;
+        } else if (normalizedPassiveSource === 'CHARGER_UNPLUGGED') {
+          passiveTitle = 'Rút sạc pin buổi sáng';
+          passiveMsg = `Nhận diện bắt đầu ngày mới an toàn, tự động gia hạn 1 chu kỳ (+${cycleMinutes / 60}h)`;
+        }
+
+        await CheckInHistory.create({
+          userId: id,
+          checkinTime: now,
+          locationAtCheckin: checkinLocation,
+          type: 'SMART_PASSIVE',
+          passiveSource: normalizedPassiveSource,
+          isSystemAutoTriggered: true,
+          metadata: {
+            ...metadata,
+            smartPassive: true,
+            cycleMinutes,
+            renewedFullCycle: true,
+          },
+        });
+
+        await createInteractionEvent({
+          userId: id,
+          type: 'CHECKIN_PASSIVE_SMART',
+          source: 'DEVICE_SENSOR',
+          metadata: {
+            passiveSource: normalizedPassiveSource,
+            cycleMinutes,
+            nextDeadline: newDeadline,
+          },
+        });
+
+        await createAlertEvent({
+          userId: id,
+          level: 'INFO',
+          status: 'CHECKIN_OK',
+          source: 'SYSTEM',
+          title: passiveTitle,
+          message: passiveMsg,
+          metadata: { passiveSource: normalizedPassiveSource, newDeadline },
+        });
+
+        const io = safeGetIo();
+        if (io) {
+          io.emit('checkin:smart_passive', {
+            userId: id,
+            passiveSource: normalizedPassiveSource,
+            nextDeadline: toIso(newDeadline),
+            cycleMinutes,
+            user: mapUserDoc(userDoc),
+          });
+          io.emit('CHECKIN_COMPLETED', {
+            userId: id,
+            type: 'SMART_PASSIVE',
+            source: normalizedPassiveSource,
+            nextDeadline: toIso(newDeadline),
+          });
+        }
+
+        return res.status(200).json({
+          message: `Điểm danh thụ động thông minh thành công: Đã tự gia hạn 1 chu kỳ (${cycleMinutes / 60}h)`,
+          user: mapUserDoc(userDoc),
+          smartRenewed: true,
+          cycleMinutes,
+          nextDeadline: toIso(newDeadline),
+        });
+      }
+
+      // Fallback cho điểm danh thụ động giới hạn thông thường
       const maxSoft = userDoc.maxSoftCheckinAllowed || 3;
       const currentConsecutive = userDoc.consecutiveSoftCheckins || 0;
 
@@ -696,11 +833,33 @@ async function checkin(req, res) {
       metadata,
     });
 
+    let checkinTitle = 'Check-in thanh cong';
+    let checkinMessage = 'Nguoi dung da xac nhan an toan';
+    if (normalizedType === 'EMOTIONAL_MOMENT') {
+      checkinTitle = 'Diem danh khoanh khac gia dinh';
+      checkinMessage = 'Nguoi dung gui khoanh khac check-in kem anh / loi nhan';
+    } else if (normalizedType === 'GESTURE_WRIST_TWIST') {
+      checkinTitle = 'Diem danh cu chi lac co tay';
+      checkinMessage = 'Xac nhan an toan qua cu chi Double Wrist-Twist tren Galaxy Watch 5';
+    } else if (normalizedType === 'HARDWARE_KEY_COMBO') {
+      checkinTitle = 'Diem danh to hop phim cung';
+      checkinMessage = 'Xac nhan an toan ngam qua to hop phim vat ly (Vol Up x2 + Down x1)';
+    } else if (normalizedType === 'VOICE_KEYWORD') {
+      checkinTitle = 'Diem danh bang giong noi';
+      checkinMessage = 'Xac nhan an toan qua khau lenh giong noi: SafeSolo toi an toan';
+    } else if (normalizedType === 'BUDDY_CROSS_CHECKIN') {
+      checkinTitle = 'Diem danh cap doi tuong ho';
+      checkinMessage = `Nguoi dung da diem danh tuong ho 1-cham voi nguoi than (${metadata.buddyName || 'Ban dong hanh'})`;
+    } else if (normalizedType === 'MEDICATION_VISION') {
+      checkinTitle = 'Diem danh uong thuoc bang Camera';
+      checkinMessage = `Da hoan tat an toan sinh tu & xac nhan uong thuoc (${metadata.pillName || 'Thuoc dinh ky'})`;
+    }
+
     await createInteractionEvent({
       userId: id,
       type: normalizedType === 'EMOTIONAL_MOMENT' ? 'CHECKIN_EMOTIONAL' : 'CHECKIN_TAP_OK',
-      source: 'MOBILE_APP',
-      metadata: { location: checkinLocation, type: normalizedType, routineType: normalizedRoutineType },
+      source: normalizedType === 'GESTURE_WRIST_TWIST' ? 'WATCH_GESTURE' : (normalizedType === 'HARDWARE_KEY_COMBO' ? 'HARDWARE_BUTTON' : 'MOBILE_APP'),
+      metadata: { location: checkinLocation, type: normalizedType, routineType: normalizedRoutineType, ...metadata },
     });
 
     await createAlertEvent({
@@ -708,14 +867,35 @@ async function checkin(req, res) {
       level: 'INFO',
       status: 'CHECKIN_OK',
       source: 'USER',
-      title: normalizedType === 'EMOTIONAL_MOMENT' ? 'Diem danh khoanh khac gia dinh' : 'Check-in thanh cong',
-      message: normalizedType === 'EMOTIONAL_MOMENT'
-        ? 'Nguoi dung gui khoanh khac check-in kem anh / loi nhan'
-        : 'Nguoi dung da xac nhan an toan',
-      metadata: { location: checkinLocation, type: normalizedType },
+      title: checkinTitle,
+      message: checkinMessage,
+      metadata: { location: checkinLocation, type: normalizedType, ...metadata },
     });
 
-    return res.json({ message: 'Check-in successful', user: mapUserDoc(userDoc) });
+    const io = safeGetIo();
+    if (io) {
+      if (normalizedType === 'BUDDY_CROSS_CHECKIN') {
+        io.emit('buddy:cross_checkin', {
+          userId: id,
+          userName: userDoc.name,
+          buddyId: metadata.buddyId,
+          timestamp: now.toISOString(),
+          message: `${userDoc.name} da diem danh an toan va gui loi chuc toi ban!`,
+        });
+      }
+      io.emit('CHECKIN_COMPLETED', {
+        userId: id,
+        type: normalizedType,
+        source: normalizedPassiveSource,
+        nextDeadline: toIso(userDoc.nextDeadline),
+      });
+    }
+
+    return res.json({
+      message: `${checkinTitle}: ${checkinMessage}`,
+      user: mapUserDoc(userDoc),
+      type: normalizedType,
+    });
   } catch (err) {
     console.error('[UserController.checkin] error:', err);
     return res.status(500).json({ message: 'Loi may chu: ' + err.message });

@@ -69,6 +69,19 @@ class WatchSyncManager extends ChangeNotifier {
   final List<WatchPacket> _recentPackets = [];
   Timer? _cloudPollTimer;
 
+  // Hồ sơ y tế thực tế đồng bộ hai chiều (Real Medical Profile)
+  String _medicalFullName = 'Đoàn Minh Quân';
+  String _medicalBirthYear = '2003';
+  String _medicalCitizenId = '079203001234';
+  String _medicalBloodType = 'O+';
+  String _medicalAllergies = 'Penicillin';
+  String _medicalConditions = 'Tăng HA nhẹ';
+  String _medicalMedications = 'Amlodipine 5mg';
+  String _medicalEmergencyPhone = '0901112222';
+  String _medicalEmergencyName = 'Mẹ Lan (ICE)';
+  String _medicalInsuranceProvider = 'BHYT Quân Đội';
+  String _medicalInsuranceNumber = 'DN4791234567890';
+
   // Getters
   bool get isPaired => _isPaired;
   WatchConnectionType get connectionType => _connectionType;
@@ -81,6 +94,18 @@ class WatchSyncManager extends ChangeNotifier {
   WatchPacket? get lastPacket => _lastPacket;
   List<WatchPacket> get recentPackets => List.unmodifiable(_recentPackets);
   Stream<WatchPacket> get packetStream => _packetController.stream;
+
+  String get medicalFullName => _medicalFullName;
+  String get medicalBirthYear => _medicalBirthYear;
+  String get medicalCitizenId => _medicalCitizenId;
+  String get medicalBloodType => _medicalBloodType;
+  String get medicalAllergies => _medicalAllergies;
+  String get medicalConditions => _medicalConditions;
+  String get medicalMedications => _medicalMedications;
+  String get medicalEmergencyPhone => _medicalEmergencyPhone;
+  String get medicalEmergencyName => _medicalEmergencyName;
+  String get medicalInsuranceProvider => _medicalInsuranceProvider;
+  String get medicalInsuranceNumber => _medicalInsuranceNumber;
 
   String get connectionStatusLabel {
     switch (_connectionType) {
@@ -120,6 +145,7 @@ class WatchSyncManager extends ChangeNotifier {
       if (!kIsTesting) {
         _startPeriodicHealthCheck();
         _fetchLatestVitals();
+        fetchMedicalProfileFromBackend();
       }
     });
   }
@@ -128,6 +154,7 @@ class WatchSyncManager extends ChangeNotifier {
   Future<void> loadPersistedState() async {
     if (kIsTesting) return;
     try {
+      await _loadMedicalState();
       final prefs = await SharedPreferences.getInstance();
       final paired = prefs.getBool(_storagePairedKey) ?? false;
       final devId = prefs.getString(_storageDeviceIdKey);
@@ -165,6 +192,148 @@ class WatchSyncManager extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[WatchSyncManager] Error saving persisted state: $e');
+    }
+  }
+
+  void _updateMedicalProfileFromMap(Map<String, dynamic> data) {
+    if (data['fullName'] != null && (data['fullName'] as String).isNotEmpty) {
+      _medicalFullName = data['fullName'] as String;
+    }
+    if (data['birthYear'] != null && (data['birthYear'] as String).isNotEmpty) {
+      _medicalBirthYear = data['birthYear'] as String;
+    }
+    if (data['citizenId'] != null && (data['citizenId'] as String).isNotEmpty) {
+      _medicalCitizenId = data['citizenId'] as String;
+    }
+    if (data['bloodType'] != null && (data['bloodType'] as String).isNotEmpty) {
+      _medicalBloodType = data['bloodType'] as String;
+    }
+    if (data['allergies'] != null && (data['allergies'] as String).isNotEmpty) {
+      _medicalAllergies = data['allergies'] as String;
+    }
+    if (data['conditions'] != null && (data['conditions'] as String).isNotEmpty) {
+      _medicalConditions = data['conditions'] as String;
+    }
+    if (data['medications'] != null && (data['medications'] as String).isNotEmpty) {
+      _medicalMedications = data['medications'] as String;
+    }
+    if (data['emergencyPhone'] != null && (data['emergencyPhone'] as String).isNotEmpty) {
+      _medicalEmergencyPhone = data['emergencyPhone'] as String;
+    } else if (data['emergencyContactPhone'] != null && (data['emergencyContactPhone'] as String).isNotEmpty) {
+      _medicalEmergencyPhone = data['emergencyContactPhone'] as String;
+    }
+    if (data['emergencyName'] != null && (data['emergencyName'] as String).isNotEmpty) {
+      _medicalEmergencyName = data['emergencyName'] as String;
+    } else if (data['emergencyContactName'] != null && (data['emergencyContactName'] as String).isNotEmpty) {
+      _medicalEmergencyName = data['emergencyContactName'] as String;
+    }
+    if (data['insuranceProvider'] != null && (data['insuranceProvider'] as String).isNotEmpty) {
+      _medicalInsuranceProvider = data['insuranceProvider'] as String;
+    }
+    if (data['insuranceNumber'] != null && (data['insuranceNumber'] as String).isNotEmpty) {
+      _medicalInsuranceNumber = data['insuranceNumber'] as String;
+    }
+    _saveMedicalState();
+    notifyListeners();
+  }
+
+  Future<void> _saveMedicalState() async {
+    if (kIsTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('safesolo_med_name', _medicalFullName);
+      await prefs.setString('safesolo_med_birth', _medicalBirthYear);
+      await prefs.setString('safesolo_med_citizen', _medicalCitizenId);
+      await prefs.setString('safesolo_med_blood', _medicalBloodType);
+      await prefs.setString('safesolo_med_allergy', _medicalAllergies);
+      await prefs.setString('safesolo_med_cond', _medicalConditions);
+      await prefs.setString('safesolo_med_drugs', _medicalMedications);
+      await prefs.setString('safesolo_med_phone', _medicalEmergencyPhone);
+      await prefs.setString('safesolo_med_ename', _medicalEmergencyName);
+      await prefs.setString('safesolo_med_ins_prov', _medicalInsuranceProvider);
+      await prefs.setString('safesolo_med_ins_num', _medicalInsuranceNumber);
+    } catch (_) {}
+  }
+
+  Future<void> _loadMedicalState() async {
+    if (kIsTesting) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _medicalFullName = prefs.getString('safesolo_med_name') ?? _medicalFullName;
+      _medicalBirthYear = prefs.getString('safesolo_med_birth') ?? _medicalBirthYear;
+      _medicalCitizenId = prefs.getString('safesolo_med_citizen') ?? _medicalCitizenId;
+      _medicalBloodType = prefs.getString('safesolo_med_blood') ?? _medicalBloodType;
+      _medicalAllergies = prefs.getString('safesolo_med_allergy') ?? _medicalAllergies;
+      _medicalConditions = prefs.getString('safesolo_med_cond') ?? _medicalConditions;
+      _medicalMedications = prefs.getString('safesolo_med_drugs') ?? _medicalMedications;
+      _medicalEmergencyPhone = prefs.getString('safesolo_med_phone') ?? _medicalEmergencyPhone;
+      _medicalEmergencyName = prefs.getString('safesolo_med_ename') ?? _medicalEmergencyName;
+      _medicalInsuranceProvider = prefs.getString('safesolo_med_ins_prov') ?? _medicalInsuranceProvider;
+      _medicalInsuranceNumber = prefs.getString('safesolo_med_ins_num') ?? _medicalInsuranceNumber;
+    } catch (_) {}
+  }
+
+  /// Tải hồ sơ y tế từ Backend Cloud Relay
+  Future<void> fetchMedicalProfileFromBackend() async {
+    if (kIsTesting) return;
+    try {
+      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/medical-profile/$_deviceId');
+      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final med = data['medical'] as Map<String, dynamic>?;
+        if (med != null) {
+          _updateMedicalProfileFromMap(med);
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// Gửi hồ sơ y tế từ Điện thoại sang Đồng hồ
+  Future<void> sendMedicalProfileSync({
+    required String fullName,
+    required String birthYear,
+    required String citizenId,
+    required String bloodType,
+    required String allergies,
+    required String conditions,
+    required String medications,
+    required String emergencyPhone,
+    required String emergencyName,
+    required String insuranceProvider,
+    required String insuranceNumber,
+  }) async {
+    final payload = {
+      'fullName': fullName,
+      'birthYear': birthYear,
+      'citizenId': citizenId,
+      'bloodType': bloodType,
+      'allergies': allergies,
+      'conditions': conditions,
+      'medications': medications,
+      'emergencyPhone': emergencyPhone,
+      'emergencyName': emergencyName,
+      'insuranceProvider': insuranceProvider,
+      'insuranceNumber': insuranceNumber,
+    };
+    _updateMedicalProfileFromMap(payload);
+
+    await sendPacket(WatchPacket.create(
+      sender: WatchSender.phone,
+      type: WatchPacketType.command,
+      action: WatchAction.medicalProfileSync,
+      payload: payload,
+    ));
+
+    if (!kIsTesting) {
+      try {
+        final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/medical-profile/$_deviceId');
+        await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'medical': payload}),
+        ).timeout(const Duration(seconds: 3));
+      } catch (_) {}
     }
   }
 
@@ -675,6 +844,15 @@ class WatchSyncManager extends ChangeNotifier {
         final dPin = packet.payload['duressPin'] as String?;
         wearOs.setPins(safePin: sPin, duressPin: dPin);
         debugPrint('[WatchSyncManager] Received PIN_CONFIG_SYNC: safePin=$sPin, duressPin=$dPin');
+        break;
+
+      // Nhận đồng bộ hồ sơ y tế thực tế từ điện thoại sang đồng hồ
+      case WatchAction.medicalProfileSync:
+        final p = packet.payload;
+        if (p.isNotEmpty) {
+          _updateMedicalProfileFromMap(p);
+          debugPrint('[WatchSyncManager] Received MEDICAL_PROFILE_SYNC: name=${p['fullName']}, blood=${p['bloodType']}');
+        }
         break;
 
       // Nhận đồng bộ thời gian từ điện thoại sang đồng hồ
