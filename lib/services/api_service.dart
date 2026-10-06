@@ -16,6 +16,7 @@ import '../models/live_journey_model.dart';
 import '../models/disaster_alert_model.dart';
 
 class ApiService {
+  static final ApiService instance = ApiService();
   final _client = http.Client();
   static const _timeout = Duration(seconds: 12);
 
@@ -1081,5 +1082,36 @@ class ApiService {
       ),
     );
     _throwIfFailed(response);
+  }
+
+  Future<void> uploadMoment({
+    required String userId,
+    required String caption,
+    String? mood,
+    required String filePath,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/v1/moments');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['x-api-key'] = 'android-app-key-abc'
+      ..fields['userId'] = userId
+      ..fields['caption'] = caption
+      ..fields['mood'] = mood ?? 'calm'
+      ..files.add(await http.MultipartFile.fromPath('photo', filePath));
+      
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    _throwIfFailed(response);
+  }
+
+  Future<List<dynamic>> getMoments() async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/v1/moments');
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as List<dynamic>;
   }
 }

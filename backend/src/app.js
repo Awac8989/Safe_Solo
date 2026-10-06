@@ -3,6 +3,7 @@ const express = require('express');
 
 const { apiRouter } = require('./routes');
 const adminPortalRoutes = require('./routes/adminPortalRoutes');
+const momentRoutes = require('./routes/momentRoutes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -22,6 +23,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api', apiRouter);
+app.use('/api/v1/moments', momentRoutes);
 app.use('/api/admin', adminPortalRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);

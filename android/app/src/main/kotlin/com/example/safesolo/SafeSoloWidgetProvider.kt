@@ -8,7 +8,6 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
-import es.antonborri.home_widget.HomeWidgetPlugin
 import android.graphics.Color
 
 class SafeSoloWidgetProvider : HomeWidgetProvider() {
@@ -36,8 +35,17 @@ class SafeSoloWidgetProvider : HomeWidgetProvider() {
                     setInt(R.id.widget_root, "setBackgroundColor", Color.parseColor("#2E7D32"))
                 }
 
-                // Setup click intent using HomeWidgetPlugin
-                val pendingIntentWithData = HomeWidgetPlugin.getDataIntent(context, Uri.parse("safesolo://checkin"))
+                // Setup click intent using standard Android PendingIntent
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("safesolo://checkin")).apply {
+                    `package` = context.packageName
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                val pendingIntentWithData = PendingIntent.getActivity(
+                    context,
+                    0,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
                 setOnClickPendingIntent(R.id.widget_root, pendingIntentWithData)
             }
             appWidgetManager.updateAppWidget(widgetId, views)

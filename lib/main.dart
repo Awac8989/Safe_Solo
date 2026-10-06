@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'l10n/app_localizations.dart';
 
 import 'core/app_theme.dart';
 import 'core/constants.dart';
@@ -30,11 +30,17 @@ import 'views/settings/app_user_guide_page.dart';
 import 'views/settings/defense_demo_sandbox_page.dart';
 import 'views/medical/lockscreen_medical_card_page.dart';
 import 'views/notifications/notification_center_page.dart';
+import 'services/widget_service.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await WidgetService.initialize();
+  } catch (e) {
+    debugPrint('WidgetService init failed: $e');
+  }
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('FLUTTER GLOBAL ERROR: ${details.exceptionAsString()}');
@@ -73,7 +79,7 @@ class SafeSoloApp extends StatelessWidget {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            localizationsDelegates: const [
+            localizationsDelegates: [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

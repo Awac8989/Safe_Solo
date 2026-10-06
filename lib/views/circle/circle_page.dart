@@ -9,6 +9,7 @@ import '../../core/widgets/top_toast.dart';
 import '../../core/widgets/voice_waveform.dart';
 import '../audio/walkie_talkie_dialog.dart';
 import 'widgets/safe_moments_carousel.dart';
+import 'widgets/moments_feed.dart';
 import 'widgets/night_shield_bar.dart';
 import 'widgets/circle_orbit_visualizer.dart';
 import 'widgets/live_safety_cockpit_card.dart';
@@ -226,6 +227,8 @@ class _CirclePageState extends State<CirclePage> {
             const AiSafetyCapsuleCard(),
             const SizedBox(height: 14),
           ],
+          const MomentsFeed(),
+          const SizedBox(height: 16),
           const SafeMomentsCarousel(),
           const SizedBox(height: 16),
           // Community Quick Action Cards

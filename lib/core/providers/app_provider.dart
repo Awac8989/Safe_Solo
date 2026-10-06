@@ -1217,7 +1217,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _persistBackgroundSafetyConfig();
 
     if (_user != null) {
-      final nextDeadline = _user!.nextDeadline ?? DateTime.now().add(Duration(minutes: _automation.timerIntervalMinutes));
+      final nextDeadline = _user!.nextDeadline ?? DateTime.now().add(Duration(minutes: _user!.timerIntervalMinutes));
       final diff = nextDeadline.difference(DateTime.now());
       final isOkay = !diff.isNegative;
       final diffStr = diff.isNegative ? 'Quá hạn' : '${diff.inHours}h ${(diff.inMinutes % 60).toString().padLeft(2, '0')}m';

@@ -14,6 +14,15 @@ class ChatService {
   final _client = http.Client();
 
   final List<Function(Map<String, dynamic>)> _messageListeners = [];
+  final List<Function(Map<String, dynamic>)> _momentListeners = [];
+
+  void addMomentListener(Function(Map<String, dynamic>) listener) {
+    _momentListeners.add(listener);
+  }
+
+  void removeMomentListener(Function(Map<String, dynamic>) listener) {
+    _momentListeners.remove(listener);
+  }
 
   void addMessageListener(Function(Map<String, dynamic>) listener) {
     _messageListeners.add(listener);
@@ -54,6 +63,12 @@ class ChatService {
 
     _socket!.on('new_message', (data) {
       for (final listener in _messageListeners) {
+        listener(data);
+      }
+    });
+
+    _socket!.on('new_moment', (data) {
+      for (final listener in _momentListeners) {
         listener(data);
       }
     });
