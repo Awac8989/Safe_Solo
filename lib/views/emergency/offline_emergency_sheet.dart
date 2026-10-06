@@ -174,13 +174,16 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
                   children: [
                     const Icon(Icons.my_location_rounded, color: Color(0xFF38BDF8), size: 18),
                     const SizedBox(width: 8),
-                    Text(
-                      strings.text('ƯỚC TÍNH VỊ TRÍ TRONG NHÀ / HẦM (PDR)', 'INDOOR DEAD RECKONING (PDR)'),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF38BDF8),
-                        letterSpacing: 0.5,
+                    Expanded(
+                      child: Text(
+                        strings.text('ƯỚC TÍNH VỊ TRÍ TRONG NHÀ / HẦM (PDR)', 'INDOOR DEAD RECKONING (PDR)'),
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF38BDF8),
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ],
@@ -201,12 +204,15 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
                     children: [
                       const Icon(Icons.terrain_rounded, color: Color(0xFFFBBF24), size: 16),
                       const SizedBox(width: 6),
-                      Text(
-                        'Độ cao áp kế: ${pdr.floorLabel}',
-                        style: const TextStyle(
-                          color: Color(0xFFFBBF24),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          'Độ cao áp kế: ${pdr.floorLabel}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFFBBF24),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:pedometer/pedometer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -20,11 +21,17 @@ import '../../models/user_model.dart';
 import '../../models/live_journey_model.dart';
 import '../../services/background_safety_service.dart';
 import '../../services/api_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/audio_note_service.dart';
 import '../../services/location_service.dart';
 import '../../services/notification_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 import '../../services/push_notification_service.dart';
 import '../../services/pedometer_service.dart';
+import '../../services/widget_service.dart';
+import '../../services/offline_sync_engine.dart';
+import '../../services/tflite_ai_engine.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
@@ -803,6 +810,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   bool get isQuietHoursMode => _isQuietHoursMode;
 
   User? _user;
+  String? _authToken;
+  String? get authToken => _authToken;
   bool _onboarded = false;
   bool _permissionsGranted = false;
   bool _isInitializing = true;
@@ -845,6 +854,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   DateTime? _lastMedicationReminderAt;
   DateTime? _lastOverdueNotificationAt;
   DateTime? _lastGeofenceCheckInAt;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   DateTime? _lastFallSignalAt;
   DateTime? _lastShakeSignalAt;
   DateTime? _fallCandidateAt;
@@ -1083,9 +1093,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         _automation = Automation.fromJson(
           Map<String, dynamic>.from(data['automation'] as Map? ?? const {}),
         );
+        _authToken = data['authToken'] as String?;
         _security = Security.fromJson(
           Map<String, dynamic>.from(data['security'] as Map? ?? const {}),
         );
+        if (_authToken != null) {
+          ChatService.instance.connect(_authToken!);
+          ChatService.instance.addMessageListener(_onChatMessageReceived);
+          _syncFamilyRoom();
+        }
         _vaultEntries = (data['vaultEntries'] as List<dynamic>? ?? const [])
             .map((item) => VaultEntry.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList();
@@ -1141,6 +1157,21 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     _restartRuntimeAutomation();
     _initWatchIntegration();
     await _syncPushTokenIfNeeded();
+    await WidgetService.initialize();
+    await OfflineSyncEngine.instance.initialize();
+    
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      if (!results.contains(ConnectivityResult.none)) {
+        unawaited(OfflineSyncEngine.instance.flushQueue());
+      }
+    });
+    
+    // Handle Android Widget Check-In Click
+    HomeWidget.widgetClicked.listen((Uri? uri) {
+      if (uri != null && uri.host == 'checkin') {
+        performSoftCheckIn(source: 'WIDGET');
+      }
+    });
     if (_user != null && _permissionsGranted) {
       await _syncBackgroundSafetyService();
     }
@@ -1180,9 +1211,22 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       'stepBaselineDayKey': _stepBaselineDayKey,
       'lastRawStepCount': _lastRawStepCount,
       'activeJourney': _activeJourney?.toJson(),
+      'authToken': _authToken,
     };
     await prefs.setString(_storageKey, jsonEncode(data));
     await _persistBackgroundSafetyConfig();
+
+    if (_user != null) {
+      final nextDeadline = _user!.nextDeadline ?? DateTime.now().add(Duration(minutes: _automation.timerIntervalMinutes));
+      final diff = nextDeadline.difference(DateTime.now());
+      final isOkay = !diff.isNegative;
+      final diffStr = diff.isNegative ? 'Quá hạn' : '${diff.inHours}h ${(diff.inMinutes % 60).toString().padLeft(2, '0')}m';
+      
+      unawaited(WidgetService.updateWidgetStatus(
+        isOkay: isOkay,
+        timeRemaining: diffStr,
+      ));
+    }
   }
 
   Future<void> completeOnboarding() async {
@@ -1407,6 +1451,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         if (userData != null) {
           final userModel = UserModel.fromJson(userData);
           _user = User.fromUserModel(userModel, email: email);
+          _authToken = data?['token'] as String?;
         } else {
           _user = User(
             id: 'google_${email.hashCode.abs()}',
@@ -1461,6 +1506,12 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         final userModel = UserModel.fromJson(userData);
         final userEmail = userData['email'] as String? ?? (identifier.contains('@') ? identifier : '');
         _user = User.fromUserModel(userModel, email: userEmail);
+        _authToken = data?['token'] as String?;
+        if (_authToken != null) {
+          ChatService.instance.connect(_authToken!);
+          ChatService.instance.addMessageListener(_onChatMessageReceived);
+          _syncFamilyRoom();
+        }
       } else {
         throw Exception('Không nhận được dữ liệu người dùng từ máy chủ.');
       }
@@ -1681,6 +1732,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     final previousUserId = _user?.id;
     _stopRuntimeAutomation();
     _user = null;
+    _authToken = null;
+    ChatService.instance.disconnect();
+    ChatService.instance.removeMessageListener(_onChatMessageReceived);
     _lastError = null;
     await _pushNotifications.removeTokenForUser(previousUserId);
     await BackgroundSafetyService.instance.stop();
@@ -1755,6 +1809,25 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         );
       } catch (err) {
         debugPrint('[AppProvider.checkin] Network/Offline fallback: $err');
+        
+        // --- 9. Offline-First Queue Sync ---
+        unawaited(OfflineSyncEngine.instance.enqueueRequest(
+          endpoint: '/users/${current.id}/checkin',
+          method: 'POST',
+          body: {
+            'lat': finalLat,
+            'lng': finalLng,
+            'type': type,
+            if (passiveSource != null) 'passiveSource': passiveSource,
+            'isDuress': isDuress,
+            if (snoozeMinutes != null) 'snoozeMinutes': snoozeMinutes,
+            if (routineType != null) 'routineType': routineType,
+            if (mediaSnapshot != null) 'mediaSnapshot': mediaSnapshot,
+            if (familyPingRef != null) 'familyPingRef': familyPingRef,
+            if (metadata != null) 'metadata': metadata,
+          },
+        ));
+
         final isPartial = (type == 'SNOOZE' || type == 'SOFT_PASSIVE');
         final cycleMinutes = !isPartial
             ? current.timerIntervalMinutes
@@ -1769,6 +1842,18 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
       if (updated != null) {
         _user = User.fromUserModel(updated, email: current.email);
+        
+        // --- AI / ML On-device: Adaptive Check-in Prediction ---
+        if (type != 'SNOOZE' && type != 'SOFT_PASSIVE' && !isDuress) {
+           final predictedInterval = TfLiteAiEngine.instance.predictOptimalCheckinInterval([0.65], _user!.timerIntervalMinutes);
+           if (predictedInterval != _user!.timerIntervalMinutes) {
+              unawaited(_api.updateTimer(_user!.id, predictedInterval).then((upd) {
+                 _user = User.fromUserModel(upd, email: _user!.email);
+                 _saveToStorage();
+                 notifyListeners();
+              }).catchError((_) {}));
+           }
+        }
       }
       _homeAnchor = AppLocation(
         lat: finalLat,
@@ -3295,6 +3380,97 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
     notifyListeners();
     await _saveToStorage();
+
+    if (_authToken != null) {
+      ChatService.instance.sendMessageSocket(threadId, 'TEXT', message);
+    }
+  }
+
+  void _onChatMessageReceived(Map<String, dynamic> data) {
+    if (data['roomId'] == null) return;
+    final roomId = data['roomId'] as String;
+    // Map backend roomId to local thread id if needed
+    // For now, assume threadId is roomId.
+    final threadIndex = _chatThreads.indexWhere((t) => t.id == roomId);
+    if (threadIndex == -1) return;
+
+    final senderName = data['sender']?['name'] ?? 'Ai đó';
+    final content = data['content'] ?? 'Tin nhắn';
+    final messageId = data['id'] ?? data['_id'] ?? 'msg-${DateTime.now().microsecondsSinceEpoch}';
+
+    final incoming = ChatMessage(
+      id: messageId,
+      sender: senderName,
+      content: content,
+      createdAt: DateTime.now(),
+      mine: data['senderId'] == _user?.id,
+    );
+
+    final thread = _chatThreads[threadIndex];
+    _chatThreads[threadIndex] = thread.copyWith(
+      preview: content,
+      updatedAt: DateTime.now(),
+      unread: thread.unread + 1,
+      messages: [...thread.messages, incoming],
+    );
+
+    notifyListeners();
+    _saveToStorage();
+  }
+
+  Future<void> _syncFamilyRoom() async {
+    if (_authToken == null) return;
+    try {
+      final res = await _api.getOrCreateFamilyRoom(_authToken!);
+      if (res['success'] == true) {
+        final room = res['data']['room'];
+        final roomId = room['_id'] ?? room['id'];
+        
+        final familyIndex = _chatThreads.indexWhere((t) => t.id == 'family' || t.groupLabel == 'NHÓM GIA ĐÌNH');
+        if (familyIndex != -1) {
+          // Replace local 'family' ID with real roomId
+          var thread = _chatThreads[familyIndex];
+          
+          try {
+            final messagesData = await ChatService.instance.getMessages(roomId, _authToken!);
+            final parsedMessages = messagesData.map((data) {
+              final senderName = data['sender']?['name'] ?? 'Ai đó';
+              final content = data['content'] ?? 'Tin nhắn';
+              final messageId = data['id'] ?? data['_id'] ?? 'msg-${DateTime.now().microsecondsSinceEpoch}';
+              
+              DateTime createdAt;
+              try {
+                createdAt = DateTime.parse(data['createdAt'] ?? '');
+              } catch (_) {
+                createdAt = DateTime.now();
+              }
+              
+              return ChatMessage(
+                id: messageId,
+                sender: senderName,
+                content: content,
+                createdAt: createdAt,
+                mine: data['senderId'] == _user?.id,
+              );
+            }).toList();
+
+            // Append mock messages to keep the feeling or replace them? 
+            // Better to replace if there are real messages.
+            if (parsedMessages.isNotEmpty) {
+              thread = thread.copyWith(messages: parsedMessages);
+            }
+          } catch (e) {
+            print('Error fetching family messages: $e');
+          }
+
+          _chatThreads[familyIndex] = thread.copyWith(id: roomId);
+        }
+        
+        ChatService.instance.joinRoom(roomId);
+      }
+    } catch (e) {
+      print('Error syncing family room: $e');
+    }
   }
 
   Future<void> sendVoiceMessage(String threadId, RecordedAudioNote note) async {

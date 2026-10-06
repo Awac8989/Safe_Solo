@@ -175,17 +175,20 @@ class DisasterAlertDetailSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
-                      children: [
+                    Row(
+                      children: const [
                         Icon(Icons.shield_rounded, color: Color(0xFFFCA5A5), size: 18),
                         SizedBox(width: 8),
-                        Text(
-                          'HƯỚNG DẪN AN TOÀN SINH TỒN',
-                          style: TextStyle(
-                            color: Color(0xFFFCA5A5),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.4,
+                        Expanded(
+                          child: Text(
+                            'HƯỚNG DẪN AN TOÀN SINH TỒN',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Color(0xFFFCA5A5),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.4,
+                            ),
                           ),
                         ),
                       ],

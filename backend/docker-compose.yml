@@ -6,11 +6,12 @@ version: '3.8'
 # ==============================================================================
 
 services:
-  # 1. Co so du lieu MongoDB chinh
+  # 1. Co so du lieu MongoDB chinh (Replica Set mode)
   mongo:
     image: mongo:7.0
     container_name: safesolo-mongo
     restart: always
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     environment:
       MONGO_INITDB_DATABASE: Safesolo
     volumes:
@@ -22,6 +23,29 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # 1.1 MongoDB Replica Set Initialization
+  mongo-setup:
+    image: mongo:7.0
+    container_name: safesolo-mongo-setup
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - safesolo-network
+    entrypoint: >
+      bash -c "
+        sleep 5;
+        mongosh --host mongo:27017 --eval '
+          try {
+            rs.status();
+          } catch(e) {
+            rs.initiate({
+              _id: \"rs0\",
+              members: [{ _id: 0, host: \"mongo:27017\" }]
+            });
+          }'
+      "
 
   # 2. Redis Cache & Job Queue (Ho tro Deadman Switch worker & Khoa phan tan)
   redis:
@@ -65,6 +89,11 @@ services:
       - uploads_data:/app/uploads
     networks:
       - safesolo-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   mongo_data:

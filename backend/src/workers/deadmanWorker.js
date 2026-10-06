@@ -65,7 +65,7 @@ function startDeadManWorker(io) {
         const grace = Number(user.falseAlertGraceMinutes || 0);
         // Home Safe Geofence or Wi-Fi relaxed tolerance: add 30 min grace if inside home zone
         const homeRelaxationMinutes = (user.homeGeofence?.isInside || user.homeWifiSsid) ? 30 : 0;
-        const reminderMinutes = Number(policy?.level1Minutes || defaultReminderMinutes);
+        const reminderMinutes = Number(user.telegramReminderOffsetMinutes || policy?.level1Minutes || defaultReminderMinutes);
         const warningMinutes = Number(policy?.level2Minutes || defaultWarningMinutes);
         const sosMinutes = Number(policy?.level3Minutes || defaultSosMinutes);
         const inQuietHours = isInQuietHours(now, user.quietHoursStart, user.quietHoursEnd);

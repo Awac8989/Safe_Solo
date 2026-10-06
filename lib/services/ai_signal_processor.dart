@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'tflite_ai_engine.dart';
 
 /// ============================================================================
 /// SAFESOLO - MODULE THUẬT TOÁN XỬ LÝ TÍN HIỆU SỐ (DSP) VÀ TRÍ TUỆ NHÂN TẠO (AI)
@@ -222,6 +223,14 @@ class AiSignalProcessor {
     String title = 'Chỉ số bình thường';
     String desc = 'Sinh tồn trong giới hạn an toàn.';
 
+    // Check with ML model first
+    final hasAnomaly = TfLiteAiEngine.instance.detectVitalsAnomaly(
+      currentHr: heartRate.toDouble(),
+      currentSpo2: spO2.toDouble(),
+      baselineHr: 75.0,
+      baselineSpo2: 98.0,
+    );
+
     if (spO2 < 88) {
       isCritical = true;
       riskScore = 95;
@@ -245,6 +254,12 @@ class AiSignalProcessor {
       riskType = 'HYPOXIA_WARNING';
       title = 'Cảnh báo SpO2 hạ ($spO2%)';
       desc = 'Nồng độ oxy máu thấp hơn ngưỡng khuyến cáo.';
+    } else if (hasAnomaly) {
+      isCritical = true;
+      riskScore = 80;
+      riskType = 'ML_ANOMALY_DETECTED';
+      title = 'Bất thường Sinh hiệu (AI)';
+      desc = 'AI phát hiện nhịp tim/SpO2 lệch xa mức cơ sở cá nhân.';
     }
 
     return AcuteVitalsRiskAssessment(

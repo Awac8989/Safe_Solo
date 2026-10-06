@@ -397,12 +397,15 @@ class _AppUserGuidePageState extends State<AppUserGuidePage> {
           // Tiêu đề danh sách
           Row(
             children: [
-              Text(
-                strings.text('Cẩm nang & Thao tác chi tiết', 'Guides & Step-by-Step'),
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Text(
+                  strings.text('Cẩm nang & Thao tác chi tiết', 'Guides & Step-by-Step'),
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
               const Spacer(),

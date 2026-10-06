@@ -15,6 +15,8 @@ import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/ai_signal_processor.dart';
 import '../../services/hrv_stroke_service.dart';
+import '../../services/notification_center_service.dart';
+import '../../services/offline_sync_engine.dart';
 import '../community_radar/community_radar_page.dart';
 import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
@@ -60,6 +62,12 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       });
       _scheduleDemoPush();
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = context.read<AppProvider>().user;
+      if (user?.id != null && user!.id.isNotEmpty) {
+        NotificationCenterService.instance.syncFromBackend(user.id);
+      }
+    });
   }
 
   @override
@@ -183,6 +191,68 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.only(top: 20, bottom: 140),
         children: [
+          // 9. Offline Indicator
+          ValueListenableBuilder<bool>(
+            valueListenable: OfflineSyncEngine.instance.isOfflineMode,
+            builder: (context, isOffline, child) {
+              if (!isOffline) return const SizedBox.shrink();
+              return ValueListenableBuilder<double>(
+                valueListenable: OfflineSyncEngine.instance.syncProgress,
+                builder: (context, progress, child) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: OfflineSyncEngine.instance.pendingCount,
+                    builder: (context, pendingCount, child) {
+                      if (pendingCount == 0) return const SizedBox.shrink();
+                      final isSyncing = progress > 0.0 && progress < 1.0;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppDarkColors.surfaceElevated : AppColors.surfaceElevated,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  isSyncing ? Icons.sync : Icons.wifi_off,
+                                  color: AppColors.warning,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    isSyncing 
+                                        ? strings.text('Đang đồng bộ dữ liệu...', 'Syncing data...')
+                                        : strings.text('Mất kết nối. Còn $pendingCount mục đang chờ đồng bộ.', 'Offline mode. $pendingCount items pending sync.'),
+                                    style: AppTextStyles.body.copyWith(
+                                      color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (isSyncing) ...[
+                              const SizedBox(height: 8),
+                              LinearProgressIndicator(
+                                value: progress,
+                                backgroundColor: AppColors.surfaceElevated,
+                                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.warning),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ]
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -235,9 +305,54 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     ),
                   ),
                   const SizedBox(height: 10),
-                  AppRoundIconButton(
-                    icon: Icons.account_circle_outlined,
-                    onPressed: () => Navigator.pushNamed(context, '/settings'),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedBuilder(
+                        animation: NotificationCenterService.instance,
+                        builder: (context, _) {
+                          final unread = NotificationCenterService.instance.unreadCount;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              AppRoundIconButton(
+                                icon: Icons.notifications_none_rounded,
+                                onPressed: () => Navigator.pushNamed(context, '/notifications'),
+                              ),
+                              if (unread > 0)
+                                Positioned(
+                                  top: -2,
+                                  right: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFEF4444),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                    child: Center(
+                                      child: Text(
+                                        unread > 99 ? '99+' : '$unread',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      AppRoundIconButton(
+                        icon: Icons.account_circle_outlined,
+                        onPressed: () => Navigator.pushNamed(context, '/settings'),
+                      ),
+                    ],
                   ),
                 ],
               ),

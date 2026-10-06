@@ -14,6 +14,8 @@ export default defineConfig({
   },
   vite: {
     server: {
+      port: 5173,
+      host: true,
       proxy: {
         "/uploads": {
           target: "http://127.0.0.1:4000",

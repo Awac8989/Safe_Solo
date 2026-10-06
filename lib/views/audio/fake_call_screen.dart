@@ -159,9 +159,12 @@ class _FakeCallScreenState extends State<FakeCallScreen> with SingleTickerProvid
                                   child: const Icon(Icons.record_voice_over_rounded, color: AppColors.success, size: 16),
                                 ),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'Giọng nói giải cứu (Voice Bot):',
-                                  style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                                const Expanded(
+                                  child: Text(
+                                    'Giọng nói giải cứu (Voice Bot):',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+                                  ),
                                 ),
                               ],
                             ),

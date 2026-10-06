@@ -2553,24 +2553,27 @@ class _AuthPageState extends State<AuthPage> {
                               : null,
                         ),
                         alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.login_rounded,
-                              size: 18,
-                              color: _authMode == 0 ? AppColors.primary : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              strings.text('ĐĂNG NHẬP', 'SIGN IN'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _authMode == 0 ? FontWeight.bold : FontWeight.w600,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.login_rounded,
+                                size: 18,
                                 color: _authMode == 0 ? AppColors.primary : AppColors.textSecondary,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                strings.text('ĐĂNG NHẬP', 'SIGN IN'),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: _authMode == 0 ? FontWeight.bold : FontWeight.w600,
+                                  color: _authMode == 0 ? AppColors.primary : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -2594,24 +2597,27 @@ class _AuthPageState extends State<AuthPage> {
                               : null,
                         ),
                         alignment: Alignment.center,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_add_rounded,
-                              size: 18,
-                              color: _authMode == 1 ? const Color(0xFF059669) : AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              strings.text('ĐĂNG KÝ TÀI KHOẢN', 'REGISTER'),
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _authMode == 1 ? FontWeight.bold : FontWeight.w600,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_add_rounded,
+                                size: 18,
                                 color: _authMode == 1 ? const Color(0xFF059669) : AppColors.textSecondary,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 6),
+                              Text(
+                                strings.text('ĐĂNG KÝ TÀI KHOẢN', 'REGISTER'),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: _authMode == 1 ? FontWeight.bold : FontWeight.w600,
+                                  color: _authMode == 1 ? const Color(0xFF059669) : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -2674,18 +2680,24 @@ class _AuthPageState extends State<AuthPage> {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 20, bottom: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
                         strings.text('Chưa có tài khoản SafeSolo?', "Don't have a SafeSolo account?"),
-                        style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, fontSize: 13.5),
+                        style: AppTextStyles.body.copyWith(color: AppColors.textSecondary, fontSize: 13),
                       ),
                       TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         onPressed: () => setState(() => _authMode = 1),
                         child: Text(
                           strings.text('Đăng ký miễn phí ngay', 'Register now for free'),
-                          style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary, fontSize: 13.5),
+                          style: AppTextStyles.bodyStrong.copyWith(color: AppColors.primary, fontSize: 13),
                         ),
                       ),
                     ],
@@ -2960,16 +2972,19 @@ class _AuthPageState extends State<AuthPage> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                         )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              strings.text('Tiếp tục vào SafeSolo', 'Continue to SafeSolo'),
-                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.8),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward_rounded, size: 18),
-                          ],
+                      : FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                strings.text('Tiếp tục vào SafeSolo', 'Continue to SafeSolo'),
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.arrow_forward_rounded, size: 18),
+                            ],
+                          ),
                         ),
                 ),
               ),
@@ -3057,7 +3072,10 @@ class _AuthPageState extends State<AuthPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 2,
                               children: [
                                 Text(
                                   item['phone'] as String,
@@ -3068,7 +3086,6 @@ class _AuthPageState extends State<AuthPage> {
                                     letterSpacing: 0.5,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                                   decoration: BoxDecoration(

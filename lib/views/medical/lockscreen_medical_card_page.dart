@@ -132,23 +132,28 @@ class LockscreenMedicalCardPage extends StatelessWidget {
                   color: Colors.white, size: 16),
             ),
             const SizedBox(width: 8),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'THẺ Y TẾ CẤP CỨU 115',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
-                    color: Colors.white,
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'THẺ Y TẾ CẤP CỨU 115',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                Text(
-                  'In Case of Emergency (ICE) • Chuẩn Y Tế',
-                  style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                ),
-              ],
+                  Text(
+                    'In Case of Emergency (ICE) • Chuẩn Y Tế',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -486,13 +491,16 @@ class LockscreenMedicalCardPage extends StatelessWidget {
                     const Icon(Icons.qr_code_scanner_rounded,
                         color: Color(0xFF0F172A), size: 20),
                     const SizedBox(width: 8),
-                    Text(
-                      'QUÉT MÃ QR CẤP CỨU 115',
-                      style: AppTextStyles.title.copyWith(
-                        color: const Color(0xFF0F172A),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.5,
+                    Flexible(
+                      child: Text(
+                        'QUÉT MÃ QR CẤP CỨU 115',
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.title.copyWith(
+                          color: const Color(0xFF0F172A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ],
@@ -540,12 +548,15 @@ class LockscreenMedicalCardPage extends StatelessWidget {
                       Icon(Icons.lock_open_rounded,
                           size: 14, color: Color(0xFF059669)),
                       SizedBox(width: 6),
-                      Text(
-                        'Truy cập Mở khẩn cấp • Chuẩn AHA 2026',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF059669),
+                      Flexible(
+                        child: Text(
+                          'Truy cập Mở khẩn cấp • Chuẩn AHA 2026',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF059669),
+                          ),
                         ),
                       ),
                     ],
@@ -593,13 +604,16 @@ class LockscreenMedicalCardPage extends StatelessWidget {
           children: [
             Icon(icon, size: 14, color: const Color(0xFF38BDF8)),
             const SizedBox(width: 6),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF94A3B8),
-                letterSpacing: 0.5,
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF94A3B8),
+                  letterSpacing: 0.5,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

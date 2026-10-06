@@ -1,0 +1,78 @@
+name: SafeSolo Flutter CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test_and_lint:
+    name: Flutter Lint & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          
+      - name: Install Dependencies
+        run: flutter pub get
+        
+      - name: Analyze Code
+        run: flutter analyze
+        
+      - name: Run Tests with Coverage
+        run: flutter test --coverage
+        
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: flutter-coverage
+          path: coverage/lcov.info
+
+  build:
+    name: Build APK & AAB
+    needs: test_and_lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+          
+      - name: Install Dependencies
+        run: flutter pub get
+        
+      - name: Build APK
+        run: flutter build apk --release
+        
+      - name: Build App Bundle (AAB)
+        run: flutter build appbundle --release
+        
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          
+      - name: Upload AAB
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-aab
+          path: build/app/outputs/bundle/release/app-release.aab

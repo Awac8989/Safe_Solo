@@ -22,4 +22,14 @@ router.post('/:roomId/messages', validate(chatSchemas.sendMessage), chatControll
 // @access  Private
 router.get('/:roomId/messages', chatController.getMessages);
 
+// @route   GET /api/chat/inbox
+// @desc    Get inbox rooms
+// @access  Private
+router.get('/inbox', chatController.getInbox);
+
+// @route   POST /api/chat/family-room
+// @desc    Get or create family room
+// @access  Private
+router.post('/family-room', chatController.getOrCreateFamilyRoom);
+
 module.exports = router;

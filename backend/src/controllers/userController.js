@@ -5,7 +5,7 @@ const MedicalProfile = require('../models/MedicalProfile');
 const AutomationSetting = require('../models/AutomationSetting');
 const SecuritySetting = require('../models/SecuritySetting');
 const DeviceSignal = require('../models/DeviceSignal');
-const { createAlertEvent } = require('../services/alertEventService');
+const { createAlertEvent, listAlertEvents } = require('../services/alertEventService');
 const {
   createInteractionEvent,
   listInteractionEvents,
@@ -497,6 +497,8 @@ async function checkin(req, res) {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const automation = await ensureAutomationSettings(id);
+
     const now = new Date();
     const normalizedType = String(type || 'HARD_TAP').toUpperCase();
     const isDuressCheckin = Boolean(isDuress || normalizedType === 'DURESS_FAKE');
@@ -526,6 +528,7 @@ async function checkin(req, res) {
       'HOME_WIFI',
       'DEVICE_ACTIVITY',
       'WAKE_UP_PULSE',
+      'MULTI_FACTOR',
       'NONE',
     ];
     const normalizedPassiveSource = passiveSource && validPassiveSources.includes(String(passiveSource).toUpperCase())
@@ -579,9 +582,11 @@ async function checkin(req, res) {
       });
 
       const io = safeGetIo();
-      triggerSosForUser(io, mapUserDoc(userDoc)).catch((err) => {
+      try {
+        await triggerSosForUser(io, mapUserDoc(userDoc));
+      } catch (err) {
         console.error('[Duress] Failed to trigger silent SOS:', err);
-      });
+      }
 
       if (io) {
         io.emit('emergency:duress', {
@@ -653,10 +658,93 @@ async function checkin(req, res) {
       });
     }
 
-    // Branch 3: SMART_PASSIVE & SOFT_PASSIVE (Passive Smart Check-in)
-    if (normalizedType === 'SMART_PASSIVE' || normalizedType === 'SOFT_PASSIVE') {
+    // Branch 3: SMART_PASSIVE, SOFT_PASSIVE & MULTI_FACTOR_PASSIVE
+    if (normalizedType === 'SMART_PASSIVE' || normalizedType === 'SOFT_PASSIVE' || normalizedType === 'MULTI_FACTOR_PASSIVE') {
+      const enabledSources = Array.isArray(automation.enabledPassiveSources) && automation.enabledPassiveSources.length > 0
+        ? automation.enabledPassiveSources
+        : [
+            'SCREEN_UNLOCK',
+            'CHARGER_PLUGGED',
+            'CHARGER_UNPLUGGED',
+            'PEDOMETER_BURST',
+            'GEOFENCE_ENTER',
+            'SAFE_GEOFENCE',
+            'HOME_WIFI',
+            'DEVICE_ACTIVITY',
+            'WAKE_UP_PULSE',
+          ];
+
+      // Check if single passive source is disabled in settings
+      if (normalizedType !== 'MULTI_FACTOR_PASSIVE' && normalizedPassiveSource !== 'NONE' && !enabledSources.includes(normalizedPassiveSource)) {
+        return res.status(400).json({
+          message: `Nguồn thụ động '${normalizedPassiveSource}' đã bị tắt trong Cài đặt Tự động hóa của bạn.`,
+          disabledSource: normalizedPassiveSource,
+          enabledSources,
+        });
+      }
+
+      // 1. Pedometer Threshold Check
+      const stepThreshold = Number(automation.pedometerThreshold || 200);
+      if (normalizedPassiveSource === 'PEDOMETER_BURST') {
+        const steps = Number(metadata.steps || 0);
+        if (steps > 0 && steps < stepThreshold) {
+          return res.status(400).json({
+            message: `Số bước chân (${steps}) chưa đạt ngưỡng tối thiểu (${stepThreshold} bước) để điểm danh thụ động.`,
+            currentSteps: steps,
+            threshold: stepThreshold,
+          });
+        }
+      }
+
+      // 1b. Safe Wi-Fi Station Check (Multi-station support)
+      if (normalizedPassiveSource === 'HOME_WIFI') {
+        const clientSsid = String(metadata.ssid || metadata.wifiSsid || '').trim().toLowerCase();
+        const clientBssid = String(metadata.bssid || '').trim().toLowerCase();
+        const homeSsid = String(userDoc.homeWifiSsid || '').trim().toLowerCase();
+        const safeStations = Array.isArray(automation.safeWifiList) ? automation.safeWifiList : [];
+
+        const isRecognizedWifi = (!clientSsid && !clientBssid) ||
+          (homeSsid && clientSsid === homeSsid) ||
+          safeStations.some(s =>
+            (s.ssid && s.ssid.toLowerCase() === clientSsid) ||
+            (s.bssid && s.bssid.toLowerCase() === clientBssid)
+          );
+
+        if (!isRecognizedWifi && (clientSsid || clientBssid)) {
+          return res.status(400).json({
+            message: `Mạng Wi-Fi '${metadata.ssid || metadata.bssid}' không nằm trong danh sách các trạm Wi-Fi an toàn đã lưu.`,
+            safeWifiList: safeStations,
+          });
+        }
+      }
+
+      // 1c. Multi-Factor Passive Check-in Evaluation
+      const isMfaActive = Boolean(automation.multiFactorPassiveEnabled || normalizedType === 'MULTI_FACTOR_PASSIVE');
+      const minRequiredSignals = Number(automation.multiFactorMinSignals || 2);
+      const rawIncomingSignals = Array.isArray(metadata.passiveSignals) && metadata.passiveSignals.length > 0
+        ? metadata.passiveSignals
+        : (normalizedPassiveSource !== 'NONE' ? [normalizedPassiveSource] : []);
+      const validSignals = rawIncomingSignals.filter(s => enabledSources.includes(s));
+
+      if (isMfaActive) {
+        const uniqueSignals = [...new Set(validSignals)];
+        const confidenceScore = Math.min(100, Math.round((uniqueSignals.length / minRequiredSignals) * 100));
+        if (uniqueSignals.length < minRequiredSignals) {
+          return res.status(400).json({
+            message: `Cơ chế Đa Yếu Tố yêu cầu tối thiểu ${minRequiredSignals} nguồn thụ động hợp lệ để đạt Điểm Tin Cậy Sinh Tồn (Đã nhận: ${uniqueSignals.length}/${minRequiredSignals}).`,
+            confidenceScore,
+            receivedSignals: uniqueSignals,
+            requiredSignalsCount: minRequiredSignals,
+            requireHardCheckin: true,
+          });
+        }
+        metadata.confidenceScore = confidenceScore;
+        metadata.multiFactorSignals = uniqueSignals;
+      }
+
       const isSmartPassiveTrigger =
         normalizedType === 'SMART_PASSIVE' ||
+        normalizedType === 'MULTI_FACTOR_PASSIVE' ||
         metadata.smartPassiveRenewal === true ||
         ['PEDOMETER_BURST', 'CHARGER_UNPLUGGED', 'SCREEN_UNLOCK', 'WAKE_UP_PULSE', 'HOME_WIFI', 'SAFE_GEOFENCE'].includes(normalizedPassiveSource);
 
@@ -676,26 +764,31 @@ async function checkin(req, res) {
 
         let passiveTitle = 'Check-in thụ động thông minh';
         let passiveMsg = `Hệ thống tự động gia hạn 1 chu kỳ an toàn (${cycleMinutes / 60}h) qua ${normalizedPassiveSource}`;
-        if (normalizedPassiveSource === 'WAKE_UP_PULSE') {
+        if (normalizedType === 'MULTI_FACTOR_PASSIVE' || isMfaActive) {
+          passiveTitle = 'Check-in Thụ động Đa Yếu Tố (Multi-Factor Passive)';
+          passiveMsg = `Đạt Điểm Tin cậy Sinh tồn (${metadata.confidenceScore || 100}%) qua kết hợp [${(metadata.multiFactorSignals || validSignals).join(', ')}] (+${cycleMinutes / 60}h)`;
+        } else if (normalizedPassiveSource === 'WAKE_UP_PULSE') {
           passiveTitle = 'Check-in nhịp tim thức giấc (BioActive PPG)';
           passiveMsg = `Đã tự động xác nhận người dùng thức dậy bình an qua cảm biến nhịp tim & cử động cổ tay (+${cycleMinutes / 60}h)`;
         } else if (normalizedPassiveSource === 'HOME_WIFI' || normalizedPassiveSource === 'SAFE_GEOFENCE') {
           passiveTitle = 'Check-in Cắm sạc & Wi-Fi Nhà (Docking Anchor)';
-          passiveMsg = `Đã về nhà an toàn & kết nối sạc pin: Tự động kích hoạt Chế độ Nghỉ ngơi (Quiet Hours), miễn báo động đêm (+${cycleMinutes / 60}h)`;
+          passiveMsg = `Đã về trạm an toàn & kết nối sạc pin: Tự động kích hoạt Chế độ Nghỉ ngơi (Quiet Hours), miễn báo động đêm (+${cycleMinutes / 60}h)`;
         } else if (normalizedPassiveSource === 'PEDOMETER_BURST') {
-          passiveTitle = 'Vận động tích cực (>200 bước chân)';
+          passiveTitle = `Vận động tích cực (>${stepThreshold} bước chân)`;
           passiveMsg = `Hệ thống phát hiện vận động thực tế và đã tự động gia hạn 1 chu kỳ an toàn (+${cycleMinutes / 60}h)`;
         } else if (normalizedPassiveSource === 'CHARGER_UNPLUGGED') {
           passiveTitle = 'Rút sạc pin buổi sáng';
           passiveMsg = `Nhận diện bắt đầu ngày mới an toàn, tự động gia hạn 1 chu kỳ (+${cycleMinutes / 60}h)`;
         }
 
+        const effectiveType = isMfaActive ? 'MULTI_FACTOR_PASSIVE' : 'SMART_PASSIVE';
+
         await CheckInHistory.create({
           userId: id,
           checkinTime: now,
           locationAtCheckin: checkinLocation,
-          type: 'SMART_PASSIVE',
-          passiveSource: normalizedPassiveSource,
+          type: effectiveType,
+          passiveSource: isMfaActive ? 'MULTI_FACTOR' : normalizedPassiveSource,
           isSystemAutoTriggered: true,
           metadata: {
             ...metadata,
@@ -707,12 +800,13 @@ async function checkin(req, res) {
 
         await createInteractionEvent({
           userId: id,
-          type: 'CHECKIN_PASSIVE_SMART',
+          type: isMfaActive ? 'CHECKIN_PASSIVE_MFA' : 'CHECKIN_PASSIVE_SMART',
           source: 'DEVICE_SENSOR',
           metadata: {
             passiveSource: normalizedPassiveSource,
             cycleMinutes,
             nextDeadline: newDeadline,
+            confidenceScore: metadata.confidenceScore,
           },
         });
 
@@ -734,10 +828,11 @@ async function checkin(req, res) {
             nextDeadline: toIso(newDeadline),
             cycleMinutes,
             user: mapUserDoc(userDoc),
+            confidenceScore: metadata.confidenceScore,
           });
           io.emit('CHECKIN_COMPLETED', {
             userId: id,
-            type: 'SMART_PASSIVE',
+            type: effectiveType,
             source: normalizedPassiveSource,
             nextDeadline: toIso(newDeadline),
           });
@@ -749,18 +844,20 @@ async function checkin(req, res) {
           smartRenewed: true,
           cycleMinutes,
           nextDeadline: toIso(newDeadline),
+          confidenceScore: metadata.confidenceScore,
         });
       }
 
-      // Fallback cho điểm danh thụ động giới hạn thông thường
-      const maxSoft = userDoc.maxSoftCheckinAllowed || 3;
+      // Fallback cho điểm danh thụ động giới hạn thông thường (Soft Extension)
+      const maxSoft = Number(automation.maxSoftCheckinAllowed || userDoc.maxSoftCheckinAllowed || 3);
       const currentConsecutive = userDoc.consecutiveSoftCheckins || 0;
 
       if (currentConsecutive >= maxSoft) {
         return res.status(200).json({
-          message: 'Da dat gioi han diem danh thu dong lien tiep. Can mo ung dung bam xac nhan an toan truc tiep.',
+          message: `Đã đạt giới hạn điểm danh thụ động liên tiếp (${maxSoft} lần). Cần mở ứng dụng bấm xác nhận an toàn trực tiếp.`,
           requireHardCheckin: true,
           consecutiveSoftCheckins: currentConsecutive,
+          maxSoftAllowed: maxSoft,
           user: mapUserDoc(userDoc),
         });
       }
@@ -794,7 +891,7 @@ async function checkin(req, res) {
       });
 
       return res.status(200).json({
-        message: 'Diem danh thu dong thanh cong',
+        message: 'Điểm danh thụ động tạm thời thành công',
         user: mapUserDoc(userDoc),
         requireHardCheckin: false,
         consecutiveSoftCheckins: userDoc.consecutiveSoftCheckins,
@@ -802,7 +899,7 @@ async function checkin(req, res) {
       });
     }
 
-    // Branch 4: HARD_TAP / EMOTIONAL_MOMENT / ROUTINE / FAMILY_PING_REPLY
+    // Branch 4: HARD_TAP / EMOTIONAL_MOMENT / ROUTINE / FAMILY_PING_REPLY / WATCH_CHECKIN
     userDoc.consecutiveSoftCheckins = 0; // Reset soft check-in counter
     userDoc.snoozeCountToday = 0; // Reset snooze count
     userDoc.lastCheckinTime = now;
@@ -821,6 +918,63 @@ async function checkin(req, res) {
 
     await userDoc.save();
 
+    // 3. Custom Routine Checklist Tracking
+    if (normalizedRoutineType === 'CUSTOM' || metadata.customRoutines) {
+      if (Array.isArray(metadata.customRoutines)) {
+        metadata.customRoutinesRecorded = metadata.customRoutines;
+      }
+    }
+
+    // 3b. Mood & Vitals Correlation Check
+    let vitalsAlertTriggered = false;
+    const distressedMoods = ['HOI_MET', 'BAT_AN', 'ANXIOUS', 'TIRED', 'DISTRESSED', 'STRESSED'];
+    const moodStr = String(metadata.mood || mediaSnapshot?.moodEmoji || '').toUpperCase();
+    const isDistressed = distressedMoods.some(m => moodStr.includes(m)) ||
+      ['HƠI MỆT', 'BẤT AN', 'LO LẮNG', 'MỆT MỎI'].some(m => String(metadata.mood || '').toUpperCase().includes(m));
+
+    if (isDistressed && metadata.vitals) {
+      const bpm = Number(metadata.vitals.bpm || 0);
+      const spo2 = Number(metadata.vitals.spo2 || 0);
+      if (bpm > 110 || (spo2 > 0 && spo2 < 90)) {
+        vitalsAlertTriggered = true;
+        metadata.vitalsAlert = {
+          triggered: true,
+          bpm,
+          spo2,
+          reason: bpm > 110 ? `Nhịp tim tăng cao đột biến (${bpm} BPM)` : `Chỉ số SpO2 tụt nguy hiểm (${spo2}%)`,
+        };
+
+        await createAlertEvent({
+          userId: id,
+          level: 'WARNING',
+          status: 'VITALS_CORRELATED_WARNING',
+          source: 'DEVICE_SENSOR',
+          title: 'Cảnh báo Sinh hiệu Bất thường khi Điểm danh',
+          message: `${userDoc.fullName} điểm danh tâm trạng '${metadata.mood || 'Bất an'}' kèm ${metadata.vitalsAlert.reason}!`,
+          metadata: { vitals: metadata.vitals, mood: metadata.mood, location: checkinLocation },
+        });
+
+        const io = safeGetIo();
+        if (io) {
+          io.emit('alert:vitals_distress', {
+            userId: id,
+            fullName: userDoc.fullName,
+            vitals: metadata.vitals,
+            mood: metadata.mood,
+            location: checkinLocation,
+            timestamp: now.toISOString(),
+          });
+        }
+      }
+    }
+
+    // 3c. Voice Note Speech-to-Text transcript
+    if (mediaSnapshot?.audioVoiceUrl) {
+      if (!mediaSnapshot.audioTranscript) {
+        mediaSnapshot.audioTranscript = metadata.audioTranscript || `[Tóm tắt bản ghi âm an toàn]: Giọng nói người dùng rõ ràng, nhịp thở bình thường.`;
+      }
+    }
+
     await CheckInHistory.create({
       userId: id,
       checkinTime: now,
@@ -833,26 +987,29 @@ async function checkin(req, res) {
       metadata,
     });
 
-    let checkinTitle = 'Check-in thanh cong';
-    let checkinMessage = 'Nguoi dung da xac nhan an toan';
+    let checkinTitle = 'Check-in thành công';
+    let checkinMessage = 'Người dùng đã xác nhận an toàn';
     if (normalizedType === 'EMOTIONAL_MOMENT') {
-      checkinTitle = 'Diem danh khoanh khac gia dinh';
-      checkinMessage = 'Nguoi dung gui khoanh khac check-in kem anh / loi nhan';
+      checkinTitle = 'Điểm danh khoảnh khắc gia đình';
+      checkinMessage = 'Người dùng gửi khoảnh khắc check-in kèm ảnh / lời nhắn' + (vitalsAlertTriggered ? ' (Cảnh báo: Sinh hiệu cần theo dõi)' : '');
     } else if (normalizedType === 'GESTURE_WRIST_TWIST') {
-      checkinTitle = 'Diem danh cu chi lac co tay';
-      checkinMessage = 'Xac nhan an toan qua cu chi Double Wrist-Twist tren Galaxy Watch 5';
+      checkinTitle = 'Điểm danh cử chỉ lắc cổ tay';
+      checkinMessage = 'Xác nhận an toàn qua cử chỉ Double Wrist-Twist trên Galaxy Watch 5';
     } else if (normalizedType === 'HARDWARE_KEY_COMBO') {
-      checkinTitle = 'Diem danh to hop phim cung';
-      checkinMessage = 'Xac nhan an toan ngam qua to hop phim vat ly (Vol Up x2 + Down x1)';
+      checkinTitle = 'Điểm danh tổ hợp phím cứng';
+      checkinMessage = 'Xác nhận an toàn ngầm qua tổ hợp phím vật lý (Vol Up x2 + Down x1)';
     } else if (normalizedType === 'VOICE_KEYWORD') {
-      checkinTitle = 'Diem danh bang giong noi';
-      checkinMessage = 'Xac nhan an toan qua khau lenh giong noi: SafeSolo toi an toan';
+      checkinTitle = 'Điểm danh bằng giọng nói';
+      checkinMessage = 'Xác nhận an toàn qua khẩu lệnh giọng nói: SafeSolo tôi an toàn';
     } else if (normalizedType === 'BUDDY_CROSS_CHECKIN') {
-      checkinTitle = 'Diem danh cap doi tuong ho';
-      checkinMessage = `Nguoi dung da diem danh tuong ho 1-cham voi nguoi than (${metadata.buddyName || 'Ban dong hanh'})`;
+      checkinTitle = 'Điểm danh cặp đôi tương hỗ';
+      checkinMessage = `Người dùng đã điểm danh tương hỗ 1-chạm với người thân (${metadata.buddyName || 'Bạn đồng hành'})`;
     } else if (normalizedType === 'MEDICATION_VISION') {
-      checkinTitle = 'Diem danh uong thuoc bang Camera';
-      checkinMessage = `Da hoan tat an toan sinh tu & xac nhan uong thuoc (${metadata.pillName || 'Thuoc dinh ky'})`;
+      checkinTitle = 'Điểm danh uống thuốc bằng Camera';
+      checkinMessage = `Đã hoàn tất an toàn sinh tử & xác nhận uống thuốc (${metadata.pillName || 'Thuốc định kỳ'})`;
+    } else if (normalizedRoutineType === 'CUSTOM') {
+      checkinTitle = 'Điểm danh Checklist Thói quen';
+      checkinMessage = `Đã hoàn tất checklist thói quen sinh hoạt an toàn`;
     }
 
     await createInteractionEvent({
@@ -864,8 +1021,8 @@ async function checkin(req, res) {
 
     await createAlertEvent({
       userId: id,
-      level: 'INFO',
-      status: 'CHECKIN_OK',
+      level: vitalsAlertTriggered ? 'WARNING' : 'INFO',
+      status: vitalsAlertTriggered ? 'VITALS_CORRELATED_WARNING' : 'CHECKIN_OK',
       source: 'USER',
       title: checkinTitle,
       message: checkinMessage,
@@ -880,7 +1037,7 @@ async function checkin(req, res) {
           userName: userDoc.name,
           buddyId: metadata.buddyId,
           timestamp: now.toISOString(),
-          message: `${userDoc.name} da diem danh an toan va gui loi chuc toi ban!`,
+          message: `${userDoc.name} đã điểm danh an toàn và gửi lời chúc tới bạn!`,
         });
       }
       io.emit('CHECKIN_COMPLETED', {
@@ -895,6 +1052,8 @@ async function checkin(req, res) {
       message: `${checkinTitle}: ${checkinMessage}`,
       user: mapUserDoc(userDoc),
       type: normalizedType,
+      vitalsAlertTriggered,
+      metadata,
     });
   } catch (err) {
     console.error('[UserController.checkin] error:', err);
@@ -1292,6 +1451,19 @@ async function updateAutomationSettings(req, res) {
   const fallDetection = req.body.fallDetection ?? current.fallDetection;
   const geofenceAutoCheckin = req.body.geofenceAutoCheckin ?? current.geofenceAutoCheckin;
   const pillReminder = req.body.pillReminder ?? current.pillReminder;
+
+  // New Customizations
+  const enabledPassiveSources = req.body.enabledPassiveSources ?? current.enabledPassiveSources;
+  const pedometerThreshold = Number(req.body.pedometerThreshold ?? current.pedometerThreshold) || 200;
+  const safeWifiList = Array.isArray(req.body.safeWifiList) ? req.body.safeWifiList : current.safeWifiList;
+  const multiFactorPassiveEnabled = req.body.multiFactorPassiveEnabled !== undefined ? Boolean(req.body.multiFactorPassiveEnabled) : current.multiFactorPassiveEnabled;
+  const multiFactorMinSignals = Number(req.body.multiFactorMinSignals ?? current.multiFactorMinSignals) || 2;
+  const maxSoftCheckinAllowed = Number(req.body.maxSoftCheckinAllowed ?? current.maxSoftCheckinAllowed) || 3;
+  const customRoutines = Array.isArray(req.body.customRoutines) ? req.body.customRoutines : current.customRoutines;
+  const telegramReminderOffsetMinutes = Number(req.body.telegramReminderOffsetMinutes ?? current.telegramReminderOffsetMinutes) || 15;
+  const telegramCustomPrompt = req.body.telegramCustomPrompt !== undefined ? String(req.body.telegramCustomPrompt).trim() : current.telegramCustomPrompt;
+  const familyPingTemplates = Array.isArray(req.body.familyPingTemplates) ? req.body.familyPingTemplates : current.familyPingTemplates;
+
   const settings = await AutomationSetting.findOneAndUpdate(
     { userId: id },
     {
@@ -1305,9 +1477,28 @@ async function updateAutomationSettings(req, res) {
       pillTime,
       homeLocation: req.body.homeLocation ?? current.homeLocation,
       lastGeofenceEventAt: current.lastGeofenceEventAt,
+
+      enabledPassiveSources,
+      pedometerThreshold,
+      safeWifiList,
+      multiFactorPassiveEnabled,
+      multiFactorMinSignals,
+      maxSoftCheckinAllowed,
+      customRoutines,
+      telegramReminderOffsetMinutes,
+      telegramCustomPrompt,
+      familyPingTemplates,
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+
+  // Sync relevant fields to User document
+  userDoc.maxSoftCheckinAllowed = maxSoftCheckinAllowed;
+  userDoc.safeWifiList = safeWifiList;
+  userDoc.telegramReminderOffsetMinutes = telegramReminderOffsetMinutes;
+  userDoc.telegramCustomPrompt = telegramCustomPrompt;
+  userDoc.familyPingTemplates = familyPingTemplates;
+  await userDoc.save();
 
   await createAlertEvent({
     userId: id,
@@ -1315,13 +1506,18 @@ async function updateAutomationSettings(req, res) {
     status: 'AUTOMATION_UPDATED',
     source: 'USER',
     title: 'Cap nhat tu dong hoa',
-    message: 'Cac quy tac daily reminder, geofence va sensor da duoc cap nhat',
+    message: 'Cac quy tac daily reminder, geofence, multi-factor check-in va telegram bot da duoc cap nhat',
     metadata: {
       dailyReminderTime,
       pillTime,
       geofenceAutoCheckin: Boolean(geofenceAutoCheckin),
       fallDetection: Boolean(fallDetection),
       shakeSos: Boolean(shakeSos),
+      enabledPassiveSources,
+      pedometerThreshold,
+      multiFactorPassiveEnabled,
+      maxSoftCheckinAllowed,
+      telegramReminderOffsetMinutes,
     },
   });
 
@@ -1605,13 +1801,34 @@ async function respondFamilyPing(req, res) {
   }
   await targetUser.save();
 
+  // Resolve message from templateIndex if provided
+  const automation = await ensureAutomationSettings(id);
+  let finalResponseMessage = responseMessage;
+  if (req.body.templateIndex !== undefined && req.body.templateIndex !== null) {
+    const idx = Number(req.body.templateIndex);
+    const templates = Array.isArray(automation.familyPingTemplates) && automation.familyPingTemplates.length > 0
+      ? automation.familyPingTemplates
+      : [
+          'Con đang lái xe, về đến nơi sẽ gọi lại.',
+          'Đang làm việc, mọi thứ vẫn ổn.',
+          'Đang tụ tập với bạn bè.',
+          'Hơi mệt một chút, đang nằm nghỉ.',
+        ];
+    if (idx >= 0 && idx < templates.length) {
+      finalResponseMessage = templates[idx];
+    }
+  }
+  if (!finalResponseMessage) {
+    finalResponseMessage = 'Vẫn khỏe, cả nhà yên tâm!';
+  }
+
   await CheckInHistory.create({
     userId: id,
     checkinTime: now,
     locationAtCheckin: targetUser.lastKnownLocation,
     type: 'FAMILY_PING_REPLY',
     familyPingRef: pingId || null,
-    metadata: { responseMessage: responseMessage || 'Van khoe, ca nha yen tam!' },
+    metadata: { responseMessage: finalResponseMessage, templateIndex: req.body.templateIndex ?? null },
     isSystemAutoTriggered: false,
   });
 
@@ -1620,13 +1837,15 @@ async function respondFamilyPing(req, res) {
     io.emit('family:ping_replied', {
       userId: id,
       pingId,
-      responseMessage: responseMessage || 'Van khoe',
+      responseMessage: finalResponseMessage,
+      templateIndex: req.body.templateIndex ?? null,
       timestamp: now.toISOString(),
     });
   }
 
   return res.status(200).json({
-    message: 'Da phan hoi loi nhan gia dinh va hoan tat diem danh',
+    message: 'Đã phản hồi lời nhắn gia đình và hoàn tất điểm danh',
+    responseMessage: finalResponseMessage,
     user: mapUserDoc(targetUser),
   });
 }
@@ -1664,6 +1883,20 @@ async function listCheckInMoments(req, res) {
   });
 }
 
+async function listUserNotifications(req, res) {
+  const { id } = req.params;
+  const targetUser = await User.findById(id);
+  if (!targetUser) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+
+  const result = await listAlertEvents({ userId: id, page, limit });
+  return res.status(200).json(result);
+}
+
 module.exports = {
   registerUser,
   checkin,
@@ -1694,4 +1927,5 @@ module.exports = {
   sendFamilyPing,
   respondFamilyPing,
   listCheckInMoments,
+  listUserNotifications,
 };

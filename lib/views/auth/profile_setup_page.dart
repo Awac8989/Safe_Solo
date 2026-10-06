@@ -268,6 +268,7 @@ class _ProfileSetupPageState extends State<ProfileSetupPage> {
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _selectedRelation,
                       decoration: InputDecoration(
                         labelText: strings.text('Mối quan hệ', 'Relationship'),

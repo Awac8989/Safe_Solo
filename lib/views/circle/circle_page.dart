@@ -194,9 +194,12 @@ class _CirclePageState extends State<CirclePage> {
                 size: 24,
               ),
               const SizedBox(width: 8),
-              Text(
-                strings.text('Alive Circle', 'Alive Circle'),
-                style: AppTextStyles.h2.copyWith(fontSize: 26),
+              Expanded(
+                child: Text(
+                  strings.text('Alive Circle', 'Alive Circle'),
+                  style: AppTextStyles.h2.copyWith(fontSize: 26),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

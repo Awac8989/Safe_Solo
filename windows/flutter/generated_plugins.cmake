@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
+  connectivity_plus
   file_selector_windows
   firebase_core
   flutter_blue_plus_winrt
@@ -16,6 +17,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
   flutter_local_notifications_windows
   jni
+  tflite_flutter
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

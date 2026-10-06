@@ -427,12 +427,15 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                strings.text('CÁC THIẾT BỊ KHÁC ĐANG HOẠT ĐỘNG', 'OTHER ACTIVE SESSIONS'),
-                style: AppTextStyles.caption.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
-                  letterSpacing: 0.7,
+              Expanded(
+                child: Text(
+                  strings.text('CÁC THIẾT BỊ KHÁC ĐANG HOẠT ĐỘNG', 'OTHER ACTIVE SESSIONS'),
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                    letterSpacing: 0.7,
+                  ),
                 ),
               ),
               if (otherSessions.isNotEmpty)

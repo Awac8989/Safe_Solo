@@ -439,7 +439,13 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
               children: const [
                 Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 28),
                 SizedBox(width: 10),
-                Text('ĐÃ BÁO CÁO CẤP CỨU', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Expanded(
+                  child: Text(
+                    'ĐÃ BÁO CÁO CẤP CỨU',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
             content: Column(
@@ -590,9 +596,12 @@ class _AccidentReportPageState extends State<AccidentReportPage> {
                       children: [
                         const Icon(Icons.inventory_2_outlined, color: Color(0xFFF59E0B), size: 16),
                         const SizedBox(width: 6),
-                        Text(
-                          'Hàng đợi ngoại tuyến: $_pendingQueueCount ca chờ gửi',
-                          style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold),
+                        Expanded(
+                          child: Text(
+                            'Hàng đợi ngoại tuyến: $_pendingQueueCount ca chờ gửi',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),

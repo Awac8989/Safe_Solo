@@ -299,15 +299,19 @@ class TelegramBotService {
     }
 
     const deadlineStr = formatVnTime(user.nextDeadline);
+    const customPromptHeader = user.telegramCustomPrompt
+      ? `💌 <b>Lời nhắc từ người thương:</b> <i>"${user.telegramCustomPrompt}"</i>\n\n`
+      : '';
     const text = [
       `⏰ <b>[SAFESOLO] NHẮC NHỞ ĐIỂM DANH BÌNH AN</b>`,
       ``,
+      customPromptHeader ? customPromptHeader : '',
       `Xin chào <b>${user.fullName || 'bạn'}</b>,`,
       `Bạn sắp đến hạn check-in định kỳ:`,
       `⏱️ Còn khoảng <b>${Math.max(1, Math.round(minutesUntilDeadline))} phút</b> (Hạn chót: <b>${deadlineStr}</b>).`,
       ``,
       `Vui lòng bấm nút bên dưới để xác nhận bạn vẫn an toàn:`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     const inlineKeyboard = {
       inline_keyboard: [
@@ -631,24 +635,75 @@ class TelegramBotService {
       ],
     });
 
-    // 1. Handle Location Sharing
+    // 1. Handle Location Sharing (Feature Upgrade: Share Location Auto-Checkin)
     if (msg.location) {
       const lat = msg.location.latitude;
       const lng = msg.location.longitude;
+      const now = new Date();
 
+      let cycleMins = 720;
       if (user) {
-        user.lastKnownLocation = { lat, lng, updatedAt: new Date() };
+        cycleMins = Number(user.timerIntervalMinutes || 720);
+        user.lastKnownLocation = { lat, lng, updatedAt: now };
+        user.lastCheckinTime = now;
+        user.nextDeadline = new Date(now.getTime() + cycleMins * 60 * 1000);
+        user.consecutiveSoftCheckins = 0;
+        user.snoozeCountToday = 0;
+        user.currentStatus = 'SAFE';
+        user.deadmanStage = 0;
+        user.lastReminderAt = null;
+        user.lastWarningAt = null;
         await user.save();
+
+        try {
+          const CheckInHistory = require('../models/CheckInHistory');
+          await CheckInHistory.create({
+            userId: user._id,
+            checkinTime: now,
+            locationAtCheckin: { lat, lng, updatedAt: now },
+            type: 'TELEGRAM_LOCATION',
+            isSystemAutoTriggered: false,
+            metadata: {
+              source: 'TELEGRAM_LOCATION_SHARE',
+              liveLocation: Boolean(msg.location.live_period),
+              latitude: lat,
+              longitude: lng,
+            },
+          });
+
+          const { getIo } = require('../sockets/socketServer');
+          const io = getIo();
+          if (io) {
+            io.emit('CHECKIN_COMPLETED', {
+              userId: user._id,
+              type: 'TELEGRAM_LOCATION',
+              location: { lat, lng },
+              nextDeadline: user.nextDeadline.toISOString(),
+            });
+            io.emit('LOCATION_UPDATED', {
+              userId: user._id,
+              lat,
+              lng,
+              updatedAt: now.toISOString(),
+            });
+          }
+        } catch (subErr) {
+          console.warn('[TelegramBotService] Location check-in record error:', subErr.message);
+        }
       }
 
       const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+      const nextDeadlineStr = user?.nextDeadline ? formatVnTime(user.nextDeadline) : 'N/A';
       const locReply = [
-        `📍 <b>ĐÃ CẬP NHẬT TỌA ĐỘ VỊ TRÍ GPS!</b>`,
+        `📍 <b>ĐÃ ĐIỂM DANH AN TOÀN QUA VỊ TRÍ TELEGRAM!</b> 💚`,
         ``,
         `Tọa độ: <code>${lat.toFixed(6)}, ${lng.toFixed(6)}</code>`,
-        `🗺️ <a href="${mapUrl}">Xem bản đồ Google Maps</a>`,
+        `🗺️ <a href="${mapUrl}">Xem vị trí trên Google Maps</a>`,
         ``,
-        `SafeSolo sẽ sử dụng tọa độ này khi bạn bấm SOS khẩn cấp hoặc cần cứu hộ.`,
+        `✅ Trạng thái: <b>Đã gia hạn chu kỳ an toàn (+${Math.round(cycleMins / 60)}h)</b>`,
+        `⏱️ Hạn chót kế tiếp: <b>${nextDeadlineStr}</b>`,
+        ``,
+        `Vị trí của bạn đã được cập nhật trực tiếp lên Bản đồ Radar SafeSolo! 🛡️`,
       ].join('\n');
 
       await this._callTelegramApi('sendMessage', {
@@ -657,7 +712,7 @@ class TelegramBotService {
         parse_mode: 'HTML',
         reply_markup: this.getMainMenuKeyboard(),
       });
-      return { ok: true, action: 'location_updated', chatId };
+      return { ok: true, action: 'checkin_location_completed', chatId };
     }
 
     const lower = text.toLowerCase();

@@ -481,18 +481,21 @@ class _VitalsMatrixCardState extends State<VitalsMatrixCard>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Text(
-                      'CẢM BIẾN GIA TỐC & TÉ NGÃ',
-                      style: TextStyle(
-                        color: Color(0xFF94A3B8),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                Row(
+                  children: const [
+                    Expanded(
+                      child: Text(
+                        'CẢM BIẾN GIA TỐC & TÉ NGÃ',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF94A3B8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
                       ),
                     ),
-                    Spacer(),
+                    SizedBox(width: 6),
                     Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 14),
                     SizedBox(width: 4),
                     Text(

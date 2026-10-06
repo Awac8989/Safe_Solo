@@ -10,6 +10,7 @@ import '../../services/false_alarm_suppression_service.dart';
 import '../../services/hrv_stroke_service.dart';
 import '../../services/offline_resilience_service.dart';
 import '../../services/offline_sos_service.dart';
+import '../../services/stroke_defense_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/wear_os_service.dart';
 import '../emergency/false_alarm_verification_dialog.dart';
@@ -147,6 +148,23 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
   // ===========================================================================
   // CÁC TÁC VỤ INJECT KỊCH BẢN THỰC CHIẾN
   // ===========================================================================
+
+  void _injectUncleTuStrokeScenario() {
+    HapticFeedback.heavyImpact();
+    StrokeDefenseService.instance.runUncleTuStrokeSimulation();
+    _addLog(
+      tag: 'STROKE_UNCLE_TU',
+      message:
+          'Kích hoạt kịch bản Safe Solo Watch "Buổi chiều của ông Tư": Tay trái lật báo (1.8g) vs Tay phải bất động rơi chén (tĩnh 1.0g). '
+          'Chỉ số bất đối xứng BMAI vọt lên 88.5%, xuất hiện tán xạ AFib, khóa mốc giờ vàng 4.5h.',
+      type: SandboxLogType.danger,
+    );
+    TopToast.show(
+      context,
+      message: '🧠 Đang chạy kịch bản: Buổi chiều ông Tư (BMAI 88.5%, Giờ Vàng 4.5h)',
+      icon: Icons.emergency_share_rounded,
+    );
+  }
 
   void _injectVehicularCrash() {
     HapticFeedback.heavyImpact();
@@ -439,13 +457,17 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
                   size: 20,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'DEFENSE DEMO SANDBOX',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                    color: Colors.white,
+                Flexible(
+                  child: Text(
+                    'DEFENSE DEMO SANDBOX',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -472,6 +494,8 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
             ),
             const Text(
               'Hộp cát Trình diễn Hội đồng & Kiểm thử Tác chiến',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
                 color: Color(0xFF94A3B8),
@@ -497,6 +521,8 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: const Color(0xFF38EF7D),
           indicatorWeight: 3,
           labelColor: const Color(0xFF38EF7D),
@@ -596,16 +622,20 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'TRẠNG THÁI: $statusLabel',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: statusColor,
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Text(
+                  'TRẠNG THÁI: $statusLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -821,6 +851,19 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
               ],
             ),
           ),
+
+        // KỊCH BẢN ĐẶC BIỆT: SAFE SOLO WATCH - BUỔI CHIỀU CỦA ÔNG TƯ (ĐỘT QUỴ ĐỐI XỨNG 2 TAY & GIỜ VÀNG)
+        _buildScenarioCard(
+          icon: Icons.emergency_share_rounded,
+          accentColor: const Color(0xFF8B5CF6),
+          title: '🧠 Safe Solo Watch: Buổi Chiều Của Ông Tư (Đột Quỵ 2 Tay & Giờ Vàng)',
+          formula: 'Tay Trái: Lật báo (1.8g)  •  Tay Phải: Rơi chén (Tĩnh 1.0g)  •  BMAI: 88.5%  •  Cửa sổ 4.5h',
+          description:
+              'Mô phỏng chính xác kịch bản Safe Solo Watch: Đang ngồi đọc báo và rót trà, tay phải lỏng dần rơi chén xuống sàn. Cảm biến 2 cổ tay đối chiếu bất đối xứng thần kinh tháp, kích hoạt quy trình hỏi đáp 3 kênh, bài test 10s Pronator Drift và cấp cứu Mốc Giờ Vàng.',
+          buttonText: '🍵 Bắt Đầu Kịch Bản: Buổi Chiều Ông Tư',
+          onTap: _injectUncleTuStrokeScenario,
+        ),
+        const SizedBox(height: 12),
 
         // KỊCH BẢN ĐẶC BIỆT: TAI NẠN VA CHẠM GIAO THÔNG (VEHICULAR CRASH)
         _buildScenarioCard(
@@ -1200,21 +1243,24 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
-                children: [
+              Row(
+                children: const [
                   Icon(
                     Icons.assessment_rounded,
                     color: Color(0xFF38EF7D),
                     size: 20,
                   ),
                   SizedBox(width: 8),
-                  Text(
-                    'CHỈ SỐ THỰC NGHIỆM ĐỒ ÁN TỐT NGHIỆP',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF38EF7D),
-                      letterSpacing: 0.5,
+                  Expanded(
+                    child: Text(
+                      'CHỈ SỐ THỰC NGHIỆM ĐỒ ÁN TỐT NGHIỆP',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF38EF7D),
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ],
@@ -1331,16 +1377,20 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
                   color: Color(0xFF38EF7D),
                 ),
                 const SizedBox(width: 6),
-                const Text(
-                  'NHẬT KÝ SỰ KIỆN TÁC CHIẾN (LIVE CONSOLE)',
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFCBD5E1),
+                const Expanded(
+                  child: Text(
+                    'NHẬT KÝ SỰ KIỆN TÁC CHIẾN',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFCBD5E1),
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     setState(() {

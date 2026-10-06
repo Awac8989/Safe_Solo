@@ -814,4 +814,46 @@ export const resolveDisasterAlert = async (id: string) => {
   });
 };
 
+// ─── Analytics Dashboard ────────────────────────────────────────────────────
 
+export type AnalyticsDashboardResponse = {
+  success: true;
+  data: {
+    period: { days: number; generatedAt: string };
+    kpis: {
+      totalUsers: number;
+      monitoredUsers: number;
+      activeUsersToday: number;
+      checkinsToday: number;
+      activeIncidents: number;
+      alertsToday: number;
+    };
+    checkinTrend: Array<{ date: string; total: number; onTime: number; late: number }>;
+    checkinMethods: Array<{ method: string; count: number }>;
+    incidentMetrics: {
+      byType: Array<{ type: string; count: number; resolved: number }>;
+      dailyTrend: Array<{ date: string; incidents: number }>;
+      responseTime: {
+        avgSeconds: number;
+        minSeconds: number;
+        maxSeconds: number;
+        resolvedCount: number;
+      };
+    };
+    escalationBreakdown: Array<{ level: string; count: number }>;
+    falseAlarmRate: {
+      totalIncidents: number;
+      totalAlerts: number;
+      resolvedCount: number;
+      falseAlarmRatePercent: number;
+    };
+    vitalsSummary: {
+      heartRate: { avg: number; min: number; max: number; readings: number } | null;
+      spo2: { avg: number; min: number; max: number; readings: number } | null;
+    };
+  };
+};
+
+export const fetchAnalyticsDashboard = async (days = 30) => {
+  return request<AnalyticsDashboardResponse>(`/admin/analytics?days=${days}`);
+};

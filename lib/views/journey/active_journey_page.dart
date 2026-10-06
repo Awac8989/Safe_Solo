@@ -239,24 +239,27 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with SingleTicker
                               ),
                             ),
                             const SizedBox(height: 4),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.gps_fixed_rounded,
-                                  size: 14,
-                                  color: isOverdue ? AppColors.destructive : AppColors.success,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'GPS Live Ping 30s',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isOverdue ? AppColors.destructive : AppColors.textSecondary,
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.gps_fixed_rounded,
+                                    size: 14,
+                                    color: isOverdue ? AppColors.destructive : AppColors.success,
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'GPS Live Ping 30s',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isOverdue ? AppColors.destructive : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),

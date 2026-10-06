@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'notification_center_service.dart';
+
 class NotificationService {
   NotificationService._();
 
@@ -195,6 +197,20 @@ class NotificationService {
     required String channelName,
     required String channelDescription,
   }) async {
+    // Record into notification center
+    String notifType = 'SYSTEM';
+    final lowerTitle = title.toLowerCase();
+    if (channelId == _alertsChannel.id || lowerTitle.contains('sos') || lowerTitle.contains('ngã') || lowerTitle.contains('fall')) {
+      notifType = 'SOS';
+    } else if (channelId == _remindersChannel.id || lowerTitle.contains('điểm danh') || lowerTitle.contains('check-in')) {
+      notifType = 'CHECKIN';
+    }
+    NotificationCenterService.instance.addNotification(
+      title: title,
+      body: body,
+      type: notifType,
+    );
+
     await initialize();
     try {
       final details = NotificationDetails(

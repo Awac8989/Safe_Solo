@@ -349,9 +349,12 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
                     child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    'SoloCare AI đang phân tích sơ cứu...',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                  Expanded(
+                    child: Text(
+                      'SoloCare AI đang phân tích sơ cứu...',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                    ),
                   ),
                 ],
               ),

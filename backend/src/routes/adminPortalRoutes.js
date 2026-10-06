@@ -47,4 +47,7 @@ router.post('/disaster-alerts', controller.createDisasterAlert);
 router.patch('/disaster-alerts/:id/resolve', controller.resolveDisasterAlert);
 router.put('/disaster-alerts/:id/resolve', controller.resolveDisasterAlert);
 
+// Analytics Dashboard
+router.get('/analytics', controller.getAnalyticsDashboard);
+
 module.exports = router;

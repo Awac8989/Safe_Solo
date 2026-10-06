@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   http: ^1.5.0
   geolocator: ^14.0.2
@@ -53,6 +55,10 @@ dependencies:
   pdf: ^3.11.3
   image_picker: ^1.2.3
   flutter_blue_plus: ^2.3.12
+  socket_io_client: ^3.1.6
+  home_widget: ^0.10.0
+  tflite_flutter: ^0.12.1
+  connectivity_plus: ^7.3.1
 
 dev_dependencies:
   flutter_test:
@@ -70,11 +76,15 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/models/safesolo_ai.tflite
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

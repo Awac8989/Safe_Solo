@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import 'core/app_theme.dart';
 import 'core/constants.dart';
@@ -27,6 +29,7 @@ import 'views/community/accident_report_page.dart';
 import 'views/settings/app_user_guide_page.dart';
 import 'views/settings/defense_demo_sandbox_page.dart';
 import 'views/medical/lockscreen_medical_card_page.dart';
+import 'views/notifications/notification_center_page.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
 
@@ -70,6 +73,17 @@ class SafeSoloApp extends StatelessWidget {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('vi'),
+              Locale('en'),
+            ],
+            locale: provider.language.name == 'vi' ? const Locale('vi') : const Locale('en'),
             home: const _AppGate(),
             routes: {
               '/auth': (_) => const AuthPage(),
@@ -97,6 +111,7 @@ class SafeSoloApp extends StatelessWidget {
               '/user-guide': (_) => const AppUserGuidePage(),
               '/demo-sandbox': (_) => const DefenseDemoSandboxPage(),
               '/lockscreen-medical': (_) => const LockscreenMedicalCardPage(),
+              '/notifications': (_) => const NotificationCenterPage(),
             },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),

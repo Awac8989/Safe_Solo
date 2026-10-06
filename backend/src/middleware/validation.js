@@ -20,6 +20,20 @@ const userSchemas = {
   login: Joi.object({
     email: Joi.string().email().required(),
   }),
+  loginPassword: Joi.object({
+    identifier: Joi.string().required(),
+    password: Joi.string().required(),
+    deviceName: Joi.string().optional()
+  }),
+  forgotPassword: Joi.object({
+    identifier: Joi.string().required(),
+    channel: Joi.string().valid('email', 'telegram', 'auto').optional()
+  }),
+  resetPassword: Joi.object({
+    identifier: Joi.string().required(),
+    resetCode: Joi.string().required(),
+    newPassword: Joi.string().min(6).max(100).required()
+  }),
   verifyOtp: Joi.object({
     email: Joi.string().email().required(),
     otp: Joi.string().length(6).pattern(/^\d+$/).required(),
@@ -28,6 +42,16 @@ const userSchemas = {
     email: Joi.string().email().required(),
     name: Joi.string().min(1).max(120).optional(),
     avatar: Joi.string().uri().optional(),
+  }),
+  gmailSendOtp: Joi.object({
+    email: Joi.string().email().required(),
+  }),
+  telegramSendOtp: Joi.object({
+    phone: Joi.string().required(),
+  }),
+  telegramVerifyOtp: Joi.object({
+    phone: Joi.string().required(),
+    otp: Joi.string().required(),
   }),
   updateProfile: Joi.object({
     firstName: Joi.string().min(1).max(50).optional(),

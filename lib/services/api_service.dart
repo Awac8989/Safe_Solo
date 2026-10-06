@@ -46,7 +46,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'fullName': fullName,
           'phoneNumber': phoneNumber,
@@ -80,7 +80,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'timerIntervalMinutes': timerIntervalMinutes}),
       ),
     );
@@ -120,7 +120,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode(payload),
       ),
     );
@@ -139,7 +139,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'fromName': fromName,
           'fromPhone': fromPhone ?? '',
@@ -168,7 +168,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode(payload),
       ),
     );
@@ -196,7 +196,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'location': {'lat': lat, 'lng': lng}
         }),
@@ -217,7 +217,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'quietHoursStart': quietHoursStart,
           'quietHoursEnd': quietHoursEnd,
@@ -238,7 +238,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'minutes': minutes}),
       ),
     );
@@ -267,7 +267,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'level1Minutes': level1Minutes,
           'level2Minutes': level2Minutes,
@@ -309,7 +309,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'type': type,
           'source': source,
@@ -344,7 +344,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'name': name,
           'phone': phone,
@@ -397,7 +397,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.put(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode(profile.toJson()),
       ),
     );
@@ -420,7 +420,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode(settings.toJson()),
       ),
     );
@@ -445,7 +445,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.patch(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'stealthMode': stealthMode,
           'autoWipeDays': autoWipeDays,
@@ -466,7 +466,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'signalType': signalType,
           'payload': payload,
@@ -484,7 +484,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'pushToken': pushToken,
         }),
@@ -553,7 +553,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
         },
         body: jsonEncode({
@@ -635,7 +635,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           'x-user-id': userId,
         },
         body: jsonEncode({
@@ -687,7 +687,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           'x-user-id': userId,
         },
         body: jsonEncode({
@@ -711,7 +711,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           'x-user-id': userId,
         },
       ),
@@ -731,7 +731,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           'x-user-id': userId,
         },
         body: jsonEncode({'minutes': minutes}),
@@ -751,7 +751,7 @@ class ApiService {
       _client.post(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
           'x-user-id': userId,
         },
       ),
@@ -776,7 +776,7 @@ class ApiService {
         _client.post(
           uri,
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
             'x-user-id': userId,
           },
           body: jsonEncode({
@@ -803,7 +803,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'identifier': identifier}),
       ),
     );
@@ -819,7 +819,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'identifier': identifier, 'otp': otp}),
       ),
     );
@@ -832,7 +832,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'email': email}),
       ),
     );
@@ -848,7 +848,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({'email': email, 'otp': otp}),
       ),
     );
@@ -866,7 +866,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'email': email,
           'name': name ?? email.split('@').first,
@@ -888,12 +888,27 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'identifier': identifier,
           'password': password,
           'deviceName': deviceName ?? 'Android Device',
         }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getOrCreateFamilyRoom(String token) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/chat/family-room');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc',
+          'Authorization': 'Bearer $token',
+        },
       ),
     );
     _throwIfFailed(response);
@@ -908,7 +923,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'identifier': identifier,
           'channel': channel,
@@ -928,7 +943,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'identifier': identifier,
           'resetCode': resetCode,
@@ -956,7 +971,7 @@ class ApiService {
     final response = await _safeRequest(
       _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
         body: jsonEncode({
           'currentSessionId': currentSessionId,
           if (userId != null) 'userId': userId,
@@ -993,6 +1008,29 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> fetchUserNotifications(
+    String userId, {
+    int page = 1,
+    int limit = 30,
+  }) async {
+    final uri = Uri.parse(
+      '${AppConstants.backendBaseUrl}/users/$userId/notifications?page=$page&limit=$limit',
+    );
+    try {
+      final response = await _safeRequest(_client.get(uri));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final list = (body['items'] as List<dynamic>? ?? const []);
+        return list
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .toList();
+      }
+      return const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
   void _throwIfFailed(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;
@@ -1019,5 +1057,29 @@ class ApiService {
         'Không kết nối được máy chủ. Vui lòng kiểm tra mạng hoặc API_BASE_URL (${AppConstants.backendBaseUrl}).',
       );
     }
+  }
+
+  Future<void> postRaw(String endpoint, Map<String, dynamic> body) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}$endpoint');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode(body),
+      ),
+    );
+    _throwIfFailed(response);
+  }
+
+  Future<void> putRaw(String endpoint, Map<String, dynamic> body) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}$endpoint');
+    final response = await _safeRequest(
+      _client.put(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode(body),
+      ),
+    );
+    _throwIfFailed(response);
   }
 }

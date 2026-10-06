@@ -30,7 +30,7 @@ class AchievementsPage extends StatelessWidget {
           crossAxisCount: 2,
           mainAxisSpacing: 14,
           crossAxisSpacing: 14,
-          childAspectRatio: 0.92,
+          childAspectRatio: 0.80,
         ),
         itemBuilder: (context, index) {
           final item = _items[index];

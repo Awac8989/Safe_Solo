@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import "../i18n";
 
 import appCss from "../styles.css?url";
 

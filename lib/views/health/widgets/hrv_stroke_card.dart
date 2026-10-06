@@ -200,10 +200,14 @@ class _HrvStrokeCardState extends State<HrvStrokeCard>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Xác suất Nguy cơ Đột quỵ / AFib',
-                          style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                        const Expanded(
+                          child: Text(
+                            'Xác suất Nguy cơ Đột quỵ / AFib',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '${assessment.riskPercent}%',
                           style: TextStyle(
@@ -320,10 +324,14 @@ class _HrvStrokeCardState extends State<HrvStrokeCard>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Đồ thị Sóng Mạch Tachogram (${hrvService.rrIntervals.length} nhịp)',
-                        style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
+                      Expanded(
+                        child: Text(
+                          'Đồ thị Sóng Mạch Tachogram (${hrvService.rrIntervals.length} nhịp)',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w600),
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         'R-R: ${metrics.meanRrMs.toInt()} ms',
                         style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),

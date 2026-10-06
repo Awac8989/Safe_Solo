@@ -965,6 +965,8 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: const Color(0xFF38BDF8),
           indicatorWeight: 3,
           labelColor: const Color(0xFF38BDF8),
@@ -1991,16 +1993,23 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.speed_rounded, color: Color(0xFF38BDF8), size: 12),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.samplingRate,
-                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.w500),
-                    ),
-                  ],
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.speed_rounded, color: Color(0xFF38BDF8), size: 12),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          task.samplingRate,
+                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.w500),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 6),
                 Flexible(
                   child: Text(
                     task.currentMetric,

@@ -79,16 +79,19 @@ class _LiveSafetyCockpitCardState extends State<LiveSafetyCockpitCard>
                 },
               ),
               const SizedBox(width: 8),
-              Text(
-                strings.text('BUỒNG LÁI HỘ TỐNG ẢO', 'LIVE SAFETY COCKPIT'),
-                style: AppTextStyles.caption.copyWith(
-                  color: const Color(0xFFFCD34D),
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                  fontSize: 11,
+              Expanded(
+                child: Text(
+                  strings.text('BUỒNG LÁI HỘ TỐNG ẢO', 'LIVE SAFETY COCKPIT'),
+                  style: AppTextStyles.caption.copyWith(
+                    color: const Color(0xFFFCD34D),
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(

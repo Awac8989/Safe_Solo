@@ -91,18 +91,23 @@ class NightShieldBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      isShieldActive
-                          ? strings.text('KHIÊN ĐÊM: ĐANG BẬT', 'NIGHT SHIELD: ACTIVE')
-                          : strings.text('NGHI THỨC BÌNH AN', 'PEACE RITUAL'),
-                      style: AppTextStyles.caption.copyWith(
-                        color: isShieldActive
-                            ? const Color(0xFFC7D2FE)
-                            : (isDark ? AppDarkColors.textSecondary : AppColors.textSecondary),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        fontSize: 10.5,
+                    Flexible(
+                      child: Text(
+                        isShieldActive
+                            ? strings.text('KHIÊN ĐÊM: ĐANG BẬT', 'NIGHT SHIELD: ACTIVE')
+                            : strings.text('NGHI THỨC BÌNH AN', 'PEACE RITUAL'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(
+                          color: isShieldActive
+                              ? const Color(0xFFC7D2FE)
+                              : (isDark ? AppDarkColors.textSecondary : AppColors.textSecondary),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          fontSize: 10.5,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),

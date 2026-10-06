@@ -12,6 +12,7 @@ import {
   Briefcase,
   ShieldCheck,
   LogOut,
+  BarChart3,
 } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import {
@@ -41,6 +42,7 @@ const fleetAndB2bItems = [
 ];
 
 const systemItems = [
+  { title: "Phân tích dữ liệu", url: "/analytics", icon: BarChart3 },
   { title: "Người dùng ứng dụng", url: "/users", icon: Smartphone },
   { title: "Kênh liên lạc & PTT", url: "/omnichannel", icon: Network },
   { title: "Doanh thu & Đối tác", url: "/revenue", icon: DollarSign },

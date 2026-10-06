@@ -132,11 +132,12 @@ class _FirstAidGuidePageState extends State<FirstAidGuidePage> with SingleTicker
 
               // Stats Row
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _statBadge('Tổng lần ép', '${cpr.totalCompressions}'),
-                  _statBadge('Chu kỳ', '${cpr.cycleCount}'),
-                  _statBadge('Nhịp', '${cpr.bpm} bpm'),
+                  Expanded(child: _statBadge('Tổng lần ép', '${cpr.totalCompressions}')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _statBadge('Chu kỳ', '${cpr.cycleCount}')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _statBadge('Nhịp', '${cpr.bpm} bpm')),
                 ],
               ),
               const SizedBox(height: 28),

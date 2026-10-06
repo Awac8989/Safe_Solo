@@ -11,8 +11,9 @@ import '../../services/wear_os_service.dart';
 import '../../services/watch_hardware_sensor_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/pedometer_service.dart';
+import '../../services/stroke_defense_service.dart';
 
-/// 7 Màn hình chuẩn 1:1 theo mẫu thiết kế SamsungGalaxyWatch5Interface trên GitHub
+/// 8 Màn hình chuẩn 1:1 bao gồm Safe Solo Stroke Shield (Đột quỵ 2 tay)
 enum WatchScreen {
   watchface,
   dashboard,
@@ -20,6 +21,7 @@ enum WatchScreen {
   warning,
   sos,
   health,
+  stroke,
   medical,
 }
 
@@ -30,16 +32,18 @@ const List<WatchScreen> kWatchScreens = [
   WatchScreen.warning,
   WatchScreen.sos,
   WatchScreen.health,
+  WatchScreen.stroke,
   WatchScreen.medical,
 ];
 
-/// 5 Màn hình thẻ thường nhật (Routine Tiles) người dùng có thể vuốt qua lại bình thường
+/// 6 Màn hình thẻ thường nhật (Routine Tiles) người dùng có thể vuốt qua lại bình thường
 /// KHÔNG BAO GỒM cảnh báo khẩn cấp (warning, sos) để tránh vuốt nhầm báo động
 const List<WatchScreen> kRoutineScreens = [
   WatchScreen.watchface,
   WatchScreen.dashboard,
   WatchScreen.checkin,
   WatchScreen.health,
+  WatchScreen.stroke,
   WatchScreen.medical,
 ];
 
@@ -50,6 +54,7 @@ const Map<WatchScreen, String> kScreenLabels = {
   WatchScreen.warning: 'Alert Warning',
   WatchScreen.sos: 'Active SOS',
   WatchScreen.health: 'Health Monitor',
+  WatchScreen.stroke: 'Stroke Shield',
   WatchScreen.medical: 'Medical ID',
 };
 
@@ -130,6 +135,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     WearOsService.instance.initialize();
     WearOsService.instance.addListener(_onWearOsChanged);
     WatchSyncManager.instance.addListener(_onSyncChanged);
+    StrokeDefenseService.instance.addListener(_onStrokeDefenseChanged);
 
     // Kích hoạt nhận diện chạy trên môi trường đồng hồ thật
     WatchSyncManager.instance.setIsRunningOnWatch(true);
@@ -374,10 +380,24 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     }
   }
 
+  void _onStrokeDefenseChanged() {
+    if (!mounted) return;
+    final stroke = StrokeDefenseService.instance;
+    setState(() {});
+    if (stroke.state != StrokeVerificationState.monitoring &&
+        stroke.state != StrokeVerificationState.safeResolved &&
+        _screen != WatchScreen.stroke &&
+        _screen != WatchScreen.warning &&
+        _screen != WatchScreen.sos) {
+      _nav(WatchScreen.stroke);
+    }
+  }
+
   @override
   void dispose() {
     WatchSyncManager.instance.removeListener(_onSyncChanged);
     WearOsService.instance.removeListener(_onWearOsChanged);
+    StrokeDefenseService.instance.removeListener(_onStrokeDefenseChanged);
     WearOsService.instance.stopMotionMonitoring();
     _pageController.dispose();
     _clockTimer?.cancel();
@@ -736,6 +756,9 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
         break;
       case WatchScreen.health:
         child = _buildHealthScreen(size, isNativeWatch: isNativeWatch);
+        break;
+      case WatchScreen.stroke:
+        child = _buildStrokeDefenseScreen(size, isNativeWatch: isNativeWatch);
         break;
       case WatchScreen.medical:
         child = _buildMedicalScreen(size, isNativeWatch: isNativeWatch);
@@ -2968,6 +2991,835 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
       ),
     );
   }
+
+  // ===========================================================================
+  // SCREEN 8: STROKE SHIELD - PHÁT HIỆN ĐỘT QUỴ ĐỐI XỨNG 2 TAY & MỐC GIỜ VÀNG
+  // (Safe Solo Watch: Kịch bản Buổi chiều của ông Tư & Cấp cứu Khung Giờ Vàng)
+  // ===========================================================================
+  Widget _buildStrokeDefenseScreen(double size, {required bool isNativeWatch}) {
+    final stroke = StrokeDefenseService.instance;
+
+    // Phân nhánh theo trạng thái của Quy trình xác thực đa lớp (Multi-tier Verification)
+    switch (stroke.state) {
+      case StrokeVerificationState.promptLevel1:
+        return _buildStrokePromptLevel1Screen(size, stroke, isNativeWatch: isNativeWatch);
+      case StrokeVerificationState.promptLevel2:
+        return _buildStrokePromptLevel2Screen(size, stroke, isNativeWatch: isNativeWatch);
+      case StrokeVerificationState.pronatorDriftTest:
+        return _buildPronatorDriftTestScreen(size, stroke, isNativeWatch: isNativeWatch);
+      case StrokeVerificationState.emergencyActivated:
+        return _buildStrokeEmergencyScreen(size, stroke, isNativeWatch: isNativeWatch);
+      case StrokeVerificationState.safeResolved:
+        return _buildStrokeSafeResolvedScreen(size, stroke, isNativeWatch: isNativeWatch);
+      case StrokeVerificationState.monitoring:
+        return _buildStrokeMonitoringScreen(size, stroke, isNativeWatch: isNativeWatch);
+    }
+  }
+
+  /// 1. GIAO DIỆN GIÁM SÁT THƯỜNG TRỰC ĐỐI XỨNG HAI TAY
+  Widget _buildStrokeMonitoringScreen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+    final bmai = stroke.bilateralAsymmetryScore;
+    final risk = stroke.compositeRiskScore;
+    final isHighRisk = risk >= 60.0;
+
+    return Container(
+      width: size,
+      height: size,
+      color: Colors.black,
+      padding: EdgeInsets.symmetric(horizontal: 14.0 * scale, vertical: 10.0 * scale),
+      child: Center(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.emergency_share_rounded, color: Color(0xFF60A5FA), size: 14),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ĐỘT QUỴ 2 TAY',
+                    style: TextStyle(
+                      fontFamily: 'sans-serif',
+                      fontSize: 10.5 * scale,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Vòng phụ: Kết nối (50Hz IMU)',
+                style: TextStyle(
+                  fontFamily: 'sans-serif',
+                  fontSize: 8.0 * scale,
+                  color: const Color(0xFF34D399),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Thẻ đo 2 cổ tay (Bilateral Wrist Sensors)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E293B),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF334155)),
+                ),
+                child: Row(
+                  children: [
+                    // Tay Trái (Đồng hồ)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '⌚ TAY TRÁI',
+                            style: TextStyle(
+                              fontSize: 7.5 * scale,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  stroke.leftWrist.isMotionActive ? 'Đang cử động' : 'Đứng yên',
+                                  style: TextStyle(
+                                    fontSize: 8.0 * scale,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(width: 1, height: 26, color: const Color(0xFF334155)),
+                    // Tay Phải (Vòng phụ)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '📿 TAY PHẢI',
+                              style: TextStyle(
+                                fontSize: 7.5 * scale,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: stroke.rightWrist.isMotionActive
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFEF4444),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    stroke.rightWrist.isMotionActive ? 'Đang cử động' : 'Liệt / Rơi chén',
+                                    style: TextStyle(
+                                      fontSize: 8.0 * scale,
+                                      fontWeight: FontWeight.w600,
+                                      color: stroke.rightWrist.isMotionActive ? Colors.white : const Color(0xFFF87171),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Chỉ số Bất đối xứng (BMAI) & Poincaré Plot
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isHighRisk ? const Color(0xFFEF4444) : const Color(0xFF1E293B),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Poincaré Mini Canvas
+                    SizedBox(
+                      width: 38 * scale,
+                      height: 38 * scale,
+                      child: CustomPaint(
+                        painter: _PoincareScatterPainter(
+                          points: stroke.poincarePoints,
+                          isAfib: stroke.isAfibDetected,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'BẤT ĐỐI XỨNG (BMAI):',
+                                style: TextStyle(fontSize: 7.0 * scale, color: const Color(0xFF94A3B8)),
+                              ),
+                              Text(
+                                '${bmai.toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontSize: 8.5 * scale,
+                                  fontWeight: FontWeight.bold,
+                                  color: isHighRisk ? const Color(0xFFEF4444) : const Color(0xFF38BDF8),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          LinearProgressIndicator(
+                            value: (bmai / 100.0).clamp(0.0, 1.0),
+                            backgroundColor: const Color(0xFF334155),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isHighRisk ? const Color(0xFFEF4444) : const Color(0xFF38BDF8),
+                            ),
+                            minHeight: 3,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            stroke.isAfibDetected ? '⚡ Phát hiện Rung Nhĩ (AFib)' : '✓ Nhịp tim đều (Poincaré elip)',
+                            style: TextStyle(
+                              fontSize: 7.0 * scale,
+                              fontWeight: FontWeight.w600,
+                              color: stroke.isAfibDetected ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // NÚT DEMO ĐẶC BIỆT: KỊCH BẢN ÔNG TƯ (RÓT TRÀ & RƠI CHÉN)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.heavyImpact();
+                  stroke.runUncleTuStrokeSimulation();
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 7 * scale),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x607C3AED),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        'DEMO: BUỔI CHIỀU ÔNG TƯ',
+                        style: TextStyle(
+                          fontFamily: 'sans-serif',
+                          fontSize: 9.0 * scale,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 5),
+
+              // Nút Xem 3 Điểm giới hạn y khoa
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _showStrokeLimitationsDialog(context),
+                child: Text(
+                  'ℹ️ 3 Điểm giới hạn y khoa (Xem)',
+                  style: TextStyle(
+                    fontFamily: 'sans-serif',
+                    fontSize: 7.5 * scale,
+                    color: const Color(0xFF94A3B8),
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 2. CẢNH BÁO CẤP 1: RUNG & HỎI THĂM ("BÁC TƯ CÓ ỔN KHÔNG?")
+  Widget _buildStrokePromptLevel1Screen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+
+    return Container(
+      width: size,
+      height: size,
+      color: const Color(0xFF171206),
+      padding: EdgeInsets.symmetric(horizontal: 16.0 * scale, vertical: 12.0 * scale),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'CẢNH BÁO ${stroke.promptCountdownSeconds}S',
+                style: TextStyle(fontSize: 8.5 * scale, fontWeight: FontWeight.w900, color: Colors.black),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'BÁC TƯ CÓ ỔN KHÔNG?',
+              style: TextStyle(
+                fontSize: 12.0 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFFDE68A),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Phát hiện bất thường: Tay phải bất động sau rót trà',
+              style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFFD1D5DB)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+
+            // 3 Phương thức phản hồi cho người yếu 1 tay
+            Row(
+              children: [
+                // 1. Chạm màn hình
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      stroke.respondByUser(method: 'Chạm màn hình');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'TÔI ỔN (CHẠM)',
+                        style: TextStyle(fontSize: 8.0 * scale, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // 2. Lắc cổ tay
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      stroke.respondByUser(method: 'Lắc cổ tay (Twist)');
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        'LẮC CỔ TAY',
+                        style: TextStyle(fontSize: 8.0 * scale, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            // 3. Khẩu lệnh giọng nói
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                stroke.respondByUser(method: 'Khẩu lệnh giọng nói');
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4B5563),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '🎙️ NÓI: "TÔI ỔN"',
+                  style: TextStyle(fontSize: 8.0 * scale, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 3. CẢNH BÁO CẤP 2: CHUÔNG LỚN ĐÁNH THỨC XUNG QUANH
+  Widget _buildStrokePromptLevel2Screen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+
+    return Container(
+      width: size,
+      height: size,
+      color: const Color(0xFF2D0606),
+      padding: EdgeInsets.symmetric(horizontal: 16.0 * scale, vertical: 12.0 * scale),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.campaign_rounded, color: Color(0xFFEF4444), size: 32),
+            const SizedBox(height: 4),
+            Text(
+              'CHUÔNG BÁO ĐỘNG LỚN!',
+              style: TextStyle(
+                fontSize: 12.5 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFFFCA5A5),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Đang đánh thức người xung quanh...\nTự động gọi 115 sau ${stroke.promptCountdownSeconds}s',
+              style: TextStyle(fontSize: 8.0 * scale, color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.heavyImpact();
+                stroke.respondByUser(method: 'Nút bấm cấp 2');
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  'TÔI VẪN TỈNH TÁO (DỪNG CHUÔNG)',
+                  style: TextStyle(
+                    fontSize: 8.5 * scale,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 4. BÀI TEST PHẢN XẠ GIƠ 2 TAY 10 GIÂY (PRONATOR DRIFT REFLEX TEST)
+  Widget _buildPronatorDriftTestScreen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+    final driftDeg = stroke.rightArmDriftAngleDegrees;
+
+    return Container(
+      width: size,
+      height: size,
+      color: const Color(0xFF0F172A),
+      padding: EdgeInsets.symmetric(horizontal: 16.0 * scale, vertical: 10.0 * scale),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'TEST PHẢN XẠ 10 GIÂY',
+              style: TextStyle(
+                fontSize: 10.5 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF38BDF8),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Nhắm mắt & Giơ thẳng 2 tay ra trước',
+              style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF94A3B8)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+
+            // Đồng hồ đếm ngược 10s
+            Container(
+              width: 42 * scale,
+              height: 42 * scale,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF38BDF8), width: 2),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '${stroke.pronatorDriftSecondsRemaining}s',
+                style: TextStyle(fontSize: 14 * scale, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            // Minh họa cánh tay bị trôi (Pronator Drift)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Tay trái: 0° (Thẳng)', style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF10B981))),
+                      Text(
+                        'Tay phải: -${driftDeg.toStringAsFixed(0)}° (Trôi)',
+                        style: TextStyle(
+                          fontSize: 7.5 * scale,
+                          fontWeight: FontWeight.bold,
+                          color: stroke.isPronatorDriftFailed ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (stroke.isPronatorDriftFailed) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '⚠️ MẤT TRƯƠNG LỰC CƠ TAY PHẢI!',
+                      style: TextStyle(
+                        fontSize: 7.0 * scale,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFFEF4444),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            GestureDetector(
+              onTap: () => stroke.resolveAsSafe(reason: 'Người dùng hủy test phản xạ'),
+              child: Text(
+                'Bỏ qua bài test',
+                style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 5. MÀN HÌNH CẤP CỨU & KHUNG GIỜ VÀNG 4.5H
+  Widget _buildStrokeEmergencyScreen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+    final remaining = stroke.remainingGoldenHourTime;
+    final hours = remaining.inHours.toString().padLeft(2, '0');
+    final minutes = (remaining.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (remaining.inSeconds % 60).toString().padLeft(2, '0');
+
+    return Container(
+      width: size,
+      height: size,
+      color: const Color(0xFF3F0A0A),
+      padding: EdgeInsets.symmetric(horizontal: 14.0 * scale, vertical: 10.0 * scale),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'CẤP CỨU ĐỘT QUỴ NÃO',
+                  style: TextStyle(
+                    fontSize: 8.5 * scale,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+
+              // Bộ đếm Mốc Giờ Vàng (Golden Hour Countdown)
+              Text(
+                'CỬA SỔ GIỜ VÀNG (4.5H rtPA)',
+                style: TextStyle(
+                  fontSize: 7.5 * scale,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFFCA5A5),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFEF4444)),
+                ),
+                child: Text(
+                  '$hours:$minutes:$seconds',
+                  style: TextStyle(
+                    fontSize: 16 * scale,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFFEF4444),
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Tóm tắt thông tin phát hiện
+              Text(
+                '✓ Đã gửi SMS cho con gái ông Tư kèm mốc giờ khởi phát & thuốc Amlodipine 5mg.',
+                style: TextStyle(fontSize: 7.0 * scale, color: const Color(0xFFE2E8F0)),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+
+              // Nút gọi 115 cấp cứu
+              GestureDetector(
+                onTap: () async {
+                  HapticFeedback.heavyImpact();
+                  final uri = Uri.parse('tel:115');
+                  if (await canLaunchUrl(uri)) await launchUrl(uri);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '📞 GỌI 115 NGAY LẬP TỨC',
+                    style: TextStyle(
+                      fontSize: 8.5 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              GestureDetector(
+                onTap: () => stroke.resolveAsSafe(reason: 'Người hỗ trợ đã có mặt'),
+                child: Text(
+                  'Đã có người hỗ trợ (Tắt)',
+                  style: TextStyle(fontSize: 7.5 * scale, color: const Color(0xFF94A3B8)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 6. TRẠNG THÁI GIẢI TỎA AN TOÀN
+  Widget _buildStrokeSafeResolvedScreen(double size, StrokeDefenseService stroke, {required bool isNativeWatch}) {
+    final scale = size / 384.0;
+
+    return Container(
+      width: size,
+      height: size,
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 40),
+            const SizedBox(height: 6),
+            Text(
+              'ĐÃ AN TOÀN',
+              style: TextStyle(
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Đã giải tỏa cảnh báo.\nTiếp tục giám sát 2 tay.',
+              style: TextStyle(fontSize: 8 * scale, color: const Color(0xFF94A3B8)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Hộp thoại xem 3 Điểm giới hạn y khoa (Từ tài liệu video YouTube)
+  void _showStrokeLimitationsDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: const Row(
+          children: [
+            Icon(Icons.medical_services_rounded, color: Color(0xFF60A5FA), size: 20),
+            SizedBox(width: 8),
+            Text(
+              '3 Điểm Giới Hạn Y Khoa',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '1. Không phân biệt thể đột quỵ:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
+              ),
+              Text(
+                'Thiết bị không phân biệt được nhồi máu não (tắc mạch) hay xuất huyết não (vỡ mạch) — việc này bắt buộc phải chụp CT/MRI tại bệnh viện.',
+                style: TextStyle(fontSize: 11, color: Color(0xFFCBD5E1)),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '2. Bỏ sót ca không yếu liệt chi:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
+              ),
+              Text(
+                'Khoảng 1/7 ca đột quỵ không biểu hiện méo mặt, yếu tay (chỉ đau đầu dữ dội, chóng mặt hoặc mất thăng bằng).',
+                style: TextStyle(fontSize: 11, color: Color(0xFFCBD5E1)),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '3. Cần kiểm chứng cộng đồng:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF38BDF8)),
+              ),
+              Text(
+                'Nghiên cứu nền tảng thực hiện trên 82 bệnh nhân nội trú Bệnh viện Đa khoa TW Cần Thơ, cần tiếp tục mở rộng quy mô cộng đồng.',
+                style: TextStyle(fontSize: 11, color: Color(0xFFCBD5E1)),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('ĐÃ HIỂU', style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom painter vẽ đồ thị phân tán Poincaré (RR_n vs RR_n+1)
+class _PoincareScatterPainter extends CustomPainter {
+  _PoincareScatterPainter({required this.points, required this.isAfib});
+
+  final List<PoincarePoint> points;
+  final bool isAfib;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..color = const Color(0xFF1E293B);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    final linePaint = Paint()
+      ..color = const Color(0xFF475569)
+      ..strokeWidth = 1.0;
+    // Đường chéo phân giác Identity Line y = x
+    canvas.drawLine(Offset(0, size.height), Offset(size.width, 0), linePaint);
+
+    final dotPaint = Paint()
+      ..color = isAfib ? const Color(0xFFEF4444) : const Color(0xFF38BDF8)
+      ..style = PaintingStyle.fill;
+
+    for (final pt in points) {
+      // Chuẩn hóa dải RR từ 400ms đến 1400ms vào kích thước Canvas
+      final x = ((pt.rrN - 400.0) / 1000.0).clamp(0.0, 1.0) * size.width;
+      final y = (1.0 - ((pt.rrNext - 400.0) / 1000.0).clamp(0.0, 1.0)) * size.height;
+      canvas.drawCircle(Offset(x, y), isAfib ? 1.4 : 1.1, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PoincareScatterPainter oldDelegate) {
+    return oldDelegate.isAfib != isAfib || oldDelegate.points.length != points.length;
+  }
 }
 
 /// Custom painter vẽ vòng cung chu vi (CircularArc)
@@ -3058,70 +3910,4 @@ class _BpmPolylinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BpmPolylinePainter oldDelegate) => true;
-}
-
-/// Custom painter vẽ mã QR cứu nạn 9x9 (chuẩn từ SVG trong React app)
-class _FigmaQrCodePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-
-    final step = size.width / 9.0;
-
-    // Lưới 9x9 với công thức (row + col + row * col) % 3 == 0
-    for (int row = 0; row < 9; row++) {
-      for (int col = 0; col < 9; col++) {
-        // Tránh 3 góc định vị
-        if ((row < 3 && col < 3) || (row < 3 && col > 5) || (row > 5 && col < 3)) {
-          continue;
-        }
-        if ((row + col + row * col) % 3 == 0) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(col * step + 0.5, row * step + 0.5, step - 1.0, step - 1.0),
-              const Radius.circular(1),
-            ),
-            paint,
-          );
-        }
-      }
-    }
-
-    // 3 góc định vị (Corner Markers)
-    _drawCornerMarker(canvas, const Offset(0, 0), step * 3);
-    _drawCornerMarker(canvas, Offset(size.width - step * 3, 0), step * 3);
-    _drawCornerMarker(canvas, Offset(0, size.height - step * 3), step * 3);
-  }
-
-  void _drawCornerMarker(Canvas canvas, Offset offset, double s) {
-    final strokePaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.22;
-
-    final fillPaint = Paint()
-      ..color = Colors.black
-      ..style = PaintingStyle.fill;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(offset.dx + s * 0.1, offset.dy + s * 0.1, s * 0.8, s * 0.8),
-        const Radius.circular(2),
-      ),
-      strokePaint,
-    );
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(offset.dx + s * 0.3, offset.dy + s * 0.3, s * 0.4, s * 0.4),
-        const Radius.circular(1.5),
-      ),
-      fillPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

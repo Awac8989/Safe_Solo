@@ -158,27 +158,30 @@ class _CircleOrbitVisualizerState extends State<CircleOrbitVisualizer>
               ..._buildSatellites(members, isNight),
             // Legend at bottom
             Positioned(
-              bottom: 10,
-              left: 14,
-              right: 14,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildLegendItem(const Color(0xFF2FAA68), strings.text('Ở nhà', 'At home'), isNight),
-                  const SizedBox(width: 12),
-                  _buildLegendItem(const Color(0xFFFF9E1B), strings.text('Đi đường', 'Transit'), isNight),
-                  const SizedBox(width: 12),
-                  _buildLegendItem(const Color(0xFF8B5CF6), strings.text('Ngủ', 'Sleep'), isNight),
-                  const SizedBox(width: 12),
-                  Text(
-                    strings.text('• Chạm để đồng điệu', '• Tap to sync'),
-                    style: AppTextStyles.caption.copyWith(
-                      color: isNight ? const Color(0xFF94A3B8) : AppColors.textMuted,
-                      fontSize: 10.5,
-                      fontStyle: FontStyle.italic,
+              bottom: 8,
+              left: 10,
+              right: 10,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLegendItem(const Color(0xFF2FAA68), strings.text('Ở nhà', 'At home'), isNight),
+                    const SizedBox(width: 10),
+                    _buildLegendItem(const Color(0xFFFF9E1B), strings.text('Đi đường', 'Transit'), isNight),
+                    const SizedBox(width: 10),
+                    _buildLegendItem(const Color(0xFF8B5CF6), strings.text('Ngủ', 'Sleep'), isNight),
+                    const SizedBox(width: 10),
+                    Text(
+                      strings.text('• Chạm để đồng điệu', '• Tap to sync'),
+                      style: AppTextStyles.caption.copyWith(
+                        color: isNight ? const Color(0xFF94A3B8) : AppColors.textMuted,
+                        fontSize: 10.5,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ],

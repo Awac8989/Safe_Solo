@@ -148,6 +148,50 @@ class ChatController {
       next(error);
     }
   }
+  // @desc    Get inbox (list of chat rooms)
+  // @route   GET /api/chat/inbox
+  // @access  Private
+  async getInbox(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const rooms = await chatService.getInbox(userId);
+      res.json({
+        success: true,
+        data: { rooms }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Get or create family room
+  // @route   POST /api/chat/family-room
+  // @access  Private
+  async getOrCreateFamilyRoom(req, res, next) {
+    try {
+      const userId = req.user.id;
+      // Tìm room GROUP có participantIds chứa userId và title là "Gia đình"
+      let room = await require('../models/ChatRoom').findOne({
+        roomType: 'GROUP',
+        participantIds: userId,
+        title: 'Gia đình'
+      });
+      if (!room) {
+        // Tự động tạo group "Gia đình" nếu chưa có
+        room = await chatService.createChatRoom(null, {
+          roomType: 'GROUP',
+          title: 'Gia đình',
+          participantIds: [userId]
+        });
+      }
+      res.json({
+        success: true,
+        data: { room }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new ChatController();

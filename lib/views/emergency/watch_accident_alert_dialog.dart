@@ -285,32 +285,37 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Colors.redAccent.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.watch_rounded,
-                            size: 14, color: Color(0xFFFCA5A5)),
-                        SizedBox(width: 6),
-                        Text(
-                          'SAMSUNG GALAXY WATCH 5 (SM-R900)',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.8,
-                            color: Color(0xFFFCA5A5),
-                          ),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: 0.6),
                         ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.watch_rounded,
+                              size: 14, color: Color(0xFFFCA5A5)),
+                          SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'SAMSUNG GALAXY WATCH 5 (SM-R900)',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                                color: Color(0xFFFCA5A5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -462,14 +467,18 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
                     const Icon(Icons.mic_rounded,
                         color: Color(0xFF38BDF8), size: 14),
                     const SizedBox(width: 6),
-                    Text(
-                      _lastVoiceTranscript.isEmpty
-                          ? 'Nói "Tôi ổn" để hủy hoặc "Cứu tôi" để gọi 115'
-                          : 'Đã nghe: "$_lastVoiceTranscript"',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF38BDF8),
+                    Expanded(
+                      child: Text(
+                        _lastVoiceTranscript.isEmpty
+                            ? 'Nói "Tôi ổn" để hủy hoặc "Cứu tôi" để gọi 115'
+                            : 'Đã nghe: "$_lastVoiceTranscript"',
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF38BDF8),
+                        ),
                       ),
                     ),
                   ],
@@ -484,12 +493,15 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
                 child: ElevatedButton.icon(
                   onPressed: _handleDismissSafe,
                   icon: const Icon(Icons.check_circle_rounded, size: 20),
-                  label: const Text(
-                    'TÔI ỔN - HỦY BÁO ĐỘNG (I AM SAFE)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12.5,
-                      letterSpacing: 0.3,
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'TÔI ỔN - HỦY BÁO ĐỘNG (I AM SAFE)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12.5,
+                        letterSpacing: 0.3,
+                      ),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -512,12 +524,15 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
                   onPressed: _handleTriggerSosNow,
                   icon: const Icon(Icons.emergency_rounded,
                       size: 20, color: Colors.white),
-                  label: const Text(
-                    '🚨 CẤP CỨU SOS NGAY (GỌI 115 & NGƯỜI THÂN)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 12,
-                      color: Colors.white,
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '🚨 CẤP CỨU SOS NGAY (GỌI 115 & NGƯỜI THÂN)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(

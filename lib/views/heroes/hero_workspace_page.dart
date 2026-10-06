@@ -581,29 +581,34 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: severityColor,
-                        borderRadius: BorderRadius.circular(6),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                        decoration: BoxDecoration(
+                          color: severityColor,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.severity,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: Text(
-                        item.severity,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          item.victimName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      item.victimName,
-                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      ' (${item.victimAge}t)',
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
+                      Text(
+                        ' (${item.victimAge}t)',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  ),
                 ),
                 Row(
                   children: [
@@ -875,13 +880,17 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'CHỈ SỐ SINH TỒN TRUYỀN TỪ GALAXY WATCH NẠN NHÂN',
-                    style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+                children: const [
+                  Expanded(
+                    child: Text(
+                      'CHỈ SỐ SINH TỒN TRUYỀN TỪ GALAXY WATCH NẠN NHÂN',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
                   ),
+                  SizedBox(width: 8),
                   Text(
                     'LIVE 250Hz',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold),
@@ -913,13 +922,17 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           ),
           child: Column(
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'BỘ ĐÀM HIỆN TRƯỜNG (PTT DIRECT LINK)',
-                    style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                children: const [
+                  Expanded(
+                    child: Text(
+                      'BỘ ĐÀM HIỆN TRƯỜNG (PTT DIRECT LINK)',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
                   ),
+                  SizedBox(width: 8),
                   Text(
                     'LOA NGOÀI ĐỒNG HỒ NẠN NHÂN',
                     style: TextStyle(color: Colors.white54, fontSize: 9.5, fontFamily: 'monospace'),
@@ -976,10 +989,12 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                         color: Colors.white,
                         size: 20,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isPttTransmitting ? 'ĐANG PHÁT THANH TRỰC TIẾP (NHẢ ĐỂ DỪNG)' : 'GIỮ ĐỂ NÓI VỚI NẠN NHÂN & TOC',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      Flexible(
+                        child: Text(
+                          _isPttTransmitting ? 'ĐANG PHÁT THANH TRỰC TIẾP (NHẢ ĐỂ DỪNG)' : 'GIỮ ĐỂ NÓI VỚI NẠN NHÂN & TOC',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -1372,10 +1387,17 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('VÍ QUỸ HỖ TRỢ HIỆP SĨ (BOUNTY WALLET)', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                children: const [
+                  Expanded(
+                    child: Text(
+                      'VÍ QUỸ HỖ TRỢ HIỆP SĨ (BOUNTY WALLET)',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  SizedBox(width: 8),
                   Text('SAFE FUND TOC', style: TextStyle(color: Color(0xFF10B981), fontSize: 9.5, fontWeight: FontWeight.bold)),
                 ],
               ),

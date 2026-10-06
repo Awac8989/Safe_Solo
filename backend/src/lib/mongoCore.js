@@ -38,6 +38,7 @@ function mapUserDoc(doc) {
 
   const row = mergeUserSensitivePayload(doc.toObject ? doc.toObject() : doc);
   return {
+    id: row._id,
     _id: row._id,
     fullName: row.fullName,
     phoneNumber: row.phoneNumber,
@@ -78,6 +79,17 @@ function mapUserDoc(doc) {
     snoozeCountToday: Number(row.snoozeCountToday || 0),
     homeGeofence: row.homeGeofence || null,
     homeWifiSsid: row.homeWifiSsid || null,
+    safeWifiList: Array.isArray(row.safeWifiList) ? row.safeWifiList : [],
+    telegramReminderOffsetMinutes: Number(row.telegramReminderOffsetMinutes || 15),
+    telegramCustomPrompt: row.telegramCustomPrompt || '',
+    familyPingTemplates: Array.isArray(row.familyPingTemplates)
+      ? row.familyPingTemplates
+      : [
+          'Con đang lái xe, về đến nơi sẽ gọi lại.',
+          'Đang làm việc, mọi thứ vẫn ổn.',
+          'Đang tụ tập với bạn bè.',
+          'Hơi mệt một chút, đang nằm nghỉ.',
+        ],
     pendingFamilyPings: Array.isArray(row.pendingFamilyPings)
       ? row.pendingFamilyPings.map(p => ({
           _id: p._id,
@@ -148,6 +160,44 @@ function mapAutomationSettingDoc(doc) {
     pillTime: row.pillTime || '08:00',
     homeLocation: row.homeLocation || null,
     lastGeofenceEventAt: toIso(row.lastGeofenceEventAt),
+
+    // 1. Passive Check-in Customizations
+    enabledPassiveSources: Array.isArray(row.enabledPassiveSources)
+      ? row.enabledPassiveSources
+      : [
+          'SCREEN_UNLOCK',
+          'CHARGER_PLUGGED',
+          'CHARGER_UNPLUGGED',
+          'PEDOMETER_BURST',
+          'GEOFENCE_ENTER',
+          'SAFE_GEOFENCE',
+          'HOME_WIFI',
+          'DEVICE_ACTIVITY',
+          'WAKE_UP_PULSE',
+        ],
+    pedometerThreshold: Number(row.pedometerThreshold || 200),
+    safeWifiList: Array.isArray(row.safeWifiList) ? row.safeWifiList : [],
+    multiFactorPassiveEnabled: Boolean(row.multiFactorPassiveEnabled),
+    multiFactorMinSignals: Number(row.multiFactorMinSignals || 2),
+    maxSoftCheckinAllowed: Number(row.maxSoftCheckinAllowed || 3),
+
+    // 3. Custom Routine Checklist
+    customRoutines: Array.isArray(row.customRoutines) ? row.customRoutines : [],
+
+    // 6. Telegram Bot Customizations
+    telegramReminderOffsetMinutes: Number(row.telegramReminderOffsetMinutes || 15),
+    telegramCustomPrompt: row.telegramCustomPrompt || '',
+
+    // 7. Family Ping Quick-Reply Templates
+    familyPingTemplates: Array.isArray(row.familyPingTemplates)
+      ? row.familyPingTemplates
+      : [
+          'Con đang lái xe, về đến nơi sẽ gọi lại.',
+          'Đang làm việc, mọi thứ vẫn ổn.',
+          'Đang tụ tập với bạn bè.',
+          'Hơi mệt một chút, đang nằm nghỉ.',
+        ],
+
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };

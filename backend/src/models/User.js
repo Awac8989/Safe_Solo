@@ -119,6 +119,27 @@ const UserSchema = new mongoose.Schema(
       isInside: { type: Boolean, default: false },
     },
     homeWifiSsid: { type: String, default: null },
+    safeWifiList: {
+      type: [
+        {
+          ssid: { type: String },
+          bssid: { type: String, default: null },
+          label: { type: String, default: 'Wi-Fi An Toàn' },
+        },
+      ],
+      default: [],
+    },
+    telegramReminderOffsetMinutes: { type: Number, default: 15 },
+    telegramCustomPrompt: { type: String, default: null },
+    familyPingTemplates: {
+      type: [String],
+      default: [
+        'Con đang lái xe, về đến nơi sẽ gọi lại.',
+        'Đang làm việc, mọi thứ vẫn ổn.',
+        'Đang tụ tập với bạn bè.',
+        'Hơi mệt một chút, đang nằm nghỉ.',
+      ],
+    },
     pendingFamilyPings: {
       type: [
         {

@@ -155,32 +155,37 @@ class _FalseAlarmVerificationDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF9800).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: const Color(0xFFFF9800).withValues(alpha: 0.5),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.shield_outlined,
-                            size: 13, color: Color(0xFFFF9800)),
-                        SizedBox(width: 5),
-                        Text(
-                          'CƠ CHẾ KHỬ BÁO ĐỘNG GIẢ ĐA TẦNG',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                            color: Color(0xFFFFB74D),
-                          ),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: const Color(0xFFFF9800).withValues(alpha: 0.5),
                         ),
-                      ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.shield_outlined,
+                              size: 13, color: Color(0xFFFF9800)),
+                          SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'CƠ CHẾ KHỬ BÁO ĐỘNG GIẢ ĐA TẦNG',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Color(0xFFFFB74D),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -289,14 +294,17 @@ class _FalseAlarmVerificationDialogState
                         const Icon(Icons.mic_rounded,
                             color: Color(0xFF38BDF8), size: 16),
                         const SizedBox(width: 6),
-                        Text(
-                          _lastVoiceTranscript.isEmpty
-                              ? 'ĐANG LẮNG NGHE GIỌNG NÓI RẢNH TAY...'
-                              : 'ĐÃ NGHE: "$_lastVoiceTranscript"',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF38BDF8),
+                        Flexible(
+                          child: Text(
+                            _lastVoiceTranscript.isEmpty
+                                ? 'ĐANG LẮNG NGHE GIỌNG NÓI RẢNH TAY...'
+                                : 'ĐÃ NGHE: "$_lastVoiceTranscript"',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF38BDF8),
+                            ),
                           ),
                         ),
                       ],
@@ -339,12 +347,15 @@ class _FalseAlarmVerificationDialogState
                     reason: 'Người dùng bấm phím "TÔI ỔN"',
                   ),
                   icon: const Icon(Icons.check_circle_rounded, size: 22),
-                  label: const Text(
-                    'TÔI ỔN - HỦY BÁO ĐỘNG (I AM SAFE)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      letterSpacing: 0.4,
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'TÔI ỔN - HỦY BÁO ĐỘNG (I AM SAFE)',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -369,12 +380,15 @@ class _FalseAlarmVerificationDialogState
                   ),
                   icon: const Icon(Icons.emergency_rounded,
                       size: 16, color: Color(0xFFEF4444)),
-                  label: const Text(
-                    'BỎ QUA CHỜ - PHÁT LỆNH CẤP CỨU NGAY',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 11,
-                      color: Color(0xFFEF4444),
+                  label: const FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      'BỎ QUA CHỜ - PHÁT LỆNH CẤP CỨU NGAY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: Color(0xFFEF4444),
+                      ),
                     ),
                   ),
                 ),

@@ -1,4 +1,5 @@
 const adminPortalService = require('../services/adminPortalService');
+const analyticsService = require('../services/analyticsService');
 
 async function getOverview(_req, res, next) {
   try {
@@ -314,6 +315,16 @@ async function resolveDisasterAlert(req, res, next) {
   }
 }
 
+async function getAnalyticsDashboard(req, res, next) {
+  try {
+    const days = parseInt(req.query.days, 10) || 30;
+    const data = await analyticsService.getFullDashboard(days);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getOverview,
   listUsers,
@@ -348,4 +359,5 @@ module.exports = {
   listDisasterAlerts,
   createDisasterAlert,
   resolveDisasterAlert,
+  getAnalyticsDashboard,
 };

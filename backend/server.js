@@ -4,6 +4,7 @@ const { createServer } = require('http');
 const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const { initializeSocket } = require('./src/sockets/socketServer');
 const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler');
@@ -11,6 +12,7 @@ const database = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
 const { startDeadManWorker } = require('./src/workers/deadmanWorker');
 const { apiRouter } = require('./src/routes');
+const apiKeyAuth = require('./src/middleware/apiKeyAuth');
 
 const emergencyRoutes = require('./src/routes/emergencyRoutes');
 const authRoutes = require('./src/routes/authRoutes');
@@ -43,7 +45,12 @@ const limiter = rateLimit({
   },
 });
 
-app.use(cors());
+app.use(helmet());
+app.use(cors({
+  origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'x-user-id']
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(limiter);
@@ -65,8 +72,12 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+app.use('/api', apiKeyAuth);
+app.use('/api/v1', apiKeyAuth);
+
 // Unified API router: includes Flutter legacy endpoints such as /api/users/register.
 app.use('/api', apiRouter);
+app.use('/api/v1', apiRouter);
 
 // Keep direct mounts for existing clients using these exact paths.
 app.use('/api/auth', authRoutes);

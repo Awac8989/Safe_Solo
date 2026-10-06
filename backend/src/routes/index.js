@@ -30,6 +30,7 @@ const {
   sendFamilyPing,
   respondFamilyPing,
   listCheckInMoments,
+  listUserNotifications,
 } = require('../controllers/userController');
 const {
   listEmergencies,
@@ -96,6 +97,7 @@ apiRouter.delete('/users/:id/push-tokens/:token', deletePushToken);
 apiRouter.post('/users/:id/family-ping', sendFamilyPing);
 apiRouter.post('/users/:id/family-ping/respond', respondFamilyPing);
 apiRouter.get('/users/:id/checkin/moments', listCheckInMoments);
+apiRouter.get('/users/:id/notifications', listUserNotifications);
 
 apiRouter.get('/admin/emergencies', listEmergencies);
 apiRouter.patch('/admin/emergencies/:id/resolve', resolveEmergencyLog);

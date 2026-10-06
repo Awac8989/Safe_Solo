@@ -116,6 +116,19 @@ Khi Thầy/Hội đồng yêu cầu biểu diễn hệ thống, hãy thực hi�
 ### 🔹 Bước 5: Thoát hiểm thông minh (Fake Call & Stealth Mode)
 - Trình diễn tính năng **Cuộc gọi ảo (Fake Call)**: Cung cấp cuộc gọi mô phỏng với giọng nói giả lập để người dùng có cớ rút lui an toàn khi bị bám đuôi hoặc rơi vào tình huống nguy hiểm nơi vắng vẻ.
 
+### 🔹 Bước 6: Safe Solo Watch — Đột Quỵ Đối Xứng 2 Tay & Mốc Giờ Vàng (ĐỈNH CAO Y KHOA ĐỒ ÁN)
+- **Kịch bản thực chứng lâm sàng:** Buổi chiều của ông Tư (Rót trà, tay phải lỏng dần rơi chén xuống sàn trong khi tay trái vẫn lật báo).
+- **Cách thao tác biểu diễn:**
+  * **Cách 1 (Trên Đồng Hồ):** Vuốt sang màn hình **"ĐỘT QUỴ 2 TAY" (Stroke Shield)** -> Nhấn nút tím **"DEMO: BUỔI CHIỀU ÔNG TƯ"**.
+  * **Cách 2 (Trên Điện Thoại):** Vào Cài đặt -> **"Phòng Thí Nghiệm & Sandbox"** -> Tab Kịch bản khẩn cấp -> Nhấn **"🍵 Bắt Đầu Kịch Bản: Buổi Chiều Ông Tư"**.
+- **Diễn biến các pha thuyết trình trước Hội đồng:**
+  1. **Đối chiếu 2 cổ tay:** Tay trái (Watch) lật báo (dao động 1.8g) vs Tay phải (Vòng phụ) bất động chỉ chịu trọng lực tĩnh g -> BMAI vọt lên 88.5%.
+  2. **Biểu đồ phân tán Poincaré Plot:** Xuất hiện rung nhĩ (AFib scatter) làm tăng nguy cơ đột quỵ gấp 5 lần.
+  3. **Hỏi thăm 3 kênh:** Đồng hồ rung và hỏi *"Bác Tư có ổn không?"* với 3 phương thức phản hồi cho người liệt 1 tay (Chạm 1-chạm, Lắc cổ tay, Giọng nói).
+  4. **Bài test phản xạ 10s (Pronator Drift):** Khi nghi ngờ lú lẫn bấm tắt nhầm, đồng hồ bắt nhắm mắt giơ 2 tay -> phát hiện tay phải trôi xuống góc -18° do mất trương lực cơ!
+  5. **Mốc Giờ Vàng (4.5h rtPA):** Tự động phát lệnh gọi 115 và gửi SMS cho con gái ông Tư kèm mốc thời gian khởi phát chính xác (yếu tố quyết định cửa sổ tiêu sợi huyết não) và danh mục thuốc đang dùng.
+  6. **3 Điểm giới hạn y khoa:** Nhấn nút `ℹ️ 3 Điểm giới hạn` để Hội đồng thấy tính khách quan, khoa học và chặt chẽ của đề tài.
+
 ---
 
 ## 💡 XỬ LÝ SỰ CỐ NHANH (NẾU CÓ)

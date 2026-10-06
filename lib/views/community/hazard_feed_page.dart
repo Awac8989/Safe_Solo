@@ -191,19 +191,23 @@ class _HazardFeedPageState extends State<HazardFeedPage> {
                   children: [
                     const Icon(Icons.radar_rounded, size: 16, color: AppColors.primary),
                     const SizedBox(width: 6),
-                    Text(
-                      'Bán kính quét: ${_radiusKm.toInt()} km',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                    Expanded(
+                      child: Text(
+                        'Bán kính: ${_radiusKm.toInt()} km',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 4),
                     ...[1.0, 3.0, 5.0, 10.0].map((r) {
                       final isSelected = _radiusKm == r;
                       return Padding(
-                        padding: const EdgeInsets.only(left: 4),
+                        padding: const EdgeInsets.only(left: 3),
                         child: ActionChip(
-                          label: Text('${r.toInt()}km', style: TextStyle(fontSize: 11, color: isSelected ? Colors.white : AppColors.textPrimary)),
+                          label: Text('${r.toInt()}k', style: TextStyle(fontSize: 10.5, color: isSelected ? Colors.white : AppColors.textPrimary)),
                           backgroundColor: isSelected ? AppColors.primary : AppColors.secondary,
                           padding: EdgeInsets.zero,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           side: BorderSide.none,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           onPressed: () => setState(() => _radiusKm = r),
@@ -308,16 +312,19 @@ class _HazardFeedPageState extends State<HazardFeedPage> {
                           color: const Color(0xFFDC2626),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.campaign_rounded, size: 13, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text(
-                              'BAN ĐIỀU PHỐI (ADMIN)',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.4),
-                            ),
-                          ],
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.campaign_rounded, size: 13, color: Colors.white),
+                              SizedBox(width: 4),
+                              Text(
+                                'BAN ĐIỀU PHỐI (ADMIN)',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.4),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
@@ -388,64 +395,75 @@ class _HazardFeedPageState extends State<HazardFeedPage> {
           const SizedBox(height: 10),
 
           // Community Verification Row
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: Text(
-                  'Bởi ${h.authorName}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isAdmin ? const Color(0xFF991B1B) : AppColors.textSecondary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                'Bởi ${h.authorName}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isAdmin ? const Color(0xFF991B1B) : AppColors.textSecondary,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 8),
-              // Confirm Button
-              InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => _verifyHazard(h, false),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.destructive.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.destructive),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Vẫn còn (${h.confirmCount})',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.destructive),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Confirm Button
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _verifyHazard(h, false),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.destructive.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 13, color: AppColors.destructive),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Vẫn còn (${h.confirmCount})',
+                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.destructive),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Resolved Button
-              InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () => _verifyHazard(h, true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppColors.success),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Đã an toàn (${h.resolvedCount})',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.success),
+                    ),
+                    const SizedBox(width: 6),
+                    // Resolved Button
+                    InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () => _verifyHazard(h, true),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.success),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Đã an toàn (${h.resolvedCount})',
+                              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.success),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
