@@ -11,6 +11,7 @@ const { errorHandler, notFoundHandler } = require('./src/middleware/errorHandler
 const database = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
 const { startDeadManWorker } = require('./src/workers/deadmanWorker');
+const { startDispatchWorker } = require('./src/workers/dispatchWorker');
 const { apiRouter } = require('./src/routes');
 const apiKeyAuth = require('./src/middleware/apiKeyAuth');
 
@@ -126,6 +127,12 @@ server.listen(port, '0.0.0.0', async () => {
     startDuressWorkers();
   } catch (e) {
     console.warn('Duress worker init warning:', e.message);
+  }
+
+  try {
+    startDispatchWorker(io);
+  } catch (e) {
+    console.warn('Dispatch worker init warning:', e.message);
   }
 
   try {

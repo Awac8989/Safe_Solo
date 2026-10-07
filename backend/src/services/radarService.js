@@ -11,7 +11,10 @@ const { AppError, ensure } = require('../lib/errors');
 const { fuzzCoordinates, haversineKm, sanitizeUser } = require('../lib/utils');
 const { toIso } = require('../lib/mongoCore');
 const { decryptEmergencyMemoPayload } = require('../lib/sensitivePayloadCodec');
-const { decryptUserSensitivePayload, buildEncryptedUserSensitiveUpdate } = require('../lib/userSensitiveCodec');
+const {
+  decryptUserSensitivePayload,
+  buildEncryptedUserSensitiveUpdate,
+} = require('../lib/userSensitiveCodec');
 
 function mapIncident(doc) {
   if (!doc) {
@@ -24,6 +27,7 @@ function mapIncident(doc) {
     status: row.status,
     incidentType: row.incidentType,
     severity: row.severity,
+    severityLevel: row.severityLevel || 'P1_CRITICAL',
     source: row.source,
     exactLat: row.exactLat,
     exactLng: row.exactLng,
@@ -31,6 +35,12 @@ function mapIncident(doc) {
     fuzzedLng: row.fuzzedLng,
     approxAddress: row.approxAddress || null,
     batteryLevel: row.batteryLevel ?? null,
+    assignedVolunteerId: row.assignedVolunteerId || null,
+    dispatchRadiusKm: row.dispatchRadiusKm || 1.2,
+    medicalSnapshot: row.medicalSnapshot || null,
+    telemetry: row.telemetry || null,
+    auditTrail: row.auditTrail || [],
+    handoffRecord: row.handoffRecord || null,
     communityRequestedAt: toIso(row.communityRequestedAt),
     createdAt: toIso(row.createdAt),
     resolvedAt: toIso(row.resolvedAt),
@@ -47,6 +57,11 @@ function mapResponse(doc) {
     incidentId: row.incidentId,
     volunteerId: row.volunteerId,
     status: row.status,
+    goodSamaritanAgreementSigned: row.goodSamaritanAgreementSigned ?? true,
+    firstAidActionsPerformed: row.firstAidActionsPerformed || [],
+    lastLocationUpdate: row.lastLocationUpdate || null,
+    etaSeconds: row.etaSeconds ?? null,
+    distanceMeters: row.distanceMeters ?? null,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   };
@@ -77,7 +92,13 @@ function mapMemo(doc) {
 class RadarService {
   async getGuardiansForVictim(victimDoc) {
     const sensitive = decryptUserSensitivePayload(victimDoc);
-    const phones = [...new Set((sensitive.emergencyContacts || []).map((item) => String(item?.phone || '').trim()).filter(Boolean))];
+    const phones = [
+      ...new Set(
+        (sensitive.emergencyContacts || [])
+          .map((item) => String(item?.phone || '').trim())
+          .filter(Boolean),
+      ),
+    ];
     if (!phones.length) {
       return [];
     }
@@ -103,24 +124,53 @@ class RadarService {
     ensure(victim, 'Victim not found', 404);
 
     const { fuzzedLat, fuzzedLng } = fuzzCoordinates(exactLat, exactLng);
+    const victimSensitive = decryptUserSensitivePayload(victim);
+
+    const initialRadius = options.dispatchRadiusKm || 1.2;
+    const initialStatus = options.status || 'DISPATCHING_R1';
+
     const incident = await RescueIncident.create({
       victimId,
-      status: 'ACTIVE',
+      status: initialStatus,
       incidentType,
-      severity: Number(options.severity || 3),
+      severity: Number(options.severity || 2),
+      severityLevel:
+        options.severityLevel ||
+        (Number(options.severity) === 1 ? 'P0_SILENT' : 'P1_CRITICAL'),
       source: options.source || 'SOS',
       exactLat,
       exactLng,
       fuzzedLat,
       fuzzedLng,
-      approxAddress: options.approxAddress || decryptUserSensitivePayload(victim).approxAddress || null,
+      approxAddress:
+        options.approxAddress || victimSensitive.approxAddress || null,
       batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
-      communityRequestedAt: null,
+      dispatchRadiusKm: initialRadius,
+      medicalSnapshot: {
+        bloodType: victimSensitive.bloodType || 'UNKNOWN',
+        allergies: victimSensitive.allergies || [],
+        chronicConditions: victimSensitive.chronicConditions || [],
+        emergencyNotes: victim.medicalNotes || options.medicalNotes || '',
+      },
+      auditTrail: [
+        {
+          action: 'SOS_BROADCASTED',
+          actorId: victimId,
+          timestamp: new Date(),
+          metadata: {
+            incidentType,
+            lat: exactLat,
+            lng: exactLng,
+            source: options.source || 'SOS',
+            severity: options.severityLevel || 'P1_CRITICAL',
+          },
+        },
+      ],
+      communityRequestedAt: new Date(),
       resolvedAt: null,
     });
 
     victim.lastKnownLocation = { lat: exactLat, lng: exactLng, updatedAt: new Date() };
-    const victimSensitive = decryptUserSensitivePayload(victim);
     Object.assign(
       victim,
       buildEncryptedUserSensitiveUpdate(victimId, {
@@ -145,17 +195,67 @@ class RadarService {
       metadata: { incidentType, lat: exactLat, lng: exactLng },
     });
 
-    const nearbyVolunteers = await this.findNearbyVolunteers(exactLat, exactLng, victimId);
+    // 1. Quét tìm Hiệp sĩ đủ điều kiện (lọc bận, lọc kyc, tính score)
+    const nearbyVolunteers = await this.findNearbyVolunteers(
+      exactLat,
+      exactLng,
+      victimId,
+      initialRadius,
+    );
+
+    // 2. Gửi PUSH BÁO ĐỘNG ĐỎ tới Top ứng viên phù hợp nhất (tối đa 5 người)
+    const topCandidates = nearbyVolunteers.slice(0, 5);
+    for (const volunteer of topCandidates) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await VolunteerResponse.findOneAndUpdate(
+          { incidentId: incident._id, volunteerId: volunteer.id },
+          {
+            $setOnInsert: {
+              incidentId: incident._id,
+              volunteerId: volunteer.id,
+              status: 'ALERTED',
+              goodSamaritanAgreementSigned: true,
+              distanceMeters: Math.round(volunteer.distanceKm * 1000),
+            },
+          },
+          { upsert: true, new: true },
+        );
+
+        // BẮN SỰ KIỆN KHẨN CẤP ĐÍCH DANH VÀO SOCKET CỦA HIỆP SĨ
+        const heroPayload = {
+          incidentId: incident._id,
+          victimId: incident.victimId,
+          victimName: sanitizeUser(victim).fullName,
+          incidentType: incident.incidentType,
+          severity: incident.severity,
+          severityLevel: incident.severityLevel,
+          distanceKm: volunteer.distanceKm,
+          approxAddress: incident.approxAddress,
+          medicalSnapshot: incident.medicalSnapshot,
+          createdAt: incident.createdAt,
+        };
+
+        const io = getIo();
+        io.to(`user:${volunteer.id}`).emit('HERO_DISPATCH_REQUEST', heroPayload);
+        io.to(volunteer.id).emit('HERO_DISPATCH_REQUEST', heroPayload);
+      } catch (_err) {
+        // socket optional
+      }
+    }
+
     await createAlertEvent({
       userId: victimId,
       level: 'SOS',
       status: 'SOS_BROADCASTED',
       source: 'USER',
-      title: 'Da phat SOS',
-      message: 'He thong dang thong bao cho guardians va tinh nguyen vien gan ban',
+      title: 'Đã phát tín hiệu SOS khẩn cấp',
+      message:
+        'Hệ thống đang tự động điều phối hiệp sĩ gần nhất và thông báo người bảo trợ',
       metadata: {
         incidentId: incident._id,
         nearbyVolunteersCount: nearbyVolunteers.length,
+        dispatchedCandidatesCount: topCandidates.length,
       },
     });
 
@@ -174,39 +274,71 @@ class RadarService {
   }
 
   async findNearbyVolunteers(lat, lng, excludeUserId, radiusKm = 3) {
+    // Lọc ra các Hiệp sĩ đang có ca cứu hộ dở dang (đang di chuyển hoặc đang ở hiện trường)
+    const busyResponses = await VolunteerResponse.find({
+      status: { $in: ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'] },
+    }).lean();
+    const busyVolunteerIds = new Set(busyResponses.map((r) => r.volunteerId));
+
     const users = await User.find({
-      _id: { $ne: excludeUserId },
+      _id: { $ne: excludeUserId, $nin: Array.from(busyVolunteerIds) },
       isActive: { $ne: false },
       isKycVerified: true,
       lastKnownLocation: { $ne: null },
     }).lean();
 
     return users
-      .map((item) => ({
-        ...sanitizeUser(item),
-        distanceKm: Number(
+      .map((item) => {
+        const distanceKm = Number(
           haversineKm(
             lat,
             lng,
             Number(item.lastKnownLocation?.lat),
             Number(item.lastKnownLocation?.lng),
           ).toFixed(2),
-        ),
-      }))
+        );
+
+        // Tính điểm ưu tiên điều phối: Dispatch Score = distScore(40%) + trustScore(30%) + experience(30%)
+        const distScore = Math.max(0, 100 - (distanceKm / radiusKm) * 50);
+        const trustScore = Math.min(100, item.trustScore || 50);
+        const rescuesScore = Math.min(100, (item.rescuesCount || 0) * 10);
+        const dispatchScore = Math.round(
+          distScore * 0.4 + trustScore * 0.3 + rescuesScore * 0.3,
+        );
+
+        return {
+          ...sanitizeUser(item),
+          distanceKm,
+          dispatchScore,
+          isBusy: false,
+        };
+      })
       .filter((item) => item.distanceKm <= radiusKm)
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+      .sort((a, b) => b.dispatchScore - a.dispatchScore || a.distanceKm - b.distanceKm);
   }
 
-  async getNearbyIncidents(volunteerLat, volunteerLng, volunteerId, radiusKm = 3) {
+  async getNearbyIncidents(volunteerLat, volunteerLng, volunteerId, radiusKm = 4.5) {
+    const activeStatuses = [
+      'ACTIVE',
+      'TRIGGERED',
+      'DISPATCHING_R1',
+      'DISPATCHING_R2',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ON_SCENE',
+    ];
+
     const incidents = await RescueIncident.find({
-      status: 'ACTIVE',
+      status: { $in: activeStatuses },
       victimId: { $ne: volunteerId },
     })
       .sort({ createdAt: -1 })
       .lean();
 
     const victimIds = [...new Set(incidents.map((item) => item.victimId))];
-    const victims = victimIds.length ? await User.find({ _id: { $in: victimIds } }).lean() : [];
+    const victims = victimIds.length
+      ? await User.find({ _id: { $in: victimIds } }).lean()
+      : [];
     const victimMap = new Map(victims.map((item) => [item._id, sanitizeUser(item)]));
 
     const accepted = await VolunteerResponse.find({
@@ -237,11 +369,71 @@ class RadarService {
   async acceptRescueIncident(incidentId, volunteerId) {
     const volunteer = await User.findById(volunteerId);
     ensure(volunteer, 'Volunteer not found', 404);
-    ensure(volunteer.isKycVerified, 'KYC verification required before accepting rescue missions', 403);
+    ensure(
+      volunteer.isKycVerified,
+      'KYC verification required before accepting rescue missions',
+      403,
+    );
 
-    const incident = await RescueIncident.findById(incidentId);
-    ensure(incident, 'Incident not found', 404);
-    ensure(incident.status === 'ACTIVE', 'Incident is no longer active', 409);
+    // Kiểm tra xem hiệp sĩ này có đang bận cứu hộ ca khác không
+    const ongoingMission = await VolunteerResponse.findOne({
+      volunteerId,
+      incidentId: { $ne: incidentId },
+      status: { $in: ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'] },
+    });
+    if (ongoingMission) {
+      throw new AppError(
+        'Bạn đang có nhiệm vụ cứu hộ chưa hoàn thành. Vui lòng hoàn tất trước khi nhận ca mới.',
+        409,
+      );
+    }
+
+    // ATOMIC LOCK: Ngăn Race Condition bằng findOneAndUpdate nguyên tử
+    const openStatuses = ['ACTIVE', 'DISPATCHING_R1', 'DISPATCHING_R2', 'TRIGGERED'];
+    const incident = await RescueIncident.findOneAndUpdate(
+      {
+        _id: incidentId,
+        status: { $in: openStatuses },
+        $or: [
+          { assignedVolunteerId: null },
+          { assignedVolunteerId: { $exists: false } },
+          { assignedVolunteerId: volunteerId },
+        ],
+      },
+      {
+        $set: {
+          status: 'ACCEPTED',
+          assignedVolunteerId: volunteerId,
+        },
+        $push: {
+          auditTrail: {
+            action: 'HERO_ACCEPTED',
+            actorId: volunteerId,
+            timestamp: new Date(),
+            metadata: {
+              volunteerName: volunteer.fullName,
+              volunteerPhone: volunteer.phoneNumber,
+            },
+          },
+        },
+      },
+      { new: true },
+    );
+
+    if (!incident) {
+      const existingIncident = await RescueIncident.findById(incidentId);
+      ensure(existingIncident, 'Incident not found', 404);
+      if (
+        existingIncident.assignedVolunteerId &&
+        existingIncident.assignedVolunteerId !== volunteerId
+      ) {
+        throw new AppError(
+          'Ca cứu hộ này đã được một Hiệp sĩ khác tiếp nhận. Cảm ơn tinh thần tương trợ của bạn!',
+          409,
+        );
+      }
+      throw new AppError('Ca cứu hộ không còn ở trạng thái mở tiếp nhận', 409);
+    }
 
     let response = await VolunteerResponse.findOne({ incidentId, volunteerId });
     if (!response) {
@@ -249,10 +441,20 @@ class RadarService {
         incidentId,
         volunteerId,
         status: 'EN_ROUTE',
+        goodSamaritanAgreementSigned: true,
+        signedAt: new Date(),
       });
     } else {
-      throw new AppError('You have already accepted this rescue mission', 409);
+      response.status = 'EN_ROUTE';
+      response.goodSamaritanAgreementSigned = true;
+      await response.save();
     }
+
+    // Đánh dấu TIMEOUT cho các ứng viên khác chỉ ở trạng thái ALERTED
+    await VolunteerResponse.updateMany(
+      { incidentId, volunteerId: { $ne: volunteerId }, status: 'ALERTED' },
+      { $set: { status: 'TIMEOUT' } },
+    );
 
     await chatService.addResponderToIncidentRoom(incidentId, volunteerId);
     await createAlertEvent({
@@ -260,10 +462,27 @@ class RadarService {
       level: 'INFO',
       status: 'VOLUNTEER_ACCEPTED',
       source: 'COMMUNITY',
-      title: 'Tinh nguyen vien dang den',
-      message: `${sanitizeUser(volunteer).fullName} da nhan ho tro`,
+      title: 'Hiệp sĩ đang đến cấp cứu',
+      message: `${sanitizeUser(volunteer).fullName} đã nhận hỗ trợ và đang trên đường tiếp cận`,
       metadata: { incidentId, volunteerId },
     });
+
+    // Bắn socket thông báo cho Nạn nhân và Người nhà biết Hiệp sĩ đã nhận ca
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('HERO_ACCEPTED', {
+        incidentId,
+        volunteer: sanitizeUser(volunteer),
+        response: mapResponse(response),
+      });
+      io.to(incident.victimId).emit('HERO_ACCEPTED', {
+        incidentId,
+        volunteer: sanitizeUser(volunteer),
+        response: mapResponse(response),
+      });
+    } catch (_err) {
+      // socket optional
+    }
 
     return {
       response: mapResponse(response),
@@ -271,11 +490,197 @@ class RadarService {
     };
   }
 
+  async updateHeroTelemetry(incidentId, volunteerId, lat, lng, speedKmh = 0) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(
+      incident.assignedVolunteerId === volunteerId,
+      'Unauthorized volunteer for this incident',
+      403,
+    );
+
+    const distanceKm = haversineKm(lat, lng, incident.exactLat, incident.exactLng);
+    const distanceMeters = Math.round(distanceKm * 1000);
+
+    incident.telemetry = {
+      lastHeroMovementAt: new Date(),
+      heroSpeedKmh: speedKmh,
+      distanceRemainingMeters: distanceMeters,
+    };
+
+    // Tự động chuyển ON_SCENE nếu khoảng cách <= 25 mét
+    if (
+      distanceMeters <= 25 &&
+      (incident.status === 'ACCEPTED' || incident.status === 'EN_ROUTE')
+    ) {
+      incident.status = 'ON_SCENE';
+      incident.auditTrail.push({
+        action: 'HERO_ON_SCENE',
+        actorId: volunteerId,
+        timestamp: new Date(),
+        metadata: { distanceMeters, speedKmh },
+      });
+
+      await VolunteerResponse.updateOne(
+        { incidentId, volunteerId },
+        { $set: { status: 'ARRIVED' } },
+      );
+    }
+
+    await incident.save();
+
+    await VolunteerResponse.updateOne(
+      { incidentId, volunteerId },
+      {
+        $set: {
+          lastLocationUpdate: { lat, lng, updatedAt: new Date(), speedKmh },
+          distanceMeters,
+        },
+      },
+    );
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('HERO_LOCATION_UPDATE', {
+        incidentId,
+        volunteerId,
+        lat,
+        lng,
+        speedKmh,
+        distanceRemainingMeters: distanceMeters,
+        status: incident.status,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      status: incident.status,
+      distanceRemainingMeters: distanceMeters,
+    };
+  }
+
+  async recordFirstAidAction(incidentId, volunteerId, actionData = {}) {
+    const { actionType, durationSeconds, notes } = actionData;
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(
+      incident.assignedVolunteerId === volunteerId,
+      'Unauthorized volunteer for first aid recording',
+      403,
+    );
+
+    const response = await VolunteerResponse.findOne({ incidentId, volunteerId });
+    ensure(response, 'Volunteer response record not found', 404);
+
+    const firstAidRecord = {
+      actionType: actionType || 'OTHER',
+      startedAt: new Date(),
+      durationSeconds: Number(durationSeconds || 0),
+      notes: notes || '',
+    };
+
+    response.firstAidActionsPerformed.push(firstAidRecord);
+    await response.save();
+
+    incident.auditTrail.push({
+      action: 'FIRST_AID_PERFORMED',
+      actorId: volunteerId,
+      timestamp: new Date(),
+      metadata: firstAidRecord,
+    });
+    await incident.save();
+
+    try {
+      getIo().to(`incident:${incidentId}`).emit('FIRST_AID_RECORDED', {
+        incidentId,
+        volunteerId,
+        action: firstAidRecord,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return { success: true, record: firstAidRecord };
+  }
+
+  async handoffToMedical(incidentId, volunteerId, handoffData = {}) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(
+      incident.assignedVolunteerId === volunteerId,
+      'Unauthorized volunteer for handoff',
+      403,
+    );
+
+    incident.status = 'HANDED_OVER_115';
+    incident.resolvedAt = new Date();
+    incident.handoffRecord = {
+      ambulancePlate: handoffData.ambulancePlate || null,
+      paramedicName: handoffData.paramedicName || null,
+      handedOverAt: new Date(),
+      qrVerificationHash: handoffData.qrVerificationHash || null,
+      notes: handoffData.notes || '',
+    };
+
+    incident.auditTrail.push({
+      action: 'HANDED_OVER_115',
+      actorId: volunteerId,
+      timestamp: new Date(),
+      metadata: incident.handoffRecord,
+    });
+    await incident.save();
+
+    await VolunteerResponse.updateOne(
+      { incidentId, volunteerId },
+      { $set: { status: 'COMPLETED' } },
+    );
+
+    // Thưởng 20 điểm Trust Score cho Hiệp sĩ hoàn thành bàn giao y tế
+    await trustService.calculateAndUpdateTrustScore(volunteerId, 20);
+    await chatService.closeChatRoom(incidentId);
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('INCIDENT_HANDED_OVER', {
+        incidentId,
+        handoffRecord: incident.handoffRecord,
+      });
+      io.emit('RADAR_INCIDENT_RESOLVED', { incidentId });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return this.getIncidentDetails(incidentId, volunteerId);
+  }
+
   async markVolunteerArrived(incidentId, volunteerId) {
     const response = await VolunteerResponse.findOne({ incidentId, volunteerId });
     ensure(response, 'Volunteer response not found', 404);
     response.status = 'ARRIVED';
     await response.save();
+
+    const incident = await RescueIncident.findById(incidentId);
+    if (incident) {
+      incident.status = 'ON_SCENE';
+      incident.auditTrail.push({
+        action: 'HERO_ARRIVED',
+        actorId: volunteerId,
+        timestamp: new Date(),
+        metadata: {},
+      });
+      await incident.save();
+    }
+
+    try {
+      getIo().to(`incident:${incidentId}`).emit('HERO_ARRIVED', {
+        incidentId,
+        volunteerId,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
     return mapResponse(response);
   }
 
@@ -287,7 +692,9 @@ class RadarService {
     ensure(victim, 'Victim not found', 404);
     const guardians = await this.getGuardiansForVictim(victim);
     const guardianIds = new Set(guardians.map((item) => item._id));
-    const responses = await VolunteerResponse.find({ incidentId }).sort({ createdAt: 1 });
+    const responses = await VolunteerResponse.find({ incidentId }).sort({
+      createdAt: 1,
+    });
     const responderIds = new Set(responses.map((item) => item.volunteerId));
     const canAccess =
       incident.victimId === requesterId ||
@@ -298,9 +705,16 @@ class RadarService {
     const responderDocs = responderIds.size
       ? await User.find({ _id: { $in: [...responderIds] } }).lean()
       : [];
-    const responderMap = new Map(responderDocs.map((item) => [item._id, sanitizeUser(item)]));
-    const room = await chatService.getChatRoomByIncident(incidentId).catch(() => null);
-    const memos = await EmergencyMemo.find({ incidentId }).sort({ createdAt: -1 }).limit(50).lean();
+    const responderMap = new Map(
+      responderDocs.map((item) => [item._id, sanitizeUser(item)]),
+    );
+    const room = await chatService
+      .getChatRoomByIncident(incidentId)
+      .catch(() => null);
+    const memos = await EmergencyMemo.find({ incidentId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
 
     return {
       ...mapIncident(incident),
@@ -328,20 +742,42 @@ class RadarService {
   async resolveIncident(incidentId, requesterId) {
     const incident = await RescueIncident.findById(incidentId);
     ensure(incident, 'Incident not found', 404);
-    ensure(incident.victimId === requesterId, 'Only the victim can resolve this incident', 403);
-    ensure(incident.status === 'ACTIVE', 'Incident is already resolved', 409);
+    ensure(
+      incident.victimId === requesterId,
+      'Only the victim can resolve this incident',
+      403,
+    );
 
-    incident.status = 'RESOLVED';
+    const isAlreadyClosed = [
+      'RESOLVED',
+      'RESOLVED_SAFE',
+      'HANDED_OVER_115',
+      'CANCELLED_FALSE_ALARM',
+    ].includes(incident.status);
+    ensure(!isAlreadyClosed, 'Incident is already resolved', 409);
+
+    incident.status = 'RESOLVED_SAFE';
     incident.resolvedAt = new Date();
+    incident.auditTrail.push({
+      action: 'INCIDENT_RESOLVED_BY_VICTIM',
+      actorId: requesterId,
+      timestamp: new Date(),
+      metadata: {},
+    });
     await incident.save();
 
     const arrivedResponses = await VolunteerResponse.find({
       incidentId,
-      status: 'ARRIVED',
+      status: { $in: ['ARRIVED', 'ON_SCENE', 'COMPLETED', 'EN_ROUTE'] },
     }).lean();
     for (const response of arrivedResponses) {
       // eslint-disable-next-line no-await-in-loop
-      await trustService.calculateAndUpdateTrustScore(response.volunteerId, 5);
+      await trustService.calculateAndUpdateTrustScore(response.volunteerId, 15);
+      // eslint-disable-next-line no-await-in-loop
+      await VolunteerResponse.updateOne(
+        { _id: response._id },
+        { $set: { status: 'COMPLETED' } },
+      );
     }
 
     await chatService.closeChatRoom(incidentId);

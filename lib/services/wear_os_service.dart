@@ -60,12 +60,19 @@ class WearOsService extends ChangeNotifier {
   // Bảo mật mã PIN đồng hồ: Safe PIN (1234) hủy còi hú; Duress PIN (9999) gửi SOS im lặng
   String _safePin = '1234';
   String _duressPin = '9999';
+  bool _isDuressActive = false;
   String get safePin => _safePin;
   String get duressPin => _duressPin;
+  bool get isDuressActive => _isDuressActive;
 
   void setPins({String? safePin, String? duressPin}) {
     if (safePin != null && safePin.isNotEmpty) _safePin = safePin;
     if (duressPin != null && duressPin.isNotEmpty) _duressPin = duressPin;
+    notifyListeners();
+  }
+
+  void simulateDuressState(bool active) {
+    _isDuressActive = active;
     notifyListeners();
   }
 

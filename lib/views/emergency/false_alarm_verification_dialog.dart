@@ -6,6 +6,7 @@ import '../../core/app_strings.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/false_alarm_suppression_service.dart';
+import '../../services/ghost_mode_service.dart';
 
 /// ============================================================================
 /// SAFESOLO - HỘP THOẠI XÁC THỰC KHỬ BÁO ĐỘNG GIẢ ĐA TẦNG (TWO-PHASE GRACE MODAL)
@@ -93,14 +94,147 @@ class _FalseAlarmVerificationDialogState
 
   void _handleEscalation() {
     if (!mounted) return;
-    context
-        .read<AppProvider>()
-        .simulateEmergencyStatus(status: 'ALERT_TRIGGERED');
+    unawaited(
+      context.read<AppProvider>().triggerEmergencyIncident(
+        incidentType: widget.incidentType,
+        details: widget.details,
+        severity: 2,
+        severityLevel: 'P1_CRITICAL',
+      ),
+    );
     Navigator.of(context, rootNavigator: true).pop(true);
     TopToast.show(
       context,
-      message: 'Hết thời gian chờ: Đã tự động kích hoạt Cứu hộ Khẩn cấp Cấp 3!',
-      icon: Icons.warning_rounded,
+      message: 'Hết thời gian chờ: Đã tự động kích hoạt Cứu hộ Khẩn cấp Cấp 3 và điều phối Hiệp sĩ!',
+      icon: Icons.emergency_rounded,
+    );
+  }
+
+  void _handleCancelAttempt() {
+    final appProvider = context.read<AppProvider>();
+    final duressPin = appProvider.security.duressPin.trim();
+    final realPin = appProvider.security.realPin.trim();
+
+    if (duressPin.isNotEmpty || realPin.isNotEmpty) {
+      _showPinAuthModal(context, realPin: realPin, duressPin: duressPin);
+    } else {
+      _service.cancelAsFalseAlarm(reason: 'Người dùng bấm phím "TÔI ỔN"');
+    }
+  }
+
+  void _showPinAuthModal(
+    BuildContext context, {
+    required String realPin,
+    required String duressPin,
+  }) {
+    final pinController = TextEditingController();
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Row(
+            children: [
+              Icon(Icons.shield_rounded, color: Color(0xFF38BDF8), size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Xác thực mã PIN an toàn',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Vui lòng nhập mã PIN bảo vệ để xác nhận an toàn hoặc mã bảo vệ khẩn cấp:',
+                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: pinController,
+                obscureText: true,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  letterSpacing: 6,
+                ),
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '••••',
+                  hintStyle: const TextStyle(color: Colors.white24),
+                  filled: true,
+                  fillColor: const Color(0xFF0F172A),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('QUAY LẠI', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+              ),
+              onPressed: () {
+                final input = pinController.text.trim();
+                Navigator.of(dialogCtx).pop();
+
+                // 1. DURESS PIN: Kẻ cướp ép nhập -> Gửi Silent SOS ngầm & bật Ghost Mode
+                if (duressPin.isNotEmpty && input == duressPin) {
+                  unawaited(context.read<AppProvider>().triggerSilentSos());
+                  unawaited(
+                    GhostModeService.instance.startGhostMode(
+                      triggerSource: 'DURESS_PIN',
+                    ),
+                  );
+                  _service.cancelAsFalseAlarm(
+                    reason: 'Nhập Duress PIN (Kích hoạt Silent SOS ngầm)',
+                  );
+                  TopToast.show(
+                    context,
+                    message: 'Đã hủy cảnh báo an toàn.',
+                    icon: Icons.check_circle_rounded,
+                  );
+                } else if (realPin.isEmpty || input == realPin) {
+                  // 2. PIN Thật: Hủy báo động
+                  _service.cancelAsFalseAlarm(
+                    reason: 'Người dùng xác thực đúng mã PIN',
+                  );
+                } else {
+                  TopToast.show(
+                    context,
+                    message:
+                        'Mã PIN không chính xác! Đang tiếp tục đếm ngược cứu nạn.',
+                    icon: Icons.error_outline_rounded,
+                  );
+                }
+              },
+              child: const Text(
+                'XÁC NHẬN',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -343,9 +477,7 @@ class _FalseAlarmVerificationDialogState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => _service.cancelAsFalseAlarm(
-                    reason: 'Người dùng bấm phím "TÔI ỔN"',
-                  ),
+                  onPressed: _handleCancelAttempt,
                   icon: const Icon(Icons.check_circle_rounded, size: 22),
                   label: const FittedBox(
                     fit: BoxFit.scaleDown,

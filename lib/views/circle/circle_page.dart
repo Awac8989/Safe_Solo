@@ -14,6 +14,7 @@ import 'widgets/night_shield_bar.dart';
 import 'widgets/circle_orbit_visualizer.dart';
 import 'widgets/live_safety_cockpit_card.dart';
 import 'widgets/ai_safety_capsule_card.dart';
+import '../health/widgets/sleep_apnea_monitor_card.dart';
 
 class CirclePage extends StatefulWidget {
   const CirclePage({super.key});
@@ -216,6 +217,10 @@ class _CirclePageState extends State<CirclePage> {
           ),
           const SizedBox(height: 16),
           const NightShieldBar(),
+          if (appProvider.isNightShieldActive) ...[
+            const SizedBox(height: 10),
+            const SleepApneaMonitorCard(),
+          ],
           const SizedBox(height: 14),
           const CircleOrbitVisualizer(),
           const SizedBox(height: 14),

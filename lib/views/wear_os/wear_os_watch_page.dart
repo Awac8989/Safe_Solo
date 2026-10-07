@@ -1178,12 +1178,17 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                                       child: TextField(
                                         controller: ipController,
                                         style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
+                                        cursorColor: const Color(0xFF10B981),
                                         decoration: const InputDecoration(
                                           hintText: 'VD: 192.168.1.15',
                                           hintStyle: TextStyle(color: Colors.white30, fontSize: 10),
+                                          filled: false,
+                                          fillColor: Colors.transparent,
                                           isDense: true,
                                           contentPadding: EdgeInsets.symmetric(vertical: 4),
                                           border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
                                         ),
                                       ),
                                     ),

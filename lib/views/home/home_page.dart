@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/widget_service.dart';
 
 import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
@@ -17,6 +19,7 @@ import '../../services/ai_signal_processor.dart';
 import '../../services/hrv_stroke_service.dart';
 import '../../services/notification_center_service.dart';
 import '../../services/offline_sync_engine.dart';
+import '../../services/tflite_ai_engine.dart';
 import '../community_radar/community_radar_page.dart';
 import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
@@ -177,8 +180,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final user = appProvider.user;
     final userName = user?.name ?? strings.text('Bạn', 'You');
     final lastCheckIn = user?.lastCheckinTime ?? DateTime.now();
-    final nextDeadline =
-        user?.nextDeadline ?? lastCheckIn.add(const Duration(hours: 12));
+    final nextDeadline = appProvider.effectiveNextDeadline;
     final remaining = nextDeadline.difference(_now);
     final state = _buttonState(remaining, appProvider.isVacation);
     final guardians = user?.emergencyContacts.take(3).toList() ?? const [];
@@ -210,7 +212,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         decoration: BoxDecoration(
                           color: isDark ? AppDarkColors.surfaceElevated : AppColors.surfaceElevated,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -561,6 +563,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               style: AppTextStyles.timer.copyWith(fontSize: 54),
             ),
           ),
+          const SizedBox(height: 6),
+          Center(
+            child: _buildAdaptiveRiskBadge(context, appProvider, strings),
+          ),
           const SizedBox(height: 10),
           Center(
             child: Text(
@@ -815,6 +821,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ],
           const SizedBox(height: 18),
           _buildWatchHealthGlanceCard(context, strings),
+          _buildHomeScreenWidgetSyncCard(context, strings, appProvider),
           const HomeJourneyCard(),
           const SizedBox(height: 10),
           _buildSoloCareAiCard(context, strings),
@@ -2643,6 +2650,441 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHomeScreenWidgetSyncCard(
+    BuildContext context,
+    AppStrings strings,
+    AppProvider appProvider,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final nextDeadline = appProvider.user?.nextDeadline ??
+        DateTime.now().add(Duration(minutes: appProvider.user?.timerIntervalMinutes ?? 720));
+    final diff = nextDeadline.difference(DateTime.now());
+    final isOkay = !diff.isNegative;
+    final diffStr = diff.isNegative ? 'Quá hạn' : '${diff.inHours}h ${(diff.inMinutes % 60).toString().padLeft(2, '0')}m';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: isDark
+            ? const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF131D31)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : const LinearGradient(
+                colors: [Color(0xFFFFFFFF), Color(0xFFF3FBF7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark ? Colors.black.withValues(alpha: 0.15) : const Color(0x0A059669),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.18 : 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.widgets_rounded,
+                    color: Color(0xFF10B981),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            strings.text('Tiện ích Màn hình chính', 'Home Screen Widget'),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'LIVE',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        strings.text(
+                          'Hỗ trợ 1-Chạm SOS & Điểm danh ngoài màn hình điện thoại',
+                          'Supports 1-Tap SOS & Check-in right from Home Screen',
+                        ),
+                        style: TextStyle(
+                          color: isDark ? Colors.white70 : AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: strings.text('Hướng dẫn ghim', 'Pin guide'),
+                  icon: const Icon(Icons.help_outline_rounded, size: 20, color: Color(0xFF94A3B8)),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (ctx) => Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.widgets_rounded, color: Color(0xFF10B981)),
+                                const SizedBox(width: 10),
+                                Text(
+                                  strings.text('Cách thêm Widget ra Màn hình chính', 'How to add Widget to Home Screen'),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              strings.text(
+                                '1. Ra ngoài màn hình chính điện thoại, nhấn giữ vào khoảng trống.\n'
+                                '2. Chọn biểu tượng "Tiện ích" (Widgets).\n'
+                                '3. Tìm ứng dụng "SafeSolo" và kéo thả Tiện ích ra màn hình.\n'
+                                '4. Bạn có thể điểm danh hoặc bấm SOS khẩn cấp tức thì mà không cần mở app!',
+                                '1. Long press on an empty space on your phone home screen.\n'
+                                '2. Tap "Widgets".\n'
+                                '3. Find "SafeSolo" and drag the widget to your home screen.\n'
+                                '4. You can now check in or trigger SOS immediately without opening the app!',
+                              ),
+                              style: TextStyle(
+                                height: 1.5,
+                                fontSize: 13,
+                                color: isDark ? Colors.white70 : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0B132B) : const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isOkay ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isOkay ? '● ĐANG AN TOÀN' : '● QUÁ HẠN ĐIỂM DANH',
+                          style: TextStyle(
+                            color: isOkay ? const Color(0xFF34D399) : const Color(0xFFEF4444),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'CHECK-IN SAU: $diffStr',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          WearOsService.instance.heartRate > 0
+                              ? '❤️ ${WearOsService.instance.heartRate} BPM • 🔋 ${WearOsService.instance.battery}%'
+                              : '❤️ -- BPM • 👟 SafeSolo Active',
+                          style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF34D399),
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () async {
+                      HapticFeedback.lightImpact();
+                      await WidgetService.updateWidgetStatus(
+                        isOkay: isOkay,
+                        timeRemaining: diffStr,
+                        heartRate: WearOsService.instance.heartRate > 0 ? WearOsService.instance.heartRate : null,
+                        steps: appProvider.stepsToday > 0 ? appProvider.stepsToday : null,
+                        batteryLevel: WearOsService.instance.battery > 0 ? WearOsService.instance.battery : null,
+                        isVacation: appProvider.isVacation,
+                        isNightShield: appProvider.isNightShieldActive,
+                      );
+                      if (context.mounted) {
+                        TopToast.show(
+                          context,
+                          message: strings.text(
+                            'Đã đồng bộ dữ liệu mới nhất ra Tiện ích màn hình chính!',
+                            'Synced fresh data to Home Screen Widget!',
+                          ),
+                          icon: Icons.check_circle_rounded,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.sync_rounded, size: 14),
+                    label: Text(
+                      strings.text('Đồng bộ', 'Sync'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdaptiveRiskBadge(
+    BuildContext context,
+    AppProvider appProvider,
+    AppStrings strings,
+  ) {
+    final state = appProvider.adaptiveDeadManState;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Color badgeColor;
+    IconData badgeIcon;
+    switch (state.level) {
+      case AdaptiveRiskLevel.relaxed:
+        badgeColor = const Color(0xFF818CF8);
+        badgeIcon = Icons.nightlight_round;
+        break;
+      case AdaptiveRiskLevel.normal:
+        badgeColor = const Color(0xFF10B981);
+        badgeIcon = Icons.verified_user_rounded;
+        break;
+      case AdaptiveRiskLevel.elevated:
+        badgeColor = const Color(0xFFF59E0B);
+        badgeIcon = Icons.warning_amber_rounded;
+        break;
+      case AdaptiveRiskLevel.highThreat:
+        badgeColor = const Color(0xFFEF4444);
+        badgeIcon = Icons.crisis_alert_rounded;
+        break;
+    }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            builder: (ctx) => Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: badgeColor.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(badgeIcon, color: badgeColor, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              strings.text('Chu kỳ Thích ứng Sinh học (DeadMan AI)', 'Biometric Adaptive DeadMan AI'),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            Text(
+                              state.labelVi,
+                              style: TextStyle(
+                                color: badgeColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              strings.text('Điểm nguy cơ tổng hợp:', 'Threat Composite Score:'),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                            Text(
+                              '${(state.threatScore * 100).toStringAsFixed(0)}%',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: badgeColor,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        LinearProgressIndicator(
+                          value: state.threatScore,
+                          backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                          valueColor: AlwaysStoppedAnimation<Color>(badgeColor),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    strings.text('Căn cứ điều chỉnh chu kỳ:', 'Adaptation Telemetry Drivers:'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final reason in state.reasons)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded, size: 16, color: badgeColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              reason,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: isDark ? Colors.white70 : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  Text(
+                    strings.text(
+                      'SafeSolo tự động điều chỉnh khoảng cách điểm danh dựa trên nhịp tim Watch 5, giấc ngủ Khiên Đêm và vị trí để bảo vệ bạn tối ưu nhất mà không gây phiền.',
+                      'SafeSolo automatically scales the check-in window based on Watch 5 vitals, Night Shield sleep, and location to provide optimal protection without hassle.',
+                    ),
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: badgeColor.withValues(alpha: isDark ? 0.15 : 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: badgeColor.withValues(alpha: 0.4),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(badgeIcon, size: 14, color: badgeColor),
+              const SizedBox(width: 6),
+              Text(
+                state.labelVi.toUpperCase(),
+                style: TextStyle(
+                  color: badgeColor,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.info_outline_rounded, size: 12, color: badgeColor.withValues(alpha: 0.7)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

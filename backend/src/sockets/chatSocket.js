@@ -31,6 +31,10 @@ function initializeChatSocket(io) {
 
   io.on('connection', (socket) => {
     console.log(`User ${socket.userId} connected with socket ${socket.id}`);
+    if (socket.userId) {
+      socket.join(socket.userId);
+      socket.join(`user:${socket.userId}`);
+    }
 
     // Join rescue room
     socket.on('join_rescue_room', async (roomId) => {

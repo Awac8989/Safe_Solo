@@ -365,7 +365,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.auto_awesome_rounded,
                 title: strings.text('Chế độ ẩn danh (Calculator)', 'Stealth mode (Calculator)'),
                 value: security.stealthMode,
-                onChanged: (value) => _saveSecurity(provider, stealthMode: value),
+                onChanged: (value) async {
+                  await _saveSecurity(provider, stealthMode: value);
+                  if (value && context.mounted) {
+                    Navigator.pushNamedAndRemoveUntil(context, '/stealth', (_) => false);
+                  }
+                },
               ),
               const _SectionDivider(),
               _SliderRow(

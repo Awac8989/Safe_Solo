@@ -981,6 +981,20 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
     if (!mounted) {
       return;
     }
+    if (_stealthMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            strings.text(
+              'Đã kích hoạt Chế độ Ẩn danh (Máy tính Casio ngụy trang).',
+              'Stealth mode activated. App transformed into calculator.',
+            ),
+          ),
+        ),
+      );
+      Navigator.pushNamedAndRemoveUntil(context, '/stealth', (_) => false);
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

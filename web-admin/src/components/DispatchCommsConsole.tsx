@@ -1,5 +1,22 @@
 import { useState, useEffect } from "react";
-import { Phone, PhoneCall, PhoneOff, Mic, Send, Check, HeartHandshake, AlertCircle, Stethoscope, Radio } from "lucide-react";
+import {
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  Mic,
+  Send,
+  Check,
+  HeartHandshake,
+  AlertCircle,
+  Stethoscope,
+  Radio,
+  Headphones,
+  Volume2,
+  Waves,
+  ShieldCheck,
+  Download,
+  Disc,
+} from "lucide-react";
 
 interface DispatchCommsConsoleProps {
   victimName: string;
@@ -53,12 +70,16 @@ export function DispatchCommsConsole({
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const [isPttMode, setIsPttMode] = useState(false);
+  type CommsMode = "CALL" | "PTT" | "WEBRTC";
+  const [commsMode, setCommsMode] = useState<CommsMode>("CALL");
   const [isTransmitting, setIsTransmitting] = useState(false);
+  const [isCovertListening, setIsCovertListening] = useState(false);
+  const [isTwoWayTalk, setIsTwoWayTalk] = useState(false);
   const [pttChannel, setPttChannel] = useState<"VICTIM" | "HEROES">("HEROES");
   const [transcripts, setTranscripts] = useState<Array<{ sender: string; text: string; time: string }>>([
     { sender: "Trực ban (SUP-0137)", text: "SafeSolo TOC gọi Hiệp sĩ Lê Hữu Phước và Phan Thị Mai, có nạn nhân AFib nhịp tim 124 cách vị trí 320m.", time: "14:24:10" },
     { sender: "Hiệp sĩ Lê Hữu Phước", text: "Rõ! Tôi đang di chuyển qua đường Nguyễn Tri Phương, ETA 1 phút 30 giây.", time: "14:24:25" },
+    { sender: "Micro Hộp Đen (Blackbox Sniffer)", text: "Tiếng thở ngắt quãng ngưng thở khi ngủ OSA, tiếng va chạm đồ sứ rơi trên sàn gạch.", time: "14:24:40" },
   ]);
 
   const handlePttStart = () => {
@@ -75,43 +96,156 @@ export function DispatchCommsConsole({
     setTranscripts((prev) => [...prev, { sender: "Trực ban (Phát thanh PTT)", text: msg, time: now }]);
   };
 
+  const handleToggleCovertListening = () => {
+    setIsCovertListening((prev) => !prev);
+    if (!isCovertListening) {
+      const now = new Date().toLocaleTimeString("vi-VN");
+      setTranscripts((prev) => [
+        ...prev,
+        {
+          sender: "Hệ thống WebRTC Blackbox",
+          text: "Bắt đầu luồng nghe ngầm 15s (Covert Sniffer Mode) từ điện thoại & Galaxy Watch 5 của nạn nhân.",
+          time: now,
+        },
+      ]);
+    }
+  };
+
   return (
     <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 shadow-md backdrop-blur space-y-3">
       {/* 1. Header with Mode Toggle */}
-      <div className="flex items-center justify-between border-b border-border/50 pb-2">
+      <div className="flex flex-wrap items-center justify-between border-b border-border/50 pb-2 gap-2">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
             <PhoneCall className="h-4 w-4" />
           </div>
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Tổng Đài Đàm Thoại & Bộ Đàm Web PTT
+              Tổng Đài Đàm Thoại & Cầu Truyền Thanh WebRTC
             </span>
-            <p className="text-[10px] text-muted-foreground">Phát thanh hiện trường 2 chiều & Cẩm nang sơ cấp cứu ban đầu</p>
+            <p className="text-[10px] text-muted-foreground">Phát thanh hiện trường 2 chiều, Bộ đàm PTT & Hộp đen âm thanh</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => setIsPttMode(false)}
+            onClick={() => setCommsMode("CALL")}
             className={`rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
-              !isPttMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+              commsMode === "CALL" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
             }`}
           >
             CUỘC GỌI
           </button>
           <button
-            onClick={() => setIsPttMode(true)}
+            onClick={() => setCommsMode("PTT")}
             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
-              isPttMode ? "bg-amber-600 text-white animate-pulse" : "text-amber-400 bg-amber-950/20 hover:bg-amber-950/40"
+              commsMode === "PTT" ? "bg-amber-600 text-white animate-pulse" : "text-amber-400 bg-amber-950/20 hover:bg-amber-950/40"
             }`}
           >
             <Radio className="h-3 w-3" /> BỘ ĐÀM PTT
           </button>
+          <button
+            onClick={() => setCommsMode("WEBRTC")}
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
+              commsMode === "WEBRTC" ? "bg-sky-600 text-white shadow-lg animate-pulse" : "text-sky-400 bg-sky-950/20 hover:bg-sky-950/40"
+            }`}
+          >
+            <Headphones className="h-3 w-3" /> CẦU WEBRTC
+          </button>
         </div>
       </div>
 
-      {/* 2. PTT Mode vs Call Mode */}
-      {isPttMode ? (
+      {/* 2. Mode Views */}
+      {commsMode === "WEBRTC" ? (
+        /* CHẾ ĐỘ CẦU TRUYỀN THANH WEBRTC & HỘP ĐEN ÂM THANH HIỆN TRƯỜNG */
+        <div className="rounded-xl border border-sky-500/30 bg-[#071026] p-3 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-500/20 pb-2">
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${isCovertListening ? "bg-rose-500 animate-ping" : "bg-sky-400 animate-pulse"}`} />
+              <span className="text-xs font-bold text-sky-400">
+                {isCovertListening ? "🔴 ĐANG LẮNG NGHE ÂM THANH NGẦM HIỆN TRƯỜNG (COVERT SNIFFER)" : "WEBRTC AUDIO BRIDGE · OPUS 48kHz (STANDBY)"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground">
+              <span>Độ trễ: 28ms</span>
+              <span className="text-border">|</span>
+              <span className="text-emerald-400 font-bold">DTLS-SRTP 256-bit</span>
+            </div>
+          </div>
+
+          {/* Real-time Spectrum Waveform Visualizer */}
+          <div className="flex flex-col items-center justify-center p-3 rounded-xl border border-border/60 bg-black/50 space-y-2">
+            <div className="flex items-end gap-1 h-9 w-full justify-center px-4">
+              {[8, 16, 28, 34, 18, 12, 38, 42, 22, 14, 30, 44, 26, 12, 20, 36, 15, 29, 10, 25].map((h, i) => (
+                <span
+                  key={i}
+                  className={`w-1.5 rounded-full transition-all duration-100 ${
+                    isCovertListening || isTwoWayTalk
+                      ? "bg-gradient-to-t from-sky-500 to-rose-400 animate-pulse"
+                      : "bg-muted-foreground/20"
+                  }`}
+                  style={{
+                    height: isCovertListening || isTwoWayTalk ? `${Math.min(36, Math.max(6, (h * (1 + (i % 4) * 0.25)))).toFixed(0)}px` : "4px",
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <button
+                onClick={handleToggleCovertListening}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition shadow ${
+                  isCovertListening
+                    ? "bg-rose-600 text-white animate-pulse hover:bg-rose-500"
+                    : "bg-sky-500 text-white hover:bg-sky-400"
+                }`}
+              >
+                <Headphones className="h-4 w-4" />
+                {isCovertListening ? "DỪNG NGHE LÉN HIỆN TRƯỜNG" : "🎧 BẬT NGHE LÉN HIỆN TRƯỜNG (15s)"}
+              </button>
+
+              <button
+                onClick={() => setIsTwoWayTalk(!isTwoWayTalk)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition ${
+                  isTwoWayTalk
+                    ? "bg-emerald-600 text-white animate-pulse"
+                    : "border border-border bg-background hover:bg-accent text-foreground"
+                }`}
+              >
+                <Mic className="h-4 w-4 text-emerald-400" />
+                {isTwoWayTalk ? "ĐANG MỞ LOA ĐÀM THOẠI 2 CHIỀU" : "MỞ MIC ĐÀM THOẠI 2 CHIỀU"}
+              </button>
+
+              <button
+                onClick={() => {
+                  setSentMessageNotice("Đang tải file bằng chứng âm thanh Blackbox 15s (SHA-256 Verified)...");
+                  setTimeout(() => setSentMessageNotice(null), 3000);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-background/60 px-3 py-2 text-xs font-bold hover:bg-accent transition text-muted-foreground"
+              >
+                <Download className="h-3.5 w-3.5 text-sky-400" /> Tải Audio Hộp Đen (.WAV)
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Micro thu ngầm không phát âm thanh ở máy nạn nhân, bảo vệ an toàn tuyệt đối khi gặp nguy hiểm.
+            </p>
+          </div>
+
+          {/* Live Audio Transcript Box */}
+          <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1.5 max-h-28 overflow-y-auto">
+            <div className="text-[10px] font-bold text-muted-foreground uppercase flex items-center justify-between">
+              <span>Bản Ghi Bóc Tách Đàm Thoại WebRTC & Hộp Đen:</span>
+              <span className="text-sky-400 font-mono">WHISPER AI · TIẾNG VIỆT</span>
+            </div>
+            {transcripts.map((t, idx) => (
+              <div key={idx} className="text-[11px] leading-tight flex items-start gap-1.5">
+                <span className="font-mono text-[10px] text-muted-foreground shrink-0">{t.time}</span>
+                <span className="font-bold text-sky-400 shrink-0">[{t.sender}]:</span>
+                <span className="text-foreground">{t.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : commsMode === "PTT" ? (
         <div className="rounded-xl border border-amber-500/30 bg-amber-950/10 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

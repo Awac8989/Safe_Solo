@@ -7,6 +7,7 @@ import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/offline_resilience_service.dart';
 import '../../services/offline_sos_service.dart';
+import 'ble_mesh_radar_sheet.dart';
 
 class OfflineEmergencySheet extends StatefulWidget {
   const OfflineEmergencySheet({super.key});
@@ -296,6 +297,31 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB), // Emergency Blue
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Mở Radar Cứu hộ Dã chiến BLE Mesh (Đột phá 3)
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                BleMeshRadarSheet.show(context);
+              },
+              icon: const Icon(Icons.hub_rounded, color: Color(0xFF38EF7D)),
+              label: Text(
+                strings.text(
+                  'MẠNG LƯỚI TIẾP SỨC DÃ CHIẾN (BLE MESH)',
+                  'TACTICAL MESH RELAY NETWORK (BLE MESH)',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF38EF7D)),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFF38EF7D), width: 1.5),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),

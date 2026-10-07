@@ -137,6 +137,36 @@ class GuardianController {
       next(error);
     }
   }
+
+  // @desc    Get Omnichannel alert status and configured channels
+  // @route   GET /api/guardians/omnichannel/status
+  // @access  Private
+  async getOmnichannelStatus(req, res, next) {
+    try {
+      const data = await guardianService.getOmnichannelStatus(req.user.id);
+      res.status(200).json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Broadcast emergency alert across Telegram, Zalo ZNS, SMS, and Voice Call
+  // @route   POST /api/guardians/alert/broadcast
+  // @access  Private
+  async broadcastOmnichannelAlert(req, res, next) {
+    try {
+      const result = await guardianService.broadcastOmnichannelAlert(req.user.id, req.body);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new GuardianController();

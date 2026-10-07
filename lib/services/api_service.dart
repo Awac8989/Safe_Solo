@@ -321,6 +321,40 @@ class ApiService {
     _throwIfFailed(response);
   }
 
+  Future<Map<String, dynamic>> broadcastRadarSOS({
+    required String incidentType,
+    required double lat,
+    required double lng,
+    String? userId,
+    int severity = 2,
+    String severityLevel = 'P1_CRITICAL',
+    String? approxAddress,
+    String? medicalNotes,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/broadcast');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'incidentType': incidentType,
+          'lat': lat,
+          'lng': lng,
+          'severity': severity,
+          'severityLevel': severityLevel,
+          if (approxAddress != null) 'approxAddress': approxAddress,
+          if (medicalNotes != null) 'medicalNotes': medicalNotes,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<List<EmergencyContactModel>> listGuardians(String userId) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/users/$userId/guardians');
     final response = await _safeRequest(_client.get(uri));
@@ -1113,5 +1147,71 @@ class ApiService {
     );
     _throwIfFailed(response);
     return jsonDecode(response.body) as List<dynamic>;
+  }
+
+  /// Lấy thông tin trạng thái 4 kênh cứu hộ Omnichannel (Telegram, Zalo ZNS, SMS, Voice Call)
+  Future<Map<String, dynamic>> fetchOmnichannelStatus({String? userId}) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/guardians/omnichannel/status');
+    try {
+      final response = await _safeRequest(
+        _client.get(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': 'android-app-key-abc',
+            if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+          },
+        ),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return body['data'] as Map<String, dynamic>? ?? {};
+      }
+      return {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Phát cảnh báo khẩn cấp đa kênh đồng thời tới toàn bộ người bảo hộ
+  Future<Map<String, dynamic>> broadcastOmnichannelAlert({
+    String? userId,
+    required String emergencyType,
+    double? lat,
+    double? lng,
+    String? address,
+    int? heartRate,
+    int? spO2,
+    int? news2Score,
+    String? notes,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/guardians/alert/broadcast');
+    final payload = {
+      'emergencyType': emergencyType,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (address != null && address.isNotEmpty) 'address': address,
+      'vitals': {
+        if (heartRate != null) 'heartRate': heartRate,
+        if (spO2 != null) 'spO2': spO2,
+        if (news2Score != null) 'news2Score': news2Score,
+      },
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    };
+
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode(payload),
+      ),
+    );
+    _throwIfFailed(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>? ?? {};
   }
 }

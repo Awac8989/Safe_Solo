@@ -113,7 +113,8 @@ export type HitlActionPayload = {
     | "PAUSE_COUNTDOWN"
     | "RESUME_COUNTDOWN"
     | "AUTO_DISPATCH_TIMEOUT"
-    | "TIER3_AMBULANCE_DISPATCH";
+    | "TIER3_AMBULANCE_DISPATCH"
+    | "NEWS2_TRIAGE_APPLIED";
   reason?: string;
   supervisorName?: string;
   supervisorId?: string;

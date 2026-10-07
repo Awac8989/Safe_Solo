@@ -30,6 +30,7 @@ import 'views/settings/app_user_guide_page.dart';
 import 'views/settings/defense_demo_sandbox_page.dart';
 import 'views/medical/lockscreen_medical_card_page.dart';
 import 'views/notifications/notification_center_page.dart';
+import 'views/sos_map/sos_map_page.dart';
 import 'services/widget_service.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
@@ -37,7 +38,21 @@ import 'core/widgets/main_navigation.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
-    await WidgetService.initialize();
+    await WidgetService.initialize(onAction: (action) {
+      final navContext = AppConstants.navigatorKey.currentContext;
+      if (navContext != null) {
+        final provider = navContext.read<AppProvider>();
+        if (action == 'checkin') {
+          provider.checkIn();
+        } else if (action == 'sos') {
+          AppConstants.navigatorKey.currentState?.push(
+            MaterialPageRoute<void>(
+              builder: (_) => const SosMapPage(),
+            ),
+          );
+        }
+      }
+    });
   } catch (e) {
     debugPrint('WidgetService init failed: $e');
   }
@@ -119,6 +134,15 @@ class SafeSoloApp extends StatelessWidget {
               '/lockscreen-medical': (_) => const LockscreenMedicalCardPage(),
               '/notifications': (_) => const NotificationCenterPage(),
             },
+            onGenerateRoute: (settings) {
+              if (settings.name == '/' || settings.name == null) {
+                return MaterialPageRoute<void>(
+                  settings: settings,
+                  builder: (_) => const _AppGate(),
+                );
+              }
+              return null;
+            },
             onUnknownRoute: (_) => MaterialPageRoute<void>(
               builder: (_) => const _AppGate(),
             ),
@@ -186,6 +210,10 @@ class _AppGate extends StatelessWidget {
 
     if (!provider.hasCompletedProfile) {
       return const ProfileSetupPage();
+    }
+
+    if (provider.security.stealthMode) {
+      return const StealthPage();
     }
 
     return const MainNavigation();

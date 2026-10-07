@@ -8,6 +8,10 @@ const router = express.Router();
 // All routes require authentication
 router.use(auth);
 
+// Omnichannel alert engine routes
+router.get('/omnichannel/status', guardianController.getOmnichannelStatus);
+router.post('/alert/broadcast', guardianController.broadcastOmnichannelAlert);
+
 // Guardian network routes
 router.get('/', guardianController.getUserGuardians);
 router.get('/search', guardianController.searchUsers);

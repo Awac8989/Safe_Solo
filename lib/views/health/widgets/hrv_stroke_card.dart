@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/ai_signal_processor.dart';
 import '../../../services/hrv_stroke_service.dart';
+import '../../emergency/fast_ai_assessment_dialog.dart';
 
 /// ============================================================================
 /// SAFESOLO - THẺ PHÂN TÍCH HRV & DỰ ĐOÁN ĐỘT QUỴ SỚM (HRV & STROKE CARD)
@@ -57,14 +58,9 @@ class _HrvStrokeCardState extends State<HrvStrokeCard>
     }
   }
 
-  /// Mở bảng tầm soát đột quỵ F.A.S.T
+  /// Mở bảng tầm soát đột quỵ F.A.S.T Thông minh (AI Vision & Speech)
   void _openFastScreeningSheet(BuildContext context, StrokeCardiacRiskAssessment assessment) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _FastScreeningModal(assessment: assessment),
-    );
+    FastAiAssessmentDialog.show(context);
   }
 
   @override

@@ -4,26 +4,121 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
-    android:padding="8dp"
-    android:background="#2E7D32">
+    android:padding="12dp"
+    android:background="@drawable/widget_bg_safe">
 
-    <TextView
-        android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
+    <!-- Header Row: App Title + Status Badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Tôi ổn"
-        android:textColor="#FFFFFF"
-        android:textStyle="bold"
-        android:textSize="18sp" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/widget_countdown"
-        android:layout_width="wrap_content"
+        <ImageView
+            android:id="@+id/widget_logo"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="SafeSolo" />
+
+        <TextView
+            android:id="@+id/widget_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="SafeSolo"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="● AN TOÀN"
+            android:textColor="#34D399"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Center: Countdown Timer & Subtitle -->
+    <LinearLayout
+        android:id="@+id/widget_content_body"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CHECK-IN SAU"
+            android:textColor="#9CA3AF"
+            android:textSize="10sp"
+            android:letterSpacing="0.08"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="11h : 30m"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="22sp" />
+
+        <TextView
+            android:id="@+id/widget_vitals"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="❤️ 75 BPM • 👟 Đang hoạt động"
+            android:textColor="#D1D5DB"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Actions Row: 1-Tap Check-in + Instant SOS -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Chạm để check-in"
-        android:textColor="#FFFFFF"
-        android:textSize="12sp"
-        android:layout_marginTop="4dp" />
-        
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <!-- Nút Điểm Danh Nhanh -->
+        <TextView
+            android:id="@+id/widget_btn_checkin"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_btn_checkin"
+            android:gravity="center"
+            android:text="✓ Tôi ổn"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+        <!-- Nút SOS Khẩn Cấp -->
+        <TextView
+            android:id="@+id/widget_btn_sos"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_btn_sos"
+            android:gravity="center"
+            android:text="🆘 SOS"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
 </LinearLayout>

@@ -19,6 +19,7 @@ import {
   FileText,
   Compass,
   Brain,
+  Stethoscope,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
 import type { AdminOverviewResponse, HitlActionPayload } from "@/lib/api";
@@ -27,6 +28,7 @@ import { DispatchCommsConsole } from "@/components/DispatchCommsConsole";
 import { IncidentDossierModal } from "@/components/IncidentDossierModal";
 import { IncidentPlaybackModal } from "@/components/IncidentPlaybackModal";
 import { AiIncidentCopilotDrawer } from "@/components/AiIncidentCopilotDrawer";
+import { News2ClinicalTriageModal } from "@/components/News2ClinicalTriageModal";
 
 type IncidentItem = AdminOverviewResponse["data"]["incidents"][number];
 
@@ -48,6 +50,7 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
   const [showDossierModal, setShowDossierModal] = useState(false);
   const [showPlaybackModal, setShowPlaybackModal] = useState(false);
   const [showAiCopilotDrawer, setShowAiCopilotDrawer] = useState(false);
+  const [showNews2Modal, setShowNews2Modal] = useState(false);
   const [supervisorCode, setSupervisorCode] = useState("SUP-0137");
 
   const currentState = hitl?.state || "COUNTDOWN_ACTIVE";
@@ -402,6 +405,14 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         >
           <Brain className="h-4 w-4 text-emerald-400 animate-pulse" /> TRỢ LÝ AI SOP
         </button>
+
+        {/* Đột phá 6: Nút Phân loại lâm sàng NEWS2 chuẩn Hoàng gia Anh */}
+        <button
+          onClick={() => setShowNews2Modal(true)}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-2.5 text-xs font-bold text-sky-400 hover:bg-sky-500/25 transition shadow-md"
+        >
+          <Stethoscope className="h-4 w-4 text-sky-400 animate-pulse" /> PHÂN LOẠI NEWS2
+        </button>
       </div>
 
       {/* Modal: Xác nhận Báo động giả */}
@@ -511,6 +522,24 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           onClose={() => setShowAiCopilotDrawer(false)}
         />
       )}
+
+      {/* Đột phá 6: Modal Phân loại Cấp cứu Lâm sàng NEWS2 Chuẩn Quốc Tế */}
+      <News2ClinicalTriageModal
+        isOpen={showNews2Modal}
+        onClose={() => setShowNews2Modal(false)}
+        incidentName={incident.name}
+        incidentId={incident.id}
+        initialHeartRate={incident.vitals?.heartRate ?? 124}
+        initialSpo2={incident.vitals?.spo2 ?? 91}
+        onApplyTriageToDispatch={(score, riskLevel, actionPlan) => {
+          void onAction({
+            action: "NEWS2_TRIAGE_APPLIED",
+            supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+            tier: score >= 7 ? 3 : 2,
+            reason: `NEWS2 Score: ${score}/20 (${riskLevel}) - ${actionPlan}`,
+          });
+        }}
+      />
     </div>
   );
 }

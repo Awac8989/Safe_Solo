@@ -603,6 +603,11 @@ class AppTheme {
           ),
         ),
       ),
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: AppDarkColors.primary,
+        selectionColor: Color(0x3310B981),
+        selectionHandleColor: AppDarkColors.primary,
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppDarkColors.input,

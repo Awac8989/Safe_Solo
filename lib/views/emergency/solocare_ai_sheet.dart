@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../services/ai_solocare_service.dart';
 
@@ -194,8 +195,10 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
+    return Theme(
+      data: AppTheme.dark,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.9,
       decoration: const BoxDecoration(
         color: Color(0xFF0B1329), // Deep Tactical Midnight Slate
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -426,7 +429,13 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
                         ),
                         child: TextField(
                           controller: _textController,
-                          style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          cursorColor: const Color(0xFF10B981),
+                          keyboardAppearance: Brightness.dark,
                           maxLines: 3,
                           minLines: 1,
                           textInputAction: TextInputAction.send,
@@ -434,7 +443,15 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
                           decoration: const InputDecoration(
                             hintText: 'Hỏi về vết thương, thuốc, hoặc tâm sự...',
                             hintStyle: TextStyle(color: Colors.white38, fontSize: 12.5),
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            isDense: true,
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
@@ -466,8 +483,9 @@ class _SoloCareAiSheetState extends State<SoloCareAiSheet> with SingleTickerProv
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildQuickChip(String label, String prompt) {
     return Padding(

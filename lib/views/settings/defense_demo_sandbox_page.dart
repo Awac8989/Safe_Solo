@@ -7,13 +7,23 @@ import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/blackbox_service.dart';
 import '../../services/false_alarm_suppression_service.dart';
+import '../../services/ble_mesh_relay_service.dart';
+import '../../services/fast_assessment_service.dart';
 import '../../services/hrv_stroke_service.dart';
 import '../../services/offline_resilience_service.dart';
 import '../../services/offline_sos_service.dart';
+import '../../services/sleep_apnea_haptic_service.dart';
+import '../../services/ghost_mode_service.dart';
 import '../../services/stroke_defense_service.dart';
+import '../../services/tflite_ai_engine.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/wear_os_service.dart';
+import '../emergency/ble_mesh_radar_sheet.dart';
 import '../emergency/false_alarm_verification_dialog.dart';
+import '../emergency/fast_ai_assessment_dialog.dart';
+import '../emergency/ghost_breadcrumbs_sheet.dart';
+import '../health/widgets/sleep_apnea_monitor_card.dart';
+import '../network/omnichannel_guardian_sheet.dart';
 
 /// ============================================================================
 /// SAFESOLO - DEFENSE DEMO SIMULATION SANDBOX
@@ -67,6 +77,10 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
     super.initState();
     WearOsService.instance.addListener(_onServiceChanged);
     WatchSyncManager.instance.addListener(_onServiceChanged);
+    FastAssessmentService.instance.addListener(_onServiceChanged);
+    BleMeshRelayService.instance.addListener(_onServiceChanged);
+    SleepApneaHapticService.instance.addListener(_onServiceChanged);
+    GhostModeService.instance.addListener(_onServiceChanged);
     _addLog(
       tag: 'SYSTEM',
       message: 'Khởi tạo Defense Sandbox Engine v1.0 (Ready for Defense Demo).',
@@ -82,6 +96,10 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
   void dispose() {
     WearOsService.instance.removeListener(_onServiceChanged);
     WatchSyncManager.instance.removeListener(_onServiceChanged);
+    FastAssessmentService.instance.removeListener(_onServiceChanged);
+    BleMeshRelayService.instance.removeListener(_onServiceChanged);
+    SleepApneaHapticService.instance.removeListener(_onServiceChanged);
+    GhostModeService.instance.removeListener(_onServiceChanged);
     _tabController.dispose();
     _logScrollController.dispose();
     super.dispose();
@@ -301,17 +319,45 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
   void _resetAllToSafe() {
     HapticFeedback.mediumImpact();
     context.read<AppProvider>().simulateSafeReset();
+    context.read<AppProvider>().simulateAdaptiveThreatLevel(null);
     HrvStrokeService.instance.reset();
+    FastAssessmentService.instance.resetAssessment();
+    BleMeshRelayService.instance.resetMeshDemo();
+    SleepApneaHapticService.instance.resetNightSession();
+    GhostModeService.instance.stopGhostMode();
     _addLog(
       tag: 'SAFE_RESET',
       message:
-          'Khôi phục toàn bộ hệ thống: Vitals bình thường (75 BPM, 98% SpO2), Deadman Timer 12h, Trạng thái SAFE.',
+          'Khôi phục toàn bộ hệ thống: Vitals bình thường (75 BPM, 98% SpO2), Deadman Timer 12h, Chu kỳ Thích ứng Chuẩn, F.A.S.T 0/3, BLE Mesh Reset, Giấc ngủ SpO2 98% (ODI < 5), Ghost Mode Standby, Trạng thái SAFE.',
       type: SandboxLogType.success,
     );
     TopToast.show(
       context,
       message: 'Toàn bộ hệ thống đã về trạng thái An toàn (SAFE)!',
       icon: Icons.check_circle_rounded,
+    );
+  }
+
+  void _injectAdaptiveScenario(AdaptiveRiskLevel? level, String title, String detail) {
+    HapticFeedback.lightImpact();
+    context.read<AppProvider>().simulateAdaptiveThreatLevel(level);
+    SandboxLogType logType;
+    if (level == AdaptiveRiskLevel.highThreat) {
+      logType = SandboxLogType.danger;
+    } else if (level == AdaptiveRiskLevel.elevated) {
+      logType = SandboxLogType.warning;
+    } else {
+      logType = SandboxLogType.success;
+    }
+    _addLog(
+      tag: 'ADAPTIVE_DEADMAN',
+      message: 'Mô phỏng Thích ứng: $title -> $detail',
+      type: logType,
+    );
+    TopToast.show(
+      context,
+      message: 'Đã chuyển: $title',
+      icon: Icons.auto_mode_rounded,
     );
   }
 
@@ -852,6 +898,26 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
             ),
           ),
 
+        // ĐỘT PHÁ 1: ADAPTIVE DEADMAN ENGINE (HỌC MÁY THÍCH ỨNG SINH HỌC)
+        _buildAdaptiveDeadManCard(),
+        const SizedBox(height: 12),
+
+        // ĐỘT PHÁ 2: F.A.S.T VISION & SPEECH AI (THANG ĐO CINCINNATI & MỐC GIỜ VÀNG)
+        _buildFastAssessmentCard(),
+        const SizedBox(height: 12),
+
+        // ĐỘT PHÁ 3: BLE MESH OFFLINE STORE-AND-FORWARD RELAY
+        _buildBleMeshRelayCard(),
+        const SizedBox(height: 12),
+
+        // ĐỘT PHÁ 4: NOCTURNAL DESATURATION & SLEEP APNEA EMERGENCY HAPTIC
+        _buildSleepApneaCard(),
+        const SizedBox(height: 12),
+
+        // ĐỘT PHÁ 5: GHOST MODE & LIVE BREADCRUMBS BLACKBOX
+        _buildGhostModeCard(),
+        const SizedBox(height: 12),
+
         // KỊCH BẢN ĐẶC BIỆT: SAFE SOLO WATCH - BUỔI CHIỀU CỦA ÔNG TƯ (ĐỘT QUỴ ĐỐI XỨNG 2 TAY & GIỜ VÀNG)
         _buildScenarioCard(
           icon: Icons.emergency_share_rounded,
@@ -975,6 +1041,967 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAdaptiveDeadManCard() {
+    final appProvider = context.watch<AppProvider>();
+    final state = appProvider.adaptiveDeadManState;
+
+    Color badgeColor;
+    IconData badgeIcon;
+    switch (state.level) {
+      case AdaptiveRiskLevel.relaxed:
+        badgeColor = const Color(0xFF818CF8);
+        badgeIcon = Icons.nightlight_round;
+        break;
+      case AdaptiveRiskLevel.normal:
+        badgeColor = const Color(0xFF10B981);
+        badgeIcon = Icons.verified_user_rounded;
+        break;
+      case AdaptiveRiskLevel.elevated:
+        badgeColor = const Color(0xFFF59E0B);
+        badgeIcon = Icons.warning_amber_rounded;
+        break;
+      case AdaptiveRiskLevel.highThreat:
+        badgeColor = const Color(0xFFEF4444);
+        badgeIcon = Icons.crisis_alert_rounded;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(badgeIcon, color: badgeColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ĐỘT PHÁ 1: ADAPTIVE DEADMAN',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: badgeColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'AI v2.0',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: badgeColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Chu Kỳ Thích Ứng Động Theo Rủi Ro',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Trạng thái: ${state.labelVi}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: badgeColor,
+                  ),
+                ),
+                Text(
+                  'Nguy cơ: ${(state.threatScore * 100).toStringAsFixed(0)}%  •  Chu kỳ: ${state.recommendedIntervalMinutes}p',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Hệ thống tự động co giãn chu kỳ điểm danh sinh tồn: Giãn (+4h) khi ngủ sâu hoặc sạc pin; siết chặt (30-45p) khi nhịp tim vọt hoặc ra ngoài đêm vắng.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAdaptiveButton(
+                label: '🌙 Khiên Đêm (Ngủ say +4h)',
+                color: const Color(0xFF818CF8),
+                onTap: () => _injectAdaptiveScenario(
+                  AdaptiveRiskLevel.relaxed,
+                  'Khiên Đêm (Ngủ say)',
+                  'Dãn chu kỳ +4h (960p), Rủi ro 5%',
+                ),
+              ),
+              _buildAdaptiveButton(
+                label: '🚶 Đi đêm vắng (>23h Co 2h)',
+                color: const Color(0xFFF59E0B),
+                onTap: () => _injectAdaptiveScenario(
+                  AdaptiveRiskLevel.elevated,
+                  'Đi đêm ngoài vùng an toàn',
+                  'Thu hẹp chu kỳ còn 2h (120p), Cảnh giác 45%',
+                ),
+              ),
+              _buildAdaptiveButton(
+                label: '🚨 Tim 135 & BMAI (Siết 30p)',
+                color: const Color(0xFFEF4444),
+                onTap: () => _injectAdaptiveScenario(
+                  AdaptiveRiskLevel.highThreat,
+                  'Cảnh báo nhịp tim & BMAI bất đối xứng',
+                  'Siết chặt chu kỳ còn 30p, Rủi ro 85%',
+                ),
+              ),
+              _buildAdaptiveButton(
+                label: '✅ Chu kỳ Chuẩn (720p)',
+                color: const Color(0xFF10B981),
+                onTap: () => _injectAdaptiveScenario(
+                  AdaptiveRiskLevel.normal,
+                  'Chu kỳ Tiêu chuẩn',
+                  'Hồi phục chu kỳ 12h (720p), Rủi ro 15%',
+                ),
+              ),
+              _buildAdaptiveButton(
+                label: '📡 Cảm biến Thực (Auto Live)',
+                color: const Color(0xFF94A3B8),
+                onTap: () => _injectAdaptiveScenario(
+                  null,
+                  'Chế độ Cảm biến Thực tế',
+                  'Tắt giả lập, dùng tín hiệu Watch 5 & GPS trực tiếp',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdaptiveButton({
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFastAssessmentCard() {
+    final service = FastAssessmentService.instance;
+    final result = service.currentResult;
+    final riskColor = result.riskColor;
+    final remaining = result.remainingGoldenWindow;
+    final remainingStr = '${remaining.inHours}h ${(remaining.inMinutes % 60).toString().padLeft(2, '0')}m';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: riskColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: riskColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.psychology_alt_rounded, color: riskColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ĐỘT PHÁ 2: F.A.S.T AI CHECK',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: riskColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: riskColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'CPSS ${result.positiveCount}/3',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: riskColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Thị Giác, Giọng Nói & Mốc Giờ Vàng 4.5h',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    result.cpssRiskLevelVi,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: riskColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'Giờ Vàng còn: $remainingStr',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Hệ thống tích hợp quy chuẩn Cincinnati (CPSS): Nhận diện méo mặt (Vision AI), đo rơi tay 10s (BMAI), phân tích âm phổ nói ngọng (Dysarthria) & đếm ngược cửa sổ điều trị tiêu sợi huyết 4.5h.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          // Interactive Simulation Buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAdaptiveButton(
+                label: '👁️ Méo Miệng (Face Droop 56%)',
+                color: const Color(0xFFEF4444),
+                onTap: () {
+                  service.simulateFaceDroop(isDroop: true);
+                  _addLog(
+                    tag: 'FAST_FACE',
+                    message: 'Mô phỏng F.A.S.T: Phát hiện liệt cơ mặt bên phải (FSI = 56%).',
+                    type: SandboxLogType.danger,
+                  );
+                  TopToast.show(context, message: 'Đã kích hoạt: Lệch cơ mặt (Face Droop)');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '✋ Rơi Tay (Pronator Drift 0.84g)',
+                color: const Color(0xFFF97316),
+                onTap: () {
+                  service.simulateArmDrift(isWeak: true);
+                  _addLog(
+                    tag: 'FAST_ARM',
+                    message: 'Mô phỏng F.A.S.T: Phát hiện yếu liệt chi tay phải (BMAI = 0.84g).',
+                    type: SandboxLogType.danger,
+                  );
+                  TopToast.show(context, message: 'Đã kích hoạt: Yếu liệt tay (Arm Drift)');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🎙️ Líu Lưỡi (Dysarthria 44%)',
+                color: const Color(0xFF8B5CF6),
+                onTap: () {
+                  service.simulateSpeechImpairment(isImpaired: true);
+                  _addLog(
+                    tag: 'FAST_SPEECH',
+                    message: 'Mô phỏng F.A.S.T: Rối loạn phát âm giọng dính chữ (Clarity = 44%).',
+                    type: SandboxLogType.danger,
+                  );
+                  TopToast.show(context, message: 'Đã kích hoạt: Rối loạn giọng nói (Speech)');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🚨 Báo Động Đỏ (Cả 3 Dấu Hiệu)',
+                color: const Color(0xFFFF2A2A),
+                onTap: () {
+                  service.simulateFaceDroop(isDroop: true);
+                  service.simulateArmDrift(isWeak: true);
+                  service.simulateSpeechImpairment(isImpaired: true);
+                  _addLog(
+                    tag: 'FAST_CRITICAL',
+                    message: 'BÁO ĐỘNG ĐỎ CẤP CỨU ĐỘT QUỴ: Dương tính cả 3/3 tiêu chí F.A.S.T (>85% đột quỵ tối cấp)!',
+                    type: SandboxLogType.danger,
+                  );
+                  TopToast.show(context, message: 'Báo động Đỏ: Đột quỵ cấp 3/3 dấu hiệu!', icon: Icons.emergency);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '📱 Mở Trình Kiểm Tra F.A.S.T Toàn Diện',
+                color: const Color(0xFF38EF7D),
+                onTap: () {
+                  FastAiAssessmentDialog.show(context);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '✅ Khôi Phục F.A.S.T (0/3 An Toàn)',
+                color: const Color(0xFF10B981),
+                onTap: () {
+                  service.resetAssessment();
+                  _addLog(
+                    tag: 'FAST_RESET',
+                    message: 'Khôi phục F.A.S.T về bình thường: 0/3 dấu hiệu, Nguy cơ thấp.',
+                    type: SandboxLogType.success,
+                  );
+                  TopToast.show(context, message: 'Đã xóa các dấu hiệu F.A.S.T');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBleMeshRelayCard() {
+    final mesh = BleMeshRelayService.instance;
+    final hasPackets = mesh.vaultPackets.isNotEmpty;
+    final activePacket = hasPackets ? mesh.vaultPackets.first : null;
+    final isDelivered = activePacket?.isDelivered ?? false;
+    final statusColor = isDelivered
+        ? const Color(0xFF38EF7D)
+        : (hasPackets ? const Color(0xFFF59E0B) : const Color(0xFF60A5FA));
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.hub_rounded, color: statusColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ĐỘT PHÁ 3: BLE MESH RELAY',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'STORE & FORWARD',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Mạng Cứu Hộ Dã Chiến Khi Mất Sóng 4G',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    activePacket != null
+                        ? 'Trạng thái: ${activePacket.formattedStatusVi}'
+                        : 'Trạng thái: Sẵn sàng phát sóng Mesh',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'Hop Count: ${activePacket?.hopCount ?? 0}  •  Peers: ${mesh.discoveredPeers.length}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Giải pháp cứu nạn khi mất hoàn toàn Internet/4G (Kẹt hầm B2-B4, sạt lở): Gói tin cứu hộ nhảy cóc qua Bluetooth của người đi đường (Store) và tự động tải lên Web Admin khi chạm vùng có 4G (Forward).',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          // Interactive Simulation Buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAdaptiveButton(
+                label: '🏢 Kẹt Hầm B2 Mất 4G (Phát Broadcast)',
+                color: const Color(0xFFEF4444),
+                onTap: () async {
+                  await mesh.simulateBasementEntrapmentSos();
+                  _addLog(
+                    tag: 'BLE_MESH_ORIGIN',
+                    message: 'Mô phỏng: Nạn nhân kẹt hầm B2 mất 4G -> Phát gói tin cứu hộ BLE Mesh (TTL=5, PDR=-6.4m).',
+                    type: SandboxLogType.danger,
+                  );
+                  if (!mounted) return;
+                  TopToast.show(context, message: 'Đã phát gói tin BLE Mesh từ Hầm B2!');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🚶 Người Đi Đường Nhận Tin -> Mang Lên 4G',
+                color: const Color(0xFFF59E0B),
+                onTap: () async {
+                  await mesh.simulatePeerRelayBridge(peerReaches4g: true);
+                  _addLog(
+                    tag: 'BLE_MESH_RELAY',
+                    message: 'Mô phỏng: Galaxy S23 tiếp nhận gói tin tại hầm B2 -> Đi lên mặt đất có 4G -> Tải lên Web Admin thành công!',
+                    type: SandboxLogType.success,
+                  );
+                  if (!mounted) return;
+                  TopToast.show(context, message: 'Nốt chuyển tiếp đã Uplink thành công lên Web Admin!', icon: Icons.cloud_done_rounded);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '📡 Mở Radar Bản Đồ Dã Chiến (Topology)',
+                color: const Color(0xFF38EF7D),
+                onTap: () {
+                  BleMeshRadarSheet.show(context);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🔄 Khôi Phục Mạng Mesh',
+                color: const Color(0xFF94A3B8),
+                onTap: () {
+                  mesh.resetMeshDemo();
+                  _addLog(
+                    tag: 'BLE_MESH_RESET',
+                    message: 'Đã khôi phục trạng thái mạng lưới dã chiến Mesh.',
+                    type: SandboxLogType.info,
+                  );
+                  TopToast.show(context, message: 'Đã xóa bộ đệm Mesh');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSleepApneaCard() {
+    final apnea = SleepApneaHapticService.instance;
+    final currentSpo2 = apnea.currentSpo2;
+    Color statusColor;
+    String tierTitle;
+    switch (apnea.currentTier) {
+      case ApneaInterventionTier.normal:
+        statusColor = const Color(0xFF38EF7D);
+        tierTitle = 'Tầng 0: Ổn Định (SpO2 ≥ 95%)';
+        break;
+      case ApneaInterventionTier.tier1HapticArousal:
+        statusColor = const Color(0xFFF59E0B);
+        tierTitle = 'Tầng 1: Xung Rung Haptic Kích Thích Thở';
+        break;
+      case ApneaInterventionTier.tier2AcousticReposition:
+        statusColor = const Color(0xFFF97316);
+        tierTitle = 'Tầng 2: Chuông Âm Học Đổi Tư Thế Ngủ';
+        break;
+      case ApneaInterventionTier.tier3EmergencySos:
+        statusColor = const Color(0xFFEF4444);
+        tierTitle = 'Tầng 3: Báo Động Đỏ SOS Suy Hô Hấp Cấp';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: statusColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.bedtime_rounded, color: statusColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ĐỘT PHÁ 4: SLEEP APNEA & HAPTIC',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'SpO2: $currentSpo2%',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Phát Hiện Ngưng Thở & Xung Rung Thức Tỉnh',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    tierTitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'ODI: ${apnea.odiScore}  •  Cứu Hồi: ${apnea.successfulHapticRecoveries}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Chống đột quỵ trong giấc ngủ (Wake-up Stroke) và đột tử do ngưng thở (OSA): Khi SpO2 tụt <88% quá 15s, đồng hồ tự động phóng chuỗi xung rung Haptic tần số biến thiên kích hoạt trung khu hô hấp mà không làm gián đoạn sâu giấc ngủ.',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          // Interactive Simulation Buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAdaptiveButton(
+                label: '🫁 Ngưng Thở OSA 84% (Xung Rung Haptic)',
+                color: const Color(0xFFF59E0B),
+                onTap: () {
+                  apnea.simulateNocturnalApneaEvent(dropSpo2: 84, durationSec: 18, autoRecover: true);
+                  _addLog(
+                    tag: 'SLEEP_APNEA',
+                    message: 'Mô phỏng: Ngưng thở khi ngủ tắc nghẽn (SpO2 tụt 84% > 15s) -> Kích hoạt Tầng 1: Xung rung Haptic thức tỉnh trung khu thần kinh hô hấp.',
+                    type: SandboxLogType.warning,
+                  );
+                  TopToast.show(context, message: 'Đã kích hoạt ngưng thở OSA: Xung rung Haptic đang phát!');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🚨 Suy Hô Hấp Kịch Phát 76% (SOS Cấp Cứu)',
+                color: const Color(0xFFEF4444),
+                onTap: () {
+                  apnea.simulateSevereHypoxemicCrisis();
+                  _addLog(
+                    tag: 'HYPOXIA_CRITICAL',
+                    message: 'BÁO ĐỘNG ĐỎ SUY HÔ HẤP: SpO2 tụt nguy kịch 76% kéo dài > 60s -> Leo thang Tầng 3: Báo động SOS, gửi Hộp đen & SMS người thân.',
+                    type: SandboxLogType.danger,
+                  );
+                  TopToast.show(context, message: 'Báo động Tầng 3: Suy hô hấp nặng (SpO2 76%)!', icon: Icons.crisis_alert_rounded);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '📊 Mở Bảng Đo Lường Giấc Ngủ (Tachogram)',
+                color: const Color(0xFF818CF8),
+                onTap: () {
+                  SleepApneaMonitorCard.showDetailsModal(context);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '✅ Khôi Phục Giấc Ngủ Bình Thường (98%)',
+                color: const Color(0xFF38EF7D),
+                onTap: () {
+                  apnea.resetNightSession();
+                  _addLog(
+                    tag: 'SLEEP_NORMAL',
+                    message: 'Khôi phục giấc ngủ sinh học: SpO2 98%, HR 68 bpm, ODI < 5.0 (An toàn).',
+                    type: SandboxLogType.success,
+                  );
+                  TopToast.show(context, message: 'Đã khôi phục giấc ngủ bình thường (SpO2 98%)');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGhostModeCard() {
+    final ghost = GhostModeService.instance;
+    final isActive = ghost.isGhostModeActive;
+    final color = isActive ? const Color(0xFFEF4444) : const Color(0xFFA78BFA);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131D35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.visibility_off_rounded, color: color, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'ĐỘT PHÁ 5: GHOST BREADCRUMBS',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.8,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isActive ? 'COVERT ACTIVE' : 'STANDBY',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Vết Tích Trinh Sát & Hộp Đen Âm Thanh',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    isActive
+                        ? 'Đang ngầm theo dõi: ${ghost.ghostDurationFormatted}'
+                        : 'Sẵn sàng kích hoạt bí mật qua Duress PIN (9111)',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  'Hộp đen: ${ghost.totalEvidenceUploadedCount}  •  Tốc độ: ${ghost.currentSpeedKmh.toStringAsFixed(1)}km/h',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Bảo vệ nạn nhân trong tình huống bị bắt cóc/cưỡng bức: Nhập Duress PIN (9111), màn hình giữ nguyên máy tính vô hại (Decoy), ngầm ghi âm 15s định kỳ đẩy lên Web Admin và thu thập vệt vết tích lộ trình di chuyển (Breadcrumbs).',
+            style: TextStyle(fontSize: 11.5, color: Color(0xFFCBD5E1), height: 1.35),
+          ),
+          const SizedBox(height: 12),
+          // Interactive Simulation Buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildAdaptiveButton(
+                label: '🕵️ Kích Hoạt Ghost Mode (Duress PIN)',
+                color: const Color(0xFFEF4444),
+                onTap: () async {
+                  await ghost.startGhostMode(triggerSource: 'DURESS_PIN');
+                  _addLog(
+                    tag: 'GHOST_DURESS',
+                    message: 'Mô phỏng: Nạn nhân bị ép buộc nhập Duress PIN (9111) -> Kích hoạt Ghost Mode ngầm, bắt đầu vòng lặp Audio Blackbox 15s & PDR Tracking.',
+                    type: SandboxLogType.danger,
+                  );
+                  if (!mounted) return;
+                  TopToast.show(context, message: 'Đã kích hoạt Ghost Mode ngầm!');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🚗 Mô Phỏng Bị Ép Buộc (6 Trạm Q.1)',
+                color: const Color(0xFFF59E0B),
+                onTap: () {
+                  ghost.simulateKidnapMovementRoute();
+                  _addLog(
+                    tag: 'GHOST_ROUTE',
+                    message: 'Mô phỏng lộ trình ép buộc: Nguyễn Du -> Nam Kỳ Khởi Nghĩa (24km/h) -> Lê Duẩn (42km/h) -> Pasteur -> Hầm Vincom B2 (-6.4m).',
+                    type: SandboxLogType.warning,
+                  );
+                  TopToast.show(context, message: 'Đã cập nhật vệt vết tích 6 trạm trung tâm Q.1!');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '🗺️ Mở Bản Đồ Vết Tích Trinh Sát (Radar)',
+                color: const Color(0xFFA78BFA),
+                onTap: () {
+                  GhostBreadcrumbsSheet.show(context);
+                },
+              ),
+              _buildAdaptiveButton(
+                label: ghost.isDecoyVaultShown
+                    ? '🔒 Đóng Két Sắt Giả (Decoy Vault)'
+                    : '🛡️ Trình Diễn Két Sắt Giả (Decoy Vault)',
+                color: const Color(0xFF38EF7D),
+                onTap: () {
+                  ghost.toggleDecoyVault(!ghost.isDecoyVaultShown);
+                  _addLog(
+                    tag: 'DECOY_VAULT',
+                    message: 'Két sắt ngụy trang: Bung hồ sơ y tế giả lập để đối phó nếu bị ép mở điện thoại.',
+                    type: SandboxLogType.info,
+                  );
+                  TopToast.show(context, message: 'Đã chuyển đổi trạng thái Két Sắt Ngụy Trang');
+                },
+              ),
+              _buildAdaptiveButton(
+                label: '✅ Tắt Chế Độ Bóng Ma',
+                color: const Color(0xFF60A5FA),
+                onTap: () {
+                  ghost.stopGhostMode();
+                  _addLog(
+                    tag: 'GHOST_STOP',
+                    message: 'Đã tắt Chế độ Bóng ma, lưu trữ an toàn vết tích.',
+                    type: SandboxLogType.success,
+                  );
+                  TopToast.show(context, message: 'Đã tắt Chế độ Bóng ma');
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1159,6 +2186,25 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
             label: const Text('CHỤP BẰNG CHỨNG'),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF8B5CF6),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // CÔNG CỤ 5: ĐIỀU PHỐI CẢNH BÁO ĐA KÊNH (OMNICHANNEL ENGINE)
+        _buildToolTile(
+          icon: Icons.cell_tower_rounded,
+          color: const Color(0xFF38BDF8),
+          title: 'Hạ Tầng Điều Phối Cảnh Báo Đa Kênh (Omnichannel)',
+          subtitle:
+              'Phát cảnh báo đồng thời qua 4 kênh: Telegram Bot, Zalo ZNS, GSM SMS và Voice Call TTS Cấp 4.',
+          actionButton: ElevatedButton.icon(
+            onPressed: () => OmnichannelGuardianSheet.show(context),
+            icon: const Icon(Icons.rocket_launch_rounded, size: 16),
+            label: const Text('MỞ BẢNG ĐIỀU KHIỂN ĐA KÊNH'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0284C7),
               foregroundColor: Colors.white,
             ),
           ),

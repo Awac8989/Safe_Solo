@@ -683,6 +683,11 @@ class _ThreadDetailPageState extends State<_ThreadDetailPage> {
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(context),
+                  style: TextStyle(
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                    fontSize: 14,
+                  ),
+                  cursorColor: isDark ? AppDarkColors.primary : AppColors.primary,
                   decoration: InputDecoration(
                     hintText: strings.text('Nhập tin nhắn phản hồi...', 'Type a reply...'),
                     filled: true,

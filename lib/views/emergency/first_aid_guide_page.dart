@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/cpr_metronome_service.dart';
+import 'fast_ai_assessment_dialog.dart';
 
 class FirstAidGuidePage extends StatefulWidget {
   const FirstAidGuidePage({super.key});
@@ -212,6 +213,23 @@ class _FirstAidGuidePageState extends State<FirstAidGuidePage> with SingleTicker
         _fastCard('A - Arms (Tay & Chân)', 'Yếu hoặc liệt một bên chi. Yêu cầu giơ 2 tay lên: một bên tay có bị rơi xuống hoặc không nâng lên được không?'),
         _fastCard('S - Speech (Giọng nói)', 'Nói ngọng, líu lưỡi hoặc không nói được từ đơn giản. Yêu cầu nhắc lại một câu ngắn: giọng có bị biến đổi không?'),
         _fastCard('T - Time (Thời gian)', 'Nếu có BẤT KỲ dấu hiệu nào trên, gọi ngay 115 và đưa nạn nhân tới bệnh viện có khoa đột quỵ gần nhất!'),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(
+          onPressed: () => FastAiAssessmentDialog.show(context),
+          icon: const Icon(Icons.psychology_alt_rounded, size: 22),
+          label: const Text(
+            '🚀 MỞ CÔNG CỤ TẦM SOÁT F.A.S.T AI (VISION & SPEECH)',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
       ],
     );
   }

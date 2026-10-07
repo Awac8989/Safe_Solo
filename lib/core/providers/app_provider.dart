@@ -35,6 +35,7 @@ import '../../services/tflite_ai_engine.dart';
 import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
+import '../../services/stroke_defense_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
 import '../../views/emergency/watch_accident_alert_dialog.dart';
@@ -867,6 +868,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   int? _stepBaseline;
   String? _stepBaselineDayKey;
   int? _lastRawStepCount;
+  AdaptiveRiskLevel? _simulatedAdaptiveRiskLevel;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -888,6 +890,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _watchAlertSubscription?.cancel();
+    _connectivitySubscription?.cancel();
     _stopRuntimeAutomation();
     super.dispose();
   }
@@ -1016,6 +1019,87 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   List<CirclePost> postsFor(CircleScope scope) =>
       _circlePosts.where((post) => post.scope == scope).toList();
+
+  /// =========================================================================
+  /// TÍNH NĂNG ĐỘT PHÁ 1: DYNAMIC RISK-ADAPTIVE DEADMAN STATE
+  /// Đánh giá rủi ro đa nguồn (Khiên đêm, PPG Watch 5, GPS, Cảm biến ngã, BMAI)
+  /// =========================================================================
+  AdaptiveDeadManResult get adaptiveDeadManState {
+    if (_simulatedAdaptiveRiskLevel != null) {
+      final now = DateTime.now();
+      final lastCheckin = _user?.lastCheckinTime ?? now;
+      int mins = 720;
+      List<String> simReasons = [];
+      double score = 0.0;
+      switch (_simulatedAdaptiveRiskLevel!) {
+        case AdaptiveRiskLevel.relaxed:
+          mins = 960;
+          simReasons = ['Mô phỏng: Khiên Đêm ngủ say & sạc pin tại nhà (+4h)'];
+          score = 0.05;
+          break;
+        case AdaptiveRiskLevel.normal:
+          mins = 720;
+          simReasons = ['Mô phỏng: Hoạt động ban ngày tiêu chuẩn'];
+          score = 0.15;
+          break;
+        case AdaptiveRiskLevel.elevated:
+          mins = 120;
+          simReasons = ['Mô phỏng: Ra ngoài ban đêm sau 23h & pin yếu'];
+          score = 0.45;
+          break;
+        case AdaptiveRiskLevel.highThreat:
+          mins = 30;
+          simReasons = ['Mô phỏng: Nhịp tim vọt 135 BPM & BMAI bất đối xứng'];
+          score = 0.85;
+          break;
+      }
+      return AdaptiveDeadManResult(
+        level: _simulatedAdaptiveRiskLevel!,
+        recommendedIntervalMinutes: mins,
+        reasons: simReasons,
+        threatScore: score,
+        adaptedDeadline: lastCheckin.add(Duration(minutes: mins)),
+      );
+    }
+
+    final current = _user;
+    final lastCheckin = current?.lastCheckinTime ?? DateTime.now();
+    final baseInterval = current?.timerIntervalMinutes ?? 720;
+    final heartRate = WearOsService.instance.heartRate;
+    final battery = WearOsService.instance.battery > 0 ? WearOsService.instance.battery : 85;
+    final bmai = StrokeDefenseService.instance.deltaM;
+    final currentHour = DateTime.now().hour;
+    final isHome = _homeAnchor != null && !_wasOutsideHome;
+
+    return TfLiteAiEngine.instance.evaluateDynamicRiskState(
+      isNightShieldActive: _isNightShieldActive,
+      isHomeWifiOrAnchor: isHome,
+      currentHour: currentHour,
+      heartRate: heartRate,
+      batteryLevel: battery,
+      bmaiScore: bmai,
+      hasRecentFallSignal: _lastFallSignalAt != null && DateTime.now().difference(_lastFallSignalAt!).inMinutes < 15,
+      baseIntervalMinutes: baseInterval,
+      lastCheckinTime: lastCheckin,
+    );
+  }
+
+  /// Mốc hạn tiếp theo có áp dụng rủi ro thích ứng (tự co ngắn khi nguy cơ cao)
+  DateTime get effectiveNextDeadline {
+    final state = adaptiveDeadManState;
+    if (state.level == AdaptiveRiskLevel.highThreat ||
+        state.level == AdaptiveRiskLevel.elevated ||
+        state.level == AdaptiveRiskLevel.relaxed) {
+      return state.adaptedDeadline;
+    }
+    return _user?.nextDeadline ?? state.adaptedDeadline;
+  }
+
+  void simulateAdaptiveThreatLevel(AdaptiveRiskLevel? level) {
+    _simulatedAdaptiveRiskLevel = level;
+    notifyListeners();
+    unawaited(_saveToStorage());
+  }
 
   ChatThread? threadById(String threadId) {
     return _chatThreads.where((thread) => thread.id == threadId).firstOrNull;
@@ -1217,7 +1301,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _persistBackgroundSafetyConfig();
 
     if (_user != null) {
-      final nextDeadline = _user!.nextDeadline ?? DateTime.now().add(Duration(minutes: _user!.timerIntervalMinutes));
+      final nextDeadline = effectiveNextDeadline;
       final diff = nextDeadline.difference(DateTime.now());
       final isOkay = !diff.isNegative;
       final diffStr = diff.isNegative ? 'Quá hạn' : '${diff.inHours}h ${(diff.inMinutes % 60).toString().padLeft(2, '0')}m';
@@ -1225,6 +1309,12 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       unawaited(WidgetService.updateWidgetStatus(
         isOkay: isOkay,
         timeRemaining: diffStr,
+        statusBadge: '● ${adaptiveDeadManState.labelVi}',
+        heartRate: WearOsService.instance.heartRate > 0 ? WearOsService.instance.heartRate : null,
+        steps: stepsToday > 0 ? stepsToday : null,
+        batteryLevel: WearOsService.instance.battery > 0 ? WearOsService.instance.battery : null,
+        isVacation: isVacation,
+        isNightShield: _isNightShieldActive,
       ));
     }
   }
@@ -2556,25 +2646,32 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> setSecurity(Security security) async {
     final current = _user;
     _security = security;
+    _updateBadges();
+    await _saveToStorage();
+    notifyListeners();
+
     if (current != null) {
-      await _runBusy(() async {
+      try {
         final remote = await _api.updateSecuritySettings(
           userId: current.id,
           stealthMode: security.stealthMode,
           autoWipeDays: security.autoWipeDays,
           encryptionEnabled: security.encryptionEnabled,
         );
-        _security = _mergeSecuritySettings(security, remote);
+        _security = Security(
+          realPin: security.realPin,
+          duressPin: security.duressPin,
+          stealthMode: security.stealthMode,
+          autoWipeDays: remote.autoWipeDays,
+          encryptionEnabled: remote.encryptionEnabled,
+        );
         _updateBadges();
-        await _evaluateSafetyAutomation();
         await _saveToStorage();
-      });
-      return;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[AppProvider.setSecurity] Sync remote failed, saved locally: $e');
+      }
     }
-    _updateBadges();
-    await _evaluateSafetyAutomation();
-    await _saveToStorage();
-    notifyListeners();
   }
 
   Future<void> saveVaultEntry({
@@ -2895,6 +2992,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         currentStatus: 'SAFE',
       );
     }
+    _simulatedAdaptiveRiskLevel = null;
     WearOsService.instance.cancelEmergency();
     WearOsService.instance.resetVitals();
     notifyListeners();
@@ -2922,6 +3020,76 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     }
     notifyListeners();
     unawaited(_saveToStorage());
+  }
+
+  Future<void> triggerEmergencyIncident({
+    String incidentType = 'FALL_DETECTED_P1',
+    String? details,
+    int severity = 2,
+    String severityLevel = 'P1_CRITICAL',
+  }) async {
+    final current = _user;
+    if (current != null) {
+      _user = current.copyWith(currentStatus: 'ALERT_TRIGGERED');
+      notifyListeners();
+      unawaited(_saveToStorage());
+    }
+
+    try {
+      final position = await _locationService.getBestEffortLocation(
+        fallbackLat: current?.lastKnownLocation?.lat,
+        fallbackLng: current?.lastKnownLocation?.lng,
+      );
+
+      if (current != null) {
+        await _api.createInteraction(
+          userId: current.id,
+          type: 'EMERGENCY_SOS',
+          source: 'INCIDENT_VERIFICATION_TIMEOUT',
+          metadata: {
+            'incidentType': incidentType,
+            'details': details,
+            'lat': position.lat,
+            'lng': position.lng,
+            'severity': severity,
+            'severityLevel': severityLevel,
+            'triggeredAt': DateTime.now().toIso8601String(),
+          },
+        );
+
+        await _api.broadcastRadarSOS(
+          incidentType: incidentType,
+          lat: position.lat,
+          lng: position.lng,
+          userId: current.id,
+          severity: severity,
+          severityLevel: severityLevel,
+          approxAddress: null,
+          medicalNotes: details,
+        );
+
+        unawaited(
+          BlackboxService.instance.captureAndUploadEvidence(
+            userId: current.id,
+            triggerSource: incidentType,
+            position: Position(
+              latitude: position.lat,
+              longitude: position.lng,
+              timestamp: DateTime.now(),
+              accuracy: 10,
+              altitude: 0,
+              heading: 0,
+              speed: 0,
+              speedAccuracy: 0,
+              altitudeAccuracy: 0,
+              headingAccuracy: 0,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('[AppProvider] triggerEmergencyIncident error: $e');
+    }
   }
 
   Future<void> triggerSilentSos() async {
@@ -3460,7 +3628,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
               thread = thread.copyWith(messages: parsedMessages);
             }
           } catch (e) {
-            print('Error fetching family messages: $e');
+            debugPrint('Error fetching family messages: $e');
           }
 
           _chatThreads[familyIndex] = thread.copyWith(id: roomId);
@@ -3469,7 +3637,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         ChatService.instance.joinRoom(roomId);
       }
     } catch (e) {
-      print('Error syncing family room: $e');
+      debugPrint('Error syncing family room: $e');
     }
   }
 

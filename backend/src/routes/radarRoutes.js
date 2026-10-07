@@ -17,4 +17,9 @@ router.post('/:incidentId/accept', radarController.acceptIncident);
 router.get('/:incidentId', radarController.getIncidentDetails);
 router.put('/:incidentId/resolve', radarController.resolveIncident);
 
+// Telemetry, First Aid and 115 Handoff routes
+router.post('/:incidentId/telemetry', radarController.updateTelemetry);
+router.post('/:incidentId/first-aid', radarController.recordFirstAid);
+router.post('/:incidentId/handoff', radarController.handoffToMedical);
+
 module.exports = router;

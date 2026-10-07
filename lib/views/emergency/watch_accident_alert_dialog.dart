@@ -134,9 +134,14 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
   /// Tự động leo thang cấp cứu khi hết 30s mà không có phản hồi (nạn nhân bất tỉnh)
   void _handleAutoEscalate() {
     if (!mounted) return;
-    context
-        .read<AppProvider>()
-        .simulateEmergencyStatus(status: 'ALERT_TRIGGERED');
+    unawaited(
+      context.read<AppProvider>().triggerEmergencyIncident(
+        incidentType: 'WATCH_ACCIDENT_AUTO_P1',
+        details: widget.title,
+        severity: 2,
+        severityLevel: 'P1_CRITICAL',
+      ),
+    );
     final rootContext = AppConstants.navigatorKey.currentContext ?? context;
     Navigator.of(context, rootNavigator: true).pop(true);
     if (rootContext.mounted) {
@@ -183,9 +188,14 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
   /// Người dùng bấm "CẤP CỨU SOS NGAY" -> Bỏ qua đếm ngược và phát lệnh cứu hộ
   void _handleTriggerSosNow() {
     _countdownTimer?.cancel();
-    context
-        .read<AppProvider>()
-        .simulateEmergencyStatus(status: 'ALERT_TRIGGERED');
+    unawaited(
+      context.read<AppProvider>().triggerEmergencyIncident(
+        incidentType: 'WATCH_USER_FORCE_SOS',
+        details: widget.title,
+        severity: 2,
+        severityLevel: 'P1_CRITICAL',
+      ),
+    );
 
     // Bắn tín hiệu SOS lập tức lên hệ thống (bảo đảm an toàn ngay cả khi offline)
     try {

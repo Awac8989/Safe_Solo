@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
+import 'omnichannel_guardian_sheet.dart';
 
 class NetworkPage extends StatelessWidget {
   const NetworkPage({super.key});
@@ -69,6 +70,75 @@ class NetworkPage extends StatelessWidget {
               icon: const Icon(Icons.person_add_alt_1_rounded),
               label: Text(strings.text('Thêm người bảo hộ', 'Add guardian')),
             ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.cell_tower_rounded, color: Color(0xFF38BDF8), size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            strings.text('Hạ tầng Cảnh báo Đa kênh', 'Omnichannel Alert Engine'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          const Text(
+                            'Telegram Bot • Zalo ZNS • GSM SMS • Voice Call',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  strings.text(
+                    'Tự động leo thang qua 4 kênh độc lập khi phát hiện té ngã, đột quỵ, hoặc hết hạn DeadMan.',
+                    'Automated escalation across 4 independent channels on fall, stroke, or DeadMan timeout.',
+                  ),
+                  style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11.5, height: 1.3),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => OmnichannelGuardianSheet.show(context),
+                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    label: Text(
+                      strings.text('Kiểm tra & Bắn thử nghiệm Đa kênh', 'Inspect & Test Omnichannel'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
