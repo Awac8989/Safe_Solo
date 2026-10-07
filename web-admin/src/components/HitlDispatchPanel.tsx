@@ -123,20 +123,20 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
       {/* 1. Header Bar: HITL Status & Priority */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400">
-            <ShieldAlert className="h-4 w-4 animate-pulse" />
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+            <Brain className="h-4 w-4 animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
-                Điều phối Bán Tự Động (HITL)
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                ĐIỀU PHỐI TỰ ĐỘNG KHÔNG CHẠM (ZERO-TOUCH)
               </span>
               <span className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-400">
-                <UserCheck className="h-3 w-3" /> Con người giám sát
+                <ShieldCheck className="h-3 w-3" /> Auto-Dispatch Engine
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Tự động hóa phản ứng nhanh · Chốt an toàn ngăn chặn báo động giả
+              Tự động chấm điểm, mở rộng bán kính và điều 115 theo cấu trúc 3 Vòng.
             </p>
           </div>
         </div>
@@ -155,21 +155,23 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         </div>
       </div>
 
-      {/* 2. Grace Period Countdown Gauge Bar */}
+      {/* 2. Auto-Dispatch Ring Expansion Countdown */}
       <div className="rounded-xl border border-border/80 bg-background/80 p-3.5 backdrop-blur">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className={`h-4 w-4 ${isCountdownActive ? "animate-spin text-rose-500" : "text-muted-foreground"}`} />
+            <Clock className={`h-4 w-4 ${isCountdownActive ? "animate-spin text-emerald-500" : "text-muted-foreground"}`} />
             <span className="text-xs font-semibold">
               {isCancelled ? (
                 <span className="text-amber-400">ĐÃ HỦY · Báo động giả</span>
-              ) : isDispatched ? (
-                <span className="text-emerald-400">ĐÃ KÍCH HOẠT ĐIỀU PHỐI CỨU HỘ</span>
+              ) : currentState === "DISPATCHED" ? (
+                <span className="text-emerald-400">VÒNG 2 ĐÃ KÍCH HOẠT (Bán kính 4.5km)</span>
+              ) : currentState === "AMBULANCE_DISPATCHED" ? (
+                <span className="text-rose-400">ĐÃ KẾT NỐI XE CẤP CỨU 115</span>
               ) : isPaused ? (
                 <span className="text-amber-400">ĐÃ TẠM DỪNG BỞI NGƯỜI GIÁM SÁT</span>
               ) : (
                 <span>
-                  Tự động điều phối sau: <strong className="text-sm font-extrabold text-rose-500">{timeLeft}s</strong>
+                  Đang quét Vòng 1 (1.2km). Tự động mở Vòng 2 sau: <strong className="text-sm font-extrabold text-emerald-500">{timeLeft}s</strong>
                 </span>
               )}
             </span>
@@ -177,8 +179,8 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
 
           <div className="flex items-center gap-2">
             {isCountdownActive && (
-              <span className="inline-flex items-center gap-1 rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-400 animate-pulse">
-                ĐANG CHẠY
+              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 animate-pulse">
+                AUTO-PILOT ĐANG CHẠY
               </span>
             )}
             {hitl?.supervisorAction && (
@@ -190,13 +192,13 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         </div>
 
         {/* Dynamic Progress Bar */}
-        {!isCancelled && !isDispatched && (
+        {!isCancelled && currentState !== "AMBULANCE_DISPATCHED" && (
           <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-secondary/50 p-0.5">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
                 timeLeft <= 10
-                  ? "bg-gradient-to-r from-rose-600 via-rose-500 to-amber-500 animate-pulse"
-                  : "bg-gradient-to-r from-amber-500 via-emerald-400 to-sky-400"
+                  ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-sky-500 animate-pulse"
+                  : "bg-gradient-to-r from-sky-500 via-indigo-400 to-purple-400"
               }`}
               style={{ width: `${progressPercentage}%` }}
             />
@@ -231,27 +233,27 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
         />
       </div>
 
-      {/* 4. 3-Tier Security Gates Matrix */}
+      {/* 4. 3-Ring Dispatch Matrix */}
       <div className="rounded-xl border border-border/80 bg-background/60 p-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Phân tầng Quyền hạn & Bảo mật (3-Tier Security Gates)
+            Tiến trình Điều phối 3 Vòng Tự động (Zero-Blind-Spots)
           </span>
-          <span className="text-[10px] font-mono text-muted-foreground">Chuẩn ISO 27001 & HITL</span>
+          <span className="text-[10px] font-mono text-muted-foreground">Theo chuẩn SafeSolo</span>
         </div>
         <div className="grid gap-2 sm:grid-cols-3 text-center text-xs">
-          {/* Tier 1 */}
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-left">
+          {/* Ring 1 */}
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-2 text-left">
             <div className="flex items-center justify-between">
-              <span className="font-bold text-emerald-400 text-[11px]">Tier 1 · Tự động 100%</span>
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="font-bold text-sky-400 text-[11px]">Vòng 1 (1.2km) · T+15s</span>
+              <CheckCircle2 className="h-3.5 w-3.5 text-sky-400" />
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Ghi log SHA-256, ping vị trí GPS mờ hóa & gửi tin người thân đã ủy quyền.
+              Gửi Push Báo động đỏ cho Top Hiệp sĩ &lt; 1.2km. Đang chờ xác nhận Atomic Lock.
             </p>
           </div>
 
-          {/* Tier 2 */}
+          {/* Ring 2 */}
           <div className={`rounded-lg border p-2 text-left ${
             isDispatched
               ? "border-emerald-500/30 bg-emerald-500/10"
@@ -261,27 +263,29 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           }`}>
             <div className="flex items-center justify-between">
               <span className={`font-bold text-[11px] ${isDispatched ? "text-emerald-400" : "text-amber-400"}`}>
-                Tier 2 · Bán Tự Động
+                Vòng 2 (4.5km) · T+45s
               </span>
               <ShieldCheck className={`h-3.5 w-3.5 ${isDispatched ? "text-emerald-400" : "text-amber-400"}`} />
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Điều phối 2-3 Hiệp sĩ SafeSolo lân cận (Kích hoạt sau 30s nếu không bị hủy).
+              Dãn bán kính lên 4.5km do Vòng 1 không có người nhận. Phát tín hiệu toàn trạm.
             </p>
           </div>
 
-          {/* Tier 3 */}
+          {/* Escalate 115 */}
           <div className={`rounded-lg border p-2 text-left ${
             currentState === "AMBULANCE_DISPATCHED"
-              ? "border-emerald-500/30 bg-emerald-500/10"
-              : "border-rose-500/30 bg-rose-500/10"
+              ? "border-rose-500/30 bg-rose-500/10"
+              : "border-border bg-muted/20"
           }`}>
             <div className="flex items-center justify-between">
-              <span className="font-bold text-rose-400 text-[11px]">Tier 3 · Chốt Nghiêm Ngặt</span>
-              <Lock className="h-3.5 w-3.5 text-rose-400" />
+              <span className={`font-bold text-[11px] ${currentState === "AMBULANCE_DISPATCHED" ? "text-rose-400" : "text-muted-foreground"}`}>
+                Cấp cứu 115 · T+105s
+              </span>
+              <Ambulance className={`h-3.5 w-3.5 ${currentState === "AMBULANCE_DISPATCHED" ? "text-rose-400" : "text-muted-foreground"}`} />
             </div>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Gọi Cấp cứu 115 / Công an 113. Bắt buộc Điều phối viên ký xác nhận. Cấm AI tự ý gọi.
+              Không có hiệp sĩ phản hồi. Chuyển giao hệ thống Cấp cứu 115 & Cảnh báo người thân.
             </p>
           </div>
         </div>
@@ -354,7 +358,7 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           </button>
         )}
 
-        {/* Nút Duyệt Ngay (Bypass Countdown) */}
+        {/* Nút Force Ring 2 */}
         {!isDispatched && !isCancelled && (
           <button
             onClick={() =>
@@ -367,7 +371,7 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
             disabled={isPending}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-emerald-500 disabled:opacity-50"
           >
-            <CheckCircle2 className="h-4 w-4" /> DUYỆT ĐIỀU PHỐI NGAY
+            <ShieldCheck className="h-4 w-4" /> ÉP MỞ RỘNG VÒNG 2 NGAY
           </button>
         )}
 
