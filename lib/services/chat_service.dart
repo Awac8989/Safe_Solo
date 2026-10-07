@@ -15,6 +15,15 @@ class ChatService {
 
   final List<Function(Map<String, dynamic>)> _messageListeners = [];
   final List<Function(Map<String, dynamic>)> _momentListeners = [];
+  final List<Function(String, Map<String, dynamic>)> _radarListeners = [];
+
+  void addRadarListener(Function(String eventName, Map<String, dynamic> payload) listener) {
+    _radarListeners.add(listener);
+  }
+
+  void removeRadarListener(Function(String eventName, Map<String, dynamic> payload) listener) {
+    _radarListeners.remove(listener);
+  }
 
   void addMomentListener(Function(Map<String, dynamic>) listener) {
     _momentListeners.add(listener);
@@ -78,6 +87,31 @@ class ChatService {
         listener(data);
       }
     });
+
+    // Real-time Business Logic Events
+    final radarEvents = [
+      'HERO_DISPATCH_REQUEST',
+      'HERO_MISSION_CANCELLED_TIMEOUT',
+      'HERO_REASSIGNED',
+      'INCIDENT_RING_EXPANDED',
+      'INCIDENT_ESCALATED_115',
+      'RADAR_INCIDENT_CREATED',
+      'RADAR_INCIDENT_RESOLVED',
+      'HERO_ACCEPTED',
+      'HERO_LOCATION_UPDATE',
+      'FIRST_AID_RECORDED',
+      'INCIDENT_HANDED_OVER',
+      'HERO_ARRIVED',
+      'DEVICE_SIGNAL_UPDATE'
+    ];
+
+    for (final event in radarEvents) {
+      _socket!.on(event, (data) {
+        for (final listener in _radarListeners) {
+          listener(event, data ?? {});
+        }
+      });
+    }
 
     _socket!.connect();
   }

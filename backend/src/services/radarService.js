@@ -280,11 +280,17 @@ class RadarService {
     }).lean();
     const busyVolunteerIds = new Set(busyResponses.map((r) => r.volunteerId));
 
+    // Bounding box pre-filtering để tối ưu hiệu năng DB, tránh quét toàn bộ collection
+    const latDelta = radiusKm / 111.0;
+    const lngDelta = radiusKm / (111.0 * Math.cos(lat * (Math.PI / 180)));
+
     const users = await User.find({
       _id: { $ne: excludeUserId, $nin: Array.from(busyVolunteerIds) },
       isActive: { $ne: false },
       isKycVerified: true,
       lastKnownLocation: { $ne: null },
+      'lastKnownLocation.lat': { $gte: lat - latDelta, $lte: lat + latDelta },
+      'lastKnownLocation.lng': { $gte: lng - lngDelta, $lte: lng + lngDelta },
     }).lean();
 
     return users
@@ -328,9 +334,14 @@ class RadarService {
       'ON_SCENE',
     ];
 
+    const latDelta = radiusKm / 111.0;
+    const lngDelta = radiusKm / (111.0 * Math.cos(volunteerLat * (Math.PI / 180)));
+
     const incidents = await RescueIncident.find({
       status: { $in: activeStatuses },
       victimId: { $ne: volunteerId },
+      fuzzedLat: { $gte: volunteerLat - latDelta, $lte: volunteerLat + latDelta },
+      fuzzedLng: { $gte: volunteerLng - lngDelta, $lte: volunteerLng + lngDelta },
     })
       .sort({ createdAt: -1 })
       .lean();

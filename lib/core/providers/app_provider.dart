@@ -1184,6 +1184,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         if (_authToken != null) {
           ChatService.instance.connect(_authToken!);
           ChatService.instance.addMessageListener(_onChatMessageReceived);
+          ChatService.instance.addRadarListener(_onRadarEventReceived);
           _syncFamilyRoom();
         }
         _vaultEntries = (data['vaultEntries'] as List<dynamic>? ?? const [])
@@ -1600,6 +1601,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         if (_authToken != null) {
           ChatService.instance.connect(_authToken!);
           ChatService.instance.addMessageListener(_onChatMessageReceived);
+          ChatService.instance.addRadarListener(_onRadarEventReceived);
           _syncFamilyRoom();
         }
       } else {
@@ -1825,6 +1827,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     _authToken = null;
     ChatService.instance.disconnect();
     ChatService.instance.removeMessageListener(_onChatMessageReceived);
+    ChatService.instance.removeRadarListener(_onRadarEventReceived);
     _lastError = null;
     await _pushNotifications.removeTokenForUser(previousUserId);
     await BackgroundSafetyService.instance.stop();
@@ -3552,6 +3555,20 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     if (_authToken != null) {
       ChatService.instance.sendMessageSocket(threadId, 'TEXT', message);
     }
+  }
+
+  void _onRadarEventReceived(String eventName, Map<String, dynamic> data) {
+    debugPrint('[AppProvider] Real-time Radar Event: $eventName -> $data');
+    if (['HERO_DISPATCH_REQUEST', 'RADAR_INCIDENT_CREATED', 'HERO_REASSIGNED', 'INCIDENT_RING_EXPANDED'].contains(eventName)) {
+      unawaited(refreshDisasterAlerts());
+      _notifications.showNotification(
+        title: 'SafeSolo Điều Phối Khẩn Cấp',
+        body: 'Có sự cố khẩn cấp gần bạn! Vui lòng kiểm tra màn hình để hỗ trợ.',
+      );
+    } else if (['HERO_ACCEPTED', 'HERO_ARRIVED', 'INCIDENT_HANDED_OVER', 'HERO_MISSION_CANCELLED_TIMEOUT', 'FIRST_AID_RECORDED'].contains(eventName)) {
+      unawaited(refreshDisasterAlerts());
+    }
+    notifyListeners();
   }
 
   void _onChatMessageReceived(Map<String, dynamic> data) {

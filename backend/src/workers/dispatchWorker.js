@@ -324,7 +324,7 @@ function startDispatchWorker(_io) {
     return;
   }
 
-  const intervalMs = Number(process.env.DISPATCH_WORKER_INTERVAL_MS || 15000);
+  const intervalMs = Number(process.env.DISPATCH_WORKER_INTERVAL_MS || 3000);
   workerIntervalId = setInterval(processDispatchLifecycle, intervalMs);
   console.log(
     `[DispatchWorker] Autonomous dispatch worker started (interval=${intervalMs}ms)`,
