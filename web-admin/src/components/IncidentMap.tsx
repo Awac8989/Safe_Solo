@@ -76,7 +76,7 @@ export function IncidentMap({
   const heroesQuery = useQuery({
     queryKey: ["hero-radar"],
     queryFn: fetchHeroRadar,
-    refetchInterval: 12000,
+    refetchInterval: 2000,
   });
 
   const safeHavensQuery = useQuery({

@@ -19,6 +19,7 @@ const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
 
 const hitlIncidentStates = new Map();
 const incidentSopStates = new Map();
+const heroSimulations = new Map();
 
 const dangerGeofences = [
   {
@@ -707,6 +708,18 @@ class AdminPortalService {
       actionDescription = `Người giám sát [${supervisorName}] đã XÁC NHẬN CHỮ KÝ ĐIỀU PHỐI XE CẤP CỨU 115 (Tier 3 Gate)`;
     }
 
+    if (nextStatus === 'DISPATCHED') {
+      const overview = await this.getOverview();
+      const incident = overview.incidents.find(i => String(i.id) === String(incidentId));
+      if (incident && incident.location) {
+        heroSimulations.set('hero-01', {
+          active: true,
+          targetLat: incident.location.lat,
+          targetLng: incident.location.lng,
+        });
+      }
+    }
+
     hitlIncidentStates.set(incidentId, {
       state: nextStatus,
       updatedAt: timestamp,
@@ -1088,19 +1101,41 @@ class AdminPortalService {
     ]).map((hero, idx) => {
       const loc = baseLocations[idx % baseLocations.length];
       const status = idx === 0 ? 'AVAILABLE' : idx === 1 ? 'BUSY' : idx === 4 ? 'OFF_DUTY' : 'AVAILABLE';
+      const heroId = String(hero.id || hero._id);
+
+      let currentLat = loc.lat + (Math.sin(idx * 1.5) * 0.003);
+      let currentLng = loc.lng + (Math.cos(idx * 1.5) * 0.003);
+      let isSimulating = false;
+
+      const sim = heroSimulations.get(heroId);
+      if (sim && sim.active) {
+         if (!sim.currentLat) { sim.currentLat = currentLat; sim.currentLng = currentLng; }
+         const distLat = sim.targetLat - sim.currentLat;
+         const distLng = sim.targetLng - sim.currentLng;
+         if (Math.abs(distLat) < 0.0001 && Math.abs(distLng) < 0.0001) {
+             sim.active = false;
+         } else {
+             sim.currentLat += distLat * 0.15;
+             sim.currentLng += distLng * 0.15;
+             isSimulating = true;
+         }
+         currentLat = sim.currentLat;
+         currentLng = sim.currentLng;
+      }
+
       return {
-        id: hero.id || hero._id,
+        id: heroId,
         name: hero.fullName,
         phone: hero.phone || hero.phoneNumber || '0913843958',
         role: 'hero',
-        status,
-        statusLabel: status === 'AVAILABLE' ? 'Sẵn sàng cứu hộ' : status === 'BUSY' ? 'Đang làm nhiệm vụ' : 'Tạm nghỉ',
+        status: isSimulating ? 'BUSY' : status,
+        statusLabel: isSimulating ? 'Đang tiếp cận nạn nhân' : (status === 'AVAILABLE' ? 'Sẵn sàng cứu hộ' : status === 'BUSY' ? 'Đang làm nhiệm vụ' : 'Tạm nghỉ'),
         trustScore: Number(hero.trustScore || 4.8),
         rescuesCount: Number(hero.rescuesCount || 0),
         battery: Math.max(45, 98 - idx * 7),
         location: {
-          lat: loc.lat + (Math.sin(idx * 1.5) * 0.003),
-          lng: loc.lng + (Math.cos(idx * 1.5) * 0.003),
+          lat: currentLat,
+          lng: currentLng,
           district: loc.district,
         },
         equipment: equipmentPresets[idx % equipmentPresets.length],
