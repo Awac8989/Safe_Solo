@@ -36,6 +36,7 @@ import '../../services/wear_os_service.dart';
 import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
 import '../../services/stroke_defense_service.dart';
+import '../../services/offline_sos_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
 import '../../views/emergency/watch_accident_alert_dialog.dart';
@@ -3092,6 +3093,28 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       }
     } catch (e) {
       debugPrint('[AppProvider] triggerEmergencyIncident error: $e');
+      // Tối ưu hóa: Fallback sang SMS khẩn cấp ngoại tuyến khi không có internet / sai wifi
+      try {
+        final position = await _locationService.getBestEffortLocation(
+          fallbackLat: current?.lastKnownLocation?.lat,
+          fallbackLng: current?.lastKnownLocation?.lng,
+        );
+        final contacts = current?.emergencyContacts ?? [];
+        final phoneToUse = contacts.isNotEmpty ? contacts.first.phone : '115';
+        
+        final msg = OfflineSosService.instance.formatEmergencySms(
+          victimName: current?.name ?? 'Tôi',
+          lat: position.lat,
+          lng: position.lng,
+          reason: 'SOS $incidentType',
+        );
+        unawaited(OfflineSosService.instance.sendEmergencySms(
+          phoneNumber: phoneToUse, 
+          message: msg,
+        ));
+      } catch (smsError) {
+        debugPrint('SMS Fallback failed: $smsError');
+      }
     }
   }
 
@@ -3165,7 +3188,28 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         ),
       );
     } catch (_) {
-      // Silent by design.
+      // Offline Fallback for Silent SOS
+      try {
+        final position = await _locationService.getBestEffortLocation(
+          fallbackLat: current?.lastKnownLocation?.lat,
+          fallbackLng: current?.lastKnownLocation?.lng,
+        );
+        final contacts = current?.emergencyContacts ?? [];
+        if (contacts.isNotEmpty) {
+          final msg = OfflineSosService.instance.formatEmergencySms(
+            victimName: current?.name ?? 'Tôi',
+            lat: position.lat,
+            lng: position.lng,
+            reason: 'SILENT SOS DURESS PIN',
+          );
+          unawaited(OfflineSosService.instance.sendEmergencySms(
+            phoneNumber: contacts.first.phone, 
+            message: msg,
+          ));
+        }
+      } catch (smsError) {
+        // completely silent
+      }
     }
   }
 
