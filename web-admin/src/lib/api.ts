@@ -5,6 +5,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      "x-api-key": "default-public-api-key-123",
       ...(init?.headers || {}),
     },
     ...init,

@@ -199,6 +199,28 @@ function DispatchCenter() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selected, isDetailOpen, incidents, hitlMutation]);
 
+  const [isAutoPilot, setIsAutoPilot] = useState(false);
+
+  useEffect(() => {
+    if (!isAutoPilot || incidents.length === 0) return;
+
+    incidents.forEach((inc) => {
+      if (
+        inc.hitl?.state === "COUNTDOWN_ACTIVE" &&
+        inc.status === "ACTIVE"
+      ) {
+        hitlMutation.mutate({
+          incidentId: inc.id,
+          payload: {
+            action: "INSTANT_DISPATCH",
+            supervisorName: "Hệ thống AI SafeSolo (Auto-Pilot)",
+            tier: 2,
+          },
+        });
+      }
+    });
+  }, [incidents, isAutoPilot]);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
@@ -288,6 +310,17 @@ function DispatchCenter() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsAutoPilot(!isAutoPilot)}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition ${
+                isAutoPilot 
+                  ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse"
+                  : "border-border bg-background/60 hover:bg-accent text-foreground"
+              }`}
+            >
+              <Sparkles className={`h-3.5 w-3.5 ${isAutoPilot ? "text-emerald-400" : "text-amber-400"}`} /> 
+              {isAutoPilot ? "Đang chạy Auto-Pilot (100% Tự động)" : "Bật Auto-Pilot AI"}
+            </button>
             <button
               onClick={() => audioAlarm.playTestSpeaker()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-xs font-semibold hover:bg-accent transition"
