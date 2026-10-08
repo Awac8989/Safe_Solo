@@ -25,6 +25,10 @@
 * **Chuyên ngành:** Kỹ thuật Phần mềm (Software Engineering)
 * **Khóa học:** 2022 - 2026
 
+### 📚 TÀI LIỆU NGHIỆP VỤ & HÀNH LANG PHÁP LÝ CHÍNH THỨC
+* [Quy trình Vận hành Thực tế & Pháp lý Ngoại viện (Zero Blind Spots)](docs/QUY_TRINH_VAN_HANH_THUC_TE_VA_PHAP_LY_NGOAI_VIEN.md): **Căn cứ pháp lý Điều 87 Luật Khám bệnh, chữa bệnh 2023, Điều 132/23 BLHS, 6 luồng tác chiến người dùng thực, kịch bản chống bẫy cướp và ranh giới đỏ hành nghề.**
+* [Tài liệu Đặc tả Nghiệp vụ Cứu hộ Toàn diện](docs/QUY_TRINH_NGHIEP_VU_CUU_HO_THUC_TE_TOAN_DIEN.md): **Đặc tả chuyên sâu 24 kịch bản thực tế, Skill-Based Dispatch và SBAR 115 Handoff.**
+
 ---
 
 ## 📑 MỤC LỤC

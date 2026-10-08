@@ -9,6 +9,7 @@ router.get('/users', controller.listUsers);
 router.get('/incidents', controller.listIncidents);
 router.patch('/incidents/:id/resolve', controller.resolveIncident);
 router.post('/incidents/:id/hitl-action', controller.handleHitlAction);
+router.post('/incidents/:id/run-clinical-sop', controller.runClinicalSop);
 router.get('/incidents/:id/sms-logs', controller.listSmsLogs);
 router.get('/audit', controller.listAuditLogs);
 router.get('/kyc', controller.listKycQueue);

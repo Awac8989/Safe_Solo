@@ -23,6 +23,10 @@ const VolunteerResponseSchema = new mongoose.Schema(
       index: true,
     },
 
+    // Thông số Chuyên môn tại thời điểm điều phối
+    heroTierAtDispatch: { type: String, default: 'TIER_1_BLS' },
+    skillMatchScore: { type: Number, default: 100 },
+
     // Bảo vệ pháp lý Good Samaritan Shield (Luật KCB 2023)
     goodSamaritanAgreementSigned: { type: Boolean, default: true },
     signedAt: { type: Date, default: Date.now },
@@ -38,6 +42,9 @@ const VolunteerResponseSchema = new mongoose.Schema(
             'AIRWAY_RECOVERY',
             'RECOVERY_POSITION',
             'AED_SHOCK',
+            'FRACTURE_SPLINT',
+            'C_SPINE_STABILIZE',
+            'TELE_FIRSTAID_CALL',
             'OTHER',
           ],
         },

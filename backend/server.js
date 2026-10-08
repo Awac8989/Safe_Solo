@@ -12,6 +12,7 @@ const database = require('./src/config/database');
 const { startDuressWorkers } = require('./src/workers/duressWorker');
 const { startDeadManWorker } = require('./src/workers/deadmanWorker');
 const { startDispatchWorker } = require('./src/workers/dispatchWorker');
+const { startCertificationWatchdog } = require('./src/workers/certificationWatchdog');
 const { apiRouter } = require('./src/routes');
 const apiKeyAuth = require('./src/middleware/apiKeyAuth');
 
@@ -140,6 +141,12 @@ server.listen(port, '0.0.0.0', async () => {
     telegramBotService.startPolling();
   } catch (e) {
     console.warn('Telegram bot init warning:', e.message);
+  }
+
+  try {
+    startCertificationWatchdog();
+  } catch (e) {
+    console.warn('Certification watchdog init warning:', e.message);
   }
 
   console.log(`SafeSolo Backend running at http://localhost:${port}`);

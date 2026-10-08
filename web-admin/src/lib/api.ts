@@ -65,10 +65,32 @@ export type AdminOverviewResponse = {
         strokeRisk?: string;
       } | null;
       hitl?: HitlTriage;
+      clinicalActions?: ClinicalAction[];
+      sbarHandoff?: SbarHandoff | null;
       nearbyHeroes?: NearbyHero[];
       nearestHospital?: NearestHospital;
     }>;
   };
+};
+
+export type ClinicalAction = {
+  code: string;
+  title: string;
+  description: string;
+  performedAt: string;
+  performer: string;
+  vitalImpact: string;
+};
+
+export type SbarHandoff = {
+  situation: string;
+  background: string;
+  assessment: string;
+  recommendation: string;
+  ambulancePlate: string;
+  paramedicName: string;
+  qrVerificationHash: string;
+  handedOverAt: string;
 };
 
 export type HitlTriage = {
@@ -153,6 +175,15 @@ export type KycApplicant = {
   trustScore: number;
   rescuesCount: number;
   thankYouCount: number;
+  certificateImageUrl?: string | null;
+  certificateNumber?: string | null;
+  issuingOrganization?: string;
+  certificateType?: string;
+  specialtyTier?: "TIER_1_BLS" | "TIER_2_PHTLS" | "TIER_3_MEDIC" | "NONE";
+  skillsList?: string[];
+  expiryDate?: string | null;
+  theoryExamScore?: number;
+  theoryExamPassed?: boolean;
 };
 
 export type ChannelHealth = {
@@ -242,6 +273,27 @@ export const submitHitlAction = async (incidentId: string, payload: HitlActionPa
   });
 };
 
+export const runClinicalSop = async (
+  incidentId: string,
+  payload?: { heroName?: string; heroPhone?: string },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    clinicalActions: ClinicalAction[];
+    sbarHandoff: SbarHandoff;
+    vitalsAfterRescue: {
+      spo2: number;
+      heartRate: number;
+      status: string;
+    };
+    timestamp: string;
+  }>(`/admin/incidents/${incidentId}/run-clinical-sop`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
+};
+
 export const fetchIncidentSmsLogs = async (incidentId: string) => {
   return request<{ success: true; data: unknown[] }>(`/admin/incidents/${incidentId}/sms-logs`);
 };
@@ -259,10 +311,14 @@ export const fetchKycQueue = async () => {
   return request<{ success: true; data: KycApplicant[] }>("/admin/kyc");
 };
 
-export const updateKycStatus = async (documentId: string, action: "APPROVE" | "REJECT") => {
+export const updateKycStatus = async (
+  documentId: string,
+  action: "APPROVE" | "REJECT",
+  tier?: string,
+) => {
   return request<{ success: true; data: unknown }>(`/admin/kyc/${documentId}`, {
     method: "PATCH",
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, tier }),
   });
 };
 
@@ -385,6 +441,16 @@ export type IncidentDossier = {
     event: string;
   }>;
   assignedHeroes: NearbyHero[];
+  handoffRecord?: {
+    ambulancePlate: string;
+    paramedicName: string;
+    handedOverAt: string;
+    qrVerificationHash: string;
+    notes: string;
+    proofImageUrl?: string;
+    cprCyclesCount?: number;
+    patientStatusOnTransfer?: string;
+  };
   supervisorSignature: {
     supervisorName: string;
     supervisorId: string;
@@ -859,3 +925,270 @@ export type AnalyticsDashboardResponse = {
 export const fetchAnalyticsDashboard = async (days = 30) => {
   return request<AnalyticsDashboardResponse>(`/admin/analytics?days=${days}`);
 };
+
+// ─── SafePoint & OpenAED Network ───────────────────────────────────────────
+
+export type SafePointAssetItem = {
+  _id: string;
+  name: string;
+  code: string;
+  type: "AED" | "FIRST_AID_KIT" | "OXYGEN_TANK" | "TRAUMA_KIT" | "MULTI_PURPOSE_CABINET";
+  status: "ACTIVE" | "MAINTENANCE" | "OFFLINE" | "IN_USE";
+  location: {
+    type: "Point";
+    coordinates: [number, number]; // [lng, lat]
+    address: string;
+    buildingName?: string;
+    floor?: string;
+    accessNotes?: string;
+  };
+  operationalHours: {
+    is24x7: boolean;
+    openTime?: string;
+    closeTime?: string;
+  };
+  hardwareState: {
+    cabinetLocked: boolean;
+    batteryLevelPercent: number;
+    padExpiryDate?: string;
+    lastInspectionDate?: string;
+    cabinetDoorSensor: "CLOSED" | "OPEN";
+  };
+  unlockMechanism: {
+    type: "TOTP_KEYPAD" | "REMOTE_RELAY" | "BLE_BEACON" | "PHYSICAL_KEY";
+    totpPeriodSeconds: number;
+  };
+  managingOrganization?: string;
+  emergencyContactPhone?: string;
+};
+
+export const fetchSafePointsNearby = async (params: {
+  latitude: number;
+  longitude: number;
+  radiusMeters?: number;
+  type?: string;
+}) => {
+  const query = new URLSearchParams({
+    latitude: params.latitude.toString(),
+    longitude: params.longitude.toString(),
+    ...(params.radiusMeters ? { radiusMeters: params.radiusMeters.toString() } : {}),
+    ...(params.type ? { type: params.type } : {}),
+  });
+  return request<{ success: true; count: number; data: SafePointAssetItem[] }>(`/safepoints/nearby?${query.toString()}`);
+};
+
+export const fetchOptimalAedWaypoint = async (params: {
+  victimLat: number;
+  victimLng: number;
+  heroLat: number;
+  heroLng: number;
+}) => {
+  const query = new URLSearchParams({
+    victimLat: params.victimLat.toString(),
+    victimLng: params.victimLng.toString(),
+    heroLat: params.heroLat.toString(),
+    heroLng: params.heroLng.toString(),
+  });
+  return request<{
+    success: boolean;
+    data: {
+      aedStation: SafePointAssetItem;
+      distanceHeroToAedMeters: number;
+      distanceAedToVictimMeters: number;
+      directDistanceMeters: number;
+      estimatedDetourSeconds: number;
+      recommendation: string;
+    } | null;
+  }>(`/safepoints/optimal-aed?${query.toString()}`);
+};
+
+export const requestSafePointUnlock = async (id: string, payload: {
+  rescuerId: string;
+  incidentId?: string;
+  purpose?: string;
+}) => {
+  return request<{
+    success: true;
+    data: {
+      safePointId: string;
+      stationName: string;
+      unlockOtp: string;
+      validSeconds: number;
+      expiresAt: string;
+      instructions: string;
+    };
+  }>(`/safepoints/${id}/unlock-request`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const confirmSafePointUnlock = async (id: string, payload: {
+  unlockOtp: string;
+  rescuerId: string;
+}) => {
+  return request<{ success: true; message: string; safePointId: string }>(`/safepoints/${id}/unlock-confirm`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ─── SafeBlood Urgent Relay ────────────────────────────────────────────────
+
+export type BloodRelayItem = {
+  _id: string;
+  requestCode: string;
+  patientId?: string;
+  targetBloodGroup: "O_MINUS" | "O_PLUS" | "A_MINUS" | "A_PLUS" | "B_MINUS" | "B_PLUS" | "AB_MINUS" | "AB_PLUS";
+  compatibleBloodGroups: string[];
+  unitsRequired: number;
+  urgencyLevel: "EXTREME_IMMEDIATE" | "URGENT_1_HOUR" | "HIGH_PRIORITY_4_HOURS";
+  hospitalLocation: {
+    hospitalName: string;
+    address: string;
+    roomOrDepartment?: string;
+    contactPhone: string;
+    coordinates: [number, number]; // [lng, lat]
+  };
+  clinicalJustification: string;
+  status: "PENDING_DONORS" | "DONORS_COMMITTED" | "IN_TRANSIT" | "DELIVERED_AND_FULFILLED" | "CANCELLED";
+  matchedDonors: Array<{
+    donorId: string;
+    donorName?: string;
+    bloodGroup: string;
+    contactPhone?: string;
+    committedUnits: number;
+    status: "NOTIFIED" | "ACCEPTED" | "ARRIVED" | "DONATED" | "DECLINED";
+    etaMinutes?: number;
+    distanceKm?: number;
+  }>;
+  createdAt: string;
+};
+
+export const fetchActiveBloodRelays = async (hospitalLat?: number, hospitalLng?: number) => {
+  const query = new URLSearchParams({
+    ...(hospitalLat !== undefined ? { hospitalLat: hospitalLat.toString() } : {}),
+    ...(hospitalLng !== undefined ? { hospitalLng: hospitalLng.toString() } : {}),
+  });
+  const url = query.toString() ? `/blood-relay/active?${query.toString()}` : `/blood-relay/active`;
+  return request<{ success: true; count: number; data: BloodRelayItem[] }>(url);
+};
+
+export const createBloodRelayRequest = async (payload: {
+  targetBloodGroup: string;
+  unitsRequired: number;
+  urgencyLevel: string;
+  hospitalLocation: {
+    hospitalName: string;
+    address: string;
+    roomOrDepartment?: string;
+    contactPhone: string;
+    coordinates: [number, number];
+  };
+  clinicalJustification: string;
+}) => {
+  return request<{ success: true; message: string; data: BloodRelayItem }>(`/blood-relay/create`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const acceptBloodRelayRequest = async (requestId: string, payload: {
+  donorId: string;
+  etaMinutes?: number;
+}) => {
+  return request<{ success: true; message: string; data: BloodRelayItem }>(`/blood-relay/${requestId}/accept`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const fulfillBloodRelayRequest = async (requestId: string, payload: {
+  donorId: string;
+  hospitalStaffNote?: string;
+}) => {
+  return request<{ success: true; message: string; data: BloodRelayItem }>(`/blood-relay/${requestId}/fulfill`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ─── HeroShield Welfare & Restock ──────────────────────────────────────────
+
+export type HeroPolicyItem = {
+  _id: string;
+  policyNumber: string;
+  heroId: string;
+  incidentId: string;
+  coverageType: "GOOD_SAMARITAN_STATUTORY" | "COMPREHENSIVE_FIRST_RESPONDER" | "VOLUNTEER_ACCIDENT_TIER1";
+  legalShieldActive: boolean;
+  statutoryLegalBasis: string;
+  insuranceUnderwriter: string;
+  status: "ACTIVE" | "EXPIRED" | "CLAIM_FILED" | "SETTLED";
+  coverageLimits: {
+    maxLegalDefenseFundVND: number;
+    maxMedicalExpenseVND: number;
+    maxThirdPartyLiabilityVND: number;
+  };
+  effectiveFrom: string;
+  expiresAt: string;
+};
+
+export type RestockVoucherItem = {
+  voucherCode: string;
+  heroId: string;
+  incidentId: string;
+  sbarHandoffId?: string;
+  status: "ISSUED" | "REDEEMED" | "EXPIRED";
+  itemsApproved: Array<{
+    itemName: string;
+    quantity: number;
+    unitPriceEstimateVND: number;
+  }>;
+  totalEstimatedValueVND: number;
+  partnerPharmacyNetwork: string;
+  issuedAt: string;
+  expiresAt: string;
+};
+
+export const fetchHeroPolicies = async (heroId: string) => {
+  return request<{ success: true; count: number; data: HeroPolicyItem[] }>(`/heroshield/policies/${heroId}`);
+};
+
+export const fetchHeroRestockVouchers = async (heroId: string) => {
+  return request<{ success: true; count: number; data: RestockVoucherItem[] }>(`/heroshield/vouchers/${heroId}`);
+};
+
+export const issueRestockVoucherFromSbar = async (payload: {
+  heroId: string;
+  incidentId: string;
+  sbarHandoffId?: string;
+  consumedSuppliesNote?: string;
+}) => {
+  return request<{ success: true; message: string; data: RestockVoucherItem }>(`/heroshield/restock-voucher`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ─── SafeTag Offline ICE Lookup ───────────────────────────────────────────
+
+export const lookupSafeTagPublicIce = async (tagUid: string) => {
+  return request<{
+    success: true;
+    tagUid: string;
+    securityTier: string;
+    data: {
+      fullName: string;
+      bloodType: string;
+      allergiesSummary: string;
+      emergencyContacts: Array<{ name: string; phone: string; relation: string }>;
+      dnrOrder: boolean;
+      organDonor: boolean;
+      chronicDiseasesMasked: string;
+      tagStatus: string;
+      complianceNote: string;
+    };
+  }>(`/safetags/public-ice/${tagUid}`);
+};
+

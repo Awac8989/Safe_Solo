@@ -36,6 +36,10 @@ function mapIncident(doc) {
     approxAddress: row.approxAddress || null,
     batteryLevel: row.batteryLevel ?? null,
     assignedVolunteerId: row.assignedVolunteerId || null,
+    backupVolunteerIds: row.backupVolunteerIds || [],
+    isBuddyDispatchRequired: Boolean(row.isBuddyDispatchRequired),
+    buddyStatus: row.buddyStatus || 'NOT_REQUIRED',
+    rendezvousPoint: row.rendezvousPoint || null,
     dispatchRadiusKm: row.dispatchRadiusKm || 1.2,
     medicalSnapshot: row.medicalSnapshot || null,
     telemetry: row.telemetry || null,
@@ -129,6 +133,20 @@ class RadarService {
     const initialRadius = options.dispatchRadiusKm || 1.2;
     const initialStatus = options.status || 'DISPATCHING_R1';
 
+    // Kịch bản 15: Chống bẫy dàn cảnh cướp giật (Anti-Ambush & Buddy Dispatch)
+    // Nếu sự cố diễn ra lúc đêm khuya (23:00 - 05:00 sáng, UTC+7) hoặc cờ isHighRiskArea
+    const nowUtc = new Date();
+    const vnHour = (nowUtc.getUTCHours() + 7) % 24;
+    const isNightDangerTime = vnHour >= 23 || vnHour < 5;
+    const isBuddyRequired = Boolean(options.isHighRiskArea || isNightDangerTime || options.isBuddyDispatchRequired);
+    const rendezvousPoint = isBuddyRequired
+      ? {
+          lat: Number((exactLat + 0.0018).toFixed(6)),
+          lng: Number((exactLng + 0.0018).toFixed(6)),
+          note: 'Điểm tập kết an toàn: Giao lộ lớn cách hiện trường 200m. 02 Hiệp sĩ tập hợp trước khi cùng tiến vào.',
+        }
+      : null;
+
     const incident = await RescueIncident.create({
       victimId,
       status: initialStatus,
@@ -146,6 +164,9 @@ class RadarService {
         options.approxAddress || victimSensitive.approxAddress || null,
       batteryLevel: options.batteryLevel ?? victim.batteryLevel ?? null,
       dispatchRadiusKm: initialRadius,
+      isBuddyDispatchRequired: isBuddyRequired,
+      buddyStatus: isBuddyRequired ? 'WAITING_BUDDY' : 'NOT_REQUIRED',
+      rendezvousPoint,
       medicalSnapshot: {
         bloodType: victimSensitive.bloodType || 'UNKNOWN',
         allergies: victimSensitive.allergies || [],
@@ -163,6 +184,8 @@ class RadarService {
             lng: exactLng,
             source: options.source || 'SOS',
             severity: options.severityLevel || 'P1_CRITICAL',
+            isBuddyDispatchRequired: isBuddyRequired,
+            isNightDangerTime,
           },
         },
       ],
@@ -195,12 +218,25 @@ class RadarService {
       metadata: { incidentType, lat: exactLat, lng: exactLng },
     });
 
-    // 1. Quét tìm Hiệp sĩ đủ điều kiện (lọc bận, lọc kyc, tính score)
+    // Xác định chuyên môn yêu cầu cho sự cố cứu nạn
+    const requiredSkillTier =
+      options.requiredSkillTier ||
+      (incident.severityLevel === 'P1_CRITICAL' ? 'TIER_1_BLS' : 'NONE');
+    const requiredSkills =
+      options.requiredSkills ||
+      (incident.severityLevel === 'P1_CRITICAL' ? ['CPR_AED'] : []);
+
+    incident.requiredSkillTier = requiredSkillTier;
+    incident.requiredSkills = requiredSkills;
+    await incident.save();
+
+    // 1. Quét tìm Hiệp sĩ đủ điều kiện theo chuyên môn Skill-Based Dispatch (SBD)
     const nearbyVolunteers = await this.findNearbyVolunteers(
       exactLat,
       exactLng,
       victimId,
       initialRadius,
+      { requiredSkillTier, requiredSkills },
     );
 
     // 2. Gửi PUSH BÁO ĐỘNG ĐỎ tới Top ứng viên phù hợp nhất (tối đa 5 người)
@@ -215,6 +251,8 @@ class RadarService {
               incidentId: incident._id,
               volunteerId: volunteer.id,
               status: 'ALERTED',
+              heroTierAtDispatch: volunteer.heroTier || 'TIER_1_BLS',
+              skillMatchScore: volunteer.skillMatchScore ?? 100,
               goodSamaritanAgreementSigned: true,
               distanceMeters: Math.round(volunteer.distanceKm * 1000),
             },
@@ -273,7 +311,7 @@ class RadarService {
     };
   }
 
-  async findNearbyVolunteers(lat, lng, excludeUserId, radiusKm = 3) {
+  async findNearbyVolunteers(lat, lng, excludeUserId, radiusKm = 3, options = {}) {
     // Lọc ra các Hiệp sĩ đang có ca cứu hộ dở dang (đang di chuyển hoặc đang ở hiện trường)
     const busyResponses = await VolunteerResponse.find({
       status: { $in: ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'] },
@@ -293,6 +331,9 @@ class RadarService {
       'lastKnownLocation.lng': { $gte: lng - lngDelta, $lte: lng + lngDelta },
     }).lean();
 
+    const now = new Date();
+    const tierHierarchy = { NONE: 0, TIER_1_BLS: 1, TIER_2_PHTLS: 2, TIER_3_MEDIC: 3 };
+
     return users
       .map((item) => {
         const distanceKm = Number(
@@ -304,22 +345,66 @@ class RadarService {
           ).toFixed(2),
         );
 
-        // Tính điểm ưu tiên điều phối: Dispatch Score = distScore(40%) + trustScore(30%) + experience(30%)
+        // 1. Chấm điểm Khớp Chuyên môn (Skill Match Score - 35%)
+        const isCertExpired =
+          item.certificateExpiry && new Date(item.certificateExpiry) < now;
+        const currentTier = isCertExpired ? 'NONE' : (item.heroTier || 'TIER_1_BLS');
+        const heroTierLevel = tierHierarchy[currentTier] ?? 1;
+
+        const reqTier = options.requiredSkillTier || options.requiredTier;
+
+        // Nguyên tắc 4 SOP: Zero Unqualified Responder (Không điều phối người hết hạn hoặc NONE vào ca có yêu cầu chuyên môn)
+        if (reqTier && heroTierLevel === 0) {
+          return null;
+        }
+
+        let skillMatchScore = 100;
+        if (reqTier && tierHierarchy[reqTier]) {
+          const reqLevel = tierHierarchy[reqTier];
+          if (heroTierLevel < reqLevel) {
+            skillMatchScore = Math.max(20, Math.round((heroTierLevel / reqLevel) * 70));
+          }
+        }
+
+        if (Array.isArray(options.requiredSkills) && options.requiredSkills.length > 0) {
+          const heroSkillsSet = new Set(
+            item.heroSkills?.length ? item.heroSkills : ['CPR_AED', 'AIRWAY_CHOKING'],
+          );
+          const matchedCount = options.requiredSkills.filter((s) =>
+            heroSkillsSet.has(s),
+          ).length;
+          const matchRate = matchedCount / options.requiredSkills.length;
+          skillMatchScore = Math.round(skillMatchScore * 0.5 + matchRate * 50);
+        }
+
+        // 2. Chấm điểm Khoảng cách (Distance Score - 30%)
         const distScore = Math.max(0, 100 - (distanceKm / radiusKm) * 50);
+
+        // 3. Chấm điểm Uy tín (Trust Score - 20%)
         const trustScore = Math.min(100, item.trustScore || 50);
+
+        // 4. Chấm điểm Kinh nghiệm thực chiến (Experience Score - 15%)
         const rescuesScore = Math.min(100, (item.rescuesCount || 0) * 10);
+
+        // Công thức điều phối chuẩn SOP 4 biến: 35% Skill + 30% Distance + 20% Trust + 15% Experience
         const dispatchScore = Math.round(
-          distScore * 0.4 + trustScore * 0.3 + rescuesScore * 0.3,
+          skillMatchScore * 0.35 +
+            distScore * 0.30 +
+            trustScore * 0.20 +
+            rescuesScore * 0.15,
         );
 
         return {
           ...sanitizeUser(item),
           distanceKm,
           dispatchScore,
+          skillMatchScore,
+          heroTier: currentTier,
+          heroSkills: item.heroSkills || ['CPR_AED', 'AIRWAY_CHOKING'],
           isBusy: false,
         };
       })
-      .filter((item) => item.distanceKm <= radiusKm)
+      .filter((item) => item !== null && item.distanceKm <= radiusKm)
       .sort((a, b) => b.dispatchScore - a.dispatchScore || a.distanceKm - b.distanceKm);
   }
 
@@ -399,47 +484,96 @@ class RadarService {
       );
     }
 
-    // ATOMIC LOCK: Ngăn Race Condition bằng findOneAndUpdate nguyên tử
-    const openStatuses = ['ACTIVE', 'DISPATCHING_R1', 'DISPATCHING_R2', 'TRIGGERED'];
-    const incident = await RescueIncident.findOneAndUpdate(
-      {
-        _id: incidentId,
-        status: { $in: openStatuses },
-        $or: [
-          { assignedVolunteerId: null },
-          { assignedVolunteerId: { $exists: false } },
-          { assignedVolunteerId: volunteerId },
-        ],
-      },
-      {
-        $set: {
-          status: 'ACCEPTED',
-          assignedVolunteerId: volunteerId,
+    // Kịch bản 15: Kiểm tra xem ca có yêu cầu Buddy Dispatch (2 Hiệp sĩ) không
+    const existingIncident = await RescueIncident.findById(incidentId);
+    ensure(existingIncident, 'Incident not found', 404);
+
+    let incident;
+    let isBuddyJoin = false;
+
+    if (
+      existingIncident.isBuddyDispatchRequired &&
+      existingIncident.assignedVolunteerId &&
+      existingIncident.assignedVolunteerId !== volunteerId &&
+      existingIncident.buddyStatus === 'WAITING_BUDDY'
+    ) {
+      // Hiệp sĩ thứ 2 gia nhập cặp đôi (Buddy Partner)
+      incident = await RescueIncident.findOneAndUpdate(
+        {
+          _id: incidentId,
+          buddyStatus: 'WAITING_BUDDY',
+          backupVolunteerIds: { $ne: volunteerId },
         },
-        $push: {
-          auditTrail: {
-            action: 'HERO_ACCEPTED',
-            actorId: volunteerId,
-            timestamp: new Date(),
-            metadata: {
-              volunteerName: volunteer.fullName,
-              volunteerPhone: volunteer.phoneNumber,
+        {
+          $set: {
+            buddyStatus: 'BUDDY_PAIRED',
+            status: 'ACCEPTED',
+          },
+          $addToSet: { backupVolunteerIds: volunteerId },
+          $push: {
+            auditTrail: {
+              action: 'HERO_2_BUDDY_PAIRED',
+              actorId: volunteerId,
+              timestamp: new Date(),
+              metadata: {
+                volunteerName: volunteer.fullName,
+                partnerId: existingIncident.assignedVolunteerId,
+                rendezvousPoint: existingIncident.rendezvousPoint,
+                message: 'Cặp đôi Hiệp sĩ đã hình thành đầy đủ (Anti-Ambush Buddy Dispatch).',
+              },
             },
           },
         },
-      },
-      { new: true },
-    );
+        { new: true },
+      );
+      isBuddyJoin = true;
+    } else {
+      // Nhận ca thông thường hoặc Hiệp sĩ đầu tiên của cặp đôi
+      const openStatuses = ['ACTIVE', 'DISPATCHING_R1', 'DISPATCHING_R2', 'TRIGGERED'];
+      const nextStatus = existingIncident.isBuddyDispatchRequired ? 'DISPATCHING_R1' : 'ACCEPTED';
+      const nextBuddyStatus = existingIncident.isBuddyDispatchRequired ? 'WAITING_BUDDY' : 'NOT_REQUIRED';
+
+      incident = await RescueIncident.findOneAndUpdate(
+        {
+          _id: incidentId,
+          status: { $in: openStatuses },
+          $or: [
+            { assignedVolunteerId: null },
+            { assignedVolunteerId: { $exists: false } },
+            { assignedVolunteerId: volunteerId },
+          ],
+        },
+        {
+          $set: {
+            status: nextStatus,
+            assignedVolunteerId: volunteerId,
+            buddyStatus: nextBuddyStatus,
+          },
+          $push: {
+            auditTrail: {
+              action: existingIncident.isBuddyDispatchRequired ? 'HERO_1_WAITING_BUDDY' : 'HERO_ACCEPTED',
+              actorId: volunteerId,
+              timestamp: new Date(),
+              metadata: {
+                volunteerName: volunteer.fullName,
+                volunteerPhone: volunteer.phoneNumber,
+                isBuddyDispatchRequired: existingIncident.isBuddyDispatchRequired,
+              },
+            },
+          },
+        },
+        { new: true },
+      );
+    }
 
     if (!incident) {
-      const existingIncident = await RescueIncident.findById(incidentId);
-      ensure(existingIncident, 'Incident not found', 404);
       if (
         existingIncident.assignedVolunteerId &&
-        existingIncident.assignedVolunteerId !== volunteerId
+        existingIncident.assignedVolunteerId !== volunteerId &&
+        (!existingIncident.isBuddyDispatchRequired || existingIncident.buddyStatus === 'BUDDY_PAIRED')
       ) {
         throw new AppError(
-          'Ca cứu hộ này đã được một Hiệp sĩ khác tiếp nhận. Cảm ơn tinh thần tương trợ của bạn!',
+          'Ca cứu hộ này đã được tiếp nhận đầy đủ lực lượng. Cảm ơn tinh thần tương trợ của bạn!',
           409,
         );
       }
@@ -461,11 +595,13 @@ class RadarService {
       await response.save();
     }
 
-    // Đánh dấu TIMEOUT cho các ứng viên khác chỉ ở trạng thái ALERTED
-    await VolunteerResponse.updateMany(
-      { incidentId, volunteerId: { $ne: volunteerId }, status: 'ALERTED' },
-      { $set: { status: 'TIMEOUT' } },
-    );
+    // Đánh dấu TIMEOUT cho các ứng viên khác chỉ khi đã đủ lực lượng (không còn chờ buddy)
+    if (!incident.isBuddyDispatchRequired || incident.buddyStatus === 'BUDDY_PAIRED') {
+      await VolunteerResponse.updateMany(
+        { incidentId, volunteerId: { $nin: [incident.assignedVolunteerId, ...(incident.backupVolunteerIds || [])] }, status: 'ALERTED' },
+        { $set: { status: 'TIMEOUT' } },
+      );
+    }
 
     await chatService.addResponderToIncidentRoom(incidentId, volunteerId);
     await createAlertEvent({
@@ -491,6 +627,16 @@ class RadarService {
         volunteer: sanitizeUser(volunteer),
         response: mapResponse(response),
       });
+
+      if (isBuddyJoin) {
+        io.to(`incident:${incidentId}`).emit('BUDDY_PAIRED', {
+          incidentId,
+          assignedVolunteerId: incident.assignedVolunteerId,
+          buddyVolunteerId: volunteerId,
+          rendezvousPoint: incident.rendezvousPoint,
+          message: 'Hai hiệp sĩ đã hình thành cặp đôi cứu hộ an toàn. Hãy hội quân tại điểm tập kết trước khi tiến vào!',
+        });
+      }
     } catch (_err) {
       // socket optional
     }
@@ -571,7 +717,11 @@ class RadarService {
     };
   }
 
-  async recordFirstAidAction(incidentId, volunteerId, actionData = {}) {
+  async recordFirstAidAction(incidentId, volunteerId, actionDataOrType = {}, maybeOptions = {}) {
+    const actionData =
+      typeof actionDataOrType === 'string'
+        ? { actionType: actionDataOrType, ...maybeOptions }
+        : actionDataOrType || {};
     const { actionType, durationSeconds, notes } = actionData;
     const incident = await RescueIncident.findById(incidentId);
     ensure(incident, 'Incident not found', 404);

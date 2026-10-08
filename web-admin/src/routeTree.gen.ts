@@ -11,11 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VitalsRouteImport } from './routes/vitals'
 import { Route as UsersRouteImport } from './routes/users'
+import { Route as SafepointsRouteImport } from './routes/safepoints'
 import { Route as RevenueRouteImport } from './routes/revenue'
 import { Route as OmnichannelRouteImport } from './routes/omnichannel'
 import { Route as KycRouteImport } from './routes/kyc'
+import { Route as HeroshieldRouteImport } from './routes/heroshield'
 import { Route as HeroesRouteImport } from './routes/heroes'
 import { Route as HazardsRouteImport } from './routes/hazards'
+import { Route as BloodrelayRouteImport } from './routes/bloodrelay'
 import { Route as B2bRouteImport } from './routes/b2b'
 import { Route as AuditRouteImport } from './routes/audit'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -29,6 +32,11 @@ const VitalsRoute = VitalsRouteImport.update({
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SafepointsRoute = SafepointsRouteImport.update({
+  id: '/safepoints',
+  path: '/safepoints',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RevenueRoute = RevenueRouteImport.update({
@@ -46,6 +54,11 @@ const KycRoute = KycRouteImport.update({
   path: '/kyc',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HeroshieldRoute = HeroshieldRouteImport.update({
+  id: '/heroshield',
+  path: '/heroshield',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HeroesRoute = HeroesRouteImport.update({
   id: '/heroes',
   path: '/heroes',
@@ -54,6 +67,11 @@ const HeroesRoute = HeroesRouteImport.update({
 const HazardsRoute = HazardsRouteImport.update({
   id: '/hazards',
   path: '/hazards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BloodrelayRoute = BloodrelayRouteImport.update({
+  id: '/bloodrelay',
+  path: '/bloodrelay',
   getParentRoute: () => rootRouteImport,
 } as any)
 const B2bRoute = B2bRouteImport.update({
@@ -82,11 +100,14 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/audit': typeof AuditRoute
   '/b2b': typeof B2bRoute
+  '/bloodrelay': typeof BloodrelayRoute
   '/hazards': typeof HazardsRoute
   '/heroes': typeof HeroesRoute
+  '/heroshield': typeof HeroshieldRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/safepoints': typeof SafepointsRoute
   '/users': typeof UsersRoute
   '/vitals': typeof VitalsRoute
 }
@@ -95,11 +116,14 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/audit': typeof AuditRoute
   '/b2b': typeof B2bRoute
+  '/bloodrelay': typeof BloodrelayRoute
   '/hazards': typeof HazardsRoute
   '/heroes': typeof HeroesRoute
+  '/heroshield': typeof HeroshieldRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/safepoints': typeof SafepointsRoute
   '/users': typeof UsersRoute
   '/vitals': typeof VitalsRoute
 }
@@ -109,11 +133,14 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/audit': typeof AuditRoute
   '/b2b': typeof B2bRoute
+  '/bloodrelay': typeof BloodrelayRoute
   '/hazards': typeof HazardsRoute
   '/heroes': typeof HeroesRoute
+  '/heroshield': typeof HeroshieldRoute
   '/kyc': typeof KycRoute
   '/omnichannel': typeof OmnichannelRoute
   '/revenue': typeof RevenueRoute
+  '/safepoints': typeof SafepointsRoute
   '/users': typeof UsersRoute
   '/vitals': typeof VitalsRoute
 }
@@ -124,11 +151,14 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/audit'
     | '/b2b'
+    | '/bloodrelay'
     | '/hazards'
     | '/heroes'
+    | '/heroshield'
     | '/kyc'
     | '/omnichannel'
     | '/revenue'
+    | '/safepoints'
     | '/users'
     | '/vitals'
   fileRoutesByTo: FileRoutesByTo
@@ -137,11 +167,14 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/audit'
     | '/b2b'
+    | '/bloodrelay'
     | '/hazards'
     | '/heroes'
+    | '/heroshield'
     | '/kyc'
     | '/omnichannel'
     | '/revenue'
+    | '/safepoints'
     | '/users'
     | '/vitals'
   id:
@@ -150,11 +183,14 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/audit'
     | '/b2b'
+    | '/bloodrelay'
     | '/hazards'
     | '/heroes'
+    | '/heroshield'
     | '/kyc'
     | '/omnichannel'
     | '/revenue'
+    | '/safepoints'
     | '/users'
     | '/vitals'
   fileRoutesById: FileRoutesById
@@ -164,11 +200,14 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   AuditRoute: typeof AuditRoute
   B2bRoute: typeof B2bRoute
+  BloodrelayRoute: typeof BloodrelayRoute
   HazardsRoute: typeof HazardsRoute
   HeroesRoute: typeof HeroesRoute
+  HeroshieldRoute: typeof HeroshieldRoute
   KycRoute: typeof KycRoute
   OmnichannelRoute: typeof OmnichannelRoute
   RevenueRoute: typeof RevenueRoute
+  SafepointsRoute: typeof SafepointsRoute
   UsersRoute: typeof UsersRoute
   VitalsRoute: typeof VitalsRoute
 }
@@ -187,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/safepoints': {
+      id: '/safepoints'
+      path: '/safepoints'
+      fullPath: '/safepoints'
+      preLoaderRoute: typeof SafepointsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/revenue': {
@@ -210,6 +256,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KycRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/heroshield': {
+      id: '/heroshield'
+      path: '/heroshield'
+      fullPath: '/heroshield'
+      preLoaderRoute: typeof HeroshieldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/heroes': {
       id: '/heroes'
       path: '/heroes'
@@ -222,6 +275,13 @@ declare module '@tanstack/react-router' {
       path: '/hazards'
       fullPath: '/hazards'
       preLoaderRoute: typeof HazardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bloodrelay': {
+      id: '/bloodrelay'
+      path: '/bloodrelay'
+      fullPath: '/bloodrelay'
+      preLoaderRoute: typeof BloodrelayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/b2b': {
@@ -260,11 +320,14 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   AuditRoute: AuditRoute,
   B2bRoute: B2bRoute,
+  BloodrelayRoute: BloodrelayRoute,
   HazardsRoute: HazardsRoute,
   HeroesRoute: HeroesRoute,
+  HeroshieldRoute: HeroshieldRoute,
   KycRoute: KycRoute,
   OmnichannelRoute: OmnichannelRoute,
   RevenueRoute: RevenueRoute,
+  SafepointsRoute: SafepointsRoute,
   UsersRoute: UsersRoute,
   VitalsRoute: VitalsRoute,
 }

@@ -163,25 +163,54 @@ export function IncidentMap({
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    // 1. Add Incident Markers
+    // 1. Add Incident Markers (High-Visibility Pulsing Victim HUD)
     for (const incident of locatedIncidents) {
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className =
-        "relative flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white shadow-[0_0_0_6px_rgba(255,255,255,0.12)]";
-      el.style.backgroundColor = markerColor(incident.type);
-      el.style.outline = selectedId === incident.id ? "3px solid rgba(125, 211, 252, 0.8)" : "none";
-      el.style.cursor = "pointer";
+      const isSelected = selectedId === incident.id;
+      const el = document.createElement("div");
+      el.className = "relative flex flex-col items-center justify-center cursor-pointer select-none";
+      el.style.transform = "translate(-50%, -50%)";
 
-      const pulse = document.createElement("span");
-      pulse.className = "absolute inset-0 animate-ping rounded-full opacity-60";
-      pulse.style.backgroundColor = markerColor(incident.type);
-      el.appendChild(pulse);
+      // Floating Victim Banner
+      const hasRecovered = (incident.vitals?.spo2 && incident.vitals.spo2 >= 95) || (incident as any).clinicalActions?.length > 0;
+      const banner = document.createElement("div");
+      banner.className = `whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-black shadow-xl flex items-center gap-1.5 backdrop-blur-md mb-1.5 transition-all ${
+        hasRecovered
+          ? "bg-emerald-950/95 text-emerald-300 border border-emerald-400 z-30 ring-2 ring-emerald-500/50"
+          : isSelected
+          ? "bg-rose-600 text-white border-2 border-white scale-110 z-30 ring-2 ring-sky-400"
+          : "bg-[#0f172a]/95 text-rose-300 border border-rose-500/80 z-20"
+      }`;
+      banner.innerHTML = hasRecovered
+        ? `<span>🩺</span> [ĐÃ SƠ CỨU & 115] ${incident.name} · <span class="text-emerald-300 font-black">SpO2 ${incident.vitals?.spo2 || 96}%</span>`
+        : `<span class="animate-pulse">🚨</span> [${incident.type === "MEDICAL" ? "Y TẾ KHẨN" : "SOS"}] ${incident.name} ${
+            incident.vitals?.spo2 ? `<span class="text-amber-300 font-bold">· SpO2 ${incident.vitals.spo2}%</span>` : ""
+          }`;
+      el.appendChild(banner);
 
-      const dot = document.createElement("span");
-      dot.className = "relative block h-2.5 w-2.5 rounded-full bg-white";
-      el.appendChild(dot);
+      // Core Marker Icon Container
+      const core = document.createElement("div");
+      core.className = "relative flex items-center justify-center";
 
+      // Multiple Radar Ripple Rings
+      const ring1 = document.createElement("span");
+      ring1.className = "absolute h-12 w-12 rounded-full bg-rose-500/40 animate-ping";
+      core.appendChild(ring1);
+
+      const ring2 = document.createElement("span");
+      ring2.className = "absolute h-8 w-8 rounded-full border-2 border-rose-400/80 bg-rose-500/20";
+      core.appendChild(ring2);
+
+      // Main SOS Center Dot
+      const centerBtn = document.createElement("button");
+      centerBtn.type = "button";
+      centerBtn.className = `relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-[0_0_15px_rgba(244,63,94,0.8)] font-black text-[11px] text-white transition-transform ${
+        isSelected ? "ring-4 ring-sky-400 scale-125" : ""
+      }`;
+      centerBtn.style.backgroundColor = markerColor(incident.type);
+      centerBtn.innerText = "SOS";
+      core.appendChild(centerBtn);
+
+      el.appendChild(core);
       el.addEventListener("click", () => onSelect(incident.id));
 
       const marker = new maplibregl.Marker({ element: el, anchor: "center" })
@@ -194,14 +223,49 @@ export function IncidentMap({
     // 2. Add Hero Radar Markers
     if (showHeroes) {
       for (const hero of heroes) {
-        const el = document.createElement("div");
-        el.className =
-          "relative flex h-4 w-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-emerald-300 bg-emerald-600 shadow-md cursor-pointer";
-        el.title = `${hero.name} (Hiệp sĩ - ⭐${hero.trustScore})`;
+        const isDispatched = Boolean(hero.isDispatched || (hero as any).status === "ON_SCENE" || (hero as any).status === "DISPATCHED");
+        const isArrived = Boolean(hero.isArrived || (hero as any).status === "ON_SCENE");
 
-        const pulse = document.createElement("span");
-        pulse.className = "absolute -inset-1 rounded-full border border-emerald-400 opacity-60 animate-ping";
-        el.appendChild(pulse);
+        const el = document.createElement("div");
+        el.className = "relative flex flex-col items-center justify-center cursor-pointer select-none";
+        el.style.transform = "translate(-50%, -50%)";
+
+        // If dispatched or arrived, show prominent mission banner
+        if (isDispatched) {
+          const banner = document.createElement("div");
+          banner.className = `whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-black shadow-2xl flex items-center gap-1 backdrop-blur-md mb-1 animate-pulse border ${
+            isArrived
+              ? "bg-emerald-950/95 text-emerald-300 border-emerald-400"
+              : "bg-sky-950/95 text-sky-300 border-sky-400"
+          }`;
+          banner.innerHTML = isArrived
+            ? `<span>🩺</span> [HIỆP SĨ ĐÃ ĐẾN] ${hero.name} · Đang ép tim CPR & Garô`
+            : `<span>🏃</span> [HIỆP SĨ CẤP CỨU] ${hero.name} · Đang chạy tới (${(hero as any).distanceMeters ?? "gần"}m)`;
+          el.appendChild(banner);
+        }
+
+        const core = document.createElement("div");
+        core.className = "relative flex items-center justify-center";
+
+        if (isDispatched) {
+          const pingRing = document.createElement("span");
+          pingRing.className = `absolute h-10 w-10 rounded-full animate-ping ${
+            isArrived ? "bg-emerald-400/50" : "bg-sky-400/50"
+          }`;
+          core.appendChild(pingRing);
+        }
+
+        const dot = document.createElement("div");
+        dot.className = `flex items-center justify-center rounded-full border-2 border-white shadow-xl text-white font-bold transition-all ${
+          isDispatched
+            ? "h-7 w-7 text-xs bg-emerald-500 ring-4 ring-emerald-400/60 scale-110"
+            : "h-4 w-4 bg-emerald-600 border-emerald-200"
+        }`;
+        dot.title = `${hero.name} (Hiệp sĩ - ⭐${hero.trustScore}) - ${hero.statusLabel || "Sẵn sàng"}`;
+        dot.innerText = isDispatched ? (isArrived ? "🩺" : "🏃") : "";
+        core.appendChild(dot);
+
+        el.appendChild(core);
 
         const marker = new maplibregl.Marker({ element: el, anchor: "center" })
           .setLngLat([hero.location.lng, hero.location.lat])
@@ -257,6 +321,22 @@ export function IncidentMap({
       }
     }
   }, [locatedIncidents, heroes, safeHavens, hazards, showHeroes, showSafeHavens, showHazards, selectedId, onSelect]);
+
+  // Auto Fly-To Selected Incident
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !selectedIncident?.location) return;
+    const { lng, lat } = selectedIncident.location;
+    if (typeof lng === "number" && typeof lat === "number") {
+      map.flyTo({
+        center: [lng, lat],
+        zoom: 15.2,
+        speed: 1.2,
+        curve: 1.3,
+        essential: true,
+      });
+    }
+  }, [selectedIncident]);
 
   // Center coordinate reference: District 5 / District 1 in HCMC
   const centerLat = 10.7680;

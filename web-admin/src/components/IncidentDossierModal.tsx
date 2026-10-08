@@ -211,6 +211,79 @@ export function IncidentDossierModal({ incidentId, onClose }: IncidentDossierMod
                 </div>
               </div>
 
+              {/* Handoff Record & Photo Proof */}
+              {dossier.handoffRecord && (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" /> BIÊN BẢN BÀN GIAO KÍP CẤP CỨU 115 & BẰNG CHỨNG HIỆN TRƯỜNG
+                    </div>
+                    <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                      GOOD SAMARITAN SHIELD
+                    </span>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 text-xs">
+                      <div className="rounded-lg bg-background/60 p-2.5 border border-border/60">
+                        <span className="text-muted-foreground">Xe Cấp cứu tiếp nhận:</span>
+                        <div className="font-mono font-bold text-amber-400 text-sm mt-0.5">
+                          {dossier.handoffRecord.ambulancePlate}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-background/60 p-2.5 border border-border/60">
+                        <span className="text-muted-foreground">Bác sĩ kíp tiếp nhận:</span>
+                        <div className="font-semibold text-foreground mt-0.5">
+                          {dossier.handoffRecord.paramedicName}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-background/60 p-2.5 border border-border/60">
+                        <span className="text-muted-foreground">Tình trạng bệnh nhân khi bàn giao:</span>
+                        <div className="font-medium text-emerald-400 mt-0.5">
+                          {dossier.handoffRecord.patientStatusOnTransfer || "Ổn định sau sơ cứu BLS"}
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-background/60 p-2.5 border border-border/60">
+                        <span className="text-muted-foreground">Thời gian bàn giao:</span>
+                        <div className="font-mono text-muted-foreground mt-0.5">
+                          {new Date(dossier.handoffRecord.handedOverAt).toLocaleString("vi-VN")}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Proof Photo Display */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-bold text-muted-foreground uppercase">
+                        ẢNH CHỤP BẰNG CHỨNG XE 115 / HIỆN TRƯỜNG (CAMERA PROOF):
+                      </span>
+                      {dossier.handoffRecord.proofImageUrl ? (
+                        <div className="relative rounded-lg overflow-hidden border border-emerald-500/40 bg-black/40 group">
+                          <img
+                            src={dossier.handoffRecord.proofImageUrl}
+                            alt="Bằng chứng bàn giao xe 115"
+                            className="w-full h-44 object-cover md:object-contain rounded"
+                          />
+                          <div className="absolute bottom-0 inset-x-0 bg-black/80 p-1.5 text-center text-[10px] font-mono text-emerald-400 border-t border-emerald-500/20">
+                            Mã xác thực SHA-256: {dossier.handoffRecord.qrVerificationHash.slice(0, 24)}...
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-44 rounded-lg border border-dashed border-border flex items-center justify-center text-xs text-muted-foreground bg-background/40">
+                          Chưa tải lên ảnh bằng chứng
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-muted-foreground bg-background/40 p-2.5 rounded-lg border border-border/40">
+                    <strong>Ghi chú chuyển tuyến:</strong> {dossier.handoffRecord.notes}
+                  </div>
+                  <div className="text-[10px] text-sky-400 italic">
+                    ⚖️ Căn cứ Điều 87 Luật Khám bệnh, chữa bệnh 2023 & Điều 132 Bộ luật Hình sự: Người tham gia sơ cứu ngoài cơ sở y tế được pháp luật bảo vệ quyền miễn trừ trách nhiệm dân sự khi thực hiện đúng chức năng và khả năng.
+                  </div>
+                </div>
+              )}
+
               {/* Digital Seal & Signature */}
               <div className="border-t-2 border-border pt-4 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
                 <div className="text-xs text-muted-foreground space-y-0.5">

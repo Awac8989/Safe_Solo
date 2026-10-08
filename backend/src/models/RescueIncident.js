@@ -51,10 +51,31 @@ const RescueIncidentSchema = new mongoose.Schema(
     communityRequestedAt: { type: Date, default: null },
     resolvedAt: { type: Date, default: null },
 
+    // Yêu cầu Năng lực Chuyên môn để Điều phối (Skill-Based Dispatch)
+    requiredSkillTier: {
+      type: String,
+      enum: ['NONE', 'TIER_1_BLS', 'TIER_2_PHTLS', 'TIER_3_MEDIC'],
+      default: 'TIER_1_BLS',
+    },
+    requiredSkills: [{ type: String }],
+
     // Thông tin Hiệp sĩ được giao nhiệm vụ
     assignedVolunteerId: { type: String, default: null, index: true },
     backupVolunteerIds: [{ type: String }],
     dispatchRadiusKm: { type: Number, default: 1.2 },
+
+    // Kịch bản 15: Chống bẫy dàn cảnh cướp giật (Anti-Ambush & Buddy Dispatch)
+    isBuddyDispatchRequired: { type: Boolean, default: false },
+    buddyStatus: {
+      type: String,
+      enum: ['NOT_REQUIRED', 'WAITING_BUDDY', 'BUDDY_PAIRED'],
+      default: 'NOT_REQUIRED',
+    },
+    rendezvousPoint: {
+      lat: { type: Number, default: null },
+      lng: { type: Number, default: null },
+      note: { type: String, default: null },
+    },
 
     // Dữ liệu y tế của nạn nhân đóng băng tại thời điểm xảy ra sự cố (Medical Snapshot)
     medicalSnapshot: {
@@ -89,6 +110,12 @@ const RescueIncidentSchema = new mongoose.Schema(
       handedOverAt: { type: Date, default: null },
       qrVerificationHash: { type: String, default: null },
       notes: { type: String, default: '' },
+      sbarSummary: {
+        situation: { type: String, default: '' },
+        background: { type: String, default: '' },
+        assessment: { type: String, default: '' },
+        recommendation: { type: String, default: '' },
+      },
     },
 
     evidenceAudioUrl: { type: String, default: null },

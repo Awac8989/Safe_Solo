@@ -54,12 +54,16 @@ async function processDispatchLifecycle() {
         });
         await incident.save();
 
-        // Tìm thêm hiệp sĩ trong bán kính mở rộng 4.5km
+        // Tìm thêm hiệp sĩ trong bán kính mở rộng 4.5km theo năng lực chuyên môn
         const nearbyVolunteers = await radarService.findNearbyVolunteers(
           incident.exactLat,
           incident.exactLng,
           incident.victimId,
           4.5,
+          {
+            requiredSkillTier: incident.requiredSkillTier,
+            requiredSkills: incident.requiredSkills,
+          },
         );
 
         // Lấy danh sách đã được alert từ trước
@@ -84,6 +88,8 @@ async function processDispatchLifecycle() {
                 incidentId: incident._id,
                 volunteerId: volunteer.id,
                 status: 'ALERTED',
+                heroTierAtDispatch: volunteer.heroTier || 'TIER_1_BLS',
+                skillMatchScore: volunteer.skillMatchScore ?? 100,
                 goodSamaritanAgreementSigned: true,
                 distanceMeters: Math.round(volunteer.distanceKm * 1000),
               },
@@ -257,12 +263,16 @@ async function processDispatchLifecycle() {
             });
           }
 
-          // Tự động quét và bắn nhiệm vụ cho các Hiệp sĩ khác ngay lập tức
+          // Tự động quét và bắn nhiệm vụ cho các Hiệp sĩ khác ngay lập tức theo chuyên môn
           const newNearbyVolunteers = await radarService.findNearbyVolunteers(
             incident.exactLat,
             incident.exactLng,
             incident.victimId,
             4.5,
+            {
+              requiredSkillTier: incident.requiredSkillTier,
+              requiredSkills: incident.requiredSkills,
+            },
           );
           const candidateVolunteers = newNearbyVolunteers
             .filter((v) => v.id !== volunteerId)
@@ -278,6 +288,8 @@ async function processDispatchLifecycle() {
                   incidentId: incident._id,
                   volunteerId: newVol.id,
                   status: 'ALERTED',
+                  heroTierAtDispatch: newVol.heroTier || 'TIER_1_BLS',
+                  skillMatchScore: newVol.skillMatchScore ?? 100,
                   goodSamaritanAgreementSigned: true,
                   distanceMeters: Math.round(newVol.distanceKm * 1000),
                 },

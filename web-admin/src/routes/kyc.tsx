@@ -14,6 +14,9 @@ import {
   Award,
   Briefcase,
   Sparkles,
+  Stethoscope,
+  FileCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
@@ -49,6 +52,7 @@ function KycPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"KYC" | "THANK_YOU">("KYC");
   const [selected, setSelected] = useState<KycApplicant | null>(null);
+  const [selectedTier, setSelectedTier] = useState<string>("TIER_1_BLS");
 
   const queueQuery = useQuery({
     queryKey: ["kyc-queue"],
@@ -72,9 +76,17 @@ function KycPage() {
     }
   }, [applicants, selected]);
 
+  useEffect(() => {
+    if (selected?.specialtyTier) {
+      setSelectedTier(selected.specialtyTier);
+    } else {
+      setSelectedTier("TIER_1_BLS");
+    }
+  }, [selected]);
+
   const actionMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: "APPROVE" | "REJECT" }) =>
-      updateKycStatus(id, action),
+    mutationFn: ({ id, action, tier }: { id: string; action: "APPROVE" | "REJECT"; tier?: string }) =>
+      updateKycStatus(id, action, tier),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["kyc-queue"] });
     },
@@ -212,7 +224,7 @@ function KycPage() {
                     </Tag>
                   </div>
 
-                  <div className="grid gap-3 p-4 md:grid-cols-3">
+                  <div className={`grid gap-3 p-4 ${selected.certificateImageUrl ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
                     <ImageCard
                       icon={UserCircle2}
                       label="Ảnh chân dung"
@@ -231,6 +243,14 @@ function KycPage() {
                       imageUrl={selected.backImageUrl}
                       tone="from-warning/10 to-success/10"
                     />
+                    {selected.certificateImageUrl && (
+                      <ImageCard
+                        icon={Stethoscope}
+                        label="Chứng chỉ Y tế"
+                        imageUrl={selected.certificateImageUrl}
+                        tone="from-emerald-500/20 to-sky-500/20"
+                      />
+                    )}
                   </div>
 
                   <div className="grid gap-3 px-4 pb-3 md:grid-cols-3">
@@ -253,41 +273,85 @@ function KycPage() {
                     </div>
                   </div>
 
-                  {/* Chứng chỉ Chuyên Môn & Trang Bị Cứu Hộ */}
-                  <div className="mx-4 mb-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 space-y-2.5">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                      <Award className="h-4 w-4 text-emerald-400" /> KỸ NĂNG & CHỨNG CHỈ SƠ CẤP CỨU
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 text-[11px]">
-                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 font-medium text-emerald-300">
-                        ✓ Chứng chỉ CPR Hội Chữ Thập Đỏ TP.HCM
-                      </span>
-                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 font-medium text-emerald-300">
-                        ✓ Kỹ thuật ép tim & cố định gãy xương
-                      </span>
-                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 font-medium text-emerald-300">
-                        ✓ Xử trí đột quỵ F.A.S.T
+                  {/* Hồ sơ Năng lực Chuyên môn Y tế & Sát hạch Lâm sàng */}
+                  <div className="mx-4 mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                        <Award className="h-4 w-4 text-emerald-400" /> THẨM ĐỊNH NĂNG LỰC SƠ CẤP CỨU Y TẾ
+                      </div>
+                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                        {selected.specialtyTier || "TIER_1_BLS"}
                       </span>
                     </div>
 
-                    <div className="pt-2 border-t border-emerald-500/20">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400 mb-1.5">
-                        <Briefcase className="h-3.5 w-3.5 text-sky-400" /> TRANG THIẾT BỊ CỨU HỘ MANG THEO
+                    <div className="grid gap-2 md:grid-cols-2 text-xs">
+                      <DetailRow label="Số hiệu chứng chỉ" value={selected.certificateNumber || "Chưa cung cấp"} />
+                      <DetailRow label="Đơn vị cấp" value={selected.issuingOrganization || "Hội Chữ Thập Đỏ / Cơ sở Y tế"} />
+                      <DetailRow label="Loại chứng chỉ" value={selected.certificateType || "Sơ cấp cứu cơ bản"} />
+                      <DetailRow label="Hạn hiệu lực" value={formatDate(selected.expiryDate)} />
+                    </div>
+
+                    {/* Kết quả thi trắc nghiệm lý thuyết lâm sàng */}
+                    <div className="rounded-lg border border-border bg-background/60 p-2.5 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <FileCheck className="h-4 w-4 text-sky-400" />
+                        <div>
+                          <div className="font-semibold text-foreground">Sát hạch lý thuyết lâm sàng (20 câu)</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Điểm số: <span className="font-bold font-mono text-foreground">{selected.theoryExamScore !== undefined ? `${selected.theoryExamScore}/20` : "Chưa hoàn tất bài thi"}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        {selected.theoryExamPassed ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 px-2.5 py-1 text-[11px] font-bold text-emerald-300 border border-emerald-500/30">
+                            ✓ ĐẠT YÊU CẦU (≥90%)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2.5 py-1 text-[11px] font-bold text-amber-300 border border-amber-500/30">
+                            <AlertTriangle className="h-3 w-3" /> CHƯA ĐẠT CHUẨN
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Kỹ năng được cấp phép */}
+                    <div>
+                      <div className="text-muted-foreground text-[10px] uppercase tracking-wider mb-1">
+                        Kỹ năng lâm sàng được công nhận
                       </div>
                       <div className="flex flex-wrap gap-1.5 text-[11px]">
-                        <span className="rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-300">
-                          🎒 Túi sơ cứu First-Aid
-                        </span>
-                        <span className="rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-300">
-                          🩹 Bộ nẹp y tế & băng gạc
-                        </span>
-                        <span className="rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-300">
-                          🔋 Dây câu bình ắc quy
-                        </span>
-                        <span className="rounded border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-sky-300">
-                          🔦 Đèn pin công suất cao
-                        </span>
+                        {(selected.skillsList && selected.skillsList.length > 0
+                          ? selected.skillsList
+                          : ["CPR_AED", "AIRWAY_CHOKING", "HEMOSTASIS_PRESSURE"]
+                        ).map((skill, idx) => (
+                          <span key={idx} className="rounded bg-emerald-500/20 px-2 py-0.5 font-medium text-emerald-300 border border-emerald-500/30">
+                            ✓ {skill}
+                          </span>
+                        ))}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Thanh Phê Duyệt & Phân Bậc Tier Hiệp Sĩ */}
+                  <div className="mx-4 mb-4 rounded-xl border border-sky-500/30 bg-sky-950/20 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-sky-300 flex items-center gap-1.5">
+                        <Briefcase className="h-4 w-4 text-sky-400" /> PHÂN CẤP BẬC HÀNH NGHỀ KHI PHÊ DUYỆT
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">Điều 87 Luật Khám bệnh, chữa bệnh</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedTier}
+                        onChange={(e) => setSelectedTier(e.target.value)}
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="TIER_1_BLS">Tier 1: Hiệp sĩ Cứu sinh cơ bản (BLS - Ép tim CPR, Dị vật đường thở, Băng ép)</option>
+                        <option value="TIER_2_PHTLS">Tier 2: Hiệp sĩ Chấn thương ngoại viện (PHTLS - Cố định cổ C-Spine, Nẹp xương, Garô CAT)</option>
+                        <option value="TIER_3_MEDIC">Tier 3: Bác sĩ / Điều dưỡng phản ứng nhanh (Medic - Hồi sức nâng cao ACLS, Tele-FirstAid)</option>
+                      </select>
                     </div>
                   </div>
 
@@ -298,15 +362,17 @@ function KycPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => actionMutation.mutate({ id: selected.id, action: "REJECT" })}
-                        className="inline-flex items-center gap-2 rounded-md border border-sos/40 bg-sos/10 px-4 py-2 text-sm font-semibold text-sos hover:bg-sos/20"
+                        disabled={actionMutation.isPending}
+                        className="inline-flex items-center gap-2 rounded-md border border-sos/40 bg-sos/10 px-4 py-2 text-sm font-semibold text-sos hover:bg-sos/20 disabled:opacity-50"
                       >
                         <XCircle className="h-4 w-4" /> Từ chối
                       </button>
                       <button
-                        onClick={() => actionMutation.mutate({ id: selected.id, action: "APPROVE" })}
-                        className="inline-flex items-center gap-2 rounded-md bg-success px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        onClick={() => actionMutation.mutate({ id: selected.id, action: "APPROVE", tier: selectedTier })}
+                        disabled={actionMutation.isPending}
+                        className="inline-flex items-center gap-2 rounded-md bg-success px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                       >
-                        <CheckCircle2 className="h-4 w-4" /> Duyệt hiệp sĩ
+                        <CheckCircle2 className="h-4 w-4" /> Phê duyệt {selectedTier.replace("TIER_", "Tier ")}
                       </button>
                     </div>
                   </div>

@@ -156,6 +156,21 @@ class NotificationService {
     );
   }
 
+  Future<void> showNotification({
+    required String title,
+    required String body,
+    int? id,
+  }) async {
+    await _show(
+      id: id ?? 3999,
+      title: title,
+      body: body,
+      channelId: _alertsChannel.id,
+      channelName: _alertsChannel.name,
+      channelDescription: _alertsChannel.description ?? '',
+    );
+  }
+
   Future<void> showRemoteMessage(RemoteMessage message) async {
     final notification = message.notification;
     final title = notification?.title?.trim();

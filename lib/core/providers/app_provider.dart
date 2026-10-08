@@ -4598,15 +4598,31 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     );
   }
 
-  /// Gửi hồ sơ định danh KYC (CCCD / Passport) để đăng ký làm Hiệp sĩ cứu hộ
+  /// Gửi hồ sơ định danh KYC (CCCD + Chứng chỉ Sơ cấp cứu Y tế) để đăng ký làm Hiệp sĩ cứu hộ
   Future<bool> submitKycDocuments({
     required String frontPath,
     required String backPath,
+    String? certificatePath,
+    String? certificateNumber,
+    String? issuingOrganization,
+    String? certificateType,
+    String? specialtyTier,
+    List<String>? skillsList,
+    String? expiryDate,
+    bool? scopeOfPracticeAgreed,
   }) async {
     try {
       final res = await _api.uploadKycDocuments(
         frontPath: frontPath,
         backPath: backPath,
+        certificatePath: certificatePath,
+        certificateNumber: certificateNumber,
+        issuingOrganization: issuingOrganization,
+        certificateType: certificateType,
+        specialtyTier: specialtyTier,
+        skillsList: skillsList,
+        expiryDate: expiryDate,
+        scopeOfPracticeAgreed: scopeOfPracticeAgreed,
         userId: _user?.id,
       );
       if (res['success'] == true) {
@@ -4621,6 +4637,24 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Submit KYC error: $e');
       return false;
+    }
+  }
+
+  /// Nộp bài thi trắc nghiệm lâm sàng 20 câu sát hạch năng lực y tế
+  Future<Map<String, dynamic>> submitClinicalExam({
+    required List<int> answers,
+    required bool scopeOfPracticeAgreed,
+  }) async {
+    try {
+      final res = await _api.submitClinicalExam(
+        answers: answers,
+        scopeOfPracticeAgreed: scopeOfPracticeAgreed,
+        userId: _user?.id,
+      );
+      return res;
+    } catch (e) {
+      debugPrint('Submit Clinical Exam error: $e');
+      return {'success': false, 'message': e.toString()};
     }
   }
 

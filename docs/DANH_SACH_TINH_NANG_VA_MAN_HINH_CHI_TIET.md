@@ -331,11 +331,14 @@ graph TD
 * **Đường dẫn mã nguồn:** [`lib/views/heroes/heroes_page.dart`](file:///c:/Users/Admin/SafeSolo/lib/views/heroes/heroes_page.dart)
 * **Hình ảnh trực quan:**
   <p align="center"><img src="screenshots/app_19_heroes_network.png" width="340px" alt="Heroes Network" /></p>
-* **Mục đích:** Quản lý cộng đồng tình nguyện viên sơ cứu và cứu hộ tại chỗ được xác thực danh tính KYC.
-* **Các thành phần giao diện:**
-  - Bảng vinh danh Hiệp sĩ (Leaderboard & Karma Points).
-  - Trạng thái sẵn sàng tiếp nhận nhiệm vụ ứng cứu (Ready / Standby).
-  - Số lượng ca cứu hộ đã hoàn thành xuất sắc và tỷ lệ phản hồi dưới 5 phút.
+* **Mục đích:** Quản lý cộng đồng Hiệp sĩ cứu hộ phản ứng nhanh có chứng nhận chuyên môn y tế / sơ cấp cứu (Certified First Responders) đã qua kiểm duyệt KYC 2 lớp.
+* **Các thành phần giao diện & Nghiệp vụ chuyên môn:**
+  - Quy trình Đăng ký & Nộp hồ sơ Chuyên môn 2 Lớp: eKYC CCCD gắn chip + Tải lên Chứng chỉ Sơ cấp cứu / Y tế hợp chuẩn (Hội Chữ thập đỏ, TT Cấp cứu 115, AHA Heartsaver, PHTLS, Chứng chỉ hành nghề Y).
+  - Khảo sát & Sát hạch Trực tuyến 20 câu tình huống lâm sàng khẩn cấp (yêu cầu đạt $\ge 90\%$).
+  - Thẻ Hiệp sĩ Số hóa hiển thị Phân cấp 3 Tầng: Tier 1 (BLS - Cơ bản), Tier 2 (PHTLS - Chấn thương), Tier 3 (Medic - Y tế chuyên nghiệp).
+  - Bảng vinh danh Hiệp sĩ (Leaderboard, Karma Points, Tín chỉ bồi dưỡng CME).
+  - Trạng thái trực chiến sẵn sàng tiếp nhận nhiệm vụ ứng cứu (Ready / Standby).
+  - Số lượng ca cứu hộ đã hoàn thành xuất sắc và chỉ số phản hồi dưới 5 phút vàng.
 
 ---
 
@@ -344,11 +347,14 @@ graph TD
 * **Đường dẫn mã nguồn:** [`lib/views/heroes/hero_workspace_page.dart`](file:///c:/Users/Admin/SafeSolo/lib/views/heroes/hero_workspace_page.dart)
 * **Hình ảnh trực quan:**
   <p align="center"><img src="screenshots/app_20_hero_workspace.png" width="340px" alt="Hero Workspace" /></p>
-* **Mục đích:** Không gian làm việc chuyên biệt khi Hiệp sĩ nhận được tín hiệu điều phối cứu hộ từ tổng đài.
-* **Các hành động tác chiến:**
-  - Nút **"Tiếp nhận ca cứu nạn" (Accept Dispatch)** hoặc **"Từ chối" (Decline)** kèm lý do.
-  - Chỉ đường lộ trình nhanh nhất tới hiện trường nạn nhân qua bản đồ tích hợp.
-  - Gọi điện thoại hoặc bộ đàm bảo mật trực tiếp cho người nhà nạn nhân.
+* **Mục đích:** Không gian tác chiến lâm sàng ngoại viện chuyên biệt khi Hiệp sĩ nhận được tín hiệu điều phối cứu hộ từ hệ thống Skill-Based Dispatch.
+* **Các hành động tác chiến & Công cụ Y khoa Khẩn cấp:**
+  - Nút **"Tiếp nhận ca cứu nạn" (Accept Dispatch)** kích hoạt Atomic Lock hoặc **"Từ chối" (Decline)** kèm lý do.
+  - Chỉ đường Turn-by-Turn GPS lộ trình nhanh nhất tới hiện trường nạn nhân.
+  - Nghe tóm tắt bệnh án khẩn cấp AI Voice Briefing (Nhóm máu, tiền sử dị ứng, nguy cơ gãy cột sống cổ).
+  - Hỗ trợ lâm sàng tại chỗ: Bộ đếm nhịp ép tim **CPR Metronome chuẩn AHA 100-120 bpm**, nút ghi nhận đặt Garô động mạch (báo giờ nới lỏng tránh hoại tử), nẹp cố định chi gãy, sốc điện máy AED.
+  - Mở kênh hội chẩn video **Tele-FirstAid** trực tiếp với Bác sĩ Cố vấn Tier 3 khi gặp ca nguy kịch vượt cấp.
+  - Xuất mã QR **Bàn giao Y tế Tiêu chuẩn SBAR** cho Bác sĩ xe cấp cứu 115 để đóng ca an toàn.
 
 ---
 
@@ -506,16 +512,16 @@ graph TD
 
 ---
 
-#### 4. Trung Tâm Thẩm Định & Phê Duyệt Danh Tính CCCD (KYC Verification Desk)
+#### 4. Trung Tâm Thẩm Định Danh Tính & Chứng Chỉ Y Tế Hiệp Sĩ (Hero KYC & Medical Verification Desk)
 * **Tên file ảnh:** [`04_kyc_verification.png`](file:///c:/Users/Admin/SafeSolo/docs/screenshots/04_kyc_verification.png)
 * **Đường dẫn mã nguồn:** [`backend/src/controllers/kycController.js`](file:///c:/Users/Admin/SafeSolo/backend/src/controllers/kycController.js)
 * **Hình ảnh trực quan:**
   <p align="center"><img src="screenshots/04_kyc_verification.png" width="600px" alt="KYC Verification Desk" /></p>
-* **Mục đích:** Quy trình phê duyệt hồ sơ Căn cước công dân (CCCD gắn chip) cho các ứng viên muốn trở thành Tình nguyện viên Cứu hộ SafeSolo Heroes.
-* **Quy trình thẩm định:**
-  - So khớp ảnh chân dung tự chụp (Selfie) với ảnh mặt trước CCCD bằng thuật toán nhận diện khuôn mặt AI.
-  - Trích xuất dữ liệu tự động (OCR) số định danh cá nhân, họ tên, ngày sinh, quê quán.
-  - Phê duyệt (Approve) hoặc Từ chối (Reject) kèm lý do phản hồi minh bạch cho người dùng.
+* **Mục đích:** Quy trình thẩm định 2 lớp (Dual-Layer KYC) phê duyệt hồ sơ Căn cước công dân và Chứng chỉ Chuyên môn Y tế / Sơ cấp cứu cho các ứng viên muốn trở thành Hiệp sĩ Cứu hộ SafeSolo Hero.
+* **Quy trình thẩm định 2 Lớp:**
+  - **Lớp 1 (eKYC Pháp lý):** So khớp ảnh chân dung tự chụp (Selfie) với ảnh CCCD 2 mặt bằng thuật toán nhận diện khuôn mặt AI, đối soát OCR trích xuất số định danh, họ tên, ngày sinh.
+  - **Lớp 2 (Medical KYC Chuyên môn):** Đối chiếu ảnh chụp chứng chỉ gốc từ các tổ chức hợp chuẩn (Hội Chữ thập đỏ, TT Cấp cứu 115, AHA Heartsaver, PHTLS, Chứng chỉ hành nghề Y), kiểm tra kết quả bài sát hạch lâm sàng 20 câu ($\ge 90\%$).
+  - **Phân cấp Tier & Kỹ năng:** Gán bậc Tier 1 (BLS), Tier 2 (PHTLS), Tier 3 (Medic) và kích hoạt đưa vào Radar điều phối Skill-Based Dispatch. Phê duyệt (Approve) hoặc Từ chối (Reject) kèm lý do chi tiết.
 
 ---
 

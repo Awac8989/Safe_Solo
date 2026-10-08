@@ -550,10 +550,10 @@ class LockscreenMedicalCardPage extends StatelessWidget {
                       SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          'Truy cập Mở khẩn cấp • Chuẩn AHA 2026',
+                          'SafeTag ICE • Bảo vệ Quyền riêng tư 2 Tầng (Nghị định 13/2023/NĐ-CP)',
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF059669),
                           ),

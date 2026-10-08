@@ -50,6 +50,10 @@ const kycRoutes = require('./kycRoutes');
 const locationRoutes = require('./locationRoutes');
 const watchRoutes = require('./watchRoutes');
 const journeyRoutes = require('./journeyRoutes');
+const safePointRoutes = require('./safePointRoutes');
+const safeTagRoutes = require('./safeTagRoutes');
+const bloodRelayRoutes = require('./bloodRelayRoutes');
+const heroShieldRoutes = require('./heroShieldRoutes');
 
 const apiRouter = express.Router();
 
@@ -66,6 +70,10 @@ apiRouter.use('/kyc', kycRoutes);
 apiRouter.use('/location', locationRoutes);
 apiRouter.use('/watch', watchRoutes);
 apiRouter.use('/journeys', journeyRoutes);
+apiRouter.use('/safepoints', safePointRoutes);
+apiRouter.use('/safetags', safeTagRoutes);
+apiRouter.use('/blood-relay', bloodRelayRoutes);
+apiRouter.use('/heroshield', heroShieldRoutes);
 
 // Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);

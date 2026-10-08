@@ -13,6 +13,9 @@ import {
   ShieldCheck,
   LogOut,
   BarChart3,
+  Compass,
+  Droplets,
+  Scale,
 } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import {
@@ -31,12 +34,15 @@ import {
 
 const operationItems = [
   { title: "Trung tâm điều phối", url: "/", icon: Radio },
+  { title: "Trạm cứu hộ SafePoint", url: "/safepoints", icon: Compass },
+  { title: "Ngân hàng máu SafeBlood", url: "/bloodrelay", icon: Droplets },
   { title: "Bản đồ hiểm họa", url: "/hazards", icon: AlertTriangle },
   { title: "Sinh tồn đa nạn nhân", url: "/vitals", icon: HeartPulse },
 ];
 
 const fleetAndB2bItems = [
   { title: "Đội ngũ hiệp sĩ", url: "/heroes", icon: ShieldCheck },
+  { title: "Phúc lợi HeroShield", url: "/heroshield", icon: Scale },
   { title: "Cổng doanh nghiệp B2B", url: "/b2b", icon: Briefcase },
   { title: "Người dùng & KYC", url: "/kyc", icon: Users },
 ];

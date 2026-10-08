@@ -316,7 +316,11 @@ def build_thesis():
         ["FR-07", "Vết tích Ghost Breadcrumbs", "Ghi nhận lộ trình di chuyển mỗi 30s và thu âm vòng lặp hộp đen 15s mã hóa AES-256."],
         ["FR-08", "Cảnh báo Người thân Đa kênh", "Chuỗi leo thang 4 tầng tự động: Telegram Bot -> Zalo ZNS -> GSM SMS -> Voice Auto-Call."],
         ["FR-09", "Bảng điều phối Web Admin", "Bản đồ GIS MapLibre hiển thị vị trí sự cố, tình nguyện viên và phân loại lâm sàng NEWS2."],
-        ["FR-10", "Cầu thoại WebRTC & AI Whisper", "Đàm thoại 2 chiều độ trễ thấp và chuyển đổi lời kêu cứu thành văn bản tự động."]
+        ["FR-10", "Cầu thoại WebRTC & AI Whisper", "Đàm thoại 2 chiều độ trễ thấp và chuyển đổi lời kêu cứu thành văn bản tự động."],
+        ["FR-11", "Trạm cứu hộ SafePoint & OpenAED", "Bản đồ máy sốc tim cộng đồng, định tuyến Waypoint tối ưu, và sinh mã OTP TOTP mở tủ chống trộm."],
+        ["FR-12", "Thẻ y tế ngoại tuyến SafeTag ICE", "Thẻ NFC/QR 2 tầng bảo mật phân quyền bảo vệ bí mật dữ liệu cá nhân theo Nghị định 13/2023/NĐ-CP."],
+        ["FR-13", "Mạng điều phối máu SafeBlood Relay", "Ghép cặp nhóm máu tương thích sinh học ABO/Rh và dẫn đường hiệp sĩ hiến máu đến cấp cứu bệnh viện."],
+        ["FR-14", "Lá chắn pháp lý & Phúc lợi HeroShield", "Kích hoạt chứng thư bảo vệ hiệp sĩ (Điều 87 Luật KBCB 2023) và cấp voucher hoàn vật tư từ SBAR."]
     ]
     add_styled_table(doc, fr_headers, fr_data, col_widths=[1.2, 2.2, 3.2])
 
@@ -558,6 +562,34 @@ def build_thesis():
     add_bullet(doc, "Android Release Build", "Biên dịch bằng lệnh 'flutter build appbundle --release', kích thước gói .aab chỉ 18.4 MB, thời gian Cold Start đạt 1.28 giây.")
     add_bullet(doc, "Wear OS Target", "Biên dịch với cờ '--dart-define=WEAR_OS=true', tự động co giãn màn hình tròn AMOLED và hỗ trợ Ambient Mode tiết kiệm pin.")
     add_bullet(doc, "Web Admin Production", "Biên dịch bằng Vite 'npm run build' đạt chuẩn tĩnh, chia nhỏ chunks, tải trang đầu tiên dưới 0.8 giây.")
+
+    add_h2(doc, "4.4. Hiện thực hóa các Phân hệ Mở rộng Vệ tinh Cứu hộ và Hành lang Pháp lý Ngoại viện")
+    add_p(doc, "Để đưa hệ sinh thái SafeSolo từ một công cụ giám sát cá nhân thành một Mạng lưới Cứu hộ Khẩn cấp Toàn diện có khả năng vận hành thực tế tại các đô thị Việt Nam, đề tài đã nghiên cứu và phát triển 4 phân hệ mở rộng vệ tinh tuân thủ nghiêm ngặt khung pháp lý y tế hiện hành:")
+
+    add_h3(doc, "4.4.1. Phân hệ SafePoint & Trạm Sốc Tim OpenAED Cộng Đồng")
+    add_p(doc, "Trong các ca ngừng tuần hoàn hô hấp (SCA / Cardiac Arrest), tỷ lệ sống sót giảm 10% sau mỗi phút chậm trễ can thiệp khử rung tim. Phân hệ SafePoint quản lý mạng lưới trạm cấp cứu công cộng (tủ sốc tim AED, bình oxy, túi cầm máu đa chấn thương) dựa trên mô hình không gian GeoJSON 2dsphere. Hệ thống tích hợp thuật toán định tuyến Waypoint tối ưu: khi hiệp sĩ nhận lệnh cứu hộ, hệ thống tự động tính toán cung đường ghé trạm lấy máy AED nếu độ trễ lệch đường dưới 90 giây. Để giải quyết mâu thuẫn giữa việc 'ngăn ngừa mất trộm tài sản công' và 'mở tủ cấp cứu khẩn cấp', SafeSolo áp dụng thuật toán mã số một lần theo thời gian (TOTP) 6 chữ số có hiệu lực 60 giây, tự động hiển thị trên ứng dụng của hiệp sĩ hoặc qua tin nhắn SMS khi kíp cứu hộ tiếp cận trạm.")
+
+    add_h3(doc, "4.4.2. Phân hệ Thẻ Định Danh Y Tế Ngoại Tuyến SafeTag ICE (NFC / QR)")
+    add_p(doc, "Khi nạn nhân bất tỉnh hoặc chấn thương sọ não, việc tiếp cận tiền sử bệnh án đóng vai trò sinh tử. Tuy nhiên, việc công khai bệnh án mâu thuẫn với Nghị định 13/2023/NĐ-CP về Bảo vệ Dữ liệu Cá nhân. SafeSolo giải quyết bài toán này bằng Kiến trúc Bảo mật Phân quyền 2 Tầng (2-Tier Privacy Shield):")
+    add_bullet(doc, "Tầng 1 (Public ICE - Quét công khai)", "Dành cho người đi đường và hiệp sĩ sơ cứu: chỉ hiển thị nhóm máu, dị ứng thuốc nguy hiểm (Penicillin, NSAID), chỉ thị DNR/Organ Donor và nút gọi trực tiếp cho người thân.")
+    add_bullet(doc, "Tầng 2 (Medical Tier 2 - Bác sĩ & Kíp 115)", "Hiển thị đầy đủ bệnh án mạn tính, thuốc đang điều trị, lịch sử phẫu thuật. Tầng này được bảo vệ bằng mã PIN y tế do người dùng thiết lập hoặc xác thực tài khoản bác sĩ cấp cứu có chứng chỉ hành nghề.")
+
+    add_h3(doc, "4.4.3. Phân hệ Điều Phối Ngân Hàng Máu Hiếm SafeBlood Urgent Relay")
+    add_p(doc, "Các ca sốc mất máu cấp tính do tai nạn giao thông hoặc vỡ nội tạng cần truyền máu khẩn cấp trong Giờ Vàng. SafeBlood xây dựng mạng lưới điều phối ngân hàng máu hiếm (O-, Rh-, A-, B-, AB-) liên kết trực tiếp giữa các trung tâm cấp cứu bệnh viện và cộng đồng hiệp sĩ hiến máu. Hệ thống tự động kích hoạt thuật toán ma trận tương thích sinh học ISBT 128: khi bệnh viện phát lệnh thiếu nhóm máu, máy chủ định vị và gửi thông báo khẩn cấp tới các hiệp sĩ tình nguyện có nhóm máu phù hợp đang ở trong bán kính 15km, tính toán thời gian di chuyển (ETA) và xác nhận ca tiếp nhận máu thành công.")
+
+    add_h3(doc, "4.4.4. Phân hệ Phúc Lợi Hiệp Sĩ HeroShield & Bồi Hoàn Vật Tư Tiêu Hao SBAR")
+    add_p(doc, "Một trong những rào cản lớn nhất khiến người dân ngần ngại sơ cứu là nỗi sợ bị gia đình nạn nhân hành hung, kiện tụng hoặc tốn kém chi phí vật tư y tế. HeroShield thiết lập cơ chế bảo vệ kép:")
+    add_bullet(doc, "Lá chắn Pháp lý Ngoại viện (Statutory Legal Shield)", "Xây dựng trên nền tảng pháp luật Việt Nam: Điều 87 Luật Khám bệnh, chữa bệnh 2023 (cho phép người được đào tạo sơ cấp cứu thực hiện can thiệp ngoài cơ sở y tế); Điều 132 & Điều 23 Bộ luật Hình sự 2015 (tình thế cấp thiết và nghĩa vụ cứu người); Điều 584 Bộ luật Dân sự 2015 (miễn trừ bồi thường thiệt hại khi hành động vì lợi ích người bị nạn). Mỗi ca điều phối đều tự động kích hoạt chứng thư bảo lãnh chi phí pháp lý lên tới 500.000.000đ và bảo hiểm tai nạn 100.000.000đ.")
+    add_bullet(doc, "Cơ chế Bồi hoàn Vật tư Tiêu hao (Consumable Restock Voucher)", "Sau khi hoàn tất sơ cứu và bàn giao cho kíp 115 qua biên bản SBAR, hệ thống tự động phân tích dữ liệu vật tư y tế đã sử dụng (gạc vô trùng, băng ép garô, nẹp xương, mặt nạ CPR) để cấp mã voucher đổi vật tư mới miễn phí tại các chuỗi nhà thuốc đối tác.")
+
+    ecosystem_headers = ["Phân hệ Mở rộng", "Mô hình Dữ liệu Core", "Chuẩn / Giao thức Kỹ thuật", "Căn cứ Pháp lý & Thực tiễn"]
+    ecosystem_data = [
+        ["SafePoint & OpenAED", "SafePointAsset (GeoJSON 2dsphere)", "TOTP Keypad (RFC 6238), Waypoint Routing", "Khuyến cáo AHA 2020 về tiếp cận AED trong 3-5 phút."],
+        ["SafeTag Offline ICE", "SafeTag (2-Tier Data Shield)", "NFC NDEF Compact Binary, AES-GCM Encrypted", "Nghị định 13/2023/NĐ-CP về Bảo vệ Dữ liệu Cá nhân."],
+        ["SafeBlood Urgent Relay", "BloodRelayRequest (ABO/Rh Matrix)", "Geo-Fencing 15km, ISBT 128 Blood Matching", "Thông tư 26/2013/TT-BYT Hướng dẫn hoạt động truyền máu."],
+        ["HeroShield Welfare", "HeroInsurancePolicy, RestockVoucher", "SBAR Medical Handoff NLP Parsing, E-Voucher", "Điều 87 Luật KBCB 2023; Điều 132 & 23 BLHS; Điều 584 BLDS."]
+    ]
+    add_styled_table(doc, ecosystem_headers, ecosystem_data, col_widths=[1.5, 1.8, 1.8, 1.9])
 
     # =========================================================================
     # CHƯƠNG 5: KIỂM THỬ VÀ ĐÁNH GIÁ THỰC NGHIỆM

@@ -21,13 +21,19 @@ import {
   Keyboard,
   Radio,
   Sparkles,
+  Lock,
   X,
+  Stethoscope,
+  QrCode,
+  FileText,
+  CheckCircle2,
+  Zap,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
 import { HitlDispatchPanel } from "@/components/HitlDispatchPanel";
 import { IncidentMap } from "@/components/IncidentMap";
 import { Topbar } from "@/components/Topbar";
-import { fetchAdminOverview, resolveIncident, submitHitlAction } from "@/lib/api";
+import { fetchAdminOverview, resolveIncident, submitHitlAction, runClinicalSop } from "@/lib/api";
 import type { HitlActionPayload } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 import { audioAlarm } from "@/lib/audioAlarm";
@@ -112,6 +118,14 @@ function DispatchCenter() {
   const hitlMutation = useMutation({
     mutationFn: ({ incidentId, payload }: { incidentId: string; payload: HitlActionPayload }) =>
       submitHitlAction(incidentId, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+      await queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+    },
+  });
+
+  const clinicalSopMutation = useMutation({
+    mutationFn: (incidentId: string) => runClinicalSop(incidentId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
       await queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
@@ -512,17 +526,239 @@ function DispatchCenter() {
               <InfoBox icon={PhoneCall} label="Liên hệ khẩn cấp" value={selected.emergencyContactPhone || "Không có"} />
             </div>
 
+            {/* Thanh Tiến Trình Cứu Hộ Lâm Sàng Thực Tế (Rescue Lifecycle Stage) */}
+            {(() => {
+              const isDispatched =
+                selected.hitl?.state === "DISPATCHED" ||
+                selected.hitl?.state === "AMBULANCE_DISPATCHED";
+              const isAmbulance = selected.hitl?.state === "AMBULANCE_DISPATCHED";
+              const isCancelled = selected.hitl?.state === "CANCELLED_FALSE_ALARM";
+              const hasClinicalActions = Boolean(selected.clinicalActions && selected.clinicalActions.length > 0);
+              const sbar = selected.sbarHandoff;
+
+              return (
+                <div className="mx-5 mb-3 space-y-3">
+                  {/* Thanh Tiến Trình Cứu Hộ 4 Bước */}
+                  <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-3">
+                    <div className="flex items-center justify-between text-xs font-bold text-sky-400 mb-2">
+                      <span className="flex items-center gap-1.5">
+                        <Activity className="h-4 w-4 text-sky-400 animate-pulse" /> TIẾN TRÌNH CỨU HỘ THỰC TẾ
+                      </span>
+                      <span className="font-mono text-[11px] font-extrabold text-foreground">
+                        {isCancelled
+                          ? "ĐÃ HỦY (BÁO ĐỘNG GIẢ)"
+                          : hasClinicalActions || isAmbulance
+                          ? "🚑 ĐÃ CẤP CỨU & BÀN GIAO 115"
+                          : isDispatched
+                          ? "🏃 HIỆP SĨ ĐANG TỚI HIỆN TRƯỜNG"
+                          : "⏳ CHỜ PHÁI CỬ HIỆP SĨ"}
+                      </span>
+                    </div>
+
+                    {/* 4-step progress breadcrumbs */}
+                    <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-semibold">
+                      <div className="rounded bg-rose-500/20 border border-rose-500/40 p-1.5 text-rose-300">
+                        1. Tiếp nhận SOS
+                      </div>
+                      <div
+                        className={`rounded p-1.5 border transition ${
+                          isDispatched
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold"
+                            : "bg-muted/30 border-border text-muted-foreground"
+                        }`}
+                      >
+                        2. Hiệp sĩ tiếp nhận
+                      </div>
+                      <div
+                        className={`rounded p-1.5 border transition ${
+                          hasClinicalActions
+                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold"
+                            : isDispatched
+                            ? "bg-sky-500/20 border-sky-500/40 text-sky-300 font-bold animate-pulse"
+                            : "bg-muted/30 border-border text-muted-foreground"
+                        }`}
+                      >
+                        3. Sơ cứu hiện trường
+                      </div>
+                      <div
+                        className={`rounded p-1.5 border transition ${
+                          hasClinicalActions || isAmbulance
+                            ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300 font-bold"
+                            : "bg-muted/30 border-border text-muted-foreground"
+                        }`}
+                      >
+                        4. Bàn giao 115
+                      </div>
+                    </div>
+
+                    {!isDispatched && !isCancelled && (
+                      <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-amber-500/10 border border-amber-500/30 p-2.5 text-[11px] text-amber-300">
+                        <div>
+                          <strong>⚠️ Chưa có ai cứu hộ:</strong> Bắt buộc phải điều phối Hiệp sĩ hoặc Kíp 115 tiếp cận hiện trường trước khi hoàn tất ca.
+                        </div>
+                        <button
+                          onClick={() =>
+                            hitlMutation.mutate({
+                              incidentId: selected.id,
+                              payload: {
+                                action: "INSTANT_DISPATCH",
+                                supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+                                tier: 2,
+                              },
+                            })
+                          }
+                          className="whitespace-nowrap rounded bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 shadow-md transition"
+                        >
+                          ⚡ Điều phối Hiệp sĩ ngay
+                        </button>
+                      </div>
+                    )}
+
+                    {isDispatched && !hasClinicalActions && !isCancelled && (
+                      <div className="mt-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-2.5 text-[11px] text-emerald-300 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <strong>✅ Hiệp sĩ đã tiếp cận:</strong> Đoàn Minh Quân (Tier 2 PHTLS) đang có mặt tại hiện trường.
+                          </div>
+                          <button
+                            onClick={() => clinicalSopMutation.mutate(selected.id)}
+                            disabled={clinicalSopMutation.isPending}
+                            className="whitespace-nowrap rounded bg-gradient-to-r from-sky-600 to-emerald-600 px-3.5 py-1.5 text-xs font-black text-white hover:opacity-95 shadow-md transition animate-pulse"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Zap className="h-3.5 w-3.5" />
+                              {clinicalSopMutation.isPending
+                                ? "Đang thực hiện..."
+                                : "▶ KÍCH HOẠT QUY TRÌNH LÂM SÀNG & SBAR 115"}
+                            </span>
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Thực hiện 3 kỹ thuật chuẩn SOP: C-Spine Log-roll, Đặt Garô CAT chèn động mạch, Ép tim CPR Metronome 110 bpm theo máy AED.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* BẢNG THAO TÁC LÂM SÀNG & BIÊN BẢN SBAR 115 (Khi đã thực hiện sơ cứu) */}
+                  {hasClinicalActions && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-3.5 space-y-3">
+                      {/* Tiêu đề & Sinh tồn phục hồi */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2">
+                        <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-400">
+                          <Stethoscope className="h-4 w-4 text-emerald-400" />
+                          NHẬT KÝ THAO TÁC LÂM SÀNG NGOẠI VIỆN (SOP V2.1)
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-black text-emerald-300">
+                            <HeartPulse className="h-3 w-3" /> SpO2: 96% (Hồi phục từ 91%)
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded bg-sky-500/20 border border-sky-500/40 px-2 py-0.5 text-[10px] font-black text-sky-300">
+                            <Activity className="h-3 w-3" /> Mạch: 86 bpm (Ổn định)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 3 Thao tác lâm sàng chi tiết */}
+                      <div className="space-y-2">
+                        {selected.clinicalActions?.map((action, idx) => (
+                          <div
+                            key={action.code || idx}
+                            className="rounded-lg border border-border bg-card/70 p-2.5 text-xs space-y-1"
+                          >
+                            <div className="flex items-center justify-between font-bold text-foreground">
+                              <span className="flex items-center gap-1.5 text-sky-400">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                                {idx + 1}. {action.title}
+                              </span>
+                              <span className="text-[10px] font-mono text-muted-foreground">{action.performer}</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">{action.description}</p>
+                            <div className="text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
+                              <span>✦ Kết quả:</span> {action.vitalImpact}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* BIÊN BẢN BÀN GIAO SBAR CHO 115 */}
+                      {sbar && (
+                        <div className="rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-2 text-xs">
+                          <div className="flex items-center justify-between font-extrabold text-indigo-300 border-b border-indigo-500/20 pb-1.5">
+                            <span className="flex items-center gap-1.5">
+                              <FileText className="h-3.5 w-3.5 text-indigo-400" />
+                              BIÊN BẢN BÀN GIAO LÂM SÀNG SBAR CHO 115 CHỢ RẪY
+                            </span>
+                            <span className="font-mono text-[10px] text-indigo-300">Xe: {sbar.ambulancePlate}</span>
+                          </div>
+
+                          <div className="grid gap-2 sm:grid-cols-2 text-[11px]">
+                            <div className="rounded bg-background/50 p-2 border border-border">
+                              <span className="font-bold text-rose-400">S (Situation):</span> {sbar.situation}
+                            </div>
+                            <div className="rounded bg-background/50 p-2 border border-border">
+                              <span className="font-bold text-amber-400">B (Background):</span> {sbar.background}
+                            </div>
+                            <div className="rounded bg-background/50 p-2 border border-border">
+                              <span className="font-bold text-emerald-400">A (Assessment):</span> {sbar.assessment}
+                            </div>
+                            <div className="rounded bg-background/50 p-2 border border-border">
+                              <span className="font-bold text-sky-400">R (Recommendation):</span> {sbar.recommendation}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-indigo-500/20 text-[10px] text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-foreground">Bác sĩ tiếp nhận:</span> {sbar.paramedicName}
+                            </div>
+                            <div className="flex items-center gap-2 font-mono">
+                              <span className="flex items-center gap-1 text-emerald-400">
+                                <QrCode className="h-3 w-3" /> EMR QR VERIFIED
+                              </span>
+                              <span className="text-muted-foreground">SHA-256: {sbar.qrVerificationHash}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 border-t border-border bg-card/95 p-4 backdrop-blur-md sm:grid-cols-2">
               <button className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-info px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90">
                 <PhoneCall className="h-4 w-4" /> Gọi người thân ({selected.emergencyContactPhone || "Chưa có"})
               </button>
-              <button
-                onClick={() => resolveMutation.mutate(selected.id)}
-                disabled={resolveMutation.isPending}
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-sos px-4 py-3 text-xs font-bold text-primary-foreground transition hover:opacity-90 pulse-sos disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Siren className="h-4 w-4" /> {resolveMutation.isPending ? "Đang xử lý..." : "Đóng & Đánh dấu hoàn tất sự cố"}
-              </button>
+              {(() => {
+                const isDispatched =
+                  selected.hitl?.state === "DISPATCHED" ||
+                  selected.hitl?.state === "AMBULANCE_DISPATCHED";
+                const isCancelled = selected.hitl?.state === "CANCELLED_FALSE_ALARM";
+
+                if (!isDispatched && !isCancelled) {
+                  return (
+                    <button
+                      disabled
+                      title="Quy định y tế SOP: Ca này chưa có ai cứu nên không thể hoàn tất. Vui lòng bấm 'Điều phối Hiệp sĩ ngay' hoặc 'Hủy do báo động giả'."
+                      className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-muted/60 px-4 py-3 text-xs font-bold text-muted-foreground border border-border cursor-not-allowed opacity-60"
+                    >
+                      <Lock className="h-4 w-4" /> Chưa thể đóng ca (Chưa có ai cứu hộ)
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    onClick={() => resolveMutation.mutate(selected.id)}
+                    disabled={resolveMutation.isPending}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-xs font-bold text-white transition hover:bg-emerald-500 shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    {resolveMutation.isPending ? "Đang xử lý..." : "✅ Đã cứu & Đóng hoàn tất sự cố"}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>

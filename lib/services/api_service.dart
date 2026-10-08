@@ -556,6 +556,14 @@ class ApiService {
   Future<Map<String, dynamic>> uploadKycDocuments({
     required String frontPath,
     required String backPath,
+    String? certificatePath,
+    String? certificateNumber,
+    String? issuingOrganization,
+    String? certificateType,
+    String? specialtyTier,
+    List<String>? skillsList,
+    String? expiryDate,
+    bool? scopeOfPracticeAgreed,
     String? userId,
     String? token,
   }) async {
@@ -568,11 +576,67 @@ class ApiService {
       request.headers['x-user-id'] = userId;
       request.fields['userId'] = userId;
     }
+    if (certificateNumber != null) request.fields['certificateNumber'] = certificateNumber;
+    if (issuingOrganization != null) request.fields['issuingOrganization'] = issuingOrganization;
+    if (certificateType != null) request.fields['certificateType'] = certificateType;
+    if (specialtyTier != null) request.fields['specialtyTier'] = specialtyTier;
+    if (skillsList != null) request.fields['skillsList'] = jsonEncode(skillsList);
+    if (expiryDate != null) request.fields['expiryDate'] = expiryDate;
+    if (scopeOfPracticeAgreed != null) {
+      request.fields['scopeOfPracticeAgreed'] = scopeOfPracticeAgreed.toString();
+    }
+
     request.files.add(await http.MultipartFile.fromPath('front_image', frontPath));
     request.files.add(await http.MultipartFile.fromPath('back_image', backPath));
+    if (certificatePath != null && certificatePath.isNotEmpty) {
+      request.files.add(await http.MultipartFile.fromPath('certificate_image', certificatePath));
+    }
 
     final streamedResponse = await request.send().timeout(_timeout);
     final response = await http.Response.fromStream(streamedResponse);
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> submitClinicalExam({
+    required List<int> answers,
+    required bool scopeOfPracticeAgreed,
+    String? userId,
+    String? token,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/kyc/exam/submit');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'answers': answers,
+          'scopeOfPracticeAgreed': scopeOfPracticeAgreed,
+          if (userId != null) 'userId': userId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getKycStatus({String? userId, String? token}) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/kyc/status');
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+      ),
+    );
     _throwIfFailed(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -1213,5 +1277,287 @@ class ApiService {
     _throwIfFailed(response);
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Lấy danh sách ca cấp cứu lân cận dành cho Hiệp sĩ
+  Future<List<Map<String, dynamic>>> getNearbyRadarIncidents({
+    required double lat,
+    required double lng,
+    double radiusKm = 4.5,
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse(
+      '${AppConstants.backendBaseUrl}/radar/nearby?lat=$lat&lng=$lng&radiusKm=$radiusKm',
+    );
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Hiệp sĩ bấm chấp nhận nhiệm vụ cứu nạn (Atomic Lock)
+  Future<Map<String, dynamic>> acceptRadarIncident(
+    String incidentId, {
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/accept');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Hiệp sĩ cập nhật tọa độ di chuyển theo thời gian thực (Watchdog Telemetry)
+  Future<Map<String, dynamic>> updateHeroTelemetry(
+    String incidentId, {
+    required double lat,
+    required double lng,
+    double speedKmh = 0,
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/telemetry');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'lat': lat,
+          'lng': lng,
+          'speedKmh': speedKmh,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Ghi nhận thao tác sơ cứu lâm sàng tại hiện trường (C-Spine, Garô CAT, CPR AED)
+  Future<Map<String, dynamic>> recordFirstAidAction(
+    String incidentId, {
+    required String actionType,
+    int durationSeconds = 0,
+    String notes = '',
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/first-aid');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'actionType': actionType,
+          'durationSeconds': durationSeconds,
+          'notes': notes,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Bàn giao y tế SBAR cho Kíp cấp cứu 115
+  Future<Map<String, dynamic>> handoffToMedical(
+    String incidentId, {
+    required String ambulancePlate,
+    required String paramedicName,
+    required String qrVerificationHash,
+    String notes = '',
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/handoff');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'ambulancePlate': ambulancePlate,
+          'paramedicName': paramedicName,
+          'qrVerificationHash': qrVerificationHash,
+          'notes': notes,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Lấy danh sách trạm SafePoint & Tủ AED lân cận
+  Future<List<Map<String, dynamic>>> getNearbySafePoints({
+    required double latitude,
+    required double longitude,
+    double radiusMeters = 5000,
+    String? type,
+  }) async {
+    final queryParams = {
+      'latitude': latitude.toString(),
+      'longitude': longitude.toString(),
+      'radiusMeters': radiusMeters.toString(),
+      if (type != null && type.isNotEmpty) 'type': type,
+    };
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/nearby')
+        .replace(queryParameters: queryParams);
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Tìm trạm AED tối ưu trên đường cứu hộ (Waypoint detouring)
+  Future<Map<String, dynamic>?> getOptimalAedWaypoint({
+    required double victimLat,
+    required double victimLng,
+    required double heroLat,
+    required double heroLng,
+  }) async {
+    final queryParams = {
+      'victimLat': victimLat.toString(),
+      'victimLng': victimLng.toString(),
+      'heroLat': heroLat.toString(),
+      'heroLng': heroLng.toString(),
+    };
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/optimal-aed')
+        .replace(queryParameters: queryParams);
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>?;
+  }
+
+  /// Tạo mã OTP TOTP mở tủ cứu hộ khẩn cấp
+  Future<Map<String, dynamic>> requestSafePointUnlock(
+    String safePointId, {
+    required String rescuerId,
+    String? incidentId,
+    String? purpose,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/$safePointId/unlock-request');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'rescuerId': rescuerId,
+          if (incidentId != null) 'incidentId': incidentId,
+          if (purpose != null) 'purpose': purpose,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Tra cứu thẻ y tế ngoại tuyến SafeTag Tầng 1 (Public ICE)
+  Future<Map<String, dynamic>> lookupSafeTagPublicIce(String tagUid) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safetags/public-ice/$tagUid');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Tra cứu danh sách lệnh điều phối máu SafeBlood khẩn cấp
+  Future<List<Map<String, dynamic>>> getActiveBloodRelays({
+    double? hospitalLat,
+    double? hospitalLng,
+  }) async {
+    final queryParams = <String, String>{
+      if (hospitalLat != null) 'hospitalLat': hospitalLat.toString(),
+      if (hospitalLng != null) 'hospitalLng': hospitalLng.toString(),
+    };
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/blood-relay/active')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Hiệp sĩ nhận lệnh hiến máu khẩn cấp
+  Future<Map<String, dynamic>> acceptBloodRelay(
+    String requestId, {
+    required String donorId,
+    int? etaMinutes,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/blood-relay/$requestId/accept');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'donorId': donorId,
+          if (etaMinutes != null) 'etaMinutes': etaMinutes,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Lấy danh sách chứng thư bảo hiểm pháp lý HeroShield của hiệp sĩ
+  Future<List<Map<String, dynamic>>> getHeroPolicies(String heroId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/policies/$heroId');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Lấy danh sách voucher bồi hoàn vật tư y tế của hiệp sĩ
+  Future<List<Map<String, dynamic>>> getHeroRestockVouchers(String heroId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/vouchers/$heroId');
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 }

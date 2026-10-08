@@ -325,12 +325,25 @@ async function getAnalyticsDashboard(req, res, next) {
   }
 }
 
+async function runClinicalSop(req, res, next) {
+  try {
+    const data = await adminPortalService.runClinicalSop(
+      req.params.id,
+      req.body || {},
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getOverview,
   listUsers,
   listIncidents,
   resolveIncident,
   handleHitlAction,
+  runClinicalSop,
   listSmsLogs,
   listAuditLogs,
   listKycQueue,
