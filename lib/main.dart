@@ -29,6 +29,8 @@ import 'views/community/accident_report_page.dart';
 import 'views/settings/app_user_guide_page.dart';
 import 'views/settings/defense_demo_sandbox_page.dart';
 import 'views/medical/lockscreen_medical_card_page.dart';
+import 'views/medical/blood_relay_page.dart';
+import 'views/emergency/safepoints_map_page.dart';
 import 'views/notifications/notification_center_page.dart';
 import 'views/sos_map/sos_map_page.dart';
 import 'services/widget_service.dart';
@@ -50,6 +52,10 @@ Future<void> main() async {
               builder: (_) => const SosMapPage(),
             ),
           );
+        } else if (action == 'circle' || action == 'ping_circle' || action == 'share_location') {
+          AppConstants.navigatorKey.currentState?.pushNamed('/circle');
+        } else if (action == 'medical') {
+          AppConstants.navigatorKey.currentState?.pushNamed('/lockscreen-medical-card');
         }
       }
     });
@@ -132,6 +138,8 @@ class SafeSoloApp extends StatelessWidget {
               '/user-guide': (_) => const AppUserGuidePage(),
               '/demo-sandbox': (_) => const DefenseDemoSandboxPage(),
               '/lockscreen-medical': (_) => const LockscreenMedicalCardPage(),
+              '/blood-relay': (_) => const BloodRelayPage(),
+              '/safepoints-map': (_) => const SafePointsMapPage(),
               '/notifications': (_) => const NotificationCenterPage(),
             },
             onGenerateRoute: (settings) {

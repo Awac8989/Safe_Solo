@@ -72,6 +72,7 @@ async function updateKycStatus(req, res, next) {
     const data = await adminPortalService.updateKycStatus(
       req.params.id,
       req.body?.action,
+      req.body,
     );
     res.json({ success: true, data });
   } catch (error) {
@@ -82,6 +83,15 @@ async function updateKycStatus(req, res, next) {
 async function getChannelHealth(_req, res, next) {
   try {
     const data = await adminPortalService.getChannelHealth();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function testDispatchOmnichannel(req, res, next) {
+  try {
+    const data = await adminPortalService.testDispatchOmnichannel(req.body || {});
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -205,6 +215,19 @@ async function disburseHeroBounty(req, res, next) {
       req.params.id,
       req.body?.amount,
       req.body?.reason,
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function sendHeroDirectMessage(req, res, next) {
+  try {
+    const data = await adminPortalService.sendHeroDirectMessage(
+      req.params.id,
+      req.body?.message,
+      req.body?.urgency,
     );
     res.json({ success: true, data });
   } catch (error) {
@@ -337,6 +360,72 @@ async function runClinicalSop(req, res, next) {
   }
 }
 
+async function instantDispatchVictim(req, res, next) {
+  try {
+    const data = await adminPortalService.instantDispatchVictim(
+      req.params.id,
+      req.body || {},
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function pingUserCheckin(req, res, next) {
+  try {
+    const data = await adminPortalService.pingUserCheckin(
+      req.params.id,
+      req.body?.reason,
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function escalateUserGuardian(req, res, next) {
+  try {
+    const data = await adminPortalService.escalateUserGuardian(
+      req.params.id,
+      req.body?.reason,
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function broadcastHazardTelegram(req, res, next) {
+  try {
+    const data = await adminPortalService.broadcastHazardTelegram(
+      req.params.id,
+      req.body?.message,
+    );
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function settlePartnerCommission(req, res, next) {
+  try {
+    const data = await adminPortalService.settlePartnerCommission(req.body || {});
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function pingB2BWorker(req, res, next) {
+  try {
+    const data = await adminPortalService.pingB2BWorker(req.body || {});
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getOverview,
   listUsers,
@@ -349,7 +438,10 @@ module.exports = {
   listKycQueue,
   updateKycStatus,
   getChannelHealth,
+  testDispatchOmnichannel,
   getRevenueSummary,
+  settlePartnerCommission,
+  pingB2BWorker,
   getHeroRadar,
   getSafeHavens,
   getThankYouNotes,
@@ -358,9 +450,14 @@ module.exports = {
   verifyHazard,
   createHazard,
   getMultiVictimVitals,
+  instantDispatchVictim,
+  pingUserCheckin,
+  escalateUserGuardian,
+  broadcastHazardTelegram,
   getB2BOverview,
   getHeroFleet,
   disburseHeroBounty,
+  sendHeroDirectMessage,
   getIncidentPlayback,
   listGeofences,
   createGeofence,

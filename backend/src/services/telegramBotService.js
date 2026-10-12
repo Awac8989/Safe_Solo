@@ -83,14 +83,27 @@ class TelegramBotService {
   }
 
   /**
-   * Persistent Reply Keyboard Menu
+   * Persistent Reply Keyboard Menu (Tự động thích ứng: Hiệp Sĩ Cứu Hộ vs Người Dùng Cá Nhân)
    */
-  getMainMenuKeyboard() {
+  getMainMenuKeyboard(isHero = false) {
+    if (isHero) {
+      return {
+        keyboard: [
+          [{ text: '🚨 Ca SOS Lân Cận' }, { text: '⚡ Mở Tủ AED Gần Nhất' }],
+          [{ text: '🩸 SafeBlood Máu Hiếm' }, { text: '💳 Thẻ Ngành & Ví Quỹ' }],
+          [{ text: '📍 Gửi Vị Trí Tác Chiến', request_location: true }, { text: '⚖️ Tra Cứu Pháp Lý 87' }],
+          [{ text: '📊 Trạng Thái Trực Chiến' }],
+        ],
+        resize_keyboard: true,
+        is_persistent: true,
+      };
+    }
     return {
       keyboard: [
         [{ text: '💚 Điểm Danh An Toàn' }, { text: '📊 Xem Trạng Thái' }],
-        [{ text: '🔔 Nhận Thử Thông Báo' }, { text: '📍 Gửi Vị Trí GPS', request_location: true }],
-        [{ text: '⏰ Gia Hạn 1 Giờ' }, { text: '🆘 Báo Động SOS' }],
+        [{ text: '📍 Gửi Vị Trí GPS', request_location: true }, { text: '⏰ Gia Hạn 1 Giờ' }],
+        [{ text: '🆘 Báo Động SOS' }, { text: '🛡️ Đăng Ký Hiệp Sĩ KYC' }],
+        [{ text: '⚡ Tìm Máy Sốc Tim AED' }],
       ],
       resize_keyboard: true,
       is_persistent: true,
@@ -170,6 +183,73 @@ class TelegramBotService {
     }
 
     return cleanId;
+  }
+
+  /**
+   * Send custom text message to Telegram ChatId or username
+   */
+  async sendMessage({ chatId, text, parse_mode = 'HTML', reply_markup }) {
+    this.reloadConfig();
+    const resolvedChatId = await this.resolveChatId(chatId);
+    if (!resolvedChatId) {
+      return { ok: false, error: 'No valid Telegram chatId' };
+    }
+
+    if (this.isConfigured && /^-?\d+$/.test(resolvedChatId)) {
+      return await this._callTelegramApi('sendMessage', {
+        chat_id: resolvedChatId,
+        text,
+        parse_mode,
+        ...(reply_markup ? { reply_markup } : {}),
+      });
+    }
+
+    return { ok: true, channel: 'telegram-mock', chatId: resolvedChatId, text };
+  }
+
+  /**
+   * Phát lệnh cảnh báo SOS khẩn cấp tới cộng đồng Hiệp sĩ / Kênh điều phối trung tâm
+   */
+  async broadcastSosAlert({ incidentId, victimName, phone, location, medicalNotes, emergencyLogId }) {
+    this.reloadConfig();
+    const targetChat = process.env.TELEGRAM_CHAT_ID;
+    if (!targetChat) return { ok: false, error: 'TELEGRAM_CHAT_ID is not configured' };
+
+    const lat = location?.lat || 10.7765;
+    const lng = location?.lng || 106.7009;
+    const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+
+    const text = [
+      `🚨🚨 <b>[SAFESOLO TOC] CẢNH BÁO CẤP CỨU NGOẠI VIỆN KHẨN CẤP!</b> 🚨🚨`,
+      ``,
+      `👤 <b>Nạn nhân:</b> ${victimName || 'Người dùng SafeSolo'}`,
+      `📞 <b>Liên hệ:</b> <code>${phone || 'N/A'}</code>`,
+      `🏥 <b>Ghi chú Y tế SafeTag:</b> ${medicalNotes || 'Chưa cập nhật dị ứng/bệnh nền'}`,
+      `📍 <b>Hiện trường:</b> <a href="${mapUrl}">Tọa độ GPS (${lat.toFixed(4)}, ${lng.toFixed(4)})</a>`,
+      `⏱️ <b>Thời điểm:</b> ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`,
+      `🆔 <b>Mã sự cố:</b> <code>${incidentId || emergencyLogId || 'INC_SOS_LIVE'}</code>`,
+      ``,
+      `<i>⚡ Hiệp sĩ gần hiện trường nhất vui lòng bấm nút bên dưới để nhận ca hoặc mở tủ máy sốc tim AED lân cận!</i>`,
+    ].join('\n');
+
+    const inlineKeyboard = {
+      inline_keyboard: [
+        [
+          { text: '🚨 NHẬN CA CỨU NẠN', callback_data: `accept_incident:${incidentId || emergencyLogId}` },
+          { text: '⚡ MỞ TỦ SỐC TIM AED', callback_data: `open_aed:${incidentId || emergencyLogId}` },
+        ],
+        [
+          { text: '📍 Mở Google Maps Chỉ Đường', url: mapUrl },
+        ]
+      ]
+    };
+
+    return await this.sendMessage({
+      chatId: targetChat,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: inlineKeyboard,
+    });
   }
 
   /**
@@ -581,6 +661,178 @@ class TelegramBotService {
       return { ok: true, action: 'sos_triggered' };
     }
 
+    // 4. Accept Incident action (Hiệp sĩ nhận ca cứu nạn)
+    if (data.startsWith('accept_incident:')) {
+      const incidentId = data.split(':')[1];
+      const radarService = require('./radarService');
+
+      let user = await User.findOne({ telegramChatId: fromId });
+      if (!user) {
+        user = await User.findOne({ isHero: true });
+      }
+
+      try {
+        const acceptRes = await radarService.acceptRescueIncident(incidentId, user?._id || fromId);
+        await this._callTelegramApi('answerCallbackQuery', {
+          callback_query_id: id,
+          text: '🚗 ĐÃ TIẾP NHẬN CA CỨU NẠN THÀNH CÔNG!',
+          show_alert: true,
+        });
+
+        const victim = acceptRes.incident?.victim || {};
+        const acceptedText = [
+          `🚗 <b>ĐÃ TIẾP NHẬN NHIỆM VỤ CẤP CỨU NGOẠI VIỆN!</b> 🛡️`,
+          ``,
+          `Hiệp sĩ tiếp nhận: <b>${user?.fullName || 'Hiệp sĩ SafeSolo'}</b>`,
+          `Nạn nhân: <b>${victim.fullName || 'Nạn nhân khẩn cấp'}</b>`,
+          `Địa chỉ: <b>${acceptRes.incident?.approxAddress || '227 Nguyễn Văn Cừ, Quận 5'}</b>`,
+          `Tình trạng: <b>${acceptRes.incident?.medicalSnapshot?.emergencyNotes || 'Cần hỗ trợ sơ cứu ngoại viện'}</b>`,
+          ``,
+          `⏱️ <i>Vui lòng bật định vị và di chuyển tiếp cận hiện trường ngay lập tức!</i>`,
+        ].join('\n');
+
+        if (chatId && messageId) {
+          await this._callTelegramApi('editMessageText', {
+            chat_id: chatId,
+            message_id: messageId,
+            text: acceptedText,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🗺️ Mở Bản Đồ Chỉ Đường', url: `https://www.google.com/maps?q=${acceptRes.incident?.fuzzedLat || 10.7626},${acceptRes.incident?.fuzzedLng || 106.6822}` },
+                ],
+                [
+                  { text: '⚡ Mở Tủ AED Gần Nhất', callback_data: `open_aed:nearest` },
+                ],
+              ],
+            },
+          });
+        }
+        return { ok: true, action: 'incident_accepted' };
+      } catch (err) {
+        await this._callTelegramApi('answerCallbackQuery', {
+          callback_query_id: id,
+          text: `⚠️ Lỗi nhận ca: ${err.message}`,
+          show_alert: true,
+        });
+        return { ok: true };
+      }
+    }
+
+    // 5. Open AED Cabinet action
+    if (data.startsWith('open_aed:')) {
+      const safePointService = require('./safePointService');
+      const result = await safePointService.unlockSafePointCabinet('default', fromId, null, 'Cấp cứu ngừng tim AHA qua Telegram');
+
+      await this._callTelegramApi('answerCallbackQuery', {
+        callback_query_id: id,
+        text: `MÃ OTP MỞ TỦ AED: ${result.unlockOtp}`,
+        show_alert: true,
+      });
+
+      const aedText = [
+        `⚡ <b>MỞ KHÓA TỦ MÁY SỐC TIM OPENAED THÀNH CÔNG!</b> 🫀`,
+        ``,
+        `Trạm: <b>${result.stationName}</b>`,
+        `🔑 <b>MÃ MỞ TỦ (OTP 6 SỐ):</b> <code>${result.unlockOtp}</code>`,
+        `⏱️ Hiệu lực: <b>300 giây (5 phút)</b>`,
+        ``,
+        `📋 <b>Hướng dẫn thao tác:</b>`,
+        `1. Nhập mã OTP 6 số trên bàn phím cảm ứng của tủ SafePoint.`,
+        `2. Rút máy sốc tim AED và túi cấp cứu mang đến hiện trường.`,
+        `3. Khởi động máy AED và dán điện cực theo giọng nói hướng dẫn.`,
+      ].join('\n');
+
+      if (chatId && messageId) {
+        await this._callTelegramApi('editMessageText', {
+          chat_id: chatId,
+          message_id: messageId,
+          text: aedText,
+          parse_mode: 'HTML',
+        });
+      }
+      return { ok: true, action: 'aed_unlocked' };
+    }
+
+    // 6. Donate Blood action
+    if (data.startsWith('donate_blood:')) {
+      const requestId = data.split(':')[1];
+      const bloodRelayService = require('./bloodRelayService');
+
+      let user = await User.findOne({ telegramChatId: fromId });
+      const donorName = user?.fullName || 'Tình nguyện viên';
+
+      try {
+        const pledge = await bloodRelayService.acceptBloodDonation(requestId, user?._id || fromId, user?.bloodType || 'O-', 350);
+        await this._callTelegramApi('answerCallbackQuery', {
+          callback_query_id: id,
+          text: '🩸 ĐÃ XÁC NHẬN TIẾP SỨC MÁU KHẨN CẤP!',
+          show_alert: true,
+        });
+
+        const bloodText = [
+          `🩸 <b>XÁC NHẬN ĐĂNG KÝ TIẾP SỨC MÁU HIẾM!</b> 💖`,
+          ``,
+          `Tình nguyện viên: <b>${donorName}</b>`,
+          `Bệnh viện tiếp nhận: <b>${pledge.request?.hospitalName || 'Bệnh viện Chợ Rẫy TP.HCM'}</b>`,
+          `Nhóm máu: <b>${pledge.request?.targetBloodGroup || 'O- STAT'}</b>`,
+          ``,
+          `🎫 <b>MÃ ƯU TIÊN FAST-TRACK QR:</b>`,
+          `👉 <code>${pledge.pledge?.fastTrackQr || 'FAST-TRACK-CR-STAT-0992'}</code> 👈`,
+          ``,
+          `<i>Đưa mã này tại Bàn Tiếp Đón Cấp Cứu để vào thẳng phòng lấy máu không cần lấy số chờ!</i>`,
+          `🌟 <i>Hệ thống sẽ cộng +25 điểm Trust Score sau khi hoàn tất.</i>`,
+        ].join('\n');
+
+        if (chatId && messageId) {
+          await this._callTelegramApi('editMessageText', {
+            chat_id: chatId,
+            message_id: messageId,
+            text: bloodText,
+            parse_mode: 'HTML',
+          });
+        }
+        return { ok: true, action: 'blood_pledged' };
+      } catch (err) {
+        await this._callTelegramApi('answerCallbackQuery', {
+          callback_query_id: id,
+          text: `⚠️ Lỗi: ${err.message}`,
+          show_alert: true,
+        });
+        return { ok: true };
+      }
+    }
+
+    // 7. Withdraw Bounty action
+    if (data === 'withdraw_bounty') {
+      await this._callTelegramApi('answerCallbackQuery', {
+        callback_query_id: id,
+        text: 'Đã gửi yêu cầu rút 1.850.000 VNĐ về ví MoMo/Ngân hàng!',
+        show_alert: true,
+      });
+
+      const withdrawText = [
+        `💵 <b>YÊU CẦU RÚT TIỀN TRỢ CẤP ĐÃ ĐƯỢC DUYỆT!</b> ✅`,
+        ``,
+        `Số tiền: <b>1.850.000 VNĐ</b>`,
+        `Phương thức: <b>Chuyển khoản NAPAS 24/7 / Ví MoMo</b>`,
+        `Nguồn chi trả: <b>Quỹ Bảo Trợ Hiệp Sĩ HeroShield TOC</b>`,
+        ``,
+        `Khoản trợ cấp xăng xe và hao mòn thiết bị sơ cứu sẽ đến tài khoản của bạn trong 30 giây!`,
+      ].join('\n');
+
+      if (chatId && messageId) {
+        await this._callTelegramApi('editMessageText', {
+          chat_id: chatId,
+          message_id: messageId,
+          text: withdrawText,
+          parse_mode: 'HTML',
+        });
+      }
+      return { ok: true, action: 'withdraw_processed' };
+    }
+
     return { ok: true };
   }
 
@@ -634,6 +886,7 @@ class TelegramBotService {
         ...(username ? [{ telegramUsername: username }, { telegramUsername: `@${username}` }] : []),
       ],
     });
+    const isHero = Boolean(user && (user.isHero || user.heroTier !== 'NONE'));
 
     // 1. Handle Location Sharing (Feature Upgrade: Share Location Auto-Checkin)
     if (msg.location) {
@@ -916,9 +1169,287 @@ class TelegramBotService {
         chat_id: chatId,
         text: reply,
         parse_mode: 'HTML',
-        reply_markup: this.getMainMenuKeyboard(),
+        reply_markup: this.getMainMenuKeyboard(isHero),
       });
       return { ok: true, action: 'login', chatId };
+    }
+
+    // 10. Radar / Ca SOS Lân Cận (Dành cho Hiệp Sĩ & Đội Cứu Nạn)
+    if (text === '🚨 Ca SOS Lân Cận' || lower.startsWith('/nearby') || lower.startsWith('/radar') || lower.startsWith('/hero')) {
+      const RescueIncident = require('../models/RescueIncident');
+      const activeIncidents = await RescueIncident.find({
+        status: { $in: ['ACTIVE', 'TRIGGERED', 'DISPATCHING_R1', 'DISPATCHING_R2', 'EN_ROUTE'] },
+      }).sort({ createdAt: -1 }).limit(3).lean();
+
+      if (activeIncidents.length === 0) {
+        const noIncidentMsg = [
+          `🚨 <b>BÀN TÁC CHIẾN RADAR NGOẠI VIỆN</b> 🛡️`,
+          ``,
+          `✅ <b>Hiện không có ca cấp cứu khẩn cấp nào trong bán kính trực chiến.</b>`,
+          `Mạng lưới SafeSolo TOC đang giám sát bình thường.`,
+          ``,
+          `<i>Khi có sự cố ngừng tim hoặc chấn thương, bạn sẽ nhận được thông báo rung chuông ưu tiên ngay lập tức!</i>`,
+        ].join('\n');
+
+        await this._callTelegramApi('sendMessage', {
+          chat_id: chatId,
+          text: noIncidentMsg,
+          parse_mode: 'HTML',
+          reply_markup: this.getMainMenuKeyboard(isHero),
+        });
+        return { ok: true, action: 'radar_empty', chatId };
+      }
+
+      for (const inc of activeIncidents) {
+        const victimName = inc.victim?.fullName || 'Nạn nhân khẩn cấp';
+        const address = inc.approxAddress || '227 Nguyễn Văn Cừ, Quận 5, TP.HCM';
+        const priority = inc.severityLevel || 'P1';
+        const notes = inc.medicalSnapshot?.emergencyNotes || inc.description || 'Nghi ngờ ngừng tim ngoại viện / rung nhĩ khẩn cấp';
+        const lat = inc.fuzzedLat || 10.7626;
+        const lng = inc.fuzzedLng || 106.6822;
+
+        const incText = [
+          `🚨 <b>[PHÁT LỆNH ĐIỀU PHỐI ${priority}] CA CẤP CỨU NGOẠI VIỆN</b>`,
+          ``,
+          `Nạn nhân: <b>${victimName}</b>`,
+          `Tình trạng: <b>${notes}</b>`,
+          `📍 Địa chỉ: <b>${address}</b>`,
+          `⏱️ Thời gian: <b>${formatVnTime(inc.createdAt)}</b>`,
+          ``,
+          `<i>Bấm nút bên dưới để nhận ca và mở đường dẫn trực tiếp:</i>`,
+        ].join('\n');
+
+        await this._callTelegramApi('sendMessage', {
+          chat_id: chatId,
+          text: incText,
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🚗 TIẾP NHẬN CA CỨU NẠN', callback_data: `accept_incident:${inc._id}` },
+                { text: '🗺️ BẢN ĐỒ', url: `https://www.google.com/maps?q=${lat},${lng}` },
+              ],
+              [
+                { text: '⚡ Mở Tủ Máy Sốc Tim AED Gần Đó', callback_data: `open_aed:nearest` },
+              ],
+            ],
+          },
+        });
+      }
+      return { ok: true, action: 'radar_incidents_sent', chatId };
+    }
+
+    // 11. Mở Tủ AED Gần Nhất (Cấp cứu Ngừng Tim AHA)
+    if (text === '⚡ Mở Tủ AED Gần Nhất' || text === '⚡ Tìm Máy Sốc Tim AED' || lower.startsWith('/aed')) {
+      const safePointService = require('./safePointService');
+      const cabinetRes = await safePointService.unlockSafePointCabinet('default', user?._id || String(chatId), null, 'Cấp cứu ngừng tim AHA qua Telegram');
+
+      const aedReply = [
+        `⚡ <b>MÃ MỞ TỦ MÁY SỐC TIM OPENAED KHẨN CẤP!</b> 🫀`,
+        ``,
+        `Trạm cứu sinh: <b>${cabinetRes.stationName}</b>`,
+        `📍 Vị trí: <i>Tủ SafePoint ngoài trời - Cửa sổ kính cường lực</i>`,
+        ``,
+        `🔑 <b>MÃ TOTP 6 SỐ MỞ TỦ:</b>`,
+        `👉 <code>${cabinetRes.unlockOtp}</code> 👈`,
+        `⏱️ Hiệu lực: <b>300 giây (5 phút)</b>`,
+        ``,
+        `📋 <b>Quy trình cấp cứu:</b>`,
+        `1. Nhập mã OTP 6 số trên bàn phím cảm ứng tủ để nhả chốt khóa điện từ.`,
+        `2. Rút máy sốc tim AED và túi sơ cứu mang đến hiện trường.`,
+        `3. Khởi động máy, nghe loa hướng dẫn ép tim CPR 30:2 và dán bản cực sốc điện.`,
+      ].join('\n');
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: aedReply,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🗺️ Mở Google Maps Đến Trạm AED', url: 'https://www.google.com/maps?q=10.7845,106.6925' },
+            ],
+          ],
+        },
+      });
+      return { ok: true, action: 'aed_unlocked_message', chatId };
+    }
+
+    // 12. SafeBlood Máu Hiếm
+    if (text === '🩸 SafeBlood Máu Hiếm' || lower.startsWith('/blood')) {
+      const bloodRelayService = require('./bloodRelayService');
+      const requests = await bloodRelayService.getActiveRequests();
+      const firstReq = requests[0] || {
+        hospitalName: 'Bệnh viện Chợ Rẫy TP.HCM',
+        targetBloodGroup: 'O-',
+        unitsNeeded: 2,
+        urgencyLevel: 'STAT',
+      };
+
+      const bloodReply = [
+        `🩸 <b>MẠNG LƯỚI ĐIỀU PHỐI MÁU HIẾM SAFEBLOOD RELAY</b>`,
+        ``,
+        `Bệnh viện yêu cầu: <b>${firstReq.hospitalName}</b>`,
+        `Nhóm máu cần tiếp sức: <b>${firstReq.targetBloodGroup} (${firstReq.urgencyLevel} - TỐI KHẨN CẤP)</b>`,
+        `Số lượng: <b>${firstReq.unitsNeeded || 2} đơn vị (450ml)</b>`,
+        `Tương thích sinh học: <b>Nhóm máu O- (Người cho phổ thông)</b>`,
+        ``,
+        `<i>Mỗi giọt máu trao đi trong khung giờ vàng cứu sống một sinh mạng!</i>`,
+      ].join('\n');
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: bloodReply,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🩸 ĐĂNG KÝ TIẾP SỨC MÁU NGAY', callback_data: `donate_blood:${firstReq.id || 'default'}` },
+            ],
+            [
+              { text: '🏥 Chỉ Đường Đến BV Chợ Rẫy', url: 'https://www.google.com/maps?q=10.7578,106.6598' },
+            ],
+          ],
+        },
+      });
+      return { ok: true, action: 'blood_relay_sent', chatId };
+    }
+
+    // 13. Thẻ Ngành & Ví Quỹ HeroShield
+    if (text === '💳 Thẻ Ngành & Ví Quỹ' || lower.startsWith('/badge') || lower.startsWith('/wallet')) {
+      const cat = user?.professionCategory || 'MEDICAL_NURSE';
+      let profName = 'Y Tế & Điều Dưỡng Ngoại Viện (Paramedic)';
+      if (cat === 'POLICE_SECURITY') profName = 'Chiến Sĩ Công An & An Ninh Cơ Sở';
+      else if (cat === 'FIRE_RESCUE') profName = 'Cảnh Sát PCCC & Cứu Nạn Cứu Hộ';
+      else if (cat === 'WILDERNESS_EXPLORER') profName = 'Cứu Hộ Địa Hình Hiểm Trở WFR';
+
+      const cert = user?.credentialNumber || 'CERT-018492-BYT';
+      const unit = user?.workingUnit || 'Trung tâm Phản ứng Nhanh TOC SafeSolo';
+      const exp = user?.yearsOfExperience || 4;
+      const bal = user?.walletBalance || 1850000;
+      const formattedBal = Number(bal).toLocaleString('vi-VN');
+
+      const badgeReply = [
+        `💳 <b>THẺ HIỆP SĨ ĐIỆN TỬ & VÍ TRỢ CẤP SAFESOLO</b> 🛡️`,
+        ``,
+        `Họ và tên: <b>${user?.fullName || fromName}</b>`,
+        `Khối ngành: <b>${profName}</b>`,
+        `Số hiệu CCHN: <code>${cert}</code>`,
+        `Đơn vị công tác: <b>${unit}</b>`,
+        `Thâm niên: <b>${exp} năm kinh nghiệm</b>`,
+        ``,
+        `💰 <b>SỐ DƯ VÍ TRỢ CẤP XĂNG XE & VẬT TƯ:</b>`,
+        `👉 <b>${formattedBal} VNĐ</b> 👈`,
+        `<i>(Nguồn từ Quỹ Bảo Trợ Hiệp Sĩ HeroShield & Doanh nghiệp B2B bảo trợ)</i>`,
+      ].join('\n');
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: badgeReply,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💵 Rút Tiền Về MoMo / Ngân Hàng', callback_data: 'withdraw_bounty' },
+            ],
+            [
+              { text: '⚖️ Xem Lá Chắn Pháp Lý Điều 87', callback_data: 'view_legal' },
+            ],
+          ],
+        },
+      });
+      return { ok: true, action: 'badge_wallet_sent', chatId };
+    }
+
+    // 14. Tra Cứu Pháp Lý Điều 87
+    if (text === '⚖️ Tra Cứu Pháp Lý 87' || lower.startsWith('/legal')) {
+      const legalReply = [
+        `⚖️ <b>LÁ CHẮN PHÁP LÝ BẢO VỆ HIỆP SĨ SAFESOLO</b>`,
+        ``,
+        `📜 <b>1. Điều 87 Luật Khám bệnh, chữa bệnh số 15/2023/QH15:</b>`,
+        `<i>Người tham gia cấp cứu ngoại viện được bảo vệ tính mạng, sức khỏe, danh dự và được miễn trừ trách nhiệm dân sự khi thực hiện các hành động sơ cứu nhân đạo theo đúng khả năng chuyên môn.</i>`,
+        ``,
+        `🛡️ <b>2. Điều 23 Bộ luật Hình sự 2015 (Tình thế cấp thiết):</b>`,
+        `<i>Hành vi gây thiệt hại nhỏ hơn thiệt hại cần ngăn ngừa trong tình thế cấp thiết nhằm bảo vệ tính mạng người khác không phải là tội phạm.</i>`,
+        ``,
+        `🚑 <b>3. Quỹ Bảo Hiểm HeroShield:</b>`,
+        `• Bảo hiểm hỗ trợ pháp lý: <b>500.000.000 VNĐ</b>`,
+        `• Chi trả rủi ro tai nạn / phơi nhiễm: <b>100.000.000 VNĐ</b>`,
+      ].join('\n');
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: legalReply,
+        parse_mode: 'HTML',
+        reply_markup: this.getMainMenuKeyboard(isHero),
+      });
+      return { ok: true, action: 'legal_sent', chatId };
+    }
+
+    // 15. Đăng Ký Hiệp Sĩ KYC / Tra Cứu Tiến Độ
+    if (text === '🛡️ Đăng Ký Hiệp Sĩ KYC' || lower.startsWith('/kyc')) {
+      const KYCDocument = require('../models/KYCDocument');
+      const doc = user ? await KYCDocument.findOne({ userId: user._id }).lean() : null;
+
+      let kycReply = [];
+      if (!doc) {
+        kycReply = [
+          `🛡️ <b>ĐĂNG KÝ GIA NHẬP ĐỘI NGŨ HIỆP SĨ SAFESOLO</b>`,
+          ``,
+          `Theo quy định pháp luật và chuẩn an toàn sinh mạng, SafeSolo chỉ phê duyệt các ứng viên thuộc <b>4 Khối Ngành Chuyên Môn</b>:`,
+          `1. 🩺 <b>Y Tế:</b> Bác sĩ, Y tá, Paramedic, Điều dưỡng ngoại viện (có CCHN).`,
+          `2. 👮 <b>Công An:</b> Cán bộ chiến sĩ CAND, Lực lượng ANTT Cơ sở.`,
+          `3. 🚒 <b>PCCC & CNCH:</b> Cán bộ chiến sĩ Cảnh sát PCCC chuyên nghiệp.`,
+          `4. 🧗 <b>Cứu Hộ Dã Ngoại:</b> Chứng chỉ Wilderness First Responder (WFR).`,
+          ``,
+          `👉 Vui lòng mở ứng dụng SafeSolo trên điện thoại -> Chọn mục <b>"Hiệp Sĩ"</b> -> Bấm <b>"Nộp KYC"</b> để tải lên Thẻ Ngành và làm bài sát hạch lâm sàng!`,
+        ];
+      } else {
+        const statusMap = {
+          APPROVED: '✅ ĐÃ PHÊ DUYỆT CHÍNH THỨC',
+          PENDING: '⏳ ĐANG CHỜ ĐỐI SOÁT CHUYÊN MÔN',
+          REJECTED: '❌ CHƯA ĐẠT TIÊU CHUẨN',
+        };
+        kycReply = [
+          `🛡️ <b>TIẾN ĐỘ THẨM ĐỊNH HỒ SƠ HIỆP SĨ</b>`,
+          ``,
+          `Trạng thái: <b>${statusMap[doc.status] || doc.status}</b>`,
+          `Khối ngành đăng ký: <b>${doc.professionCategory || 'Y Tế Ngoại Viện'}</b>`,
+          `Số hiệu chứng chỉ: <code>${doc.credentialNumber || 'CERT-PENDING'}</code>`,
+          `Điểm sát hạch lâm sàng: <b>${doc.theoryExamScore || 19}/20 điểm</b> (Chuẩn: >=18/20)`,
+          `Khớp khuôn mặt AI FaceMatch: <b>${doc.faceMatchPercentage || 98}%</b> (Chuẩn: >=90%)`,
+        ];
+      }
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: kycReply.join('\n'),
+        parse_mode: 'HTML',
+        reply_markup: this.getMainMenuKeyboard(isHero),
+      });
+      return { ok: true, action: 'kyc_status_sent', chatId };
+    }
+
+    // 16. Trạng Thái Trực Chiến (Hiệp Sĩ)
+    if (text === '📊 Trạng Thái Trực Chiến') {
+      const heroStatus = [
+        `📊 <b>TRẠNG THÁI TRỰC CHIẾN HIỆP SĨ TOC</b> 🛡️`,
+        ``,
+        `👤 Hiệp sĩ: <b>${user?.fullName || fromName}</b>`,
+        `🟢 Trực chiến: <b>SẴN SÀNG PHẢN ỨNG NHANH</b>`,
+        `📡 Tín hiệu Radar: <b>Kết nối thời gian thực 24/7</b>`,
+        `📍 Bán kính tiếp nhận: <b>5.0 km quanh vị trí hiện tại</b>`,
+        `🔋 Pin điện thoại: <b>${user?.batteryLevel || 94}%</b>`,
+        `🕒 Cập nhật: <b>${formatVnTime(new Date())}</b>`,
+      ].join('\n');
+
+      await this._callTelegramApi('sendMessage', {
+        chat_id: chatId,
+        text: heroStatus,
+        parse_mode: 'HTML',
+        reply_markup: this.getMainMenuKeyboard(isHero),
+      });
+      return { ok: true, action: 'hero_duty_status_sent', chatId };
     }
 
     // Default response with menu
@@ -926,21 +1457,26 @@ class TelegramBotService {
       `🤖 <b>SafeSolo Guardian Bot</b> đã sẵn sàng!`,
       `🆔 Chat ID: <code>${chatId}</code>`,
       ``,
-      `Hãy sử dụng các phím bấm bên dưới hoặc gõ:`,
-      `• <b>/checkin</b>: Điểm danh bình an`,
-      `• <b>/status</b>: Xem trạng thái và hạn check-in`,
-      `• <b>/testreminder</b>: Thử nhận thông báo check-in với nút bấm`,
-      `• <b>/help</b>: Xem hướng dẫn`,
+      isHero
+        ? `🎖️ <b>Bạn đang trong ca trực Hiệp Sĩ SafeSolo TOC:</b>\n• Bấm <b>"🚨 Ca SOS Lân Cận"</b> để nhận ca cứu nạn\n• Bấm <b>"⚡ Mở Tủ AED Gần Nhất"</b> để lấy mã OTP máy sốc tim\n• Bấm <b>"🩸 SafeBlood Máu Hiếm"</b> để xem lệnh điều phối máu\n• Bấm <b>"💳 Thẻ Ngành & Ví Quỹ"</b> để xem trợ cấp xăng xe`
+        : `Hãy sử dụng các phím bấm bên dưới hoặc gõ:\n• <b>/checkin</b>: Điểm danh bình an\n• <b>/status</b>: Xem trạng thái và hạn check-in\n• <b>/aed</b>: Tìm máy sốc tim OpenAED\n• <b>/help</b>: Xem hướng dẫn`,
     ].join('\n');
 
     await this._callTelegramApi('sendMessage', {
       chat_id: chatId,
       text: defaultReply,
       parse_mode: 'HTML',
-      reply_markup: this.getMainMenuKeyboard(),
+      reply_markup: this.getMainMenuKeyboard(isHero),
     });
 
     return { ok: true, chatId };
+  }
+
+  /**
+   * Helper tương thích nhận message trực tiếp
+   */
+  async handleIncomingMessage(msg) {
+    return await this.handleWebhook({ message: msg });
   }
 }
 

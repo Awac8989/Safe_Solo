@@ -63,4 +63,5 @@ database/
 # External reference repos
 watch-interface/
 scratch/
-
+tools/
+*.exe

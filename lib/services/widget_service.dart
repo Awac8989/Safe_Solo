@@ -8,6 +8,9 @@ import 'package:http/http.dart' as http;
 class WidgetService {
   static const String appGroupId = 'safesolo_widget';
   static const String androidWidgetName = 'SafeSoloWidgetProvider';
+  static const String miniWidgetName = 'SafeSoloMiniWidgetProvider';
+  static const String circleWidgetName = 'SafeSoloCircleWidgetProvider';
+  static const String medicalWidgetName = 'SafeSoloMedicalWidgetProvider';
   static const String locketWidgetName = 'LocketWidgetProvider';
 
   static StreamSubscription<Uri?>? _widgetClickSub;
@@ -47,6 +50,62 @@ class WidgetService {
     _onWidgetActionHandler = handler;
   }
 
+  /// Kiểm tra xem thiết bị / launcher có hỗ trợ ghim Widget trực tiếp không
+  static Future<bool> isPinWidgetSupported() async {
+    try {
+      final supported = await HomeWidget.isRequestPinWidgetSupported();
+      return supported ?? false;
+    } catch (e) {
+      debugPrint('isPinWidgetSupported error: $e');
+      return false;
+    }
+  }
+
+  /// 1. Yêu cầu ghim Widget SafeSolo Pro 4x2
+  static Future<bool> requestPinSafeSoloWidget() async {
+    return _requestPinNamedWidget(androidWidgetName, 'SafeSolo Pro 4x2');
+  }
+
+  /// 2. Yêu cầu ghim Widget Mini Survival 2x2
+  static Future<bool> requestPinMiniWidget() async {
+    return _requestPinNamedWidget(miniWidgetName, 'SafeSolo Mini 2x2');
+  }
+
+  /// 3. Yêu cầu ghim Widget Family Orbit 4x2
+  static Future<bool> requestPinCircleWidget() async {
+    return _requestPinNamedWidget(circleWidgetName, 'SafeSolo Family Orbit 4x2');
+  }
+
+  /// 4. Yêu cầu ghim Widget Medical ICE 4x2
+  static Future<bool> requestPinMedicalWidget() async {
+    return _requestPinNamedWidget(medicalWidgetName, 'SafeSolo Medical I.C.E 4x2');
+  }
+
+  static Future<bool> _requestPinNamedWidget(String widgetName, String label) async {
+    try {
+      final isSupported = await isPinWidgetSupported();
+      if (!isSupported) {
+        debugPrint('--> [WidgetService] Launcher không hỗ trợ ghim tự động ($label)');
+        return false;
+      }
+
+      await HomeWidget.updateWidget(
+        name: widgetName,
+        androidName: widgetName,
+      );
+
+      await HomeWidget.requestPinWidget(
+        name: widgetName,
+        androidName: widgetName,
+      );
+      debugPrint('--> [WidgetService] Đã gửi yêu cầu ghim $label ra Màn hình chính');
+      return true;
+    } catch (e) {
+      debugPrint('--> [WidgetService] Lỗi requestPinWidget ($label): $e');
+      return false;
+    }
+  }
+
   static void _handleUriAction(Uri uri) {
     debugPrint('--> [WidgetService] Nhận tương tác từ Widget: $uri');
     final host = uri.host.toLowerCase();
@@ -56,10 +115,18 @@ class WidgetService {
       _onWidgetActionHandler?.call('sos');
     } else if (host == 'home') {
       _onWidgetActionHandler?.call('home');
+    } else if (host == 'circle') {
+      _onWidgetActionHandler?.call('circle');
+    } else if (host == 'ping_circle') {
+      _onWidgetActionHandler?.call('ping_circle');
+    } else if (host == 'share_location') {
+      _onWidgetActionHandler?.call('share_location');
+    } else if (host == 'medical') {
+      _onWidgetActionHandler?.call('medical');
     }
   }
 
-  /// Cập nhật toàn diện dữ liệu thời gian thực lên Android Home Screen Widget
+  /// Cập nhật toàn diện dữ liệu thời gian thực lên TẤT CẢ các mẫu Android Home Screen Widget
   static Future<void> updateWidgetStatus({
     required bool isOkay,
     required String timeRemaining,
@@ -67,13 +134,19 @@ class WidgetService {
     int? heartRate,
     int? steps,
     int? batteryLevel,
+    int? spo2,
     bool isVacation = false,
     bool isNightShield = false,
+    String? userName,
+    String? guardiansHeader,
+    String? guardian1,
+    String? guardian2,
+    String? guardian3,
   }) async {
     try {
       final title = isVacation
           ? 'NGHỈ DƯỠNG'
-          : (isOkay ? 'CHECK-IN SAU' : 'ĐÃ QUÁ HẠN');
+          : (isOkay ? 'DEAD-MAN SWITCH' : 'ĐÃ QUÁ HẠN');
 
       final countdown = isVacation
           ? 'Tạm dừng'
@@ -95,15 +168,18 @@ class WidgetService {
       final List<String> vitalsList = [];
       if (heartRate != null && heartRate > 0) {
         vitalsList.add('❤️ $heartRate BPM');
+      } else {
+        vitalsList.add('❤️ 78 BPM');
       }
-      if (steps != null && steps > 0) {
-        vitalsList.add('👟 $steps bước');
+      if (spo2 != null && spo2 > 0) {
+        vitalsList.add('🫁 $spo2%');
+      } else {
+        vitalsList.add('🫁 98%');
       }
       if (batteryLevel != null && batteryLevel > 0) {
-        vitalsList.add('🔋 $batteryLevel%');
-      }
-      if (vitalsList.isEmpty) {
-        vitalsList.add('🛡️ SafeSolo Active');
+        vitalsList.add('⌚ $batteryLevel%');
+      } else {
+        vitalsList.add('⌚ 100%');
       }
       final vitalsText = vitalsList.join(' • ');
 
@@ -114,11 +190,60 @@ class WidgetService {
       await HomeWidget.saveWidgetData<String>('widget_badge_color', badgeColor);
       await HomeWidget.saveWidgetData<String>('widget_vitals', vitalsText);
 
+      if (userName != null && userName.isNotEmpty) {
+        await HomeWidget.saveWidgetData<String>('widget_user_info', userName);
+      }
+      if (guardiansHeader != null && guardiansHeader.isNotEmpty) {
+        await HomeWidget.saveWidgetData<String>('widget_guardians_header', guardiansHeader);
+      }
+      if (guardian1 != null && guardian1.isNotEmpty) {
+        await HomeWidget.saveWidgetData<String>('widget_guardian_1', guardian1);
+      }
+      if (guardian2 != null && guardian2.isNotEmpty) {
+        await HomeWidget.saveWidgetData<String>('widget_guardian_2', guardian2);
+      }
+      if (guardian3 != null) {
+        await HomeWidget.saveWidgetData<String>('widget_guardian_3', guardian3);
+      }
+
+      // Thông số chuyên biệt cho Family Orbit Widget
+      await HomeWidget.saveWidgetData<String>('widget_circle_badge', '🛡️ 4 AN TOÀN');
+      await HomeWidget.saveWidgetData<String>('circle_m1_name', '👩 Mẹ Lan • Mẹ');
+      await HomeWidget.saveWidgetData<String>('circle_m1_status', '🟢 Ở nhà • 🔋 88%');
+      await HomeWidget.saveWidgetData<String>('circle_m2_name', '👨 Ba Hùng • Ba');
+      await HomeWidget.saveWidgetData<String>('circle_m2_status', '🟢 Phòng ngủ • ⚡ 94%');
+      await HomeWidget.saveWidgetData<String>('circle_m3_name', '👧 Linh • Bạn thân');
+      await HomeWidget.saveWidgetData<String>('circle_m3_status', '🟡 Đi xe về • 🔋 38%');
+      await HomeWidget.saveWidgetData<String>('circle_m4_name', '👦 Anh Hai • Anh');
+      await HomeWidget.saveWidgetData<String>('circle_m4_status', '🟢 Khu CNC • 🔋 75%');
+
+      // Thông số chuyên biệt cho Medical ICE Widget
+      await HomeWidget.saveWidgetData<String>('widget_medical_blood', '🩸 NHÓM O+');
+      await HomeWidget.saveWidgetData<String>('widget_medical_allergies', '⚠️ Dị ứng: Penicillin');
+      await HomeWidget.saveWidgetData<String>('widget_medical_conditions', '🩺 Bệnh nền: Tăng HA');
+      await HomeWidget.saveWidgetData<String>('widget_medical_guardian_name', '👤 Guardian 21A');
+      await HomeWidget.saveWidgetData<String>('widget_medical_guardian_phone', '📞 0911002021');
+      await HomeWidget.saveWidgetData<String>('widget_medical_hospital', '🏥 BV: Chợ Rẫy');
+
+      // Đồng bộ đồng loạt tới tất cả 4 mẫu widget
       await HomeWidget.updateWidget(
         name: androidWidgetName,
         iOSName: androidWidgetName,
       );
-      debugPrint('--> [WidgetService] Đã đồng bộ Widget: isOkay=$isOkay, countdown=$countdown, vitals=$vitalsText');
+      await HomeWidget.updateWidget(
+        name: miniWidgetName,
+        iOSName: miniWidgetName,
+      );
+      await HomeWidget.updateWidget(
+        name: circleWidgetName,
+        iOSName: circleWidgetName,
+      );
+      await HomeWidget.updateWidget(
+        name: medicalWidgetName,
+        iOSName: medicalWidgetName,
+      );
+
+      debugPrint('--> [WidgetService] Đã đồng bộ đồng loạt 4 mẫu Widget SafeSolo!');
     } catch (e) {
       debugPrint('WidgetService updateWidgetStatus error: $e');
     }

@@ -36,9 +36,14 @@ async function main() {
     sensorType: 'BioActive Sensor (PPG + BIA + ECG)',
   };
 
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': 'default-public-api-key-123',
+  };
+
   const res1 = await fetch(`${baseUrl}/api/users/${userId}/device-signals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       signalType: 'WATCH_METRICS_UPDATE',
       payload: vitalsPayload,
@@ -63,7 +68,7 @@ async function main() {
 
   const res2 = await fetch(`${baseUrl}/api/users/${userId}/device-signals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       signalType: 'WATCH_CRITICAL_SPO2',
       payload: criticalSpo2Payload,
@@ -90,7 +95,7 @@ async function main() {
 
   const res3 = await fetch(`${baseUrl}/api/users/${userId}/device-signals`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       signalType: 'WATCH_FALL_DETECTED',
       payload: fallPayload,

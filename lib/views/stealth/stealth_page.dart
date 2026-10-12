@@ -410,36 +410,43 @@ class _StealthPageState extends State<StealthPage> {
 
               // Thanh tiêu đề ngụy trang (Chạm hoặc ấn giữ để mở khóa khẩn cấp)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    GestureDetector(
-                      onTap: _showMasterUnlockDialog,
-                      onLongPress: _showMasterUnlockDialog,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.calculate_rounded, color: Colors.white54, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Máy tính',
-                              style: TextStyle(
-                                color: Colors.white54,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
+                    Flexible(
+                      child: GestureDetector(
+                        onTap: _showMasterUnlockDialog,
+                        onLongPress: _showMasterUnlockDialog,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.calculate_rounded, color: Colors.white54, size: 20),
+                              SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Máy tính',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white54,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         GestureDetector(
                           onTap: _showMasterUnlockDialog,

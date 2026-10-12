@@ -261,15 +261,19 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
                           size: 26,
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          isSirenOn
-                            ? strings.text('ĐANG PHÁT CÒI CỨU HỘ 115dB (CHẠM ĐỂ TẮT)', 'SIREN ACTIVE (TAP TO STOP)')
-                            : strings.text('BẬT CÒI CỨU HỘ ÂM HỌC ĐỊNH VỊ 115dB', 'ACTIVATE 115dB RESCUE SIREN'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            letterSpacing: 0.5,
+                        Flexible(
+                          child: Text(
+                            isSirenOn
+                              ? strings.text('ĐANG PHÁT CÒI CỨU HỘ 115dB (CHẠM ĐỂ TẮT)', 'SIREN ACTIVE (TAP TO STOP)')
+                              : strings.text('BẬT CÒI CỨU HỘ ÂM HỌC ĐỊNH VỊ 115dB', 'ACTIVATE 115dB RESCUE SIREN'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ],
@@ -288,12 +292,15 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
             child: ElevatedButton.icon(
               onPressed: () => _sendOfflineEmergencySms(context),
               icon: const Icon(Icons.sms_rounded, color: Colors.white),
-              label: Text(
-                strings.text(
-                  'GỬI SMS CỨU HỘ NGOẠI TUYẾN (KÈM PDR & Y TẾ)',
-                  'SEND OFFLINE RESCUE SMS (PDR + MEDICAL)',
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  strings.text(
+                    'GỬI SMS CỨU HỘ NGOẠI TUYẾN (KÈM PDR & Y TẾ)',
+                    'SEND OFFLINE RESCUE SMS (PDR + MEDICAL)',
+                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
                 ),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Colors.white),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2563EB), // Emergency Blue
@@ -313,12 +320,15 @@ class _OfflineEmergencySheetState extends State<OfflineEmergencySheet> with Sing
                 BleMeshRadarSheet.show(context);
               },
               icon: const Icon(Icons.hub_rounded, color: Color(0xFF38EF7D)),
-              label: Text(
-                strings.text(
-                  'MẠNG LƯỚI TIẾP SỨC DÃ CHIẾN (BLE MESH)',
-                  'TACTICAL MESH RELAY NETWORK (BLE MESH)',
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  strings.text(
+                    'MẠNG LƯỚI TIẾP SỨC DÃ CHIẾN (BLE MESH)',
+                    'TACTICAL MESH RELAY NETWORK (BLE MESH)',
+                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF38EF7D)),
                 ),
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: Color(0xFF38EF7D)),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFF38EF7D), width: 1.5),

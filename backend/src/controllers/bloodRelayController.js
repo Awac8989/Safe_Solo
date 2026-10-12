@@ -1,26 +1,23 @@
 const bloodRelayService = require('../services/bloodRelayService');
 
 class BloodRelayController {
-  async createRequest(req, res, next) {
+  async getActiveRequests(req, res, next) {
     try {
-      const request = await bloodRelayService.createEmergencyBloodRequest(req.body);
-      res.status(201).json({ success: true, data: request });
+      const { hospitalLat, hospitalLng } = req.query;
+      const data = await bloodRelayService.getActiveRequests(
+        hospitalLat ? Number(hospitalLat) : undefined,
+        hospitalLng ? Number(hospitalLng) : undefined
+      );
+      res.json({ success: true, count: data.length, data });
     } catch (err) {
       next(err);
     }
   }
 
-  async searchDonors(req, res, next) {
+  async createRequest(req, res, next) {
     try {
-      const { id } = req.params;
-      const { hospitalLat, hospitalLng, maxDistance } = req.query;
-      const donors = await bloodRelayService.findMatchingDonors(
-        id,
-        Number(hospitalLat || 10.7626),
-        Number(hospitalLng || 106.6822),
-        maxDistance ? Number(maxDistance) : 15000
-      );
-      res.json({ success: true, data: donors, count: donors.length });
+      const request = await bloodRelayService.createEmergencyBloodRequest(req.body);
+      res.status(201).json({ success: true, message: 'Đã phát lệnh điều phối máu thành công', data: request });
     } catch (err) {
       next(err);
     }
@@ -29,9 +26,10 @@ class BloodRelayController {
   async accept(req, res, next) {
     try {
       const { id } = req.params;
-      const { donorUserId, donorBloodType, distanceMeters } = req.body;
-      const result = await bloodRelayService.acceptBloodDonation(id, donorUserId, donorBloodType, distanceMeters);
-      res.json({ success: true, data: result });
+      const { donorId, donorUserId, etaMinutes } = req.body;
+      const targetDonorId = donorId || donorUserId;
+      const result = await bloodRelayService.acceptBloodDonation(id, targetDonorId, etaMinutes);
+      res.json({ success: true, message: 'Đã xác nhận tình nguyện viên hiến máu', data: result });
     } catch (err) {
       next(err);
     }
@@ -40,9 +38,26 @@ class BloodRelayController {
   async fulfill(req, res, next) {
     try {
       const { id } = req.params;
-      const { donorUserId, unitsDonated } = req.body;
-      const result = await bloodRelayService.confirmDonationFulfilled(id, donorUserId, unitsDonated);
-      res.json({ success: true, data: result });
+      const { donorId, donorUserId, hospitalStaffNote } = req.body;
+      const targetDonorId = donorId || donorUserId;
+      const result = await bloodRelayService.confirmDonationFulfilled(id, targetDonorId, hospitalStaffNote);
+      res.json({ success: true, message: 'Đã hoàn tất ca tiếp nhận máu thành công', data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getMatchingDonors(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { lat, lng, radius } = req.query;
+      const data = await bloodRelayService.findMatchingDonors(
+        id,
+        lat ? Number(lat) : undefined,
+        lng ? Number(lng) : undefined,
+        radius ? Number(radius) : undefined
+      );
+      res.json({ success: true, count: data.length, data });
     } catch (err) {
       next(err);
     }

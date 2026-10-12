@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: LICH_SU_SUC_KHOE (HEALTH_HISTORY_PAGE)
+// [DUONG_DAN]: lib/views/health/health_history_page.dart
+// [CHUC_NANG]: Theo doi dien tien nhip tim, SpO2, HRV dot quy, xuat bao cao EMR
+// ============================================================================
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -235,9 +241,12 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(
-                                strings.text('Trung tâm Sức khỏe', 'Health & Vitals Hub'),
-                                style: AppTextStyles.h2.copyWith(fontSize: 24),
+                              Flexible(
+                                child: Text(
+                                  strings.text('Trung tâm Sức khỏe', 'Health & Vitals Hub'),
+                                  style: AppTextStyles.h2.copyWith(fontSize: 24),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -309,12 +318,15 @@ class _HealthHistoryPageState extends State<HealthHistoryPage> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          pedometer.watchModel,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
+                                        Flexible(
+                                          child: Text(
+                                            pedometer.watchModel,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                         const SizedBox(width: 6),

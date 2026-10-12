@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
+  Award,
   BatteryCharging,
   Briefcase,
   Building2,
@@ -11,17 +13,22 @@ import {
   FileCheck,
   HardHat,
   Phone,
+  PhoneCall,
+  Printer,
+  Radio,
   Search,
+  Send,
   Shield,
   ShieldAlert,
   ShieldCheck,
   TrendingUp,
   UserCheck,
   Users,
+  X,
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { fetchB2BOverview, type B2BEnterprise } from "@/lib/api";
+import { fetchB2BOverview, pingB2BWorker, type B2BEnterprise } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/b2b")({
@@ -30,13 +37,36 @@ export const Route = createFileRoute("/b2b")({
 });
 
 function B2BEnterprisePage() {
+  const queryClient = useQueryClient();
   const [selectedEntId, setSelectedEntId] = useState<string>("ALL");
   const [search, setSearch] = useState("");
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // EHS Contact Modal
+  const [selectedEhsContact, setSelectedEhsContact] = useState<{
+    name: string;
+    phone: string;
+    entName: string;
+    entCode: string;
+  } | null>(null);
+
+  // ISO 45001 Certificate Modal
+  const [selectedCertEnt, setSelectedCertEnt] = useState<B2BEnterprise | null>(null);
 
   const b2bQuery = useQuery({
     queryKey: ["b2b-overview"],
     queryFn: fetchB2BOverview,
     refetchInterval: 10000,
+  });
+
+  const pingWorkerMutation = useMutation({
+    mutationFn: (payload: { workerName: string; enterpriseCode: string; post: string }) =>
+      pingB2BWorker(payload),
+    onSuccess: (res) => {
+      setActionNotice(res.data.message || "Đã gửi tín hiệu kiểm tra an toàn Dead-Man Switch tới nhân sự!");
+      setTimeout(() => setActionNotice(null), 3500);
+      void queryClient.invalidateQueries({ queryKey: ["b2b-overview"] });
+    },
   });
 
   const data = b2bQuery.data?.data;
@@ -47,7 +77,13 @@ function B2BEnterprisePage() {
     selectedEntId === "ALL" ? null : enterprises.find((e) => e.id === selectedEntId) ?? null;
 
   const allShifts = enterprises.flatMap((e) =>
-    e.activeShifts.map((s) => ({ ...s, enterpriseName: e.name, enterpriseCode: e.code })),
+    e.activeShifts.map((s) => ({
+      ...s,
+      enterpriseName: e.name,
+      enterpriseCode: e.code,
+      contactPerson: e.contactPerson,
+      contactPhone: e.contactPhone,
+    })),
   );
 
   const filteredShifts = allShifts.filter((s) => {
@@ -97,6 +133,14 @@ function B2BEnterprisePage() {
         subtitle="Bảo vệ & Giám sát tuân thủ an toàn lao động nhân sự làm việc độc lập 24/7"
       />
       <div className="space-y-4 p-4 pb-16">
+        {/* Toast Notice */}
+        {actionNotice && (
+          <div className="flex items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/40 p-3 text-xs font-semibold text-sky-300 backdrop-blur animate-in fade-in slide-in-from-top-2">
+            <CheckCircle2 className="h-4 w-4 text-sky-400 shrink-0" />
+            {actionNotice}
+          </div>
+        )}
+
         {/* 1. Metric Cards Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
@@ -157,36 +201,62 @@ function B2BEnterprisePage() {
             {enterprises.map((ent) => {
               const isSelected = selectedEntId === ent.id;
               return (
-                <button
+                <div
                   key={ent.id}
-                  onClick={() => setSelectedEntId(isSelected ? "ALL" : ent.id)}
-                  className={`rounded-xl border p-3.5 text-left transition ${
+                  className={`rounded-xl border p-3.5 text-left transition flex flex-col justify-between ${
                     isSelected
                       ? "border-primary bg-primary/10 shadow-md"
                       : "border-border bg-card/80 hover:border-primary/40 hover:bg-card"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="font-mono text-[10px] font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
-                      {ent.code}
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> {ent.complianceRate}% Tuân thủ
-                    </span>
+                  <div
+                    onClick={() => setSelectedEntId(isSelected ? "ALL" : ent.id)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                      <span className="font-mono text-[10px] font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+                        {ent.code}
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> {ent.complianceRate}% Tuân thủ
+                      </span>
+                    </div>
+
+                    <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-1">{ent.name}</h3>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{ent.industry}</p>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-[11px]">
+                      <span className="text-muted-foreground">
+                        Nhân viên: <strong className="text-foreground">{ent.activeWorkers}/{ent.totalWorkers}</strong>
+                      </span>
+                      <span className="text-muted-foreground">
+                        Chu kỳ: <strong className="text-foreground">{ent.checkInInterval}p</strong>
+                      </span>
+                    </div>
                   </div>
 
-                  <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-1">{ent.name}</h3>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{ent.industry}</p>
-
-                  <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2 text-[11px]">
-                    <span className="text-muted-foreground">
-                      Nhân viên: <strong className="text-foreground">{ent.activeWorkers}/{ent.totalWorkers}</strong>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Chu kỳ: <strong className="text-foreground">{ent.checkInInterval}p</strong>
-                    </span>
+                  <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
+                    <button
+                      onClick={() => setSelectedCertEnt(ent)}
+                      className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-sky-400 hover:text-sky-300 transition"
+                    >
+                      <Award className="h-3 w-3" /> Chứng thư ISO 45001
+                    </button>
+                    <button
+                      onClick={() =>
+                        setSelectedEhsContact({
+                          name: ent.contactPerson,
+                          phone: ent.contactPhone,
+                          entName: ent.name,
+                          entCode: ent.code,
+                        })
+                      }
+                      className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-emerald-400 hover:text-emerald-300 transition"
+                    >
+                      <PhoneCall className="h-3 w-3" /> EHS Hotline
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -235,6 +305,7 @@ function B2BEnterprisePage() {
                   <th className="p-3">Thời hạn Check-in</th>
                   <th className="p-3">Pin thiết bị</th>
                   <th className="p-3">Trạng thái an toàn</th>
+                  <th className="p-3 text-right">Hành động tác chiến</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -281,6 +352,38 @@ function B2BEnterprisePage() {
                             : "CHỜ CHECK-IN"}
                         </span>
                       </td>
+                      <td className="p-3 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() =>
+                              pingWorkerMutation.mutate({
+                                workerName: shift.workerName,
+                                enterpriseCode: shift.enterpriseCode,
+                                post: shift.post,
+                              })
+                            }
+                            disabled={pingWorkerMutation.isPending}
+                            className="inline-flex items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 hover:bg-sky-500/20 px-2 py-1 text-[11px] font-bold text-sky-400 transition shadow-sm disabled:opacity-50"
+                            title="Gửi tín hiệu kiểm tra an toàn Dead-Man Switch"
+                          >
+                            <Send className="h-3 w-3" /> Ping Bot
+                          </button>
+                          <button
+                            onClick={() =>
+                              setSelectedEhsContact({
+                                name: shift.contactPerson,
+                                phone: shift.contactPhone,
+                                entName: shift.enterpriseName,
+                                entCode: shift.enterpriseCode,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-background hover:bg-accent px-2 py-1 text-[11px] font-semibold text-muted-foreground transition"
+                            title="Liên hệ Trưởng ban EHS phụ trách"
+                          >
+                            <Phone className="h-3 w-3" /> EHS
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -288,6 +391,143 @@ function B2BEnterprisePage() {
             </table>
           </div>
         </div>
+
+        {/* Modal 1: EHS Contact Hotline Modal */}
+        {selectedEhsContact && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="relative w-full max-w-md rounded-2xl border border-sky-500/40 bg-[#090d16] p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2 text-sky-400">
+                  <PhoneCall className="h-5 w-5" />
+                  <h3 className="text-base font-bold text-white">Liên Hệ Trực Ban An Toàn EHS</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedEhsContact(null)}
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-accent"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-border/60 bg-background/60 p-4 space-y-2 text-xs">
+                <div className="text-muted-foreground">Đơn vị doanh nghiệp:</div>
+                <div className="font-bold text-sm text-white">{selectedEhsContact.entName}</div>
+                <div className="text-[11px] font-mono text-sky-400">Mã: {selectedEhsContact.entCode}</div>
+
+                <div className="border-t border-border/40 pt-2 mt-2">
+                  <div className="text-muted-foreground">Trưởng ban phụ trách An toàn Lao động:</div>
+                  <div className="font-bold text-foreground text-sm mt-0.5">{selectedEhsContact.name}</div>
+                  <div className="font-mono text-emerald-400 text-sm mt-0.5">📞 {selectedEhsContact.phone}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <a
+                  href={`tel:${selectedEhsContact.phone}`}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-2.5 px-4 text-xs font-bold text-white transition shadow"
+                >
+                  <Phone className="h-3.5 w-3.5" /> Gọi Hotline EHS
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEhsContact(null)}
+                  className="rounded-xl border border-border bg-background px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-accent"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal 2: ISO 45001 EHS Compliance Certificate */}
+        {selectedCertEnt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="relative w-full max-w-xl rounded-2xl border border-sky-500/40 bg-[#090d16] p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2 text-sky-400">
+                  <Award className="h-5 w-5" />
+                  <h3 className="text-base font-bold uppercase tracking-wider text-white">
+                    Chứng Thư An Toàn Lao Động ISO 45001:2018
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedCertEnt(null)}
+                  className="rounded-lg p-1 text-muted-foreground hover:bg-accent"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Printable Certificate Frame */}
+              <div className="rounded-2xl border-2 border-sky-500/50 bg-gradient-to-b from-sky-950/30 to-card p-6 shadow-xl space-y-4 text-center">
+                <div className="flex justify-center">
+                  <div className="h-14 w-14 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shadow-lg">
+                    <ShieldCheck className="h-8 w-8 animate-pulse" />
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs uppercase font-mono tracking-widest text-sky-400">
+                    CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM — AN TOÀN VỆ SINH LAO ĐỘNG
+                  </h4>
+                  <h3 className="text-base font-extrabold text-white mt-1">
+                    CHỨNG CHỈ GIÁM SÁT AN TOÀN NHÂN SỰ LONE WORKER 24/7
+                  </h3>
+                  <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                    Số hiệu: ISO45001-VN-{selectedCertEnt.code}-2026
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-background/60 p-4 text-left text-xs space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Doanh nghiệp thụ hưởng:</span>
+                    <strong className="text-white">{selectedCertEnt.name}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Mã đối tác EHS:</span>
+                    <strong className="font-mono text-sky-400">{selectedCertEnt.code}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Quy chuẩn tuân thủ:</span>
+                    <strong className="text-emerald-400">ISO 45001:2018 & Luật ATVSLĐ 2015</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tỷ lệ tuân thủ thực tế:</span>
+                    <strong className="text-emerald-400 font-mono font-bold">{selectedCertEnt.complianceRate}%</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bảo hiểm trách nhiệm:</span>
+                    <strong className="text-amber-400">100.000.000 VNĐ / Nhân viên (Bảo Việt)</strong>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/60 pt-3 text-[10px] text-muted-foreground">
+                  <span>Hệ thống giám sát: SafeSolo IoT & WatchOS</span>
+                  <span className="font-mono text-sky-400">Xác thực số: SHA-256 EHS Verified</span>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-4 py-2 text-xs font-semibold text-foreground hover:bg-accent transition"
+                >
+                  <Printer className="h-3.5 w-3.5" /> In Chứng Thư A4
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCertEnt(null)}
+                  className="rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

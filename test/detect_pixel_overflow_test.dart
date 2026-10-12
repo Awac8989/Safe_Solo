@@ -40,7 +40,10 @@ import 'package:safesolo/views/achievements/achievements_page.dart';
 import 'package:safesolo/views/settings/settings_page.dart';
 import 'package:safesolo/views/settings/defense_demo_sandbox_page.dart';
 import 'package:safesolo/views/settings/app_user_guide_page.dart';
+import 'package:safesolo/views/medical/blood_relay_page.dart';
+import 'package:safesolo/views/emergency/safepoints_map_page.dart';
 import 'package:safesolo/views/wear_os/wear_os_watch_page.dart';
+import 'package:safesolo/services/fake_call_service.dart';
 
 AppProvider createMockProvider() {
   final p = AppProvider();
@@ -144,7 +147,7 @@ Future<void> runOverflowCheck(
     ),
   );
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(milliseconds: 600));
 }
 
 void main() {
@@ -205,11 +208,21 @@ void main() {
       '25_SettingsPage': () => const SettingsPage(),
       '26_DefenseDemoSandboxPage': () => const DefenseDemoSandboxPage(),
       '27_AppUserGuidePage': () => const AppUserGuidePage(),
+      '28_BloodRelayPage': () => const BloodRelayPage(),
+      '29_SafePointsMapPage': () => const SafePointsMapPage(),
     };
 
     for (final entry in screens.entries) {
       testWidgets('Check ${entry.key}', (tester) async {
         await runOverflowCheck(tester, entry.value(), entry.key);
+        if (entry.key == '20_FakeCallScreen') {
+          FakeCallService.instance.endCall();
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump(const Duration(seconds: 1));
+        }
+        if (entry.key == '28_BloodRelayPage' || entry.key == '29_SafePointsMapPage') {
+          await tester.pump(const Duration(seconds: 3));
+        }
       });
     }
   });
@@ -243,7 +256,7 @@ void main() {
     print('           KẾT QUẢ QUÉT TOÀN DIỆN LỖI PIXEL TRÊN MỌI MÀN HÌNH');
     print('=' * 70);
     if (overflowReport.isEmpty) {
-      print('✅ XUẤT SẮC: Không phát hiện bất kỳ lỗi tràn Pixel nào trên toàn bộ 34 màn hình!');
+      print('✅ XUẤT SẮC: Không phát hiện bất kỳ lỗi tràn Pixel nào trên toàn bộ 36 màn hình!');
     } else {
       print('⚠️ TỔNG CỘNG ${overflowReport.length} MÀN HÌNH CÓ LỖI PIXEL OVERFLOW:');
       overflowReport.forEach((screen, errors) {

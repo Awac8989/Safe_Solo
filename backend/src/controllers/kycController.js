@@ -96,6 +96,16 @@ class KYCController {
         const defaultExpiry = new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000); // 24 tháng
         const expiryDate = b.expiryDate ? new Date(b.expiryDate) : defaultExpiry;
 
+        const professionCategory = b.professionCategory || 'MEDICAL_NURSE';
+        let mappedTier = b.specialtyTier;
+        if (!mappedTier || mappedTier === 'TIER_1_BLS' || mappedTier === 'TIER_2_PHTLS' || mappedTier === 'TIER_3_MEDIC') {
+          if (professionCategory === 'POLICE_SECURITY') mappedTier = 'TIER_POLICE_SECURITY';
+          else if (professionCategory === 'FIRE_RESCUE') mappedTier = 'TIER_FIRE_RESCUE';
+          else if (professionCategory === 'WILDERNESS_EXPLORER') mappedTier = 'TIER_WILDERNESS_EXPLORER';
+          else if (professionCategory === 'RED_CROSS_FIRST_AID') mappedTier = 'TIER_BLS_FIRST_AID';
+          else mappedTier = 'TIER_PARAMEDIC_MEDIC';
+        }
+
         const updateData = {
           userId,
           frontImageUrl: frontUrl,
@@ -103,7 +113,14 @@ class KYCController {
           status: 'PENDING',
           submittedAt: new Date(),
           reviewedAt: null,
-          specialtyTier: b.specialtyTier || 'TIER_1_BLS',
+          professionCategory,
+          credentialName: b.credentialName || b.certificateType || 'Chứng chỉ Chuyên môn Cấp cứu & Cứu nạn',
+          credentialNumber: b.credentialNumber || b.certificateNumber || `CERT-${Date.now().toString().slice(-6)}`,
+          issuingAuthority: b.issuingAuthority || b.issuingOrganization || 'Cơ quan Chức năng Thẩm quyền Cấp phép',
+          workingUnit: b.workingUnit || 'Đơn vị Cứu hộ Phản ứng nhanh',
+          yearsOfExperience: Number(b.yearsOfExperience) || 2,
+          credentialImageUrl: certUrl,
+          specialtyTier: mappedTier,
           certificateType: b.certificateType || (certUrl ? 'BLS_CPR_AED' : 'FIRST_AID_STANDARD'),
           skillsList,
           scopeOfPracticeAgreed: true,

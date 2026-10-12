@@ -111,7 +111,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
 
     setState(() => _isRevokingSessions = true);
     try {
@@ -256,15 +256,16 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                   return;
                 }
                 Navigator.pop(dialogCtx);
-                final user = context.read<AppProvider>().user;
+                final appProvider = context.read<AppProvider>();
+                final user = appProvider.user;
                 if (user != null) {
                   try {
-                    await context.read<AppProvider>().resetPassword(
+                    await appProvider.resetPassword(
                           identifier: user.email.isNotEmpty ? user.email : user.phoneNumber,
                           resetCode: '123456',
                           newPassword: newPass,
                         );
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           backgroundColor: Color(0xFF10B981),
@@ -273,7 +274,7 @@ class _SecurityPageState extends State<SecurityPage> with SingleTickerProviderSt
                       );
                     }
                   } catch (err) {
-                    if (mounted) {
+                    if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Lỗi: $err')),
                       );

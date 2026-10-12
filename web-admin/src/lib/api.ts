@@ -175,11 +175,17 @@ export type KycApplicant = {
   trustScore: number;
   rescuesCount: number;
   thankYouCount: number;
+  professionCategory?: "MEDICAL_NURSE" | "POLICE_SECURITY" | "FIRE_RESCUE" | "WILDERNESS_EXPLORER" | "RED_CROSS_FIRST_AID" | "UNQUALIFIED_CIVILIAN" | string;
+  credentialName?: string;
+  credentialNumber?: string | null;
+  issuingAuthority?: string;
+  workingUnit?: string;
+  yearsOfExperience?: number;
   certificateImageUrl?: string | null;
   certificateNumber?: string | null;
   issuingOrganization?: string;
   certificateType?: string;
-  specialtyTier?: "TIER_1_BLS" | "TIER_2_PHTLS" | "TIER_3_MEDIC" | "NONE";
+  specialtyTier?: "TIER_PARAMEDIC_MEDIC" | "TIER_POLICE_SECURITY" | "TIER_FIRE_RESCUE" | "TIER_WILDERNESS_EXPLORER" | "TIER_BLS_FIRST_AID" | "TIER_1_BLS" | "TIER_2_PHTLS" | "TIER_3_MEDIC" | "UNVERIFIED" | "NONE" | string;
   skillsList?: string[];
   expiryDate?: string | null;
   theoryExamScore?: number;
@@ -314,23 +320,117 @@ export const fetchKycQueue = async () => {
 export const updateKycStatus = async (
   documentId: string,
   action: "APPROVE" | "REJECT",
-  tier?: string,
+  options?: string | { tier?: string; reason?: string },
 ) => {
+  const payload =
+    typeof options === "string"
+      ? { action, tier: options }
+      : { action, tier: options?.tier, reason: options?.reason };
   return request<{ success: true; data: unknown }>(`/admin/kyc/${documentId}`, {
     method: "PATCH",
-    body: JSON.stringify({ action, tier }),
+    body: JSON.stringify(payload),
   });
 };
 
 export const fetchChannelHealth = async () => {
   return request<{
     success: true;
-    data: { channels: ChannelHealth[]; policy: Array<{ step: number; name: string; tone: string }> };
+    data: {
+      channels: ChannelHealth[];
+      policy: Array<{ step: number; name: string; tone: string }>;
+      meta?: {
+        botUsername?: string;
+        gmailAccount?: string;
+        activePolling?: boolean;
+        smtpConnected?: boolean;
+      };
+    };
   }>("/admin/channels");
+};
+
+export type TestDispatchPayload = {
+  victimName: string;
+  phoneNumber: string;
+  targetEmail: string;
+  address: string;
+  lat: number;
+  lng: number;
+  emergencyType: string;
+  medicalNotes: string;
+};
+
+export type TestDispatchResult = {
+  success: true;
+  data: {
+    success: true;
+    testLogId: string;
+    dispatchedAt: string;
+    channels: Array<{
+      channel: string;
+      vendor: string;
+      status: "DELIVERED" | "FAILED" | "QUEUED";
+      latencyMs: number;
+      detail: string;
+    }>;
+  };
+};
+
+export const testDispatchOmnichannel = async (payload: TestDispatchPayload) => {
+  return request<TestDispatchResult>("/admin/channels/test-dispatch", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };
 
 export const fetchRevenueSummary = async () => {
   return request<{ success: true; data: RevenueSummary }>("/admin/revenue");
+};
+
+export const settlePartnerCommission = async (payload: {
+  partnerName: string;
+  amount: number;
+  bankAccount: string;
+  bankName: string;
+  beneficiaryName: string;
+  note: string;
+}) => {
+  return request<{
+    success: true;
+    data: {
+      settlementId: string;
+      partnerName: string;
+      amount: number;
+      bankAccount: string;
+      bankName: string;
+      beneficiaryName: string;
+      settledAt: string;
+      status: string;
+      message: string;
+    };
+  }>("/admin/revenue/settle-partner", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const pingB2BWorker = async (payload: {
+  workerName: string;
+  enterpriseCode: string;
+  post: string;
+}) => {
+  return request<{
+    success: true;
+    data: {
+      workerName: string;
+      enterpriseCode: string;
+      telegramStatus: string;
+      timestamp: string;
+      message: string;
+    };
+  }>("/admin/b2b/ping-worker", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };
 
 export function resolveAssetUrl(value?: string | null) {
@@ -560,10 +660,98 @@ export type MultiVictimVitalsItem = {
     status: string;
     syncTime: string;
   };
+  iceProfile?: {
+    bloodGroup: string;
+    allergies: string;
+    chronicDiseases: string;
+    bhytNumber: string;
+    cccdNumber: string;
+    safeTagNfcId: string;
+    primaryGuardian: {
+      name: string;
+      phone: string;
+      relation: string;
+    };
+    secondaryGuardian?: {
+      name: string;
+      phone: string;
+      relation: string;
+    };
+  };
 };
 
 export const fetchMultiVictimVitals = async () => {
   return request<{ success: true; data: MultiVictimVitalsItem[] }>("/admin/vitals/active");
+};
+
+export const instantDispatchVictim = async (
+  incidentId: string,
+  payload: {
+    ambulanceUnit: string;
+    dispatchNotes: string;
+    targetSop: string;
+    broadcastChannels: string[];
+  }
+) => {
+  return request<{
+    success: true;
+    data: {
+      dispatchId: string;
+      dispatchedAt: string;
+      telegramStatus: string;
+      sbarSummary: string;
+    };
+  }>(`/admin/vitals/${incidentId}/instant-dispatch`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const pingUserCheckin = async (userId: string, reason?: string) => {
+  return request<{
+    success: true;
+    data: {
+      userId: string;
+      userName: string;
+      telegramStatus: string;
+      message: string;
+      timestamp: string;
+    };
+  }>(`/admin/users/${userId}/ping-checkin`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+};
+
+export const escalateUserGuardian = async (userId: string, reason?: string) => {
+  return request<{
+    success: true;
+    data: {
+      userId: string;
+      userName: string;
+      guardiansNotified: number;
+      telegramStatus: string;
+      message: string;
+      timestamp: string;
+    };
+  }>(`/admin/users/${userId}/escalate-guardian`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+};
+
+export const broadcastHazardTelegram = async (hazardId: string, message?: string) => {
+  return request<{
+    success: true;
+    data: {
+      hazardId: string;
+      telegramStatus: string;
+      broadcastTimestamp: string;
+    };
+  }>(`/admin/hazards/${hazardId}/broadcast-telegram`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
 };
 
 export type B2BEnterprise = {
@@ -653,6 +841,17 @@ export const disburseHeroBounty = async (heroId: string, amount: number, reason:
   return request<{ success: true; data: any }>(`/admin/heroes/${heroId}/bounty`, {
     method: "POST",
     body: JSON.stringify({ amount, reason }),
+  });
+};
+
+export const sendHeroDirectMessage = async (
+  heroId: string,
+  message: string,
+  urgency: "NORMAL" | "HIGH" = "NORMAL"
+) => {
+  return request<{ success: true; data: any }>(`/admin/heroes/${heroId}/message`, {
+    method: "POST",
+    body: JSON.stringify({ message, urgency }),
   });
 };
 
@@ -1061,6 +1260,7 @@ export type BloodRelayItem = {
     status: "NOTIFIED" | "ACCEPTED" | "ARRIVED" | "DONATED" | "DECLINED";
     etaMinutes?: number;
     distanceKm?: number;
+    fastTrackCode?: string;
   }>;
   createdAt: string;
 };
@@ -1113,6 +1313,33 @@ export const fulfillBloodRelayRequest = async (requestId: string, payload: {
   });
 };
 
+export type MatchingDonor = {
+  donorUserId: string;
+  donorName: string;
+  donorBloodType: string;
+  contactPhone: string;
+  distanceKm: number;
+  etaMinutes: number;
+  trustScore: number;
+};
+
+export const fetchMatchingBloodDonors = async (
+  requestId: string,
+  lat?: number,
+  lng?: number,
+  radius?: number
+) => {
+  const query = new URLSearchParams({
+    ...(lat !== undefined ? { lat: lat.toString() } : {}),
+    ...(lng !== undefined ? { lng: lng.toString() } : {}),
+    ...(radius !== undefined ? { radius: radius.toString() } : {}),
+  });
+  const url = query.toString()
+    ? `/blood-relay/${requestId}/donors?${query.toString()}`
+    : `/blood-relay/${requestId}/donors`;
+  return request<{ success: true; count: number; data: MatchingDonor[] }>(url);
+};
+
 // ─── HeroShield Welfare & Restock ──────────────────────────────────────────
 
 export type HeroPolicyItem = {
@@ -1151,12 +1378,67 @@ export type RestockVoucherItem = {
   expiresAt: string;
 };
 
+export type HeroCandidateOption = {
+  id: string;
+  name: string;
+  phone: string;
+  tier: string;
+  trustScore: number;
+  rescuesCount: number;
+  walletBalance: number;
+};
+
+export type HeroShieldClaimItem = {
+  _id: string;
+  policyId: string;
+  policyNumber: string;
+  incidentId: string;
+  heroId: string;
+  heroName: string;
+  heroPhone: string;
+  heroTier: string;
+  claimType: string;
+  claimTypeLabel: string;
+  legalBasis: string;
+  estimatedLossVND: number;
+  payoutAmountVND: number;
+  claimStatus: "FILED" | "UNDER_REVIEW" | "APPROVED" | "PAID_OUT" | "REJECTED";
+  hospitalReportUrl?: string;
+  doctorDiagnosis?: string;
+  filedAt: string;
+  settledAt?: string | null;
+};
+
+export const fetchHeroShieldCandidates = async () => {
+  return request<{ success: true; count: number; data: HeroCandidateOption[] }>(`/heroshield/heroes-list`);
+};
+
 export const fetchHeroPolicies = async (heroId: string) => {
-  return request<{ success: true; count: number; data: HeroPolicyItem[] }>(`/heroshield/policies/${heroId}`);
+  return request<{ success: true; count: number; data: HeroPolicyItem[] }>(`/heroshield/policies/${heroId || "ALL"}`);
 };
 
 export const fetchHeroRestockVouchers = async (heroId: string) => {
-  return request<{ success: true; count: number; data: RestockVoucherItem[] }>(`/heroshield/vouchers/${heroId}`);
+  return request<{ success: true; count: number; data: RestockVoucherItem[] }>(`/heroshield/vouchers/${heroId || "ALL"}`);
+};
+
+export const fetchHeroClaims = async (heroId?: string) => {
+  return request<{ success: true; count: number; data: HeroShieldClaimItem[] }>(`/heroshield/claims/${heroId || "ALL"}`);
+};
+
+export const settleHeroClaim = async (policyId: string, payoutAmountVND: number) => {
+  return request<{ success: true; message: string; data: any }>(`/heroshield/claims/${policyId}/settle`, {
+    method: "POST",
+    body: JSON.stringify({ payoutAmountVND }),
+  });
+};
+
+export const redeemHeroRestockVoucher = async (voucherCode: string) => {
+  return request<{ success: true; message: string; voucherCode: string; status: string }>(
+    `/heroshield/vouchers/${voucherCode}/redeem`,
+    {
+      method: "POST",
+    }
+  );
 };
 
 export const issueRestockVoucherFromSbar = async (payload: {

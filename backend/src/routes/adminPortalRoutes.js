@@ -15,7 +15,9 @@ router.get('/audit', controller.listAuditLogs);
 router.get('/kyc', controller.listKycQueue);
 router.patch('/kyc/:id', controller.updateKycStatus);
 router.get('/channels', controller.getChannelHealth);
+router.post('/channels/test-dispatch', controller.testDispatchOmnichannel);
 router.get('/revenue', controller.getRevenueSummary);
+router.post('/revenue/settle-partner', controller.settlePartnerCommission);
 router.get('/heroes/radar', controller.getHeroRadar);
 router.get('/safe-havens', controller.getSafeHavens);
 router.get('/thank-you-notes', controller.getThankYouNotes);
@@ -23,10 +25,16 @@ router.get('/incidents/:id/dossier', controller.getIncidentDossier);
 router.get('/hazards', controller.listHazards);
 router.patch('/hazards/:id/verify', controller.verifyHazard);
 router.post('/hazards', controller.createHazard);
+router.post('/hazards/:id/broadcast-telegram', controller.broadcastHazardTelegram);
 router.get('/vitals/active', controller.getMultiVictimVitals);
+router.post('/vitals/:id/instant-dispatch', controller.instantDispatchVictim);
+router.post('/users/:id/ping-checkin', controller.pingUserCheckin);
+router.post('/users/:id/escalate-guardian', controller.escalateUserGuardian);
 router.get('/b2b/overview', controller.getB2BOverview);
+router.post('/b2b/ping-worker', controller.pingB2BWorker);
 router.get('/heroes/fleet', controller.getHeroFleet);
 router.post('/heroes/:id/bounty', controller.disburseHeroBounty);
+router.post('/heroes/:id/message', controller.sendHeroDirectMessage);
 
 // P1: Incident Timeline Playback (Flight Recorder)
 router.get('/incidents/:id/playback', controller.getIncidentPlayback);

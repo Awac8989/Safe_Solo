@@ -27,49 +27,38 @@ function mapEmergencyDoc(doc) {
   };
 }
 
+const emailService = require('./emailService');
+const telegramBotService = require('./telegramBotService');
+
 // -----------------------------------------------------------------------------
-// OMNICHANNEL DISPATCH HELPERS: Telegram Bot, Zalo ZNS, Voice Auto-Call
+// OMNICHANNEL DISPATCH HELPERS: Telegram Bot, Gmail SafeTag, Zalo ZNS, Voice Auto-Call
 // -----------------------------------------------------------------------------
 
 async function sendTelegramEmergencyAlert({ user, location, emergencyLogId }) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  const lat = location?.lat || 10.7765;
-  const lng = location?.lng || 106.7009;
-  const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-
-  const message = [
-    '🚨 *SAFESOLO - CANH BAO CAP CUU SOS KHAN CAP* 🚨',
-    `👤 *Nan nhan:* ${user.fullName || 'Nguoi dung SafeSolo'}`,
-    `📞 *SDT:* \`${user.phoneNumber || 'N/A'}\``,
-    `🏥 *Ho so y te:* ${user.medicalNotes || 'Chua co ghi chu'}`,
-    `📍 *Vi tri hien truong:* [Mo Google Maps](${mapUrl})`,
-    `⏰ *Thoi diem:* ${new Date().toISOString()}`,
-    `🆔 *Ma su co:* \`${emergencyLogId}\``,
-  ].join('\n');
-
-  if (token && chatId) {
-    try {
-      const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: message,
-          parse_mode: 'Markdown',
-        }),
-      });
-      const data = await resp.json().catch(() => null);
-      return { success: Boolean(data?.ok), channel: 'Telegram Bot', realHttp: true };
-    } catch (err) {
-      console.error('[Omnichannel] Telegram dispatch error:', err.message);
-      return { success: false, error: err.message, channel: 'Telegram Bot' };
-    }
+  try {
+    const res = await telegramBotService.broadcastSosAlert({
+      emergencyLogId,
+      incidentId: emergencyLogId,
+      victimName: user.fullName || 'Người dùng SafeSolo',
+      phone: user.phoneNumber || 'N/A',
+      location,
+      medicalNotes: user.medicalNotes || 'Chưa có ghi chú y tế',
+    });
+    return { success: res.ok !== false, channel: 'Telegram Bot', realHttp: true, result: res };
+  } catch (err) {
+    console.error('[Omnichannel] Telegram dispatch error:', err.message);
+    return { success: false, error: err.message, channel: 'Telegram Bot' };
   }
+}
 
-  // Safe simulated dispatch for local demo & defense
-  console.log(`[Omnichannel] [Telegram Mock Dispatch] Alert sent for ${user.fullName}: ${mapUrl}`);
-  return { success: true, channel: 'Telegram Bot', simulated: true };
+async function sendEmailEmergencyAlert({ user, location, contacts }) {
+  try {
+    const res = await emailService.sendSosEmergencyAlertEmail(user, location, contacts);
+    return { success: res.success !== false, channel: 'Gmail SafeTag', result: res };
+  } catch (err) {
+    console.error('[Omnichannel] Email dispatch error:', err.message);
+    return { success: false, error: err.message, channel: 'Gmail SafeTag' };
+  }
 }
 
 async function sendZaloZnsEmergencyAlert({ user, location, contacts }) {
@@ -159,6 +148,13 @@ async function triggerSosForMongoUser(io, userDoc) {
     contacts: user.emergencyContacts,
   });
 
+  // 5. Dispatch Gmail SafeTag Y Tế Khẩn Cấp
+  const emailResult = await sendEmailEmergencyAlert({
+    user,
+    location: user.lastKnownLocation,
+    contacts: user.emergencyContacts,
+  });
+
   const payload = {
     type: 'EMERGENCY_SOS',
     userId: user._id,
@@ -172,6 +168,7 @@ async function triggerSosForMongoUser(io, userDoc) {
     omnichannel: {
       smsSent: successCount,
       telegramDispatched: telegramResult.success,
+      emailDispatched: emailResult.success,
       zaloDispatched: zaloResult.success,
       voiceCallDispatched: voiceCallResult.success,
     },
@@ -186,6 +183,7 @@ async function triggerSosForMongoUser(io, userDoc) {
       channels: [
         { name: 'SMS Gateway', status: successCount > 0 ? 'DELIVERED' : 'FAILED', sentCount: successCount },
         { name: 'Telegram Bot', status: telegramResult.success ? 'DELIVERED' : 'FAILED' },
+        { name: 'Gmail SafeTag', status: emailResult.success ? 'DELIVERED' : 'FAILED' },
         { name: 'Zalo ZNS', status: zaloResult.success ? 'DELIVERED' : 'FAILED' },
         { name: 'Voice Auto-Call', status: voiceCallResult.success ? 'QUEUED' : 'FAILED' },
       ],
@@ -198,13 +196,14 @@ async function triggerSosForMongoUser(io, userDoc) {
     status: 'SOS_DISPATCHED',
     source: 'SYSTEM',
     title: 'Kich hoat SOS',
-    message: 'He thong da phat tin hieu khan cap da kenh (SMS, Telegram, Zalo ZNS, Voice Call)',
+    message: 'He thong da phat tin hieu khan cap da kenh (SMS, Telegram, Gmail SafeTag, Zalo ZNS, Voice Call)',
     metadata: {
       emergencyLogId: emergencyLog._id,
       smsSent: successCount,
       smsAttempted: smsResults.length,
       smsFailed: smsResults.length - successCount,
       telegram: telegramResult,
+      email: emailResult,
       zalo: zaloResult,
       voiceCall: voiceCallResult,
       location: user.lastKnownLocation,

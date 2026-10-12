@@ -209,6 +209,38 @@ class RadarController {
       next(error);
     }
   }
+
+  // @desc    Mark volunteer arrived at the scene
+  // @route   POST /api/radar/:incidentId/arrive
+  // @access  Private
+  async arriveAtScene(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.markVolunteerArrived(
+        incidentId,
+        req.user.id,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Trigger proximity sound and flash beacon on victim device (<25m)
+  // @route   POST /api/radar/:incidentId/beacon
+  // @access  Private
+  async triggerBeacon(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.triggerProximityBeacon(
+        incidentId,
+        req.user.id,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new RadarController();

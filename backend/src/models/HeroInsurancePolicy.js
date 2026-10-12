@@ -29,7 +29,7 @@ const heroInsurancePolicySchema = new mongoose.Schema(
       issuedAt: Date,
       status: {
         type: String,
-        enum: ['NONE', 'ISSUED', 'SHIPPED', 'DELIVERED'],
+        enum: ['NONE', 'ISSUED', 'SHIPPED', 'DELIVERED', 'REDEEMED'],
         default: 'NONE',
       },
     },

@@ -1096,13 +1096,16 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'ĐỘT PHÁ 1: ADAPTIVE DEADMAN',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
-                            color: badgeColor,
+                        Flexible(
+                          child: Text(
+                            'ĐỘT PHÁ 1: ADAPTIVE DEADMAN',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              color: badgeColor,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -1147,16 +1150,20 @@ class _DefenseDemoSandboxPageState extends State<DefenseDemoSandboxPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Trạng thái: ${state.labelVi}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: badgeColor,
+                Flexible(
+                  child: Text(
+                    'Trạng thái: ${state.labelVi}',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: badgeColor,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
-                  'Nguy cơ: ${(state.threatScore * 100).toStringAsFixed(0)}%  •  Chu kỳ: ${state.recommendedIntervalMinutes}p',
+                  'Nguy cơ: ${(state.threatScore * 100).toStringAsFixed(0)}%  •  ${state.recommendedIntervalMinutes}p',
                   style: const TextStyle(
                     fontSize: 11,
                     color: Color(0xFF94A3B8),

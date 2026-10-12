@@ -208,6 +208,104 @@ class _MedicalPageState extends State<MedicalPage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      onTap: () => Navigator.pushNamed(context, '/blood-relay'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEF4444),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.bloodtype_rounded, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    strings.text('Máu hiếm SafeBlood', 'SafeBlood Relay'),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    strings.text('Tiếp ứng khẩn STAT', 'Urgent Blood Relay'),
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      onTap: () => Navigator.pushNamed(context, '/safepoints-map'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.shield_rounded, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    strings.text('Trạm sốc tim AED', 'SafePoint OpenAED'),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    strings.text('Mở tủ TOTP 300s', 'TOTP Cabinet Unlock'),
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 18),
               _SectionTitle(strings.text('Thông tin cá nhân', 'Personal information')),
               const SizedBox(height: 10),

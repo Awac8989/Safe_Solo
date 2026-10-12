@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: CAI_DAT_CUOC_GOI_GIA (FAKE_CALL_SETUP_SHEET)
+// [DUONG_DAN]: lib/views/audio/fake_call_setup_sheet.dart
+// [CHUC_NANG]: Thiet lap danh tinh nguoi goi & hen gio do chuong cuoc goi gia
+// ============================================================================
+
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../models/fake_call_config.dart';

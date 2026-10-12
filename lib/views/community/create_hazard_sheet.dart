@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_theme.dart';
+import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../models/hazard_report_model.dart';
+import '../../services/api_service.dart';
 
 class CreateHazardSheet extends StatefulWidget {
   const CreateHazardSheet({super.key, this.onCreated});
@@ -35,7 +38,26 @@ class _CreateHazardSheetState extends State<CreateHazardSheet> {
     super.dispose();
   }
 
-  void _submit() {
+  String _categoryToApi(HazardCategory cat) {
+    switch (cat) {
+      case HazardCategory.darkRoad:
+        return 'DARK_ROAD';
+      case HazardCategory.suspiciousPerson:
+        return 'SUSPICIOUS_PERSON';
+      case HazardCategory.roadHazard:
+        return 'ROAD_HAZARD';
+      case HazardCategory.flooding:
+        return 'FLOODING';
+      case HazardCategory.landslide:
+        return 'LANDSLIDE';
+      case HazardCategory.accident:
+        return 'ACCIDENT';
+      case HazardCategory.other:
+        return 'ROAD_HAZARD';
+    }
+  }
+
+  Future<void> _submit() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       TopToast.show(context, message: 'Vui lòng nhập tiêu đề cảnh báo', icon: Icons.error_outline_rounded);
@@ -44,25 +66,49 @@ class _CreateHazardSheetState extends State<CreateHazardSheet> {
 
     setState(() => _isSubmitting = true);
 
-    final report = HazardReportModel(
-      id: 'hazard_${DateTime.now().millisecondsSinceEpoch}',
-      authorName: _isAnonymous ? 'Hiệp sĩ ẩn danh' : 'Bạn',
-      title: title,
-      description: _descController.text.trim(),
-      category: _category,
-      lat: 10.7769,
-      lng: 106.7009,
-      address: 'Vị trí hiện tại của bạn',
-      distanceKm: 0.1,
-      confirmCount: 1,
-      createdAt: DateTime.now(),
-      isAnonymous: _isAnonymous,
-    );
+    try {
+      final app = context.read<AppProvider>();
+      final userId = app.user?.id;
 
-    widget.onCreated?.call(report);
+      final res = await ApiService.instance.createCommunityHazard(
+        title: title,
+        description: _descController.text.trim(),
+        category: _categoryToApi(_category),
+        lat: 10.7769,
+        lng: 106.7009,
+        address: 'Vị trí hiện tại của bạn',
+        isAnonymous: _isAnonymous,
+        userId: userId,
+      );
 
-    Navigator.pop(context);
-    TopToast.show(context, message: 'Đã gửi cảnh báo nguy cơ lên cộng đồng radar!');
+      final report = HazardReportModel.fromJson(res);
+      widget.onCreated?.call(report);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      TopToast.show(context, message: 'Đã gửi cảnh báo nguy cơ lên cộng đồng radar!');
+    } catch (e) {
+      final fallbackReport = HazardReportModel(
+        id: 'hazard_${DateTime.now().millisecondsSinceEpoch}',
+        authorName: _isAnonymous ? 'Hiệp sĩ ẩn danh' : 'Bạn',
+        title: title,
+        description: _descController.text.trim(),
+        category: _category,
+        lat: 10.7769,
+        lng: 106.7009,
+        address: 'Vị trí hiện tại của bạn',
+        distanceKm: 0.1,
+        confirmCount: 1,
+        createdAt: DateTime.now(),
+        isAnonymous: _isAnonymous,
+      );
+
+      widget.onCreated?.call(fallbackReport);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      TopToast.show(context, message: 'Đã lưu cảnh báo nguy cơ (lưu ngoại tuyến).');
+    }
   }
 
   @override

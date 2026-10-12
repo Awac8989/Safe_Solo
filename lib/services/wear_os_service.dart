@@ -280,7 +280,7 @@ class WearOsService extends ChangeNotifier {
     _startEmergencyCountdown(
       title: '🚨 PHÁT HIỆN TAI NẠN VA CHẠM TỪ GALAXY WATCH 5',
       message:
-          'Cảm biến IMU phát hiện va chạm xung lực cực lớn (${svm}g) và góc nghiêng ${tilt}°. Hệ thống đang gửi dữ liệu về điện thoại và đếm ngược 30s trước khi tự động gọi cấp cứu 115.',
+          'Cảm biến IMU phát hiện va chạm xung lực cực lớn (${svm}g) và góc nghiêng $tilt°. Hệ thống đang gửi dữ liệu về điện thoại và đếm ngược 30s trước khi tự động gọi cấp cứu 115.',
       signalType: 'WATCH_ACCIDENT_CRASH',
       extraPayload: {
         'svm': svm,

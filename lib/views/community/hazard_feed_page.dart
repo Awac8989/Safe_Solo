@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_theme.dart';
+import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../models/hazard_report_model.dart';
+import '../../services/api_service.dart';
 import 'create_hazard_sheet.dart';
 
 class HazardFeedPage extends StatefulWidget {
@@ -14,8 +17,15 @@ class HazardFeedPage extends StatefulWidget {
 class _HazardFeedPageState extends State<HazardFeedPage> {
   HazardCategory? _selectedCategory;
   double _radiusKm = 5.0;
+  bool _isLoading = false;
 
-  final List<HazardReportModel> _hazards = [
+  @override
+  void initState() {
+    super.initState();
+    _loadHazards();
+  }
+
+  List<HazardReportModel> _hazards = [
     HazardReportModel(
       id: 'hazard_admin_1',
       authorName: 'Ban Chỉ Huy SafeSolo Admin',
@@ -92,7 +102,37 @@ class _HazardFeedPageState extends State<HazardFeedPage> {
     ),
   ];
 
-  void _verifyHazard(HazardReportModel report, bool isResolved) {
+  Future<void> _loadHazards() async {
+    setState(() => _isLoading = true);
+    try {
+      final list = await ApiService.instance.fetchCommunityHazards(radiusKm: _radiusKm);
+      if (list.isNotEmpty && mounted) {
+        final models = list.map((e) => HazardReportModel.fromJson(e)).toList();
+        setState(() {
+          _hazards = models;
+          _isLoading = false;
+        });
+        return;
+      }
+    } catch (_) {
+      // Keep existing items if network error
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _verifyHazard(HazardReportModel report, bool isResolved) async {
+    final app = context.read<AppProvider>();
+    final userId = app.user?.id;
+    try {
+      await ApiService.instance.verifyCommunityHazard(
+        report.id,
+        action: isResolved ? 'RESOLVE' : 'VERIFY',
+        userId: userId,
+      );
+    } catch (_) {
+      // Continue optimistic update
+    }
+    if (!mounted) return;
     setState(() {
       final index = _hazards.indexWhere((h) => h.id == report.id);
       if (index != -1) {
@@ -223,33 +263,48 @@ class _HazardFeedPageState extends State<HazardFeedPage> {
 
           // Hazards List
           Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded, size: 64, color: AppColors.success.withValues(alpha: 0.5)),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Khu vực xung quanh bạn đang an toàn',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.textPrimary),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Không có cảnh báo nguy cơ nào trong bán kính đã chọn.',
-                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            child: _isLoading && _hazards.isEmpty
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.destructive),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadHazards,
+                    color: AppColors.destructive,
+                    child: filtered.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 80),
+                        Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle_outline_rounded, size: 64, color: AppColors.success.withValues(alpha: 0.5)),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Khu vực xung quanh bạn đang an toàn',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Không có cảnh báo nguy cơ nào trong bán kính đã chọn.',
+                                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final h = filtered[index];
+                        return _buildHazardCard(h);
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, index) {
-                      final h = filtered[index];
-                      return _buildHazardCard(h);
-                    },
-                  ),
+            ),
           ),
         ],
       ),

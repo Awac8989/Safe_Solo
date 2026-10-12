@@ -1241,7 +1241,7 @@ class _AuthPageState extends State<AuthPage> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       final identifier = _pwdIdentifierController.text.trim().isNotEmpty
           ? _pwdIdentifierController.text.trim()
           : '0913843958';
@@ -1287,7 +1287,7 @@ class _AuthPageState extends State<AuthPage> {
     _forgotNewPasswordController.clear();
     _forgotStep = 0;
     _forgotError = null;
-    String _forgotChannel = 'email';
+    String forgotChannel = 'email';
 
     showModalBottomSheet<void>(
       context: context,
@@ -1379,7 +1379,7 @@ class _AuthPageState extends State<AuthPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setSheetState(() {
-                            _forgotChannel = 'email';
+                            forgotChannel = 'email';
                             if (!_forgotIdentifierController.text.contains('@') && _forgotIdentifierController.text.isNotEmpty) {
                               _forgotIdentifierController.text = 'user.safesolo@gmail.com';
                             }
@@ -1388,13 +1388,13 @@ class _AuthPageState extends State<AuthPage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
                             decoration: BoxDecoration(
-                              color: _forgotChannel == 'email'
+                              color: forgotChannel == 'email'
                                   ? const Color(0xFFEA4335).withValues(alpha: 0.12)
                                   : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: _forgotChannel == 'email' ? const Color(0xFFEA4335) : Colors.grey.shade300,
-                                width: _forgotChannel == 'email' ? 1.5 : 1,
+                                color: forgotChannel == 'email' ? const Color(0xFFEA4335) : Colors.grey.shade300,
+                                width: forgotChannel == 'email' ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
@@ -1406,8 +1406,8 @@ class _AuthPageState extends State<AuthPage> {
                                   strings.text('Hộp thư Gmail', 'Gmail Email'),
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: _forgotChannel == 'email' ? FontWeight.bold : FontWeight.normal,
-                                    color: _forgotChannel == 'email' ? const Color(0xFFEA4335) : Colors.black87,
+                                    fontWeight: forgotChannel == 'email' ? FontWeight.bold : FontWeight.normal,
+                                    color: forgotChannel == 'email' ? const Color(0xFFEA4335) : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -1419,7 +1419,7 @@ class _AuthPageState extends State<AuthPage> {
                       Expanded(
                         child: InkWell(
                           onTap: () => setSheetState(() {
-                            _forgotChannel = 'telegram';
+                            forgotChannel = 'telegram';
                             if (!_forgotIdentifierController.text.startsWith('@')) {
                               _forgotIdentifierController.text = '@safesolo_hero';
                             }
@@ -1428,13 +1428,13 @@ class _AuthPageState extends State<AuthPage> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
                             decoration: BoxDecoration(
-                              color: _forgotChannel == 'telegram'
+                              color: forgotChannel == 'telegram'
                                   ? const Color(0xFF229ED9).withValues(alpha: 0.12)
                                   : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: _forgotChannel == 'telegram' ? const Color(0xFF229ED9) : Colors.grey.shade300,
-                                width: _forgotChannel == 'telegram' ? 1.5 : 1,
+                                color: forgotChannel == 'telegram' ? const Color(0xFF229ED9) : Colors.grey.shade300,
+                                width: forgotChannel == 'telegram' ? 1.5 : 1,
                               ),
                             ),
                             child: Row(
@@ -1446,8 +1446,8 @@ class _AuthPageState extends State<AuthPage> {
                                   strings.text('Telegram Bot', 'Telegram Bot'),
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    fontWeight: _forgotChannel == 'telegram' ? FontWeight.bold : FontWeight.normal,
-                                    color: _forgotChannel == 'telegram' ? const Color(0xFF229ED9) : Colors.black87,
+                                    fontWeight: forgotChannel == 'telegram' ? FontWeight.bold : FontWeight.normal,
+                                    color: forgotChannel == 'telegram' ? const Color(0xFF229ED9) : Colors.black87,
                                   ),
                                 ),
                               ],
@@ -1462,22 +1462,22 @@ class _AuthPageState extends State<AuthPage> {
                     controller: _forgotIdentifierController,
                     autofillHints: const [AutofillHints.username],
                     decoration: InputDecoration(
-                      labelText: _forgotChannel == 'email'
+                      labelText: forgotChannel == 'email'
                           ? strings.text('Địa chỉ Gmail của bạn', 'Your Gmail Address')
-                          : (_forgotChannel == 'telegram'
+                          : (forgotChannel == 'telegram'
                               ? strings.text('Tài khoản Telegram (@username hoặc Chat ID)', 'Telegram (@username or Chat ID)')
                               : strings.text('Email hoặc Số điện thoại', 'Email or Phone Number')),
                       prefixIcon: Icon(
-                        _forgotChannel == 'email'
+                        forgotChannel == 'email'
                             ? Icons.mail_outline_rounded
-                            : (_forgotChannel == 'telegram' ? Icons.send_rounded : Icons.person_outline_rounded),
-                        color: _forgotChannel == 'email'
+                            : (forgotChannel == 'telegram' ? Icons.send_rounded : Icons.person_outline_rounded),
+                        color: forgotChannel == 'email'
                             ? const Color(0xFFEA4335)
-                            : (_forgotChannel == 'telegram' ? const Color(0xFF229ED9) : null),
+                            : (forgotChannel == 'telegram' ? const Color(0xFF229ED9) : null),
                       ),
-                      hintText: _forgotChannel == 'email'
+                      hintText: forgotChannel == 'email'
                           ? 'user@gmail.com'
-                          : (_forgotChannel == 'telegram' ? '@safesolo_user hoặc 8153057951' : '0913843958 hoặc user@gmail.com'),
+                          : (forgotChannel == 'telegram' ? '@safesolo_user hoặc 8153057951' : '0913843958 hoặc user@gmail.com'),
                     ),
                   ),
                   const SizedBox(height: 18),
@@ -1485,7 +1485,7 @@ class _AuthPageState extends State<AuthPage> {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _forgotChannel == 'telegram'
+                        backgroundColor: forgotChannel == 'telegram'
                             ? const Color(0xFF229ED9)
                             : AppColors.primary,
                         foregroundColor: Colors.white,
@@ -1504,16 +1504,17 @@ class _AuthPageState extends State<AuthPage> {
                                 _isForgotSubmitting = true;
                                 _forgotError = null;
                               });
+                              final appProvider = context.read<AppProvider>();
                               try {
-                                final msg = await context.read<AppProvider>().forgotPassword(
+                                final msg = await appProvider.forgotPassword(
                                   identifier: id,
-                                  channel: _forgotChannel,
+                                  channel: forgotChannel,
                                 );
                                 setSheetState(() {
                                   _forgotStep = 1;
                                   _forgotError = null;
                                 });
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
                                 }
                               } catch (e) {
@@ -1525,9 +1526,9 @@ class _AuthPageState extends State<AuthPage> {
                       child: _isForgotSubmitting
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           : Text(
-                              _forgotChannel == 'email'
+                              forgotChannel == 'email'
                                   ? strings.text('Gửi mã OTP về Gmail', 'Send OTP to Gmail')
-                                  : (_forgotChannel == 'telegram'
+                                  : (forgotChannel == 'telegram'
                                       ? strings.text('Gửi mã OTP về Telegram', 'Send OTP to Telegram')
                                       : strings.text('Gửi mã xác nhận khôi phục', 'Send Reset Code')),
                             ),
@@ -1583,15 +1584,16 @@ class _AuthPageState extends State<AuthPage> {
                                 _isForgotSubmitting = true;
                                 _forgotError = null;
                               });
+                              final appProvider = context.read<AppProvider>();
                               try {
-                                await context.read<AppProvider>().resetPassword(
+                                await appProvider.resetPassword(
                                   identifier: _forgotIdentifierController.text.trim(),
                                   resetCode: otp,
                                   newPassword: newPass,
                                 );
-                                Navigator.pop(sheetCtx);
+                                if (sheetCtx.mounted) Navigator.pop(sheetCtx);
                                 _pwdPasswordController.text = newPass;
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       backgroundColor: const Color(0xFF10B981),

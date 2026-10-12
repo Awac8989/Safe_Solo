@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -283,7 +282,7 @@ class _MomentsFeedState extends State<MomentsFeed> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         )
@@ -310,7 +309,7 @@ class _MomentsFeedState extends State<MomentsFeed> {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                                  colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
                                   begin: Alignment.bottomCenter,
                                   end: Alignment.topCenter,
                                 )

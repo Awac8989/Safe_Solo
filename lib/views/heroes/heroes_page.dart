@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: DANH_SACH_VA_KYC_HIEP_SI (HEROES_PAGE)
+// [DUONG_DAN]: lib/views/heroes/heroes_page.dart
+// [CHUC_NANG]: Danh sach Hiep si, Dang ky tham dinh KYC, Bai thi sat hach y te
+// ============================================================================
+
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -28,13 +34,49 @@ class _HeroesPageState extends State<HeroesPage> {
     XFile? frontImage;
     XFile? backImage;
     XFile? certImage;
-    String selectedTier = 'TIER_1_BLS';
+    String selectedCategory = 'MEDICAL_NURSE';
+    String selectedTier = 'TIER_PARAMEDIC_MEDIC';
+    final credentialNameController = TextEditingController(text: 'Chứng chỉ Hành nghề Khám bệnh, chữa bệnh (CCHN)');
     final certNumberController = TextEditingController();
-    final issuingOrgController = TextEditingController(text: 'Hội Chữ Thập Đỏ TP.HCM');
+    final issuingOrgController = TextEditingController(text: 'Bộ Y tế / Sở Y tế TP.HCM');
+    final workingUnitController = TextEditingController(text: 'Bệnh viện Đa khoa / Trung tâm Cấp cứu 115');
+    final yearsExpController = TextEditingController(text: '3');
     bool scopeAgreed = true;
     bool examTaken = false;
     int examScore = 20;
     bool isSubmitting = false;
+
+    void updateCategoryDefaults(String cat, StateSetter setModalState) {
+      setModalState(() {
+        selectedCategory = cat;
+        switch (cat) {
+          case 'MEDICAL_NURSE':
+            selectedTier = 'TIER_PARAMEDIC_MEDIC';
+            credentialNameController.text = 'Chứng chỉ Hành nghề Khám bệnh, chữa bệnh (CCHN)';
+            issuingOrgController.text = 'Bộ Y tế / Sở Y tế TP.HCM';
+            workingUnitController.text = 'Bệnh viện Đa khoa / Trung tâm Cấp cứu 115';
+            break;
+          case 'POLICE_SECURITY':
+            selectedTier = 'TIER_POLICE_SECURITY';
+            credentialNameController.text = 'Thẻ ngành CAND / Giấy chứng minh CAND';
+            issuingOrgController.text = 'Bộ Công an / Công an TP.HCM';
+            workingUnitController.text = 'Công an Phường / Đội CSGT-TT / CSCĐ';
+            break;
+          case 'FIRE_RESCUE':
+            selectedTier = 'TIER_FIRE_RESCUE';
+            credentialNameController.text = 'Chứng nhận Huấn luyện Nghiệp vụ CNCH & PCCC';
+            issuingOrgController.text = 'Cục Cảnh sát PCCC & CNCH';
+            workingUnitController.text = 'Đội Cảnh sát PCCC & CNCH Khu vực';
+            break;
+          case 'WILDERNESS_EXPLORER':
+            selectedTier = 'TIER_WILDERNESS_EXPLORER';
+            credentialNameController.text = 'Chứng chỉ Cứu hộ Dã ngoại WFR (Wilderness First Responder)';
+            issuingOrgController.text = 'Wilderness Medical Associates / WMA';
+            workingUnitController.text = 'Đoàn Thám hiểm / Đội Cứu hộ Địa hình';
+            break;
+        }
+      });
+    }
 
     await showModalBottomSheet<void>(
       context: context,
@@ -74,24 +116,43 @@ class _HeroesPageState extends State<HeroesPage> {
                       children: [
                         const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 24),
                         const SizedBox(width: 8),
-                        Text(
-                          'Đăng ký Hiệp sĩ & Thẩm định Y tế',
-                          style: AppTextStyles.h3.copyWith(color: Colors.white),
+                        Expanded(
+                          child: Text(
+                            'Thẩm định Hiệp sĩ Nghiệp vụ Chuyên môn',
+                            style: AppTextStyles.h3.copyWith(color: Colors.white, fontSize: 16),
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Thẩm định 2 lớp: eKYC CCCD + Chứng chỉ Sơ cấp cứu Y tế theo Điều 87 Luật Khám bệnh, chữa bệnh 2023.',
-                      style: AppTextStyles.body.copyWith(color: Colors.white70, fontSize: 12),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Icon(Icons.info_outline_rounded, color: Color(0xFF38BDF8), size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Quy định pháp lý & Điều 87 Luật Khám bệnh, chữa bệnh 2023: SafeSolo chỉ cấp quyền Hiệp sĩ phản ứng nhanh cho nhân sự thuộc 4 khối nghiệp vụ có bằng cấp / thẻ ngành chuyên môn.',
+                              style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
 
                     // LỚP 1: CCCD 2 MẶT
-                    const Text('1. ĐỊNH DANH CĂN CƯỚC CÔNG DÂN (eKYC)', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                    const Text('1. ĐỊNH DANH CĂN CƯỚC CÔNG DÂN (eKYC LỚP 1)', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     _buildImagePickerBox(
-                      title: 'Mặt trước CCCD / Hộ chiếu',
+                      title: 'Mặt trước CCCD gắn chip',
                       image: frontImage,
                       onTap: () async {
                         final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -100,7 +161,7 @@ class _HeroesPageState extends State<HeroesPage> {
                     ),
                     const SizedBox(height: 10),
                     _buildImagePickerBox(
-                      title: 'Mặt sau CCCD / Hộ chiếu',
+                      title: 'Mặt sau CCCD gắn chip',
                       image: backImage,
                       onTap: () async {
                         final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -109,11 +170,49 @@ class _HeroesPageState extends State<HeroesPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // LỚP 2: CHỨNG CHỈ SƠ CẤP CỨU Y TẾ
-                    const Text('2. CHỨNG CHỈ SƠ CẤP CỨU Y TẾ (MEDICAL KYC)', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
+                    // LỚP 2: KHỐI NGÀNH CHUYÊN MÔN BẮT BUỘC (4 NHÓM)
+                    const Text('2. KHỐI NGÀNH CHUYÊN MÔN BẮT BUỘC (BẰNG CẤP / THẺ NGÀNH)', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
+
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory,
+                      dropdownColor: const Color(0xFF0F172A),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        labelText: 'Nhóm nghiệp vụ chuyên môn (*)',
+                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'MEDICAL_NURSE',
+                          child: Text('🏥 Y tế & Cấp cứu Ngoại viện (Bác sĩ, Điều dưỡng, Paramedic)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'POLICE_SECURITY',
+                          child: Text('🛡️ Công an & Lực lượng An ninh Trật tự (CAND, CSGT, CSCĐ)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'FIRE_RESCUE',
+                          child: Text('🚒 Cảnh sát PCCC & Cứu nạn Cứu hộ (CNCH chuyên nghiệp)'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'WILDERNESS_EXPLORER',
+                          child: Text('🧭 Thám hiểm & Cứu hộ Dã ngoại (Wilderness WFR, Sinh tồn)'),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) updateCategoryDefaults(val, setModalState);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Ảnh thẻ ngành / Chứng chỉ
                     _buildImagePickerBox(
-                      title: 'Ảnh Chứng chỉ Y tế (CPR / BLS / PHTLS)',
+                      title: 'Ảnh Thẻ ngành / Chứng chỉ Chuyên môn (*)',
                       image: certImage,
                       onTap: () async {
                         final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -122,7 +221,22 @@ class _HeroesPageState extends State<HeroesPage> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Số hiệu & Đơn vị cấp
+                    // Tên bằng cấp / thẻ ngành
+                    TextField(
+                      controller: credentialNameController,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        labelText: 'Tên chứng chỉ / thẻ ngành',
+                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                        filled: true,
+                        fillColor: const Color(0xFF0F172A),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Số hiệu & Cơ quan cấp
                     Row(
                       children: [
                         Expanded(
@@ -130,9 +244,9 @@ class _HeroesPageState extends State<HeroesPage> {
                             controller: certNumberController,
                             style: const TextStyle(color: Colors.white, fontSize: 12),
                             decoration: InputDecoration(
-                              labelText: 'Số hiệu chứng chỉ',
+                              labelText: 'Số hiệu thẻ / CCHN (*)',
                               labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
-                              hintText: 'VD: CC-BLS-2024/09',
+                              hintText: 'VD: CCHN-115/09',
                               hintStyle: const TextStyle(color: Colors.white30, fontSize: 11),
                               filled: true,
                               fillColor: const Color(0xFF0F172A),
@@ -147,10 +261,8 @@ class _HeroesPageState extends State<HeroesPage> {
                             controller: issuingOrgController,
                             style: const TextStyle(color: Colors.white, fontSize: 12),
                             decoration: InputDecoration(
-                              labelText: 'Cơ quan cấp chứng chỉ',
+                              labelText: 'Cơ quan cấp phép',
                               labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
-                              hintText: 'VD: Hội Chữ Thập Đỏ',
-                              hintStyle: const TextStyle(color: Colors.white30, fontSize: 11),
                               filled: true,
                               fillColor: const Color(0xFF0F172A),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -160,38 +272,44 @@ class _HeroesPageState extends State<HeroesPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
 
-                    // Bậc chuyên môn đề xuất
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedTier,
-                      dropdownColor: const Color(0xFF0F172A),
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      decoration: InputDecoration(
-                        labelText: 'Bậc chuyên môn đề xuất',
-                        labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
-                        filled: true,
-                        fillColor: const Color(0xFF0F172A),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'TIER_1_BLS',
-                          child: Text('Tier 1: Hiệp sĩ Cứu sinh cơ bản (BLS - CPR, Dị vật)'),
+                    // Đơn vị công tác & Số năm kinh nghiệm
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: workingUnitController,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            decoration: InputDecoration(
+                              labelText: 'Đơn vị công tác hiện tại',
+                              labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                              filled: true,
+                              fillColor: const Color(0xFF0F172A),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'TIER_2_PHTLS',
-                          child: Text('Tier 2: Hiệp sĩ Chấn thương ngoại viện (PHTLS - Nẹp, C-Spine)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'TIER_3_MEDIC',
-                          child: Text('Tier 3: Bác sĩ / Điều dưỡng phản ứng nhanh (Medic)'),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 1,
+                          child: TextField(
+                            controller: yearsExpController,
+                            keyboardType: TextInputType.number,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                            decoration: InputDecoration(
+                              labelText: 'Kinh nghiệm (năm)',
+                              labelStyle: const TextStyle(color: Colors.white60, fontSize: 11),
+                              filled: true,
+                              fillColor: const Color(0xFF0F172A),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
                         ),
                       ],
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedTier = val);
-                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -220,7 +338,7 @@ class _HeroesPageState extends State<HeroesPage> {
                                   style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
                                 Text(
-                                  examTaken ? 'Đủ điều kiện chuyên môn sơ cấp cứu' : 'Quy định tối thiểu đạt ≥18/20 câu (≥90%)',
+                                  examTaken ? 'Đủ điều kiện chuyên môn sơ cấp cứu ngoại viện' : 'Quy định tối thiểu đạt ≥18/20 câu (≥90%)',
                                   style: const TextStyle(color: Colors.white54, fontSize: 10.5),
                                 ),
                               ],
@@ -263,7 +381,7 @@ class _HeroesPageState extends State<HeroesPage> {
                           child: Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: Text(
-                              'Tôi cam kết tuân thủ Giới hạn hành nghề (Scope of Practice) theo Điều 87 Luật Khám bệnh, chữa bệnh 2023: Không tiêm truyền, không cho thuốc bừa bãi, không can thiệp xâm lấn.',
+                              'Tôi cam kết tuân thủ Giới hạn hành nghề (Scope of Practice) theo Điều 87 Luật Khám bệnh, chữa bệnh 2023: Không tiêm truyền, không cho thuốc bừa bãi, không can thiệp xâm lấn trái thẩm quyền.',
                               style: TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.3),
                             ),
                           ),
@@ -300,11 +418,15 @@ class _HeroesPageState extends State<HeroesPage> {
                                       certificatePath: certImage?.path,
                                       certificateNumber: certNumberController.text.trim().isNotEmpty
                                           ? certNumberController.text.trim()
-                                          : 'CERT-BLS-${DateTime.now().millisecondsSinceEpoch}',
+                                          : 'CERT-${DateTime.now().millisecondsSinceEpoch}',
                                       issuingOrganization: issuingOrgController.text.trim().isNotEmpty
                                           ? issuingOrgController.text.trim()
-                                          : 'Hội Chữ Thập Đỏ',
+                                          : 'Cơ quan Thẩm quyền Cấp phép',
                                       specialtyTier: selectedTier,
+                                      professionCategory: selectedCategory,
+                                      credentialName: credentialNameController.text.trim(),
+                                      workingUnit: workingUnitController.text.trim(),
+                                      yearsOfExperience: int.tryParse(yearsExpController.text.trim()) ?? 2,
                                       scopeOfPracticeAgreed: scopeAgreed,
                                     );
                                 if (!context.mounted) return;
@@ -315,7 +437,7 @@ class _HeroesPageState extends State<HeroesPage> {
                                     backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
                                     content: Text(
                                       ok
-                                          ? 'Hồ sơ Hiệp sĩ & Chứng chỉ Y tế đã gửi thành công! Cổng quản trị đang thẩm định.'
+                                          ? 'Hồ sơ Hiệp sĩ & Chứng chỉ Ngành đã gửi thành công! Cổng quản trị đang thẩm định.'
                                           : 'Gửi hồ sơ thất bại, vui lòng thử lại.',
                                     ),
                                   ),

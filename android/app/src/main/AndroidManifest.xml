@@ -94,6 +94,27 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/safesolo_widget_info" />
         </receiver>
 
+        <receiver android:name=".SafeSoloMiniWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/safesolo_widget_mini_info" />
+        </receiver>
+
+        <receiver android:name=".SafeSoloCircleWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/safesolo_widget_circle_info" />
+        </receiver>
+
+        <receiver android:name=".SafeSoloMedicalWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/safesolo_widget_medical_info" />
+        </receiver>
+
         <receiver android:name=".LocketWidgetProvider" android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

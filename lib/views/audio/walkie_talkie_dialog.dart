@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: HOP_THOAI_BO_DAM_NOI_BO (WALKIE_TALKIE_DIALOG)
+// [DUONG_DAN]: lib/views/audio/walkie_talkie_dialog.dart
+// [CHUC_NANG]: Kenh bo dam noi bo Push-to-Talk giua Nan nhan va Hiep si
+// ============================================================================
+
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/walkie_talkie_service.dart';

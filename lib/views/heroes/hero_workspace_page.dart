@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: KHU_VUC_TAC_CHIEN_HIEP_SI (HERO_WORKSPACE_PAGE)
+// [DUONG_DAN]: lib/views/heroes/hero_workspace_page.dart
+// [CHUC_NANG]: Radar truc chien, Tiep nhan ca SOS, CPR Metronome, SBAR cho 115
+// ============================================================================
+
 import 'dart:async';
 import 'dart:io';
 
@@ -70,6 +76,11 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
   int _activeCallSeconds = 0;
   Timer? _missionTimer;
 
+  // HeroShield policies & vouchers state
+  bool _isLoadingHeroShield = false;
+  List<Map<String, dynamic>> _heroPolicies = [];
+  List<Map<String, dynamic>> _heroVouchers = [];
+
   // Active mission state
   HeroIncidentItem? _activeMission;
   HeroMissionStage _missionStage = HeroMissionStage.enRoute;
@@ -78,6 +89,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
   bool _isCprMetronomeActive = false;
   int _cprCompressionsCount = 0;
   int _cprCycleCount = 1;
+  String _cprTargetType = 'ADULT'; // 'ADULT' (30:2, 5-6cm), 'CHILD' (30:2, 4-5cm), 'INFANT' (30:2, 3-4cm)
   Timer? _cprTimer;
   final List<String> _clinicalLogs = [
     'Tiếp cận hiện trường & đánh giá an toàn 3S (14:32)',
@@ -145,6 +157,27 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     _activeMission = _incidents.first;
     _startMissionTimer();
     _fetchNearbyIncidents();
+    _loadHeroShieldData();
+  }
+
+  Future<void> _loadHeroShieldData() async {
+    if (!mounted) return;
+    setState(() => _isLoadingHeroShield = true);
+    try {
+      final app = context.read<AppProvider>();
+      final heroId = app.user?.id ?? 'ALL';
+      final policies = await ApiService.instance.getHeroPolicies(heroId);
+      final vouchers = await ApiService.instance.getHeroRestockVouchers(heroId);
+      if (mounted) {
+        setState(() {
+          _heroPolicies = policies;
+          _heroVouchers = vouchers;
+          _isLoadingHeroShield = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingHeroShield = false);
+    }
   }
 
   Future<void> _fetchNearbyIncidents() async {
@@ -354,14 +387,35 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       ),
       title: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF10B981), width: 1.5),
-            ),
-            child: const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 18),
+          Builder(
+            builder: (context) {
+              final cat = user?.professionCategory ?? 'MEDICAL_NURSE';
+              IconData icon = Icons.shield_rounded;
+              Color col = const Color(0xFF10B981);
+              if (cat == 'MEDICAL_NURSE') {
+                icon = Icons.medical_services_rounded;
+                col = const Color(0xFF10B981);
+              } else if (cat == 'POLICE_SECURITY') {
+                icon = Icons.local_police_rounded;
+                col = const Color(0xFF38BDF8);
+              } else if (cat == 'FIRE_RESCUE') {
+                icon = Icons.fire_hydrant_alt_rounded;
+                col = const Color(0xFFEF4444);
+              } else if (cat == 'WILDERNESS_EXPLORER') {
+                icon = Icons.hiking_rounded;
+                col = const Color(0xFFF59E0B);
+              }
+
+              return Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: col.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: col, width: 1.5),
+                ),
+                child: Icon(icon, color: col, size: 18),
+              );
+            },
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -381,23 +435,45 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: const Color(0xFFF59E0B), width: 0.8),
-                      ),
-                      child: const Text(
-                        'KYC ĐẠT',
-                        style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.bold),
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final cat = user?.professionCategory ?? 'MEDICAL_NURSE';
+                        String tag = 'Y TẾ';
+                        Color col = const Color(0xFF10B981);
+                        if (cat == 'POLICE_SECURITY') {
+                          tag = 'CÔNG AN';
+                          col = const Color(0xFF38BDF8);
+                        } else if (cat == 'FIRE_RESCUE') {
+                          tag = 'PCCC';
+                          col = const Color(0xFFEF4444);
+                        } else if (cat == 'WILDERNESS_EXPLORER') {
+                          tag = 'DÃ NGOẠI WFR';
+                          col = const Color(0xFFF59E0B);
+                        }
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: col.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: col, width: 0.8),
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(color: col, fontSize: 8.5, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
-                const Text(
-                  'MÃ: HERO-HCM-0928 · BẬC A',
-                  style: TextStyle(color: Colors.white54, fontSize: 10, fontFamily: 'monospace'),
+                Text(
+                  user?.credentialNumber.isNotEmpty == true
+                      ? '${user!.credentialNumber} · ${user.workingUnit.isNotEmpty ? user.workingUnit : "TOC PHẢN ỨNG NHANH"}'
+                      : 'HERO-HCM-0928 · TOC PHẢN ỨNG NHANH',
+                  style: const TextStyle(color: Colors.white54, fontSize: 9.5, fontFamily: 'monospace'),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ],
             ),
@@ -454,40 +530,46 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              AnimatedBuilder(
-                animation: _pulseAnim,
-                builder: (context, _) {
-                  return Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _isOnDuty ? const Color(0xFF10B981) : Colors.amber,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        if (_isOnDuty)
-                          BoxShadow(
-                            color: const Color(0xFF10B981).withValues(alpha: _pulseAnim.value),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              Text(
-                _isOnDuty ? 'GPS RTK: ĐANG PHÁT TỌA ĐỘ VỀ TOC' : 'ĐỊNH VỊ: TẠM DỪNG',
-                style: TextStyle(
-                  color: _isOnDuty ? const Color(0xFF34D399) : Colors.white54,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  fontFamily: 'monospace',
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _pulseAnim,
+                  builder: (context, _) {
+                    return Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _isOnDuty ? const Color(0xFF10B981) : Colors.amber,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          if (_isOnDuty)
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withValues(alpha: _pulseAnim.value),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _isOnDuty ? 'GPS RTK: ĐANG PHÁT TỌA ĐỘ VỀ TOC' : 'ĐỊNH VỊ: TẠM DỪNG',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: _isOnDuty ? const Color(0xFF34D399) : Colors.white54,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           Row(
             children: [
@@ -869,25 +951,32 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-                        child: const Icon(Icons.timer_rounded, color: Colors.white, size: 16),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'THỜI GIAN ĐIỀU PHỐI: $minutes:$seconds',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
+                  Flexible(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                          child: const Icon(Icons.timer_rounded, color: Colors.white, size: 16),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'THỜI GIAN ĐIỀU PHỐI: $minutes:$seconds',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -1259,6 +1348,84 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       ).catchError((_) => <String, dynamic>{});
     }
     TopToast.show(context, message: 'Đã ghi nhận lâm sàng: $entry');
+  }
+
+  Future<void> _triggerProximityBeacon() async {
+    final mission = _activeMission;
+    if (mission == null) return;
+    try {
+      await ApiService.instance.triggerProximityBeacon(mission.id);
+      _logClinicalAction('Đã kích hoạt Còi & Đèn Flash tìm kiếm tầm gần (<25m)');
+      if (mounted) {
+        TopToast.show(
+          context,
+          message: 'ĐÃ KÍCH HOẠT CÒI HÚ & ĐÈN FLASH MÁY NẠN NHÂN ĐỂ ĐỊNH VỊ!',
+          icon: Icons.volume_up_rounded,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        TopToast.show(context, message: 'Kích hoạt còi tầm gần thất bại: $e', icon: Icons.error_outline_rounded);
+      }
+    }
+  }
+
+  void _showCSpineGuideDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Color(0xFFEF4444), width: 1.5)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'NGHI NGỜ TỔN THƯƠNG C-SPINE',
+                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Quy trình Cố định Cột sống cổ Tai nạn Giao thông (SOP Bước 3):', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            _buildGuideBullet('1. Giữ trục thẳng đầu - cổ - thân (In-line manual stabilization) không cho gập/xoay.'),
+            _buildGuideBullet('2. Tuyệt đối KHÔNG bế xốc nách nạn nhân lên xe máy (nguy cơ đứt tủy cổ gây liệt tứ chi).'),
+            _buildGuideBullet('3. Kỹ thuật Log-roll 3 người: Một người giữ chắc đầu cổ làm chỉ huy, hai người đỡ vai-hông-chân lăn cùng lúc.'),
+            _buildGuideBullet('4. KHÔNG tháo mũ bảo hiểm nếu không có kỹ thuật viên thứ 2 giữ cổ chuyên trách.'),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _logClinicalAction('Đã cố định C-Spine & áp dụng Log-roll 3 người');
+              TopToast.show(context, message: 'Đã lưu thao tác C-Spine vào biên bản SBAR!', icon: Icons.check_circle_rounded);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
+            child: const Text('ĐÃ CỐ ĐỊNH C-SPINE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuideBullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('• ', style: TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold)),
+          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.3))),
+        ],
+      ),
+    );
   }
 
   void _startTeleFirstAidCall() {
@@ -1733,6 +1900,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                           final plate = plateController.text.trim().isNotEmpty ? plateController.text.trim() : '51B-115.99';
                           final medic = medicController.text.trim().isNotEmpty ? medicController.text.trim() : 'BS. CKI Trần Minh Tuấn';
                           final hash = '0x${DateTime.now().millisecondsSinceEpoch.toRadixString(16)}';
+                          final myUserId = context.read<AppProvider>().user?.id ?? 'HERO_RESCUER_001';
 
                           Navigator.pop(ctx);
                           if (_activeMission != null) {
@@ -1746,6 +1914,17 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                               );
                             } catch (_) {}
                           }
+
+                          try {
+                            await ApiService.instance.completeHeroRescue(
+                              incidentId: _activeMission?.id ?? 'INC_TRAUMA_9921',
+                              volunteerId: myUserId,
+                              ambulancePlate: plate,
+                              doctorName: medic,
+                              verificationHash: hash,
+                              consumedSuppliesNote: 'Đã sử dụng 4 cuộn gạc vô trùng 10x10cm, 2 băng thun ép garô, 1 mặt nạ CPR bỏ túi hỗ trợ hô hấp.',
+                            );
+                          } catch (_) {}
 
                           if (mounted) {
                             setState(() => _missionStage = HeroMissionStage.completed);
@@ -2137,7 +2316,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           ),
           const SizedBox(height: 12),
 
-          // 1. CPR Metronome Card
+          // 1. CPR Metronome Card (AHA Adult & Pediatric Protocols)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -2152,6 +2331,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               ),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2177,25 +2357,46 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                   ],
                 ),
                 const SizedBox(height: 8),
+
+                // Chọn đối tượng CPR (Kịch bản 21: Pediatric Mode)
+                Row(
+                  children: [
+                    _buildCprModeChip('ADULT', 'Người lớn'),
+                    const SizedBox(width: 6),
+                    _buildCprModeChip('CHILD', 'Trẻ nhỏ (1-8t)'),
+                    const SizedBox(width: 6),
+                    _buildCprModeChip('INFANT', 'Sơ sinh (<1t)'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ÉP TIM: $_cprCompressionsCount / 30',
-                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
-                        ),
-                        Text(
-                          _cprCompressionsCount >= 28 ? 'CHUẨN BỊ THỔI NGẠT 2 LẦN!' : 'Độ sâu 5-6cm · Để ngực nở hoàn toàn',
-                          style: TextStyle(
-                            color: _cprCompressionsCount >= 28 ? const Color(0xFFF59E0B) : Colors.white54,
-                            fontSize: 10,
-                            fontWeight: _cprCompressionsCount >= 28 ? FontWeight.bold : FontWeight.normal,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'ÉP TIM: $_cprCompressionsCount / 30',
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
                           ),
-                        ),
-                      ],
+                          Text(
+                            _cprCompressionsCount >= 28
+                                ? 'CHUẨN BỊ THỔI NGẠT 2 LẦN!'
+                                : _cprTargetType == 'CHILD'
+                                    ? 'Ép 1 bàn tay · Sâu 4-5cm (1/3 ngực) · 30:2'
+                                    : _cprTargetType == 'INFANT'
+                                        ? 'Ép 2 ngón tay · Sâu 3-4cm · Thổi nhẹ'
+                                        : 'Ép 2 bàn tay đan ngón · Sâu 5-6cm · 110 bpm',
+                            style: TextStyle(
+                              color: _cprCompressionsCount >= 28 ? const Color(0xFFF59E0B) : Colors.white70,
+                              fontSize: 10,
+                              fontWeight: _cprCompressionsCount >= 28 ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
@@ -2229,11 +2430,12 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
             runSpacing: 6,
             children: [
               _buildClinicalActionButton('🩸 Garô CAT', () => _logClinicalAction('Đặt garô cầm máu CAT')),
-              _buildClinicalActionButton('🛡️ Cố định C-Spine', () => _logClinicalAction('Cố định cột sống cổ (C-Spine in-line)')),
+              _buildClinicalActionButton('🛡️ Cố định C-Spine', _showCSpineGuideDialog),
               _buildClinicalActionButton('🦴 Nẹp gãy xương', () => _logClinicalAction('Nẹp cố định chi qua 2 khớp')),
               _buildClinicalActionButton('⚡ Sốc tim AED', () => _logClinicalAction('Dán điện cực AED & phân tích nhịp')),
               _buildClinicalActionButton('🏷️ Quét SafeTag ICE', _scanVictimSafeTag),
               _buildClinicalActionButton('📞 Tele-FirstAid BS', _startTeleFirstAidCall),
+              _buildClinicalActionButton('🔊 Còi Tìm Kiếm (<25m)', _triggerProximityBeacon),
             ],
           ),
           const SizedBox(height: 10),
@@ -2316,6 +2518,35 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
         ),
         child: Text(label, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10.5, fontWeight: FontWeight.w600)),
+      ),
+    );
+  }
+
+  Widget _buildCprModeChip(String mode, String label) {
+    final isSelected = _cprTargetType == mode;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _cprTargetType = mode;
+        });
+        TopToast.show(context, message: 'Đã chuyển chế độ CPR: $label');
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isSelected ? const Color(0xFF38BDF8) : Colors.white12),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : Colors.white54,
+            fontSize: 9.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ),
     );
   }
@@ -2763,28 +2994,80 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
   }
 
   // ==========================================
+  // ==========================================
   // TAB 3: 💳 THẺ HIỆP SĨ ĐIỆN TỬ & VÍ THƯỞNG
   // ==========================================
   Widget _buildDigitalIdAndWalletTab(User? user) {
-    final heroName = user?.name.isNotEmpty == true ? user!.name : 'LÊ HỮU PHƯỚC';
+    final heroName = user?.name.isNotEmpty == true ? user!.name : 'HIỆP SĨ PHẢN ỨNG NHANH';
+    final cat = user?.professionCategory ?? 'MEDICAL_NURSE';
+
+    // Xác định bộ nhận diện chuyên môn (Theme & Metadata theo khối ngành)
+    String cardTitle = 'THẺ CHUYÊN MÔN Y TẾ NGOẠI VIỆN';
+    String cardSubtitle = 'BỘ Y TẾ · HỘI TIM MẠCH HỌC VIỆT NAM (AHA/VNHA)';
+    String gradeBadge = 'PARAMEDIC BLS/ACLS';
+    IconData profIcon = Icons.medical_services_rounded;
+    Color primaryColor = const Color(0xFF10B981);
+    List<Color> cardGradient = const [Color(0xFF064E3B), Color(0xFF0F172A), Color(0xFF022C22)];
+    String defaultCert = '018492/BYT-CCHN';
+    String defaultUnit = 'Trung tâm Cấp cứu 115 & Mạng lưới TOC SafeSolo';
+    List<String> skillsChips = ['AHA BLS/ACLS', 'ĐẶT MASK AMBU', 'ÉP TIM CPR 30:2', 'NHÓM MÁU: O-'];
+
+    if (cat == 'POLICE_SECURITY') {
+      cardTitle = 'THẺ LỰC LƯỢNG AN NINH & CÔNG AN CƠ SỞ';
+      cardSubtitle = 'LỰC LƯỢNG THAM GIA BẢO VỆ AN NINH TRẬT TỰ CƠ SỞ';
+      gradeBadge = 'POLICE TIER 1';
+      profIcon = Icons.local_police_rounded;
+      primaryColor = const Color(0xFF38BDF8);
+      cardGradient = const [Color(0xFF1E3A8A), Color(0xFF0F172A), Color(0xFF0C4A6E)];
+      defaultCert = 'AN-HCM-038291';
+      defaultUnit = 'Công an Phường / Đội Trật tự An ninh Cơ sở';
+      skillsChips = ['BẢO VỆ HIỆN TRƯỜNG', 'TRẤN ÁP DURESS', 'PHÂN LUỒNG GT', 'PHỐI HỢP 113'];
+    } else if (cat == 'FIRE_RESCUE') {
+      cardTitle = 'THẺ CẢNH SÁT PCCC & CỨU NẠN CỨU HỘ';
+      cardSubtitle = 'CỤC CẢNH SÁT PCCC VÀ CNCH · BỘ CÔNG AN';
+      gradeBadge = 'FIRE RESCUE A';
+      profIcon = Icons.fire_hydrant_alt_rounded;
+      primaryColor = const Color(0xFFEF4444);
+      cardGradient = const [Color(0xFF7F1D1D), Color(0xFF0F172A), Color(0xFF450A0A)];
+      defaultCert = 'PCCC-7749-HCM';
+      defaultUnit = 'Đội Cảnh sát PCCC & CNCH Khu vực TP.HCM';
+      skillsChips = ['CỨU HỘ KHÔNG GIAN HẸP', 'SƠ TÁN ĐÁM CHÁY', 'PHÁ DỠ KHẨN CẤP', 'PHỐI HỢP 114'];
+    } else if (cat == 'WILDERNESS_EXPLORER') {
+      cardTitle = 'CHỨNG CHỈ CỨU HỘ ĐỊA HÌNH HIỂM TRỞ WFR';
+      cardSubtitle = 'WILDERNESS FIRST RESPONDER RESCUE CORPS';
+      gradeBadge = 'WFR CERTIFIED';
+      profIcon = Icons.hiking_rounded;
+      primaryColor = const Color(0xFFF59E0B);
+      cardGradient = const [Color(0xFF78350F), Color(0xFF0F172A), Color(0xFF451A03)];
+      defaultCert = 'WFR-VN-9082';
+      defaultUnit = 'Đội Cứu nạn Dã ngoại & Sinh tồn Địa hình Hiểm trở';
+      skillsChips = ['ĐỊNH VỊ GPS OFFLINE', 'CỐ ĐỊNH XƯƠNG DÃ CHIẾN', 'CHỐNG HẠ THÂN NHIỆT', 'VÕNG TẢI THƯƠNG'];
+    }
+
+    final certNumber = user?.credentialNumber.isNotEmpty == true ? user!.credentialNumber : defaultCert;
+    final workingUnit = user?.workingUnit.isNotEmpty == true ? user!.workingUnit : defaultUnit;
+    final expYears = user?.yearsOfExperience ?? 3;
+    final walletBal = user?.walletBalance != null && user!.walletBalance > 0
+        ? user.walletBalance
+        : 1850000;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // THẺ HIỆP SĨ ĐIỆN TỬ (CYBER DIGITAL BADGE)
+        // THẺ HIỆP SĨ ĐIỆN TỬ CHUYÊN NGÀNH (TACTICAL DIGITAL CREDENTIAL)
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF0B132B)],
+            gradient: LinearGradient(
+              colors: cardGradient,
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+            border: Border.all(color: primaryColor, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                color: primaryColor.withValues(alpha: 0.2),
                 blurRadius: 18,
                 offset: const Offset(0, 4),
               ),
@@ -2796,33 +3079,62 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFF59E0B), size: 20),
-                      ),
-                      const SizedBox(width: 8),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'THẺ HIỆP SĨ CỨU HỘ SAFESOLO',
-                            style: TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withValues(alpha: 0.2),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
                           ),
-                          Text('GOOD SAMARITAN RESCUE CORPS', style: TextStyle(color: Colors.white38, fontSize: 8)),
-                        ],
-                      ),
-                    ],
+                          child: Icon(profIcon, color: primaryColor, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cardTitle,
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                cardSubtitle,
+                                style: const TextStyle(color: Colors.white54, fontSize: 8),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const Text('GRADE A', style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: primaryColor.withValues(alpha: 0.6)),
+                    ),
+                    child: Text(
+                      gradeBadge,
+                      style: TextStyle(color: primaryColor, fontSize: 9.5, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
 
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2831,25 +3143,27 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('HỌ VÀ TÊN HIỆP SĨ:', style: TextStyle(color: Colors.white38, fontSize: 9.5)),
+                        const Text('HỌ VÀ TÊN HIỆP SĨ:', style: TextStyle(color: Colors.white38, fontSize: 9)),
                         Text(
                           heroName.toUpperCase(),
                           style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 6),
-                        const Text('MÃ SỐ ĐỊNH DANH CCCD:', style: TextStyle(color: Colors.white38, fontSize: 9.5)),
-                        const Text('079*******89 (ĐÃ ĐỐI SOÁT)', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace')),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            _buildMiniChip('NHÓM MÁU: O+'),
-                            const SizedBox(width: 6),
-                            _buildMiniChip('CPR/AED CERTIFIED'),
-                          ],
+                        const SizedBox(height: 5),
+                        Text('SỐ HIỆU / CCHN: $certNumber', style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text('ĐƠN VỊ: $workingUnit', style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                        const SizedBox(height: 2),
+                        Text('THÂM NIÊN: $expYears NĂM KINH NGHIỆM THỰC CHIẾN', style: TextStyle(color: primaryColor, fontSize: 9.5, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: skillsChips.map((s) => _buildMiniChip(s)).toList(),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
 
                   // QR Code xác thực cho Công An 113 / Bệnh Viện 115 quét
                   Container(
@@ -2859,9 +3173,9 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: QrImageView(
-                      data: 'SAFESOLO-HERO:ID=0928;NAME=$heroName;KYC=VERIFIED;GRADE=A',
+                      data: 'SAFESOLO-HERO-SECURE:ID=${user?.id ?? "0928"};PROF=$cat;CERT=$certNumber;NAME=$heroName;EXP=$expYears;VERIFIED=GOV_LEGAL',
                       version: QrVersions.auto,
-                      size: 72.0,
+                      size: 74.0,
                     ),
                   ),
                 ],
@@ -2869,10 +3183,45 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               const SizedBox(height: 14),
               const Divider(color: Colors.white12, height: 1),
               const SizedBox(height: 10),
-              const Text(
-                'Lá chắn pháp lý: Căn cứ Điều 87 Luật Khám bệnh, chữa bệnh 2023; Điều 132 & Điều 23 Bộ luật Hình sự 2015; Điều 584 Bộ luật Dân sự 2015. Hạn mức trợ giúp pháp lý: 500.000.000đ • Bảo hiểm tai nạn sơ cứu: 100.000.000đ.',
-                style: TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5, fontStyle: FontStyle.italic, height: 1.3),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.gavel_rounded, color: primaryColor, size: 14),
+                  const SizedBox(width: 6),
+                  const Expanded(
+                    child: Text(
+                      'Lá chắn pháp lý: Căn cứ Điều 87 Luật Khám bệnh, chữa bệnh số 15/2023/QH15; Điều 23 & Điều 132 Bộ luật Hình sự 2015; Điều 584 Bộ luật Dân sự 2015. Miễn trừ trách nhiệm sơ cứu nhân đạo • Quỹ trợ cấp pháp lý HeroShield bảo trợ 500.000.000đ.',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 9.2, fontStyle: FontStyle.italic, height: 1.35),
+                    ),
+                  ),
+                ],
               ),
+              if (_heroPolicies.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black38,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.security_rounded, color: primaryColor, size: 13),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Hợp đồng: ${_heroPolicies.first["policyNumber"] ?? "POL-HERO-ACTIVE"}',
+                        style: TextStyle(color: primaryColor, fontSize: 10, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                      ),
+                      const Spacer(),
+                      const Text(
+                        'Bảo Việt: 500Tr',
+                        style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -2907,14 +3256,14 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Số dư trợ cấp xăng xe & hao mòn:', style: TextStyle(color: Colors.white38, fontSize: 10.5)),
-                      SizedBox(height: 2),
+                      const Text('Số dư trợ cấp xăng xe & hao mòn:', style: TextStyle(color: Colors.white38, fontSize: 10.5)),
+                      const SizedBox(height: 2),
                       Text(
-                        '1.850.000 VNĐ',
-                        style: TextStyle(color: Color(0xFF10B981), fontSize: 22, fontWeight: FontWeight.bold),
+                        '${walletBal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} VNĐ',
+                        style: const TextStyle(color: Color(0xFF10B981), fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -2925,7 +3274,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () {
-                      TopToast.show(context, message: 'Đã gửi yêu cầu rút 1.850.000 VNĐ về ví MoMo/Ngân hàng');
+                      _showWithdrawModal(context, walletBal);
                     },
                     child: const Text('RÚT TIỀN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
@@ -2937,6 +3286,84 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
               _buildWalletRow('+200.000 VNĐ', 'Trợ cấp xăng xe ca AFib Nguyễn Thị Hoa (Hôm nay)', '14:40'),
               _buildWalletRow('+150.000 VNĐ', 'Hỗ trợ ca tai nạn Lý Thường Kiệt (Hôm qua)', '21:15'),
               _buildWalletRow('+500.000 VNĐ', 'Thưởng Hiệp Sĩ phản ứng nhanh xuất sắc tuần', '15/09'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // KẾT NỐI BÀN ĐIỀU PHỐI TELEGRAM BOT TÁC CHIẾN (@SFESOLOBot)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0C4A6E), Color(0xFF0F172A)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.send_rounded, color: Color(0xFF38BDF8), size: 18),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'BÀN TÁC CHIẾN TELEGRAM BOT',
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981), width: 0.8),
+                    ),
+                    child: const Text('@SFESOLOBot', style: TextStyle(color: Color(0xFF10B981), fontSize: 9.5, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Nhận lệnh cứu nạn khẩn cấp, mở tủ sốc tim AED bằng mã OTP 6 số và tra cứu lá chắn pháp lý Điều 87 trực tiếp qua Telegram mà không cần mở ứng dụng.',
+                style: TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final uri = Uri.parse('https://t.me/SFESOLOBot?start=hero');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } else if (mounted) {
+                      TopToast.show(context, message: 'Vui lòng mở Telegram và tìm @SFESOLOBot');
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                  label: const Text('MỞ BÀN TÁC CHIẾN TELEGRAM NGAY', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ],
           ),
         ),
@@ -2969,36 +3396,22 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                       color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Text('SBAR RESTOCK', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _heroVouchers.isNotEmpty ? '${_heroVouchers.length} VOUCHER' : 'SBAR RESTOCK',
+                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.qr_code_2_rounded, color: Colors.white70, size: 36),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('RESTOCK-AFIB-8821', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
-                          SizedBox(height: 2),
-                          Text('Được đổi: 2 Gạc vô trùng 10x10 • 1 Băng ép garô • 2 Găng tay nitrile', style: TextStyle(color: Colors.white70, fontSize: 10)),
-                          SizedBox(height: 2),
-                          Text('Áp dụng tại: Nhà thuốc Long Châu / Pharmacity toàn quốc', style: TextStyle(color: Colors.white38, fontSize: 9)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              if (_isLoadingHeroShield)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF59E0B)))),
+                )
+              else if (_heroVouchers.isNotEmpty)
+                ..._heroVouchers.take(3).map((v) => _buildVoucherItem(v))
+              else
+                _buildDefaultVoucherItem(),
             ],
           ),
         ),
@@ -3045,6 +3458,211 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     );
   }
 
+  Widget _buildVoucherItem(Map<String, dynamic> v) {
+    final code = v['voucherCode']?.toString() ?? 'RESTOCK-AUTO';
+    final isRedeemed = v['status'] == 'REDEEMED';
+    final partner = v['partnerPharmacyNetwork']?.toString() ?? v['partnerPharmacyChain']?.toString() ?? 'Nhà thuốc Long Châu / Pharmacity';
+    final items = v['items'] as List<dynamic>? ?? v['itemsApproved'] as List<dynamic>? ?? [];
+    final itemsDesc = items.isNotEmpty
+        ? items.map((i) => '${i["quantity"] ?? 1}x ${i["itemName"] ?? "Vật tư"}').join(' • ')
+        : 'Gạc vô trùng 10x10 • Garô CAT • Găng tay nitrile';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isRedeemed ? const Color(0xFF10B981).withValues(alpha: 0.3) : const Color(0xFFF59E0B).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isRedeemed ? Icons.check_circle_rounded : Icons.qr_code_2_rounded,
+            color: isRedeemed ? const Color(0xFF10B981) : Colors.white70,
+            size: 34,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      code,
+                      style: TextStyle(
+                        color: isRedeemed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isRedeemed ? const Color(0xFF10B981).withValues(alpha: 0.2) : const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        isRedeemed ? 'ĐÃ NHẬN' : 'CHỜ ĐỔI',
+                        style: TextStyle(
+                          color: isRedeemed ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          fontSize: 8.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  itemsDesc,
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text('Điểm nhận: $partner', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+              ],
+            ),
+          ),
+          if (!isRedeemed) ...[
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () => _showRedeemVoucherModal(v),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('ĐỔI', style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDefaultVoucherItem() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.qr_code_2_rounded, color: Colors.white70, size: 36),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('RESTOCK-AFIB-8821', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                SizedBox(height: 2),
+                Text('Được đổi: 2 Gạc vô trùng 10x10 • 1 Băng ép garô • 2 Găng tay nitrile', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                SizedBox(height: 2),
+                Text('Áp dụng tại: Nhà thuốc Long Châu / Pharmacity toàn quốc', style: TextStyle(color: Colors.white38, fontSize: 9)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRedeemVoucherModal(Map<String, dynamic> voucher) {
+    final code = voucher['voucherCode']?.toString() ?? 'RESTOCK-XXXX';
+    final partner = voucher['partnerPharmacyNetwork']?.toString() ?? voucher['partnerPharmacyChain']?.toString() ?? 'Nhà thuốc FPT Long Châu & Pharmacity';
+    final items = voucher['items'] as List<dynamic>? ?? voucher['itemsApproved'] as List<dynamic>? ?? [];
+    final itemsDesc = items.isNotEmpty
+        ? items.map((i) => '${i["quantity"] ?? 1}x ${i["itemName"] ?? "Vật tư"}').join(' • ')
+        : 'Gạc vô trùng 10x10 • Garô CAT • Găng tay nitrile';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('XUẤT TRÌNH BỒI HOÀN VẬT TƯ', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: QrImageView(
+                  data: 'SAFEFUND:RESTOCK:$code|PARTNER:$partner',
+                  size: 160,
+                  version: QrVersions.auto,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(code, style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 16, fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+              const SizedBox(height: 6),
+              Text(
+                itemsDesc,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Điểm nhận: $partner',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    try {
+                      await ApiService.instance.redeemHeroRestockVoucher(code);
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) TopToast.show(context, message: 'Đã hoàn tất bồi hoàn vật tư!');
+                      _loadHeroShieldData();
+                    } catch (_) {
+                      if (mounted) TopToast.show(context, message: 'Đã nhận vật tư thành công.');
+                      if (ctx.mounted) Navigator.pop(ctx);
+                    }
+                  },
+                  child: const Text('XÁC NHẬN ĐÃ NHẬN VẬT TƯ', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildAchievementStat(String value, String label, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -3061,6 +3679,86 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
         ],
       ),
+    );
+  }
+
+  void _showWithdrawModal(BuildContext context, int balance) {
+    final formatted = balance.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.');
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'RÚT QUỸ TRỢ CẤP CỨU NẠN',
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Số dư khả dụng: $formatted VNĐ',
+                style: const TextStyle(color: Color(0xFF10B981), fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Nguồn: Quỹ Bảo hiểm HeroShield & Bồi hoàn hỗ trợ xăng xe, hao mòn thiết bị sơ cứu ngoại viện.',
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF1E293B)),
+                ),
+                tileColor: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                leading: const Icon(Icons.account_balance_rounded, color: Color(0xFF38BDF8)),
+                title: const Text('Tài khoản Ngân hàng (NAPAS 24/7)', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Vietcombank / MBBank / BIDV (Miễn phí rút)', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  TopToast.show(context, message: 'Lệnh chuyển $formatted VNĐ về tài khoản ngân hàng đã được duyệt!');
+                },
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF1E293B)),
+                ),
+                tileColor: const Color(0xFF1E293B).withValues(alpha: 0.5),
+                leading: const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFA855F7)),
+                title: const Text('Ví điện tử MoMo / ZaloPay', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                subtitle: const Text('Nhận tiền tức thì trong 30 giây', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  TopToast.show(context, message: 'Đã giải ngân $formatted VNĐ tức thì vào Ví MoMo!');
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp"
+    android:padding="11dp"
     android:background="@drawable/widget_bg_safe">
 
-    <!-- Header Row: App Title + Status Badge -->
+    <!-- Header Row: App Info + User/Role + Status Badge -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -16,21 +16,37 @@
 
         <ImageView
             android:id="@+id/widget_logo"
-            android:layout_width="20dp"
-            android:layout_height="20dp"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
             android:src="@mipmap/ic_launcher"
             android:contentDescription="SafeSolo" />
 
-        <TextView
-            android:id="@+id/widget_app_name"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="SafeSolo"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="13sp" />
+            android:layout_marginStart="7dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_app_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="SafeSolo Pro"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/widget_user_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BS. CKII Lê Hoàng Nam"
+                android:textColor="#94A3B8"
+                android:textSize="9.5sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/widget_status_badge"
@@ -38,86 +54,157 @@
             android:layout_height="wrap_content"
             android:text="● AN TOÀN"
             android:textColor="#34D399"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:background="@drawable/widget_badge_safe"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp" />
     </LinearLayout>
 
-    <!-- Center: Countdown Timer & Subtitle -->
+    <!-- Center Section: 2 Columns (Left: Dead-man switch & Vitals, Right: Loved Ones / Guardians Card) -->
     <LinearLayout
         android:id="@+id/widget_content_body"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp">
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp">
 
-        <TextView
-            android:id="@+id/widget_title"
-            android:layout_width="wrap_content"
+        <!-- Column 1: Sinh tồn & Điểm danh -->
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="CHECK-IN SAU"
-            android:textColor="#9CA3AF"
-            android:textSize="10sp"
-            android:letterSpacing="0.08"
-            android:textStyle="bold" />
+            android:layout_weight="1.0"
+            android:orientation="vertical"
+            android:gravity="center_vertical">
 
-        <TextView
-            android:id="@+id/widget_countdown"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="11h : 30m"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:textSize="22sp" />
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DEAD-MAN SWITCH"
+                android:textColor="#6EE7B7"
+                android:textSize="9.5sp"
+                android:letterSpacing="0.05"
+                android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/widget_vitals"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/widget_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="71h 48m"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:textSize="21sp" />
+
+            <TextView
+                android:id="@+id/widget_vitals"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="❤️ 78 BPM • 🫁 98% • ⌚ 100%"
+                android:textColor="#CBD5E1"
+                android:textSize="10sp"
+                android:singleLine="true"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Column 2: Vòng Tròn Bảo Hộ / Người Thân Card -->
+        <LinearLayout
+            android:id="@+id/widget_guardians_card"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="❤️ 75 BPM • 👟 Đang hoạt động"
-            android:textColor="#D1D5DB"
-            android:textSize="11sp"
-            android:maxLines="1"
-            android:ellipsize="end" />
+            android:layout_weight="1.15"
+            android:layout_marginStart="8dp"
+            android:orientation="vertical"
+            android:background="@drawable/widget_card_bg"
+            android:paddingLeft="8dp"
+            android:paddingRight="8dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp">
+
+            <TextView
+                android:id="@+id/widget_guardians_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🛡️ BẢO HỘ ONLINE (2)"
+                android:textColor="#38BDF8"
+                android:textSize="9sp"
+                android:letterSpacing="0.04"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_guardian_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 Mẹ Lan: 88% 🔋 Ở nhà"
+                android:textColor="#F1F5F9"
+                android:textSize="10sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:paddingTop="2dp" />
+
+            <TextView
+                android:id="@+id/widget_guardian_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 Ba Hùng: 94% ⚡ Phòng ngủ"
+                android:textColor="#E2E8F0"
+                android:textSize="10sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:paddingTop="2dp" />
+
+            <TextView
+                android:id="@+id/widget_guardian_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🟢 Linh: 38% 🔋 Đi xe"
+                android:textColor="#94A3B8"
+                android:textSize="9sp"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Actions Row: 1-Tap Check-in + Instant SOS -->
+    <!-- Bottom Actions Row: 1-Tap Check-in + Instant SOS -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="33dp"
         android:orientation="horizontal"
-        android:gravity="center">
+        android:gravity="center"
+        android:layout_marginTop="2dp">
 
         <!-- Nút Điểm Danh Nhanh -->
         <TextView
             android:id="@+id/widget_btn_checkin"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/widget_btn_checkin"
             android:gravity="center"
-            android:text="✓ Tôi ổn"
+            android:text="✓ Tôi ổn (Check-in)"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
-
-        <View
-            android:layout_width="8dp"
-            android:layout_height="1dp" />
 
         <!-- Nút SOS Khẩn Cấp -->
         <TextView
             android:id="@+id/widget_btn_sos"
             android:layout_width="0dp"
-            android:layout_height="36dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
+            android:layout_marginStart="4dp"
             android:background="@drawable/widget_btn_sos"
             android:gravity="center"
-            android:text="🆘 SOS"
+            android:text="🆘 SOS Cấp Cứu"
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
     </LinearLayout>
 

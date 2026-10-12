@@ -15,9 +15,22 @@ import '../models/user_model.dart';
 import '../models/live_journey_model.dart';
 import '../models/disaster_alert_model.dart';
 
+class _ApiKeyClient extends http.BaseClient {
+  final http.Client _inner;
+  _ApiKeyClient(this._inner);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (!request.headers.containsKey('x-api-key')) {
+      request.headers['x-api-key'] = 'android-app-key-abc';
+    }
+    return _inner.send(request);
+  }
+}
+
 class ApiService {
   static final ApiService instance = ApiService();
-  final _client = http.Client();
+  final _client = _ApiKeyClient(http.Client());
   static const _timeout = Duration(seconds: 12);
 
   Future<List<UserModel>> listUsers() async {
@@ -561,6 +574,11 @@ class ApiService {
     String? issuingOrganization,
     String? certificateType,
     String? specialtyTier,
+    String? professionCategory,
+    String? credentialName,
+    String? issuingAuthority,
+    String? workingUnit,
+    int? yearsOfExperience,
     List<String>? skillsList,
     String? expiryDate,
     bool? scopeOfPracticeAgreed,
@@ -576,8 +594,19 @@ class ApiService {
       request.headers['x-user-id'] = userId;
       request.fields['userId'] = userId;
     }
-    if (certificateNumber != null) request.fields['certificateNumber'] = certificateNumber;
-    if (issuingOrganization != null) request.fields['issuingOrganization'] = issuingOrganization;
+    if (professionCategory != null) request.fields['professionCategory'] = professionCategory;
+    if (credentialName != null) request.fields['credentialName'] = credentialName;
+    if (issuingAuthority != null) request.fields['issuingAuthority'] = issuingAuthority;
+    if (workingUnit != null) request.fields['workingUnit'] = workingUnit;
+    if (yearsOfExperience != null) request.fields['yearsOfExperience'] = yearsOfExperience.toString();
+    if (certificateNumber != null) {
+      request.fields['certificateNumber'] = certificateNumber;
+      request.fields['credentialNumber'] = certificateNumber;
+    }
+    if (issuingOrganization != null) {
+      request.fields['issuingOrganization'] = issuingOrganization;
+      if (issuingAuthority == null) request.fields['issuingAuthority'] = issuingOrganization;
+    }
     if (certificateType != null) request.fields['certificateType'] = certificateType;
     if (specialtyTier != null) request.fields['specialtyTier'] = specialtyTier;
     if (skillsList != null) request.fields['skillsList'] = jsonEncode(skillsList);
@@ -717,6 +746,89 @@ class ApiService {
     final response = await http.Response.fromStream(streamedResponse);
     _throwIfFailed(response);
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Lấy danh sách cảnh báo nguy cơ từ cộng đồng radar
+  Future<List<Map<String, dynamic>>> fetchCommunityHazards({
+    double? lat,
+    double? lng,
+    double? radiusKm,
+    String? category,
+  }) async {
+    final queryParams = <String, String>{};
+    if (lat != null) queryParams['lat'] = lat.toString();
+    if (lng != null) queryParams['lng'] = lng.toString();
+    if (radiusKm != null) queryParams['radiusKm'] = radiusKm.toString();
+    if (category != null && category != 'ALL') queryParams['category'] = category;
+
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/hazards')
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final response = await _safeRequest(_client.get(uri));
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = json['data'] as List<dynamic>? ?? [];
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Đăng cảnh báo nguy cơ lên cộng đồng radar
+  Future<Map<String, dynamic>> createCommunityHazard({
+    required String title,
+    String description = '',
+    required String category,
+    required double lat,
+    required double lng,
+    String address = '',
+    bool isAnonymous = false,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/hazards');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'title': title,
+          'description': description,
+          'category': category,
+          'lat': lat,
+          'lng': lng,
+          'address': address,
+          'isAnonymous': isAnonymous,
+          if (userId != null) 'userId': userId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Xác thực / giải tỏa cảnh báo nguy cơ (upvote hoặc resolve)
+  Future<Map<String, dynamic>> verifyCommunityHazard(
+    String hazardId, {
+    required String action, // 'VERIFY' or 'RESOLVE'
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/community/hazards/$hazardId/verify');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'action': action,
+          if (userId != null) 'userId': userId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
   }
 
   Future<LiveJourneyModel> startJourney({
@@ -1440,7 +1552,12 @@ class ApiService {
     };
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/nearby')
         .replace(queryParameters: queryParams);
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final data = json['data'] as List<dynamic>? ?? [];
@@ -1462,7 +1579,12 @@ class ApiService {
     };
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/optimal-aed')
         .replace(queryParameters: queryParams);
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return json['data'] as Map<String, dynamic>?;
@@ -1492,10 +1614,53 @@ class ApiService {
     return json['data'] as Map<String, dynamic>? ?? {};
   }
 
+  /// Xác nhận đã mở tủ SafePoint thành công (chuyển trạng thái trạm sang IN_USE)
+  Future<Map<String, dynamic>> confirmSafePointUnlock(
+    String stationId, {
+    required String unlockOtp,
+    required String rescuerId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safepoints/$stationId/unlock-confirm');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'unlockOtp': unlockOtp,
+          'rescuerId': rescuerId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Alias fetchNearbySafePoints cho tính tương thích màn hình bản đồ cứu hộ
+  Future<List<Map<String, dynamic>>> fetchNearbySafePoints({
+    double lat = 10.7769,
+    double lng = 106.7009,
+    double radiusMeters = 50000,
+    String? type,
+  }) => getNearbySafePoints(
+    latitude: lat,
+    longitude: lng,
+    radiusMeters: radiusMeters,
+    type: type,
+  );
+
+  /// Alias fetchActiveBloodRelays cho điều phối máu khẩn cấp
+  Future<List<Map<String, dynamic>>> fetchActiveBloodRelays() => getActiveBloodRelays();
+
   /// Tra cứu thẻ y tế ngoại tuyến SafeTag Tầng 1 (Public ICE)
   Future<Map<String, dynamic>> lookupSafeTagPublicIce(String tagUid) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/safetags/public-ice/$tagUid');
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return json['data'] as Map<String, dynamic>? ?? {};
@@ -1512,11 +1677,54 @@ class ApiService {
     };
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/blood-relay/active')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final data = json['data'] as List<dynamic>? ?? [];
     return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Phát lệnh điều phối máu SafeBlood khẩn cấp
+  Future<Map<String, dynamic>> createBloodRelayRequest({
+    required String targetBloodGroup,
+    required int unitsRequired,
+    required String hospitalName,
+    required String address,
+    required String contactPhone,
+    String urgencyLevel = 'EXTREME_IMMEDIATE',
+    String? clinicalJustification,
+    double? lat,
+    double? lng,
+    String? requestedByDoctorId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/blood-relay/create');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'targetBloodGroup': targetBloodGroup,
+          'unitsRequired': unitsRequired,
+          'urgencyLevel': urgencyLevel,
+          'hospitalLocation': {
+            'hospitalName': hospitalName,
+            'address': address,
+            'contactPhone': contactPhone,
+            'coordinates': [lng ?? 106.6822, lat ?? 10.7626],
+          },
+          'clinicalJustification': clinicalJustification ?? 'Cần máu gấp trong phẫu thuật cấp cứu ngoại viện.',
+          if (requestedByDoctorId != null) 'requestedByDoctorId': requestedByDoctorId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
   }
 
   /// Hiệp sĩ nhận lệnh hiến máu khẩn cấp
@@ -1544,7 +1752,12 @@ class ApiService {
   /// Lấy danh sách chứng thư bảo hiểm pháp lý HeroShield của hiệp sĩ
   Future<List<Map<String, dynamic>>> getHeroPolicies(String heroId) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/policies/$heroId');
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final data = json['data'] as List<dynamic>? ?? [];
@@ -1554,10 +1767,106 @@ class ApiService {
   /// Lấy danh sách voucher bồi hoàn vật tư y tế của hiệp sĩ
   Future<List<Map<String, dynamic>>> getHeroRestockVouchers(String heroId) async {
     final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/vouchers/$heroId');
-    final response = await _safeRequest(_client.get(uri));
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
     _throwIfFailed(response);
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final data = json['data'] as List<dynamic>? ?? [];
     return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  /// Đổi/Kích hoạt nhận vật tư y tế bù đắp tại chuỗi nhà thuốc hoặc tủ SafePoint
+  Future<Map<String, dynamic>> redeemHeroRestockVoucher(String voucherCode) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/vouchers/$voucherCode/redeem');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json;
+  }
+
+  /// Kích hoạt còi tìm kiếm tầm gần & chớp flash máy nạn nhân (<25m) - Kịch bản 16
+  Future<Map<String, dynamic>> triggerProximityBeacon(
+    String incidentId, {
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/beacon');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Đánh dấu Hiệp sĩ đã tiếp cận hiện trường (<25m)
+  Future<Map<String, dynamic>> markArrivedAtScene(
+    String incidentId, {
+    String? token,
+    String? userId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/radar/$incidentId/arrive');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+          if (userId != null && userId.isNotEmpty) 'x-user-id': userId,
+        },
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Hoàn thành ca cứu nạn & Gửi bằng chứng cấp Voucher Bồi Hoàn Vật Tư (HeroShield)
+  Future<Map<String, dynamic>> completeHeroRescue({
+    required String incidentId,
+    required String volunteerId,
+    required String ambulancePlate,
+    required String doctorName,
+    required String verificationHash,
+    String? consumedSuppliesNote,
+    String? proofImageBase64,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/complete-mission');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'incidentId': incidentId,
+          'volunteerId': volunteerId,
+          'ambulancePlate': ambulancePlate,
+          'doctorName': doctorName,
+          'verificationHash': verificationHash,
+          'consumedSuppliesNote': consumedSuppliesNote,
+          'proofImageBase64': proofImageBase64,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json;
   }
 }

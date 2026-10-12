@@ -47,7 +47,8 @@ router.get('/hazards', async (req, res, next) => {
 
 router.post('/hazards', async (req, res, next) => {
   try {
-    const report = await hazardService.createHazard(req.user.id, req.body);
+    const userId = req.user?.id || req.body.userId || null;
+    const report = await hazardService.createHazard(userId, req.body);
     res.status(201).json({ success: true, data: report });
   } catch (err) {
     next(err);
@@ -132,7 +133,8 @@ router.post('/hazards/accident-report', accidentUpload.single('timemark_photo'),
 
 router.post('/hazards/:id/verify', async (req, res, next) => {
   try {
-    const report = await hazardService.verifyHazard(req.params.id, req.user.id, req.body.action);
+    const userId = req.user?.id || req.body.userId || 'ANONYMOUS_VERIFIER';
+    const report = await hazardService.verifyHazard(req.params.id, userId, req.body.action);
     res.json({ success: true, data: report });
   } catch (err) {
     next(err);

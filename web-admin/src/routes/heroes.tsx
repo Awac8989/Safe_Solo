@@ -10,21 +10,30 @@ import {
   HeartHandshake,
   MapPin,
   Medal,
+  MessageSquare,
+  Navigation,
   Phone,
   Radio,
   Search,
+  Send,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Star,
   Stethoscope,
+  Volume2,
   X,
   Zap,
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { fetchHeroFleet, disburseHeroBounty, type HeroFleetItem } from "@/lib/api";
+import {
+  fetchHeroFleet,
+  disburseHeroBounty,
+  sendHeroDirectMessage,
+  type HeroFleetItem,
+} from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/heroes")({
@@ -39,6 +48,14 @@ function HeroFleetPage() {
   const [bountyModalHero, setBountyModalHero] = useState<HeroFleetItem | null>(null);
   const [bountyAmount, setBountyAmount] = useState(200000);
   const [bountyReason, setBountyReason] = useState("Hỗ trợ xăng xe & chi phí sơ cứu tại chỗ");
+
+  // Direct Message & Dispatch modal
+  const [dispatchModalHero, setDispatchModalHero] = useState<HeroFleetItem | null>(null);
+  const [dispatchMessageInput, setDispatchMessageInput] = useState(
+    "🚨 LỆNH KHẨN: Tiếp cận ngay hiện trường sự cố tại địa bàn, hỗ trợ sơ cứu và bảo vệ hiện trường!"
+  );
+  const [dispatchUrgency, setDispatchUrgency] = useState<"NORMAL" | "HIGH">("HIGH");
+
   const [notice, setNotice] = useState<string | null>(null);
 
   const fleetQuery = useQuery({
@@ -52,9 +69,22 @@ function HeroFleetPage() {
       disburseHeroBounty(heroId, amount, reason),
     onSuccess: (_, vars) => {
       setBountyModalHero(null);
-      setNotice(`Đã giải ngân thành công ${vars.amount.toLocaleString("vi-VN")}đ tới Hiệp sĩ!`);
-      setTimeout(() => setNotice(null), 3500);
+      setNotice(`Đã giải ngân thành công ${vars.amount.toLocaleString("vi-VN")}đ và bắn thông báo Telegram tới Hiệp sĩ!`);
+      setTimeout(() => setNotice(null), 4000);
       void queryClient.invalidateQueries({ queryKey: ["hero-fleet"] });
+    },
+  });
+
+  const messageMutation = useMutation({
+    mutationFn: ({ heroId, message, urgency }: { heroId: string; message: string; urgency: "NORMAL" | "HIGH" }) =>
+      sendHeroDirectMessage(heroId, message, urgency),
+    onSuccess: (res) => {
+      setDispatchModalHero(null);
+      setNotice(`Đã gửi lệnh điều động tác chiến tức thì qua Telegram tới ${res.data?.heroName || "Hiệp sĩ"}!`);
+      setTimeout(() => setNotice(null), 4000);
+    },
+    onError: (err: any) => {
+      setNotice(`Lỗi gửi tin: ${err.message}`);
     },
   });
 
@@ -104,16 +134,41 @@ function HeroFleetPage() {
     <>
       <Topbar
         title="Quản Trị Lực Lượng Hiệp Sĩ & Quỹ Cứu Trợ (Hero Fleet & Logistics)"
-        subtitle="Phân công trực chiến, giải ngân trợ cấp và kiểm định trang thiết bị y tế tại Trạm An Toàn"
+        subtitle="Phân công trực chiến, gửi lệnh tác chiến qua Telegram và giải ngân trợ cấp y tế"
       />
       <div className="space-y-4 p-4 pb-16">
         {/* Notice Toast */}
         {notice && (
           <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-3 text-xs font-semibold text-emerald-300 backdrop-blur animate-in fade-in slide-in-from-top-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-            {notice}
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{notice}</span>
           </div>
         )}
+
+        {/* Live Telegram Duty Banner */}
+        <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-card to-card p-3.5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shrink-0">
+              <Radio className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-foreground">Kênh Điều Động & Trực Chiến Telegram Thời Gian Thực</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  @SFESOLOBot Connected
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Hiệp sĩ tại hiện trường nhận lệnh tác chiến, bấm nhận ca và báo cáo hoàn tất trực tiếp qua bot Telegram. Admin có thể gửi chỉ đạo điều động khẩn cấp trực tiếp từ bàn chỉ huy.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-mono px-2.5 py-1 rounded bg-muted/60 text-muted-foreground border border-border">
+              Phản ứng nhanh &lt; 3 phút
+            </span>
+          </div>
+        </div>
 
         {/* 1. Fleet Metric Cards Grid */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -193,7 +248,6 @@ function HeroFleetPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredFleet.map((hero) => {
             const isOnMission = hero.status === "ON_MISSION";
-            const isOnDuty = hero.status === "ON_DUTY" || hero.status === "AVAILABLE";
 
             return (
               <div
@@ -275,17 +329,30 @@ function HeroFleetPage() {
                   </div>
                 </div>
 
-                {/* Action Button: Disburse Bounty */}
-                <div className="mt-3.5 border-t border-border/50 pt-2.5 flex items-center justify-between">
-                  <div className="text-[10px] text-muted-foreground">
-                    Hạn mức trợ cấp: <strong className="text-emerald-400">{hero.availableBountyVND.toLocaleString("vi-VN")}đ</strong>
-                  </div>
+                {/* Action Buttons: Message, HeroShield & Disburse Bounty */}
+                <div className="mt-3.5 border-t border-border/50 pt-2.5 flex items-center justify-between gap-1.5">
                   <button
-                    onClick={() => setBountyModalHero(hero)}
-                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/90 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-500 transition shadow"
+                    onClick={() => setDispatchModalHero(hero)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition shadow-sm"
+                    title="Gửi lệnh điều động trực tiếp tới Telegram của Hiệp sĩ"
                   >
-                    <Coins className="h-3 w-3" /> Trợ Cấp Xăng Xe
+                    <Send className="h-3 w-3" /> Điều Động
                   </button>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <a
+                      href={`/heroshield`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                    >
+                      <ShieldCheck className="h-3 w-3 text-blue-400" /> HeroShield
+                    </a>
+                    <button
+                      onClick={() => setBountyModalHero(hero)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/90 px-2.5 py-1 text-xs font-bold text-white hover:bg-emerald-500 transition shadow"
+                    >
+                      <Coins className="h-3 w-3" /> Trợ Cấp
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -337,10 +404,104 @@ function HeroFleetPage() {
           </div>
         </div>
 
-        {/* 5. Bounty Disbursement Modal */}
+        {/* 5. Direct Dispatch Message Modal */}
+        {dispatchModalHero && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-primary/40 bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+              <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <Send className="h-4 w-4" /> Bắn Lệnh Điều Động Tác Chiến Telegram
+                </div>
+                <button onClick={() => setDispatchModalHero(null)} className="rounded p-1 text-muted-foreground hover:bg-accent">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl bg-muted/40 p-3 border border-border/60 flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-foreground text-sm">{dispatchModalHero.name}</div>
+                    <div className="text-muted-foreground text-[11px]">{dispatchModalHero.phone} · Địa bàn: {dispatchModalHero.zone}</div>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-primary/10 text-primary font-mono font-semibold">
+                    Telegram: @SFESOLOBot
+                  </span>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Mức độ khẩn cấp tác chiến</label>
+                  <select
+                    value={dispatchUrgency}
+                    onChange={(e) => setDispatchUrgency(e.target.value as "NORMAL" | "HIGH")}
+                    className="w-full h-8 rounded-lg border border-border bg-background px-3 text-xs font-semibold"
+                  >
+                    <option value="HIGH">🚨 KHẨN CẤP (Báo động tức thì P1/P2)</option>
+                    <option value="NORMAL">📢 THÔNG BÁO ĐIỀU ĐỘNG TIÊU CHUẨN</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Lệnh mẫu nhanh:</label>
+                  <div className="space-y-1">
+                    {[
+                      "🚨 LỆNH KHẨN: Tiếp cận ngay hiện trường vụ tai nạn giao thông tại địa bàn, hỗ trợ cố định nẹp cổ và băng ép cầm máu!",
+                      "🚑 HỖ TRỢ AED: Ghé Trạm SafePoint gần nhất lấy máy sốc tim mang đến nhà nạn nhân đang ngừng tuần hoàn!",
+                      "🩸 SAFEBLOOD STAT: Di chuyển khẩn cấp tới Bệnh viện Chợ Rẫy tiếp nhận ca hiến máu cấp cứu (Luồng Fast-Track)!",
+                      "🧭 ĐIỀU ĐỘNG: Hộ tống người già neo đơn đi lạc về nhà an toàn.",
+                    ].map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setDispatchMessageInput(preset)}
+                        className="w-full text-left p-1.5 rounded border border-border/60 hover:bg-muted/50 text-[11px] text-muted-foreground hover:text-foreground transition truncate"
+                      >
+                        • {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-semibold block mb-1">Nội dung chỉ đạo chi tiết:</label>
+                  <textarea
+                    rows={3}
+                    value={dispatchMessageInput}
+                    onChange={(e) => setDispatchMessageInput(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background p-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                <button
+                  onClick={() => setDispatchModalHero(null)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold hover:bg-accent transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={() =>
+                    messageMutation.mutate({
+                      heroId: dispatchModalHero.id,
+                      message: dispatchMessageInput,
+                      urgency: dispatchUrgency,
+                    })
+                  }
+                  disabled={messageMutation.isPending}
+                  className="rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50 transition flex items-center gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {messageMutation.isPending ? "Đang phát lệnh..." : "Bắn Lệnh Telegram"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 6. Bounty Disbursement Modal */}
         {bountyModalHero && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
               <div className="flex items-center justify-between border-b border-border/60 pb-3">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
                   <Coins className="h-4 w-4" /> Giải Ngân Quỹ Cứu Hộ Cho Hiệp Sĩ

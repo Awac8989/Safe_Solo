@@ -1,0 +1,33 @@
+services:
+  # SafeSolo Backend Web Service on Render.com
+  - type: web
+    name: safesolo-backend
+    runtime: node
+    plan: free
+    region: singapore # Nearest region to Vietnam with lowest latency (~30ms)
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false # Set in Render Dashboard with MongoDB Atlas connection string
+      - key: MONGODB_DB_NAME
+        value: Safesolo
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false

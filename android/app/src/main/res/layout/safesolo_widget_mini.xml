@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_mini_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:background="@drawable/widget_bg_safe">
+
+    <!-- Header Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/widget_mini_logo"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="SafeSolo" />
+
+        <TextView
+            android:id="@+id/widget_mini_app_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="5dp"
+            android:text="SafeSolo"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/widget_mini_status_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="● AN TOÀN"
+            android:textColor="#34D399"
+            android:textSize="8.5sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Center Section: Dead-man switch & Vitals -->
+    <LinearLayout
+        android:id="@+id/widget_mini_body"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp">
+
+        <TextView
+            android:id="@+id/widget_mini_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="DEAD-MAN SWITCH"
+            android:textColor="#6EE7B7"
+            android:textSize="8.5sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04" />
+
+        <TextView
+            android:id="@+id/widget_mini_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="71h 06m"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/widget_mini_vitals"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="❤️ 78 BPM • ⌚ 100%"
+            android:textColor="#CBD5E1"
+            android:textSize="9.5sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/widget_mini_guardians"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🛡️ 4 người bảo hộ online"
+            android:textColor="#38BDF8"
+            android:textSize="8.5sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- Bottom Actions Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/widget_mini_btn_checkin"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:background="@drawable/widget_btn_checkin"
+            android:gravity="center"
+            android:text="✓ Tôi ổn"
+            android:textColor="#FFFFFF"
+            android:textSize="10.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_mini_btn_sos"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/widget_btn_sos"
+            android:gravity="center"
+            android:text="🆘 SOS"
+            android:textColor="#FFFFFF"
+            android:textSize="10.5sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,6 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../core/constants.dart';
 
 class ChatService {
@@ -9,8 +10,9 @@ class ChatService {
 
   ChatService._internal();
 
-  IO.Socket? _socket;
+  io.Socket? _socket;
   String? _token;
+  String? get token => _token;
   final _client = http.Client();
 
   final List<Function(Map<String, dynamic>)> _messageListeners = [];
@@ -53,9 +55,9 @@ class ChatService {
     if (_socket != null && _socket!.connected) return;
     _token = token;
 
-    _socket = IO.io(
+    _socket = io.io(
       _socketUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket'])
           .disableAutoConnect()
           .setAuth({'token': token})
@@ -63,11 +65,11 @@ class ChatService {
     );
 
     _socket!.onConnect((_) {
-      print('ChatService connected to socket');
+      debugPrint('ChatService connected to socket');
     });
 
     _socket!.onDisconnect((_) {
-      print('ChatService disconnected from socket');
+      debugPrint('ChatService disconnected from socket');
     });
 
     _socket!.on('new_message', (data) {

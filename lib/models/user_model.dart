@@ -74,6 +74,14 @@ class UserModel {
     this.lastCheckinTime,
     this.lastKnownLocation,
     this.isKycVerified = false,
+    this.isHero = false,
+    this.heroTier = 'NONE',
+    this.professionCategory,
+    this.credentialNumber = '',
+    this.credentialName = '',
+    this.workingUnit = '',
+    this.yearsOfExperience = 0,
+    this.walletBalance = 0,
     this.personaType = 'GENERAL_SOLO',
     this.consecutiveSoftCheckins = 0,
     this.snoozeCountToday = 0,
@@ -94,6 +102,14 @@ class UserModel {
   final AppLocation? lastKnownLocation;
   final List<EmergencyContactModel> emergencyContacts;
   final bool isKycVerified;
+  final bool isHero;
+  final String heroTier;
+  final String? professionCategory;
+  final String credentialNumber;
+  final String credentialName;
+  final String workingUnit;
+  final int yearsOfExperience;
+  final int walletBalance;
   final String personaType;
   final int consecutiveSoftCheckins;
   final int snoozeCountToday;
@@ -106,6 +122,14 @@ class UserModel {
 
     return UserModel(
       isKycVerified: json['isKycVerified'] as bool? ?? false,
+      isHero: json['isHero'] as bool? ?? false,
+      heroTier: json['heroTier'] as String? ?? 'NONE',
+      professionCategory: json['professionCategory'] as String?,
+      credentialNumber: json['credentialNumber'] as String? ?? '',
+      credentialName: json['credentialName'] as String? ?? '',
+      workingUnit: json['workingUnit'] as String? ?? '',
+      yearsOfExperience: (json['yearsOfExperience'] as num?)?.toInt() ?? 0,
+      walletBalance: (json['walletBalance'] as num?)?.toInt() ?? 0,
       id: json['_id'] as String? ?? json['id'] as String? ?? '',
       fullName: json['fullName'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',

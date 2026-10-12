@@ -28,10 +28,11 @@ import {
   Waves,
   X,
   Zap,
+  Send,
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { fetchHazards, verifyHazard, createHazard, fetchDangerGeofences, resolveAssetUrl, type HazardItem } from "@/lib/api";
+import { fetchHazards, verifyHazard, createHazard, fetchDangerGeofences, broadcastHazardTelegram, resolveAssetUrl, type HazardItem } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 import { DangerGeofenceModal } from "@/components/DangerGeofenceModal";
 import { DisasterBroadcastModal } from "@/components/DisasterBroadcastModal";
@@ -113,6 +114,14 @@ function HazardsPage() {
       setTimeout(() => setActionNotice(null), 3000);
       void queryClient.invalidateQueries({ queryKey: ["hazards-list"] });
       void queryClient.invalidateQueries({ queryKey: ["hazards-radar"] });
+    },
+  });
+
+  const broadcastTelegramMutation = useMutation({
+    mutationFn: (hazardId: string) => broadcastHazardTelegram(hazardId),
+    onSuccess: () => {
+      setActionNotice("Đã phát sóng cảnh báo hiểm họa thành công tới Telegram Bot (@SFESOLOBot)!");
+      setTimeout(() => setActionNotice(null), 3500);
     },
   });
 
@@ -398,6 +407,14 @@ function HazardsPage() {
                           className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background/80 py-1.5 text-xs font-semibold hover:bg-accent transition"
                         >
                           <ThumbsUp className="h-3 w-3 text-sky-400" /> Xác nhận (+1)
+                        </button>
+                        <button
+                          onClick={() => broadcastTelegramMutation.mutate(item.id)}
+                          disabled={broadcastTelegramMutation.isPending}
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/10 px-2.5 py-1.5 text-xs font-bold text-sky-400 hover:bg-sky-500/20 transition disabled:opacity-50"
+                          title="Bắn cảnh báo tới Telegram Bot (@SFESOLOBot) cho cộng đồng lân cận"
+                        >
+                          <Send className="h-3 w-3" /> Bot
                         </button>
                         <button
                           onClick={() => verifyMutation.mutate({ id: item.id, action: "RESOLVE" })}

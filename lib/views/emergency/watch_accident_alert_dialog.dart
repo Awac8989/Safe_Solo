@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/app_strings.dart';
 import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
@@ -241,7 +240,6 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
     final progress =
         (_remainingSeconds / widget.initialSeconds).clamp(0.0, 1.0);
 
@@ -338,7 +336,9 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
                     ? widget.title
                     : (isAccidentCrash
                         ? '🚨 PHÁT HIỆN TAI NẠN VA CHẠM GIAO THÔNG'
-                        : '⚠️ PHÁT HIỆN BIẾN CỐ NGUY HIỂM TỪ ĐỒNG HỒ'),
+                        : (isCardiacDistress
+                            ? '🫀 CẢNH BÁO NGUY HIỂM TIM MẠCH & SPO2'
+                            : '⚠️ PHÁT HIỆN BIẾN CỐ NGUY HIỂM TỪ ĐỒNG HỒ')),
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
@@ -464,34 +464,38 @@ class _WatchAccidentAlertDialogState extends State<WatchAccidentAlertDialog>
               const SizedBox(height: 12),
 
               // NHẬN DIỆN GIỌNG NÓI RẢNH TAY
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.mic_rounded,
-                        color: Color(0xFF38BDF8), size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _lastVoiceTranscript.isEmpty
-                            ? 'Nói "Tôi ổn" để hủy hoặc "Cứu tôi" để gọi 115'
-                            : 'Đã nghe: "$_lastVoiceTranscript"',
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF38BDF8),
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _simulateVoiceInput('Tôi ổn'),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.mic_rounded,
+                          color: Color(0xFF38BDF8), size: 14),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _lastVoiceTranscript.isEmpty
+                              ? 'Nói "Tôi ổn" để hủy hoặc "Cứu tôi" để gọi 115'
+                              : 'Đã nghe: "$_lastVoiceTranscript"',
+                          textAlign: TextAlign.center,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF38BDF8),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 16),

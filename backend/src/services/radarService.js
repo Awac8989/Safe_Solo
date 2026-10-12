@@ -845,6 +845,44 @@ class RadarService {
     return mapResponse(response);
   }
 
+  async triggerProximityBeacon(incidentId, volunteerId) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+
+    incident.auditTrail.push({
+      action: 'PROXIMITY_BEACON_TRIGGERED',
+      actorId: volunteerId,
+      timestamp: new Date(),
+      metadata: { note: 'Hiệp sĩ kích hoạt còi và đèn flash tầm gần (<25m) để tìm nạn nhân' },
+    });
+    await incident.save();
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('PROXIMITY_BEACON_TRIGGERED', {
+        incidentId,
+        triggeredBy: volunteerId,
+        victimId: incident.victimId,
+        timestamp: new Date(),
+      });
+      if (incident.victimId) {
+        io.to(`user:${incident.victimId}`).emit('PROXIMITY_BEACON_TRIGGERED', {
+          incidentId,
+          triggeredBy: volunteerId,
+        });
+      }
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      success: true,
+      incidentId,
+      status: 'BEACON_ACTIVATED',
+      message: 'Đã kích hoạt còi hú âm lượng cao nhất và đèn flash trên thiết bị nạn nhân!',
+    };
+  }
+
   async getIncidentDetails(incidentId, requesterId) {
     const incident = await RescueIncident.findById(incidentId);
     ensure(incident, 'Incident not found', 404);

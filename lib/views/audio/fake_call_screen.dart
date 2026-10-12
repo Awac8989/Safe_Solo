@@ -1,3 +1,9 @@
+// ============================================================================
+// [TEN_NGHIEP_VU]: MAN_HINH_CUOC_GOI_GIA (FAKE_CALL_SCREEN)
+// [DUONG_DAN]: lib/views/audio/fake_call_screen.dart
+// [CHUC_NANG]: Gia lap cuoc goi khan cap de thoat khoi ke xau, quay roi
+// ============================================================================
+
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/fake_call_service.dart';

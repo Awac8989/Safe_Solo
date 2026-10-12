@@ -565,9 +565,73 @@ class LockscreenMedicalCardPage extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // KHỐI 6: NÚT XUẤT ẢNH MÀN HÌNH KHÓA & CHIA SẺ
+          // KHỐI 6: LIÊN KẾT NHANH MẠNG LƯỚI CẤP CỨU NGOẠI VIỆN
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => Navigator.pushNamed(context, '/blood-relay'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF881337).withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.bloodtype_rounded, color: Color(0xFFEF4444), size: 18),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'SafeBlood Máu Hiếm',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => Navigator.pushNamed(context, '/safepoints-map'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF064E3B).withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 18),
+                        SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'OpenAED Trạm Sốc Tim',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // KHỐI 7: NÚT XUẤT ẢNH MÀN HÌNH KHÓA & CHIA SẺ
           OutlinedButton.icon(
             onPressed: () => _copyEmergencyData(context, qrPayload),
             icon: const Icon(Icons.share_rounded, color: Color(0xFF38BDF8)),

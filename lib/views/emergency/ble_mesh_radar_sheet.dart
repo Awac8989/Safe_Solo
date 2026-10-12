@@ -304,7 +304,7 @@ class _BleMeshRadarSheetState extends State<BleMeshRadarSheet>
                   onPressed: () async {
                     HapticFeedback.heavyImpact();
                     await mesh.simulateBasementEntrapmentSos();
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     TopToast.show(
                       context,
                       message: 'Đã phát sóng cứu hộ dã chiến BLE Mesh từ Tầng hầm B2!',
@@ -331,7 +331,7 @@ class _BleMeshRadarSheetState extends State<BleMeshRadarSheet>
                   onPressed: () async {
                     HapticFeedback.mediumImpact();
                     await mesh.simulatePeerRelayBridge(peerReaches4g: true);
-                    if (!mounted) return;
+                    if (!context.mounted) return;
                     TopToast.show(
                       context,
                       message: 'Nốt Galaxy S23 đã nhận tin và chuyển tiếp lên Web Admin!',
