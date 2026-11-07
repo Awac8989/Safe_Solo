@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bảo Vệ Đồ Án Tốt Nghiệp — SafeSolo Ecosystem</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090D16;
+      --surface: #0F172A;
+      --surface-border: #1E293B;
+      --primary: #38BDF8;
+      --primary-glow: rgba(56, 189, 248, 0.25);
+      --accent: #F43F5E;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --card-bg: rgba(30, 41, 59, 0.7);
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+    }
+    .slide-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+    }
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      padding: 40px 60px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(60px);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-width: 1400px;
+      margin: 0 auto;
+      right: 0;
+    }
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+    }
+    .slide-header {
+      margin-bottom: 24px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      margin-bottom: 12px;
+    }
+    .slide-title {
+      font-size: 2.6rem;
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #FFFFFF 30%, #94A3B8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .slide-subtitle {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      transform: translateY(-2px);
+    }
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .card-text {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: #CBD5E1;
+    }
+    .stat-box {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 18px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      background: #1E293B;
+      color: #94A3B8;
+      border: 1px solid #334155;
+    }
+    .tag.primary { background: rgba(56, 189, 248, 0.15); color: #38BDF8; border-color: #0284C7; }
+    .tag.danger { background: rgba(244, 63, 94, 0.15); color: #FB7185; border-color: #E11D48; }
+    .tag.success { background: rgba(16, 185, 129, 0.15); color: #34D399; border-color: #059669; }
+    .footer-bar {
+      height: 64px;
+      background: #0B1120;
+      border-top: 1px solid var(--surface-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .nav-btn {
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #FFFFFF;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .nav-btn:hover {
+      background: var(--primary);
+      color: #000;
+    }
+    .progress-bar-container {
+      height: 4px;
+      background: #1E293B;
+      width: 100%;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #38BDF8, #818CF8);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .speaker-notes {
+      margin-top: 18px;
+      padding: 12px 18px;
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.88rem;
+      color: #94A3B8;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="progress-bar-container">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <div class="slide-container">
+
+    <!-- SLIDE 1: COVER -->
+    <div class="slide active">
+      <div style="text-align: center; max-width: 900px; margin: 0 auto;">
+        <div class="badge">🎓 BÁO CÁO KHÓA LUẬN TỐT NGHIỆP KỸ SƯ / CỬ NHÂN CNTT</div>
+        <h1 style="font-size: 3.2rem; font-weight: 800; line-height: 1.15; margin: 16px 0; background: linear-gradient(135deg, #FFFFFF 20%, #38BDF8 60%, #818CF8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          SAFESOLO: HỆ SINH THÁI AN TOÀN CÁ NHÂN & CỨU HỘ ĐƠN ĐỘC ĐA NỀN TẢNG
+        </h1>
+        <p style="font-size: 1.3rem; color: #94A3B8; margin-bottom: 32px;">
+          Ứng dụng Chuẩn Lâm Sàng "4 Phút Vàng", Điều Phối Hiệp Sĩ Radar SBD, Mạng Lưới OpenAED & Thẩm Định Y Tế Good Samaritan
+        </p>
+
+        <div style="display: inline-flex; gap: 40px; background: rgba(30, 41, 59, 0.6); padding: 20px 40px; border-radius: 16px; border: 1px solid #334155; text-align: left;">
+          <div>
+            <div style="font-size: 0.8rem; color: #64748B; text-transform: uppercase;">Sinh viên thực hiện</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">Đoàn Minh Quân</div>
+            <div style="font-size: 0.9rem; color: var(--primary); font-family: 'JetBrains Mono', monospace;">MSSV: 2224801030137</div>
+          </div>
+          <div style="width: 1px; background: #334155;"></div>
+          <div>
+            <div style="font-size: 0.8rem; color: #64748B; text-transform: uppercase;">Thiết bị thực nghiệm</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">Honor Magic 7 • Galaxy A53 • A71</div>
+            <div style="font-size: 0.9rem; color: #10B981;">Galaxy Watch 5 (Wear OS 4)</div>
+          </div>
+          <div style="width: 1px; background: #334155;"></div>
+          <div>
+            <div style="font-size: 0.8rem; color: #64748B; text-transform: uppercase;">Kiến trúc triển khai</div>
+            <div style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">Mobile + Wear OS + Web TOC</div>
+            <div style="font-size: 0.9rem; color: #F59E0B;">Node.js • Socket.IO • MongoDB</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: BỐI CẢNH & TÍNH CẤP THIẾT -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">CHƯƠNG 1 • BỐI CẢNH & TÍNH CẤP THIẾT</div>
+        <h2 class="slide-title">Khoảng Trống Cứu Hộ Tiền Viện & "4 Phút Vàng"</h2>
+        <p class="slide-subtitle">Hơn 4.3 triệu người sống một mình tại Việt Nam đối mặt với nguy cơ đột quỵ và tai nạn mà không ai biết</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title"><span style="color: #F43F5E;">⚠️</span> Nguy Cơ Tử Vong Đơn Độc</div>
+          <p class="card-text">
+            Người cao tuổi, người sống độc thân, tài xế công nghệ và người leo núi khi đột quỵ, nhồi máu cơ tim hoặc té ngã chấn thương sọ não thường mất tri giác ngay tức khắc, không thể bấm điện thoại gọi 115.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title"><span style="color: #F59E0B;">⏱️</span> "4 Phút Vàng" Y Tế (AHA)</div>
+          <p class="card-text">
+            Khi ngừng tuần hoàn hô hấp, tế bào não bắt đầu hoại tử không thể hồi phục sau <strong>4 phút</strong>. Thời gian xe cấp cứu 115 tiếp cận trung bình tại đô thị lớn là <strong>15–25 phút</strong> (quá trễ đối với ngừng tim).
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title"><span style="color: #38BDF8;">🛡️</span> Rào Cản Pháp Lý & Kỹ Năng</div>
+          <p class="card-text">
+            Quần chúng sợ bị kiện tụng (Good Samaritan Liability), thiếu kỹ năng ép tim CPR và không biết vị trí đặt máy sốc tim tự động (AED) gần nhất để ứng cứu ngoại viện.
+          </p>
+        </div>
+      </div>
+      <div class="speaker-notes">
+        💡 <strong>Lời thoại:</strong> "Kính thưa Hội đồng, SafeSolo không chỉ là một ứng dụng gọi cấp cứu thông thường, mà là một hệ thống tự động phát hiện, báo động tức thời và kích hoạt mạng lưới sơ cứu cộng đồng trước khi xe 115 kịp đến hiện trường."
+      </div>
+    </div>
+
+    <!-- SLIDE 3: GIẢI PHÁP TỔNG THỂ -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">GIẢI PHÁP TỔNG THỂ • SAFESOLO ECOSYSTEM</div>
+        <h2 class="slide-title">Hệ Sinh Thái Cứu Hộ Đa Nền Tảng 4 Tầng</h2>
+        <p class="slide-subtitle">Sự kết hợp hoàn hảo giữa Mobile App, Smartwatch Wear OS và Trung tâm Chỉ huy Web TOC</p>
+      </div>
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-title">📱 1. Mobile App</div>
+          <p class="card-text">
+            <strong>Flutter Multiplatform</strong><br>
+            • Dead-Man Switch thông minh.<br>
+            • Bypass 0-Giây P0 cực cấp.<br>
+            • Hộp đen Blackbox lưu bằng chứng.<br>
+            • Thẻ y tế I.C.E & SBAR QR.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">⌚ 2. Wear OS Watch</div>
+          <p class="card-text">
+            <strong>Galaxy Watch 5 Engine</strong><br>
+            • Cảm biến PPG phát hiện ngừng tim.<br>
+            • Gia tốc kế phát hiện té ngã mạnh.<br>
+            • Nhịp tim thức giấc (Wake-up).<br>
+            • Lắc cổ tay Double Wrist-Twist.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🦸 3. Mạng Lưới Hiệp Sĩ</div>
+          <p class="card-text">
+            <strong>First Responder Radar</strong><br>
+            • Thẩm định KYC 2 lớp (BLS/PHTLS).<br>
+            • Điều phối thông minh (SBD).<br>
+            • OpenAED Waypoint Routing.<br>
+            • Bảo trợ Good Samaritan Shield.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🏛️ 4. Web TOC Admin</div>
+          <p class="card-text">
+            <strong>Tactical Operations Center</strong><br>
+            • Bản đồ GIS sự cố thời gian thực.<br>
+            • Mở tủ SafePoint/AED từ xa.<br>
+            • Ngân hàng máu SafeBlood Relay.<br>
+            • Giải ngân Quỹ HeroShield.
+          </p>
+        </div>
+      </div>
+      <div class="speaker-notes">
+        💡 <strong>Lời thoại:</strong> "SafeSolo liên kết chặt chẽ 4 đối tượng: Nạn nhân gặp nạn, Người thân trong gia đình, Tình nguyện viên sơ cứu gần nhất và Trung tâm điều phối y tế 115."
+      </div>
+    </div>
+
+    <!-- SLIDE 4: 7 CƠ CHẾ CHECK-IN SINH TỒN -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">ĐỘT PHÁ CÔNG NGHỆ 1 • CHỦ ĐỘNG BẢO VỆ</div>
+        <h2 class="slide-title">Hệ Sinh Thái 4 Nhóm — 7 Cơ Chế Check-in Sinh Tồn</h2>
+        <p class="slide-subtitle">Xóa bỏ điểm yếu của Dead-Man Switch truyền thống: Không gây phiền toái, tự động hóa tối đa</p>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🌿 Nhóm 1: Thụ Động Zero-Touch (Không Chạm)</div>
+          <p class="card-text">
+            • <strong>Cơ chế 1 - Nhịp tim thức giấc (Sleep Wake-up Pulse):</strong> PPG trên Watch 5 đo nhịp tim tăng sinh lý buổi sáng (>75 bpm) kết hợp cử động cổ tay -> Tự động xác nhận an toàn buổi sáng (+12h).<br>
+            • <strong>Cơ chế 2 - Trạm sạc & Home Wi-Fi:</strong> Về đến nhà cắm sạc điện thoại -> Tự gia hạn an toàn và chuyển Chế độ Giờ Nghỉ (Quiet Hours).
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">⚡ Nhóm 2: Vi Cử Chỉ & Phím Cứng Vật Lý</div>
+          <p class="card-text">
+            • <strong>Cơ chế 3 - Lắc cổ tay (Double Wrist-Twist):</strong> Lắc xoay cổ tay 2 nhịp nhanh trên đồng hồ khi đang nấu ăn, ướt tay hoặc lái xe.<br>
+            • <strong>Cơ chế 4 - Phím cứng (Hardware Key Combo):</strong> Nhấn tổ hợp `Vol Up x2 + Down x1` xác nhận ngầm khi màn hình tắt hoặc trong túi quần.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🎙️ Nhóm 3: Giọng Nói & Mật Mã Cưỡng Bức (Duress)</div>
+          <p class="card-text">
+            • <strong>Cơ chế 5A - Khẩu lệnh:</strong> Nói *"SafeSolo tôi an toàn"* rảnh tay.<br>
+            • <strong>Cơ chế 5B - Mã Duress PIN 9999 (Điểm sáng):</strong> Khi bị kẻ xấu uy hiếp, nhập mã Duress PIN thì màn hình báo an toàn bình thường nhưng ngầm kích hoạt Silent SOS và ghi âm môi trường.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🤝 Nhóm 4: Gia Đình & Trách Nhiệm Sức Khỏe</div>
+          <p class="card-text">
+            • <strong>Cơ chế 6 - Điểm danh chéo (Buddy Cross Check-in):</strong> Con điểm danh, điện thoại Mẹ nhận thông báo 1-chạm xác nhận an toàn tương hỗ.<br>
+            • <strong>Cơ chế 7 - Camera nhận diện thuốc (Medication Vision):</strong> Quét vỉ thuốc sáng/tối để vừa nhắc nhở y tế vừa hoàn tất an toàn sinh tử.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: BYPASS 0-GIÂY & 4 PHÚT VÀNG -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">ĐỘT PHÁ CÔNG NGHỆ 2 • CỨU NẠN 4 PHÚT VÀNG</div>
+        <h2 class="slide-title">Bypass 0-Giây, Loa Quần Chúng & Trạm Sốc Tim AED</h2>
+        <p class="slide-subtitle">Tối ưu hóa đến từng miligiây cho các tình huống đe dọa tính mạng cấp bách nhất</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">⚡ Bypass 0-Giây Non-Blocking</div>
+          <p class="card-text">
+            • <strong>0.01 giây chuyển màn hình:</strong> Bỏ qua hoàn toàn việc chờ đợi mạng và GPS trước khi mở War Room.<br>
+            • <strong>Chạy nền bất đồng bộ (`unawaited`):</strong> Socket.IO, SMS và điều phối đám mây chạy song song không làm đóng băng UI.<br>
+            • <strong>3 nút hành động lâm sàng:</strong> 🫀 Ngừng tim (CPR/AED) • 🩸 Chấn thương (115) • 🧠 Đột quỵ FAST.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">📢 Loa Phát Thanh Quần Chúng</div>
+          <p class="card-text">
+            • <strong>Kêu gọi người xung quanh:</strong> Tự động kích hoạt loa ngoài 100% âm lượng phát thanh song ngữ (Việt - Anh):<br>
+            <em>"CẤP CỨU! CÓ NGƯỜI NGUY KỊCH TẠI ĐÂY! XIN HÃY GIÚP ĐỠ HOẶC GỌI 115!"</em><br>
+            • Kèm đèn flash máy ảnh chớp nháy Strobe SOS thu hút người dân xung quanh đến hỗ trợ.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🫀 HUD Dẫn Đường AED + PIN 1150</div>
+          <p class="card-text">
+            • <strong>OpenAED Waypoint:</strong> Ghim ngay trạm máy sốc tim tự động gần nhất (350m · 4 phút đi bộ).<br>
+            • <strong>Mã mở tủ khẩn cấp PIN 1150:</strong> Hiển thị mã mở khóa chốt điện tử ngay trên thanh HUD.<br>
+            • <strong>CPR Metronome:</strong> Âm thanh đếm nhịp ép tim chuẩn AHA 100–120 nhịp/phút.
+          </p>
+        </div>
+      </div>
+      <div class="speaker-notes">
+        💡 <strong>Lời thoại:</strong> "Trong cấp cứu ngừng tim, mỗi phút trôi qua cơ hội sống sót giảm đi 10%. Nhờ cơ chế Bypass 0s và Loa quần chúng, người bị nạn nhận được sự ép tim ngay từ phút đầu tiên."
+      </div>
+    </div>
+
+    <!-- SLIDE 6: SKILL-BASED DISPATCH -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">ĐỘT PHÁ CÔNG NGHỆ 3 • ĐIỀU PHỐI THÔNG MINH</div>
+        <h2 class="slide-title">Thuật Toán Skill-Based Dispatch & Multi-Wave Radar</h2>
+        <p class="slide-subtitle">Điều phối tình nguyện viên dựa trên chứng chỉ y tế, khoảng cách và bảo vệ pháp lý</p>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🎯 Thuật Toán Trọng Số Chuyên Môn SBD</div>
+          <p class="card-text">
+            Điểm ưu tiên điều phối $S_{\text{dispatch}}$ được tính toán theo công thức đa biến chuẩn khoa học:
+            <br><br>
+            <code style="color: var(--primary); font-family: 'JetBrains Mono', monospace; font-size: 0.95rem;">
+              Score = 0.35*Skill + 0.30*Distance + 0.20*Trust + 0.15*Readiness
+            </code>
+            <br><br>
+            • Ca <strong>ngừng tim</strong> ưu tiên Hiệp sĩ có chứng chỉ <code>CPR_AED</code>.<br>
+            • Ca <strong>tai nạn giao thông</strong> ưu tiên Hiệp sĩ Tier 2 PHTLS có kỹ năng <code>CERVICAL_SPINE</code> (nẹp cổ) và <code>HEMOSTASIS_TOURNIQUET</code> (garô).
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🌊 Điều Phối Làn Sóng Kép (Multi-Wave) & Khóa Atomic Lock</div>
+          <p class="card-text">
+            • <strong>Vòng 1 (1.2km):</strong> Quét tìm 2 hiệp sĩ BLS gần nhất.<br>
+            • <strong>Làn sóng 2 (4.5km):</strong> Tự động mở rộng nếu Vòng 1 thiếu quân số hoặc sau 15–30 giây.<br>
+            • <strong>Khóa nguyên tử (Atomic Lock):</strong> Chống tranh chấp ca khi 2 người cùng nhận đồng thời (người đến sau nhận 409 Conflict an toàn).<br>
+            • <strong>Watchdog Giám sát 45s:</strong> Tự động phạt -20 điểm uy tín và tái điều phối nếu hiệp sĩ đứng im.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: KẾT QUẢ KIỂM THỬ THỰC TẾ -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">CHƯƠNG 5 • ĐÁNH GIÁ THỰC NGHIỆM</div>
+        <h2 class="slide-title">Kết Quả Kiểm Thử Thực Tế: 537/537 Test Cases (100% Pass)</h2>
+        <p class="slide-subtitle">Minh chứng thực nghiệm toàn diện trên 134 Phân hệ Lâm sàng, Thảm họa, An ninh Độc hành, Tự phục hồi CSDL & Phần cứng (Flutter, Wear OS, Backend & Web TOC)</p>
+      </div>
+      <div class="grid-4" style="margin-bottom: 20px;">
+        <div class="stat-box">
+          <div class="stat-number">100%</div>
+          <div class="stat-label">TỶ LỆ TEST PASS (537/537)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">0.01s</div>
+          <div class="stat-label">BYPASS 0-GIÂY MỞ WAR ROOM</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">2.85s</div>
+          <div class="stat-label">5 KÊNH OMNICHANNEL ĐỒNG THỜI</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">36/36</div>
+          <div class="stat-label">MÀN HÌNH 0 PIXEL OVERFLOW</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Bảng Tổng Hợp Kiểm Thử 134 Phân Hệ Chuyên Sâu Lâm Sàng, Đô Thị & Phần Cứng</div>
+        <p class="card-text">
+          ✅ <strong>Tích Hợp Đa Thiết Bị Phần Cứng Honor, Samsung & Watch 5 (Phân hệ 134) — ĐẠT ĐỈNH CAO 134 PHÂN HỆ:</strong> 4/4 tests pass (Honor Magic 7 Pro Magic Capsule Live Activity 110 BPM, Vệ tinh Beidou 70B, PowerGenie Doze Whitelist; Samsung Galaxy A53 5G Knox Vault TEE AES-256, Exynos 1280 Never Sleeping Apps, Dolby 118dB Siren; Samsung Galaxy A71 Snapdragon 730 tham chiếu, NFC SafeTag Reader &lt; 180ms, Scrcpy 60fps TOC; Galaxy Watch 5 Wear OS 4 Circular 396x396, BioActive 25Hz, Double Wrist-Twist 1.2s, Té ngã SVM &gt; 4g, OLED 100% Strobe Beacon; 0 lỗi tràn pixel trên cả 4 kích thước màn hình).<br>
+          ✅ <strong>Check-in Sinh tồn & Bypass 0-Giây (Phân hệ 1-4):</strong> 14/14 tests pass (7 cơ chế check-in, Duress PIN 9999, Blackbox số hóa, Omnichannel 5 kênh).<br>
+          ✅ <strong>Hiệp sĩ Cứu hộ, OpenAED & Radar Điều phối (Phân hệ 5-10):</strong> 13/13 tests pass (KYC 20 câu, Waypoint AED PIN 1150, Atomic Lock, Watchdog 90s, SafeBlood).<br>
+          ✅ <strong>Y khoa Ngoại viện PHTLS & Pháp lý (Phân hệ 11-15):</strong> 28/28 tests pass (Điều 23 BLHS, Garô C-A-T 120p, Bàn giao SBAR, NEWS-2, Bồi thường phơi nhiễm PEP, Tele-FirstAid).<br>
+          ✅ <strong>Cấp cứu Đặc thù Đô thị (Phân hệ 16-21):</strong> 20/20 tests pass (Mạng lưới Oxy, Sốc phản vệ EpiPen, Safe Night Route, Đuối nước 5 Breaths, Sốc nhiệt hạ thân nhiệt, Stroke FAST-ED LVO).<br>
+          ✅ <strong>Thảm họa & Cứu sinh Nâng cao (Phân hệ 22-27):</strong> 34/34 tests pass (SafeTag Offline HTML & Paramedic Bypass, Bản đồ ngập lụt, Thảm họa MCI START, Rắn độc PIT, Bỏng bù dịch Parkland, USAR Vùi lấp chống ngừng tim Kali).<br>
+          ✅ <strong>Cấp cứu Lồng ngực, Cột sống & Đái tháo đường (Phân hệ 28-30):</strong> 12/12 tests pass (Tràn khí áp lực chọc kim 14G KLS 2 & Băng ngực van 1 chiều có xả Burp, Bất động cột sống cổ SMR Canadian Rule & Sốc thần kinh, Hạ đường huyết Quy tắc 15-15 & Tiêm bắp Glucagon khẩn cấp cấm đường uống).<br>
+          ✅ <strong>Hóc Dị Vật Nhi, Động Kinh & Điện Giật Cao Thế (Phân hệ 31-33):</strong> 12/12 tests pass (Hóc dị vật FBAO nhũ nhi 5 Vỗ lưng 5 Ấn ngực cấm Heimlich rách gan lách & cấm móc họng mù, Cơn động kinh Status Epilepticus cấm chèn đũa muỗng gãy răng & tư thế hồi phục Recovery Position, Điện giật đô thị 220V sốc AED khử rung VF & Di chuyển nhảy chụm chân chống Điện thế bước cao thế).<br>
+          ✅ <strong>Khói Cháy CO/Cyanide, Bỏng Mắt & Đứt Lìa Chi Vi Phẫu (Phân hệ 34-36):</strong> 12/12 tests pass (Ngộ độc khí CO/Cyanide cháy chung cư oxy 100% NRM & Oxy cao áp HBOT thai phụ / Cyanokit, Bỏng kiềm/axit mắt tưới rửa liên tục 20p 1500mL đưa pH về 7.3 & Khiên che mắt cấm đè ép/cấm rút dị vật, Đứt lìa chi quy tắc 3 lớp bảo quản lạnh gián tiếp 2-4°C cấm ngâm trực tiếp đá lạnh & Garô chi lớn cửa sổ vàng 6h).<br>
+          ✅ <strong>Vỡ ĐM Chủ Bụng, Ngộ Độc Phospho Hữu Cơ & Vỡ Khung Chậu Nặng (Phân hệ 37-39):</strong> 12/12 tests pass (Vỡ phình ĐM chủ bụng SBP 80-90 mmHg cấm bù dịch quá mức & Thoát vị tạng bụng cấm ấn ruột gạc ẩm co gối 45°, Ngộ độc thuốc trừ sâu phospho chuẩn liều Atropine phổi khô & Pralidoxime 2-PAM chống lão hóa enzym, Vỡ khung chậu cấm lắc kiểm tra mào chậu & Đai kẹp Greater Trochanters kết hợp buộc chụm gối cáng xúc vận chuyển).<br>
+          ✅ <strong>Chấn Thương Sọ Não, Cấp Cứu Sản Phụ & Bệnh Giảm Áp Khí Nén (Phân hệ 40-42):</strong> 12/12 tests pass (Chấn thương sọ não Tam chứng Cushing tụt kẹt não đầu cao 30° tăng thông khí kiểm soát EtCO2 30-35 mmHg cấm tăng thông khí bừa bãi & Chống tụt HA/Hypoxia EPIC Rule, Cấp cứu sản phụ ngừng tim nghiệm pháp Manual LUD đẩy tử cung sang trái cấm nghiêng cả thân & Mổ bắt con cấp cứu cứu mẹ PMCD 4-5 phút vàng, Bệnh giảm áp lặn biển/thi công hầm metro oxy 100% NRM cấm lặn lại dưới nước & Vận chuyển bay thấp < 300m kết hợp Buồng tăng áp Bảng 6 Hải quân).<br>
+          ✅ <strong>Sốc Mất Máu Nặng, Hạ Thân Nhiệt Sâu & Cơn Bão Giáp (Phân hệ 43-45):</strong> 12/12 tests pass (Sốc mất máu CRASH-2 TXA 1g IV trong 3h đầu & DCR dịch tinh thể < 1L kèm MTP 1:1:1, Hạ thân nhiệt sâu Gentle Handling chống rung thất VF & Cấm sưởi ấm tứ chi trước chống tụt nhiệt Afterdrop kèm Warm & Dead Rule, Cơn bão giáp BWPS >= 45 điểm Cấm tuyệt đối Aspirin tránh bão hormone tự do & Chẹn beta Propranolol kiểm soát nhịp tim kết hợp ICU BV Chợ Rẫy).<br>
+          ✅ <strong>Khí Độc H2S/Clo, Sốc Tim Phù Phổi Cấp & Sốc Nhiễm Khuẩn (Phân hệ 46-48):</strong> 12/12 tests pass (Khí độc công nghiệp H2S Knockdown & Chặn cứu hộ không SCBA kèm Sodium Nitrite giải độc, Sốc tim phù phổi cấp Killip IV ngồi cao High Fowler buông thõng hai chân & CPAP 10 cmH2O cấm Nitroglycerin khi HA tụt/PDE-5, Sốc nhiễm khuẩn qSOFA >= 2 điểm & Bù dịch 30 mL/kg Ringer Lactate kèm Noradrenaline duy trì MAP >= 65 mmHg kết hợp ICU BV Bệnh Nhiệt Đới).<br>
+          ✅ <strong>Mạch Máu Giáp Ranh, Tăng Thân Nhiệt Ác Tính & ECPR (Phân hệ 49-51):</strong> 12/12 tests pass (Chấn thương mạch máu giáp ranh bẹn/nách Hemostatic Packing Chitosan 3p & SAM Junctional Tourniquet kèm Cấm kê cao chi chống hội chứng khoang, Tăng thân nhiệt ác tính & Hội chứng Serotonin Tiêu chuẩn Hunter Cấm dây trói cưỡng chế tránh tiêu cơ vân cấp & Dantrolene 2.5mg/kg/Cyproheptadine 12mg, Hồi sinh tim phổi ngoài cơ thể ECPR ngoại viện ngưng tim có chứng kiến nhịp sốc trơ & Máy ép tim cơ học LUCAS duy trì luồn Cannula ECMO < 60 phút mốc vàng bảo tồn não).<br>
+          ✅ <strong>Cột Sống ASIA, Phù Não HACE/HAPE & Bỏng Lạnh Nitơ (Phân hệ 52-54):</strong> 12/12 tests pass (Chấn thương cột sống ngực thắt lưng phân độ ASIA Log-roll 4 người & Rút ván cứng <30p chuyển đệm chân không Vacuum Mattress kèm Watchdog sốc tủy, Phù não phù phổi độ cao Lake Louise >= 5 điểm Nguyên tắc sống còn hạ độ cao khẩn cấp >= 1000m & Túi tăng áp Gamow Bag 2 psi kèm Dexamethasone/Nifedipine, Sơ cứu bỏng lạnh độ 2 Hennepin ngâm nước ấm 37-39°C Cấm ma sát chà xát tuyết & Cấm rã đông nếu có nguy cơ tái đóng băng kèm Ibuprofen kháng Thromboxane A2).<br>
+          ✅ <strong>Viêm Cân Mạc LRINEC, Máu Tụ Hốc Mắt & Ngộ Độc Thuốc Tê LAST (Phân hệ 55-57):</strong> 12/12 tests pass (Viêm cân mạc hoại tử LRINEC >= 6 điểm Dấu hiệu đau vượt tỷ lệ & Clindamycin ức chế độc tố kèm Cắt lọc khẩn cấp < 6h, Khối máu tụ sau nhãn cầu OCS lồi mắt cứng đá IOP >= 40 mmHg & Cửa sổ 60-90p giải áp Lateral Canthotomy kèm BV Mắt, Ngộ độc thuốc tê toàn thân LAST Bupivacaine co giật/loạn nhịp thất & Giải độc ASRA Nhũ dịch Lipid 20% bolus 1.5 mL/kg cơ chế Lipid Sink kèm Tuyệt đối CẤM Vasopressin/Chẹn kênh Calci/Beta).<br>
+          ✅ <strong>Thuyên Tắc Phổi PE/AFE, Vỡ Thực Quản Boerhaave & Đứt Niệu Đạo (Phân hệ 58-60):</strong> 12/12 tests pass (Thuyên tắc phổi Wells >= 6 & Tắc mạch ối AFE suy thất phải cấp bù dịch thận trọng <= 500mL kèm Tiêu sợi huyết tPA/ECMO, Vỡ thực quản tự phát áp lực Boerhaave Tam chứng Mackler Tuyệt đối CẤM ăn uống NPO & CẤM đặt sonde dạ dày mù kèm Khâu vết rách < 24h, Chấn thương vỡ bàng quang & đứt niệu đạo Tam chứng giọt máu miệng sáo Tuyệt đối CẤM đặt ống thông Foley mù & Chụp RUG kèm Dẫn lưu trên mu BV Bình Dân / BV Chợ Rẫy).<br>
+          ✅ <strong>Xuất Huyết Dưới Nhện aSAH, Vết Thương Tim & Chùm Đuôi Ngựa (Phân hệ 61-63):</strong> 12/12 tests pass (Xuất huyết não dưới nhện aSAH Cơn đau đầu sét đánh Hunt & Hess SBP &lt; 140 mmHg & Nimodipine 60mg chống co thắt DCI kết hợp DSA 115, Vết thương xuyên thấu tim Tam chứng Beck & Chèn ép tim cấp Tuyệt đối CẤM rút dị vật găm ngực kèm Mở ngực cấp cứu EDT, Hội chứng chùm đuôi ngựa CES Tứ chứng cờ đỏ Saddle Anesthesia & Bí tiểu cấp Cửa sổ vàng giải ép &lt; 24-48h BV Chấn Thương Chỉnh Hình / BV Chợ Rẫy).<br>
+          ✅ <strong>Thuyên Tắc Khí/Mỡ FES, Tăng Huyết Áp Ác Tính & U Tủy Thượng Thận (Phân hệ 64-66):</strong> 12/12 tests pass (Thuyên tắc mỡ FES Tam chứng Gurd Suy hô hấp/Lú lẫn/Ban đốm xuất huyết & Tư thế Durant bẫy khí giải tỏa Air Lock kèm Oxy 100% NRM, Cơn tăng huyết áp cấp cứu Hypertensive Emergency Quy tắc AHA giảm MAP 20-25% 1h đầu & Tuyệt đối CẤM Nifedipine ngậm dưới lưỡi, U tủy thượng thận bão Catecholamine Pheochromocytoma Quy tắc vàng BẮT BUỘC chẹn Alpha trước - Chẹn Beta sau kèm Phentolamine IV BV Chợ Rẫy / BV 115).<br>
+          ✅ <strong>Xuất Huyết Não ICH, Bóc Tách ĐMC Stanford A & Hôn Mê HHS (Phân hệ 67-69):</strong> 12/12 tests pass (Xuất huyết não nhu mô ICH Score/Spot Sign CTA bùng nổ máu tụ 3h đầu & Đảo ngược chống đông 4-Factor PCC/Idarucizumab kèm SBP 130-140 mmHg, Bóc tách ĐMC Stanford A Đau xé rách ngực lưng & Tuyệt đối CẤM chọc hút màng ngoài tim bừa bãi tránh mất hiệu ứng tự cầm máu tamponade toác vỡ ĐMC kèm Anti-impulse HR &lt; 60 bpm mổ tim hở, Hôn mê tăng áp lực thẩm thấu HHS Glucose &gt;= 600 mg/dL &gt; 320 mOsm/kg mất nước 10L Nguyên tắc sống còn số 1 Bù dịch tinh thể trước TUYỆT ĐỐI CẤM tiêm Insulin khi chưa bù thể tích kèm Kali &gt;= 3.3 mEq/L BV Chợ Rẫy / BV 115).<br>
+          ✅ <strong>Cơn Hen Ác Tính, Thuyên Tắc Chi Cấp & Nhiễm Trùng Đường Mật (Phân hệ 70-72):</strong> 12/12 tests pass (Cơn hen ác tính Near-Fatal Asthma Dấu hiệu Lồng ngực im lặng Silent Chest đe dọa tử vong kiệt cơ & Khí dung SABA/Ipratropium + Magnesium Sulfate 2g IV kèm Tuyệt đối CẤM thuốc an thần Benzodiazepine/Morphine, Thuyên tắc động mạch chi cấp tính ALI Hội chứng 6P Rutherford IIb Cửa sổ vàng 6h & Heparin 80 IU/kg IV kèm Tuyệt đối CẤM chườm nóng và CẤM kê cao chi BV Bình Dân / BV Chợ Rẫy, Nhiễm trùng đường mật cấp Tam chứng Charcot & Ngũ chứng Reynolds Pentad có sốc nhiễm trùng Ringer Lactate 30 mL/kg & Kháng sinh tĩnh mạch 1h đầu kèm BẮT BUỘC dẫn lưu giải áp đường mật ERCP &lt; 12-24h BV Chợ Rẫy / BV 115).<br>
+          ✅ <strong>Tràn Khí Màng Tim, Ngộ Độc Methanol & Hội Chứng Khoang Bụng (Phân hệ 73-75):</strong> 12/12 tests pass (Tràn khí màng ngoài tim áp lực Tension Pneumopericardium Tiếng bánh xe nước Bruit de Moulin & Dấu hiệu Hamman kèm Chọc kim dưới mũi kiếm giải áp và Tuyệt đối CẤM bóp bóng áp lực cao PPV trước khi giải áp màng tim, Ngộ độc cồn công nghiệp Methanol Thị giác bão tuyết Snowstorm Vision mù vĩnh viễn do Acid Formic phá hủy thần kinh thị & Đối kháng cạnh tranh ADH bằng Fomepizole/Ethanol 40 độ kèm Axit Folic/Leucovorin 50mg và Chỉ định lọc máu ngắt quãng cấp cứu IHD &lt; 6h BV Chợ Rẫy / BV 115, Hội chứng chèn ép khoang bụng cấp ACS Áp lực bàng quang IAP &gt; 20 mmHg kèm Tam chứng suy tạng bụng cứng/vô niệu/áp lực đỉnh thở vọt &gt; 40 cmH2O Tuyệt đối CẤM bù dịch quá tải fluid overload tránh phù nề ruột kèm Mở toang bụng giải áp Decompressive Laparotomy túi Bogota/Vac-Pack BV Bình Dân / BV Chợ Rẫy / BV 115).<br>
+          ✅ <strong>Vỡ Nhãn Cầu Mở, Xuất Huyết DOACs & Vỡ Tim Kín (Phân hệ 76-78):</strong> 12/12 tests pass (Vỡ nhãn cầu mở Open Globe Injury Nghiệm pháp Seidel dòng thác thủy dịch rò rỉ buồng trước & Đồng tử giọt nước teardrop pupil kèm Cố định khiên cứng tựa bờ xương ổ mắt và Tuyệt đối CẤM đè ép/dụi mắt/băng ép mắt cùng CẤM Succinylcholine khi đặt nội khí quản BV Mắt TP.HCM / BV Chợ Rẫy, Xuất huyết nặng do kháng đông thế hệ mới DOACs Dabigatran vs Kháng Xa & Đối kháng đặc hiệu Idarucizumab 5g IV hoặc 4-Factor PCC 50 IU/kg kèm Tuyệt đối CẤM truyền FFP đơn thuần quá tải TACO và Cảnh báo Vitamin K vô hiệu BV Chợ Rẫy / BV 115, Vỡ tim do đụng dập ngực kín Blunt Cardiac Rupture Siêu âm E-FAST màng tim tràn máu xoáy cuộn & Tiếng thổi đứt van tim/loạn nhịp thất kèm Tuyệt đối CẤM tiêu sợi huyết tPA làm toác vỡ tim và Mổ tim hở chạy máy CEC khẩn cấp BV Chợ Rẫy / BV 115).<br>
+          ✅ <strong>Thuyên Tắc Khí Durant, Vỡ Giãn TMTQ & Ngạt Khói Cyanide (Phân hệ 79-81):</strong> 12/12 tests pass (Thuyên tắc khí áp lực tĩnh mạch VAE bẫy khí van ĐMP Air Lock tư thế Durant nghiêng trái dốc đầu 15-30 độ CẤM ngồi dậy & CẤM PEEP cao, Vỡ giãn TMTQ tăng áp cửa Terlipressin 2mg IV bolus Ceftriaxone 1g hạn chế bù dịch SBP 90-100 mmHg bóng chèn Bakri/Sengstaken EVL Bình Dân / Chợ Rẫy, Ngạt khói Cyanokit 5g IV toan lactic > 8 mmol/L CẤM Nitrite khi có CO kết hợp đặt NKQ sớm Chợ Rẫy / 115).<br>
+          ✅ <strong>Sốc Phản Vệ Pha Hai, Cơn Xoắn Đỉnh TdP & Tràn Máu Màng Phổi Lớn (Phân hệ 82-84):</strong> 12/12 tests pass (Sốc phản vệ pha hai kháng Adrenaline do chẹn Beta dùng Glucagon 1-5mg IV tiêm chậm >= 5 phút CẤM xuất viện sớm < 24h & CẤM bolus Glucagon nhanh sặc thở, Cơn xoắn đỉnh do thuốc TdP QTc > 500ms tiêm Magnesium Sulfate 2g IV 1-2 phút CẤM Amiodarone & CẤM sốc điện đồng bộ sẵn sàng khử rung 200J Chợ Rẫy / 115, Tràn máu màng phổi lượng lớn >= 1,500 mL ống dẫn lưu ngực lớn 28-32 Fr KLS 5 nách giữa hút -15 cmH2O CẤM kẹp ống dẫn lưu & CẤM chọc kim nhỏ mở ngực cấp cứu Bình Dân / Chợ Rẫy).<br>
+          ✅ <strong>Băng Huyết Sau Sinh PPH, Thuyên Tắc Phổi Diện Rộng & Viêm Nắp Thanh Quản (Phân hệ 85-87):</strong> 12/12 tests pass (Băng huyết sau sinh PPH đờ tử cung xoa đáy tử cung Oxytocin 10 IU TXA 1g IV trong 3h chuẩn WOMAN Trial bóng chèn Bakri 300-500mL CẤM Methylergometrine ở sản phụ tăng HA/tiền sản giật thay bằng Misoprostol 800mcg Từ Dũ / Chợ Rẫy, Thuyên tắc phổi diện rộng High-Risk Massive PE tụt HA SBP < 90 mmHg dấu hiệu McConnell RV/LV > 1.0 tiêu sợi huyết rt-PA 50-100mg IV 2h CẤM bù dịch quá mức > 500mL đè bẹp thất trái sẵn sàng VA-ECMO Chợ Rẫy / 115, Viêm nắp thanh quản cấp trẻ em sưng đỏ mọng tam chứng sốt chảy dãi thở rít ngửi khí Sniffing oxy ẩm CẤM que đè lưỡi khám họng co thắt thanh quản bít thanh môn & CẤM nằm ngửa kíp ENT mở màng nhẫn giáp vi phẫu Nhi Đồng 1 / Nhi Đồng 2).<br>
+          ✅ <strong>Sốc Tủy Neurogenic Shock, Chấn Thương Cổ Thấu & Hội Chứng Cai Rượu DT (Phân hệ 88-90):</strong> 12/12 tests pass (Sốc tủy Neurogenic Shock chấn thương tủy cổ ngực cao >= T6 tam chứng tụt HA nhịp chậm da ấm khô vận mạch Norepinephrine/Dopamine duy trì MAP >= 85-90 mmHg liên tục 7 ngày CẤM bù dịch quá tải & CẤM Phenylephrine đơn độc tránh vô tâm thu Chợ Rẫy / 115, Chấn thương xuyên thấu cổ Hard Signs máu tụ lan nhanh đè xẹp khí quản thở rít Stridor ấn tay trực tiếp gạc vô trùng CẤM băng ép vòng quanh cổ siết nghẹt động mạch cảnh & CẤM kẹp Hemostat mò mở màng nhẫn giáp vi phẫu khẩn Bình Dân / Chợ Rẫy, Hội chứng cai rượu tối cấp Delirium Tremens bão giao cảm CIWA-Ar >= 15-20 sốt cao nhịp nhanh ảo giác mê sảng Diazepam 10-20mg IV liều cao BẮT BUỘC tiêm Thiamine 100-500mg IV trước Glucose chống hoại tử não Wernicke & CẤM Haloperidol đơn độc hạ ngưỡng co giật và TdP ICU Chợ Rẫy / 115).<br>
+          ✅ <strong>Dị Vật Găm Ngực Xuyên Thấu Tim, Sốt Rét Thể Não & Vỡ Thận Độ V (Phân hệ 91-93):</strong> 12/12 tests pass (Chấn thương xuyên thấu tim dị vật găm lồng ngực bất động tại chỗ gạc cuộn donut CẤM rút dị vật ngoại viện mất nút bít phụt máu ngừng tim 60s & CẤM đè ép dị vật theo dõi Tam chứng Beck phòng mổ tim mở ngực CEC Chợ Rẫy / 115 / Viện Tim, Sốt rét ác tính thể não hôn mê sâu co giật P.falciparum Artesunate 2.4mg/kg IV chuẩn WHO các mốc 0h-12h-24h CẤM Corticosteroid Dexamethasone tăng tử vong & CẤM bù dịch quá tải phù phổi ARDS BV Bệnh Nhiệt Đới / Chợ Rẫy, Vỡ thận độ V đứt toạc cuống mạch thận sau phúc mạc Grey Turner DCR SBP 80-90 mmHg MTP 1:1:1 CẤM nắn ép hông lưng rách mạc Gerota máu tràn ổ bụng ngừng tim & CẤM dịch tinh thể quá mức bục cuống mạch DSA nút mạch khẩn Bình Dân / Chợ Rẫy / 115).<br>
+          ✅ <strong>Sốc Nhiệt Ác Tính CWI, Bỏng Hóa Chất & Vỡ Gan Độ V DCS (Phân hệ 94-96):</strong> 12/12 tests pass (Sốc nhiệt ác tính gắng sức EHS thân nhiệt lõi > 40.5°C ngâm nước đá lạnh toàn thân CWI 1.5-15°C hạ nhiệt độ lõi < 39°C trong 30 phút vàng CẤM thuốc hạ sốt Paracetamol/Aspirin hoại tử gan cấp bùng phát & CẤM vận chuyển trước khi hạ nhiệt lõi "Cool First, Transport Second" ICU Chợ Rẫy / 115 / Gia Định, Bỏng hóa chất công nghiệp diện rộng phân định hoại tử đông Axit vs hoại tử hóa lỏng Kiềm ăn sâu tưới rửa 30-60 phút nước sạch/dung dịch lưỡng tính Diphoterine và pH mắt 7.0-7.4 CẤM dùng hóa chất trung hòa tỏa nhiệt thiêu đốt mô sống & CẤM vòi xịt áp lực mạnh xé da Trung tâm Bỏng Chợ Rẫy / Nhi Đồng 1, Vỡ gan độ V rách > 75% hoặc rách tĩnh mạch gan mất máu > 1,500 mL phẫu thuật DCS kẹp cuống gan Pringle Maneuver 15p và chèn 6-10 miếng gạc quanh gan Perihepatic Packing CẤM rút gạc sớm < 48-72h bục toác tái xuất huyết tử vong & CẤM khâu mò tĩnh mạch sau gan tránh Tam chứng tử vong Trung tâm Ngoại Gan Mật Tụy Chợ Rẫy / Bình Dân / 115).<br>
+          ✅ <strong>Vỡ Lách Độ V DCR, Ngộ Độc Nhôm Photphua, Vết Thương Ngực Hở & Cơn Bão Nhược Cơ (Phân hệ 97-100):</strong> 16/16 tests pass (Vỡ lách độ V Kehr's Sign DCR permissive hypotension SBP 80-90 mmHg MTP 1:1:1 CẤM bù dịch quá mức & CẤM CT Donut of Death vắc-xin OPSI Chợ Rẫy/115/Bình Dân; Ngộ độc Nhôm Photphua AlP khí PH3 hoại tử cơ tim uống ngay dầu dừa bọc lipid rửa NaHCO3 5% CẤM rửa nước lã bùng nổ khí & CẤM phòng kín ECMO Chợ Rẫy/115; Vết thương ngực hở phì phò rít gió lắc lư trung thất băng van 3 cạnh một chiều xả khí máu CẤM băng kín 4 cạnh tràn khí áp lực cao & CẤM nhét gạc dẫn lưu ngực kín 28-32 Fr Chợ Rẫy/115/Bình Dân; Cơn bão nhược cơ kịch phát suy hô hấp cấp Quy tắc 20/30/40 Rule đặt NKQ sớm liệu pháp thay huyết tương PLEX/IVIG CẤM Aminoglycoside/Macrolide/Quinolone/chẹn Beta-Canxi/Magnesium liệt cơ hoành & CẤM an thần khi chưa thở máy ICU Chợ Rẫy/115/Đại học Y Dược).<br>
+          ✅ <strong>Vỡ TMTQ Phình Vị Histoacryl, Rách Khí Phế Quản, Ngộ Độc TCA & Thuyên Tắc Ối A-OK (Phân hệ 101-104):</strong> 16/16 tests pass (Vỡ phình vị Sarin IGV1 keo Histoacryl Lipiodol 1:1 Terlipressin SBP 90-100 CẤM thắt vòng cao su EVL toác búi giãn & CẤM keo nguyên chất PE Chợ Rẫy/115/Bình Dân; Rách khí phế quản tràn khí dưới da khổng lồ soi phế quản ống mềm đặt NKQ chọn lọc CẤM áp lực dương cao tràn khí trung thất đè tim & CẤM đặt NKQ mò khâu phục hồi Chợ Rẫy/115/Bình Dân; Ngộ độc TCA Amitriptyline QRS >= 100-160ms kiềm hóa NaHCO3 8.4% CẤM chống loạn nhịp IA/IC/Amiodarone & CẤM Physostigmine vô tâm thu Intralipid Chợ Rẫy/115; Thuyên tắc ối AFE suy sụp DIC phác đồ A-OK Atropine/Ondansetron/Ketorolac CẤM bù dịch quá tải bẹp thất trái & CẤM hoãn mổ PMCD 4 phút Từ Dũ/Chợ Rẫy/115).<br>
+          ✅ <strong>Hít Phân Su Sơ Sinh MAS, Ngộ Độc MetHb, Vỡ Phình ĐM Tạng & Hạ Canxi Máu Tetany (Phân hệ 105-108):</strong> 16/16 tests pass (Hít phân su sơ sinh MAS ối sệt pea-soup bẫy khí PPHN thở HFOV bơm Surfactant 100-200 mg/kg iNO 20 ppm CẤM hút sâu mò mẫm khi trẻ thở & CẤM bóp bóng áp lực cao bừa bãi vỡ phế nang tràn khí màng phổi áp lực NICU Nhi Đồng 1/Nhi Đồng 2/Từ Dũ; Ngộ độc Methemoglobinemia tím tái kháng trị máu socola SpO2 kẹt 85% Xanh Methylen 1% 1-2 mg/kg CHỐNG CHỈ ĐỊNH TUYỆT ĐỐI Xanh Methylen ở bệnh nhân thiếu men G6PD tan máu nội mạch ồ ạt suy thận tử vong & CẤM quá liều > 7 mg/kg Vitamin C/thay máu Chợ Rẫy/115/Nhi Đồng 1; Vỡ túi phình ĐM tạng lách/gan vỡ 2 thì hậu cung mạc nối DCR SBP 80-90 mmHg MTP 1:1:1 TXA 1g nút mạch DSA Coils sandwich/Stent-graft CẤM ấn nắn thượng vị thô bạo & CẤM bù dịch quá tải SBP > 100 mmHg Chợ Rẫy/Bình Dân/115/Từ Dũ; Cơn hạ canxi máu tối cấp Trousseau co quắp bàn tay Stridor thanh quản QTc kéo dài Calcium Gluconate 10% tiêm chậm 10-20 phút bù Magie Sulfat 1-2g IV CHỐNG CHỈ ĐỊNH tiêm nhanh Calcium Chloride ngoại vi hoại tử mô sâu & CẤM tiêm chung Bicarbonate/Phosphat kết tủa tắc mạch phổi ICU Chợ Rẫy/115/Bình Dân).<br>
+          ✅ <strong>Sốc Phản Vệ Cản Quang Iod, Vỡ Toác Khung Chậu SAM Sling, Ngộ Độc Khí Độc Thần Kinh DuoDote & Ngưng Tim Hạ Thân Nhiệt Sâu ECLS (Phân hệ 109-112):</strong> 16/16 tests pass (Sốc phản vệ cản quang iod độ IV Adrenaline IM 0.5mg mặt trước ngoài đùi lặp lại 5-10 phút bolus dịch tinh thể 1-2L khí dung Budesonide CẤM tiêm IV trực tiếp Adrenaline nguyên chất 1:1,000 rung thất xuất huyết não & CẤM dùng Corticoid thay thế Adrenaline làm mất thời gian vàng ICU Chợ Rẫy/115; Vỡ toác khung chậu mất vững Open-book/Shear đai nẹp chậu SAM Pelvic Sling II ngang Mấu chuyển lớn DCR SBP 80-90 mmHg MTP 1:1:1 TXA 1g can thiệp nút mạch DSA ĐM chậu trong CẤM đặt đai nẹp ở mào chậu bửa toác khung chậu & CẤM lật trở log-roll phá vỡ cục máu đông non sau phúc mạc Chợ Rẫy/CTCH/115; Ngộ độc chất độc thần kinh Sarin/VX Killer B's SLUDGE phác đồ DuoDote Atropine tăng liều tới khi khô phổi kết hợp Pralidoxime 2-PAM 1-2g tái hoạt hóa AChE tiêu tẩy Decon Diazepam CẤM dùng 2-PAM đơn độc không Atropine bùng phát co thắt & CẤM tiếp cận hiện trường khi chưa mang đồ bảo hộ PPE cấp A/B Chợ Rẫy/175; Ngưng tim do hạ thân nhiệt sâu dưới 30°C quy trình Gentle Handling CPR liên tục giới hạn sốc điện 3 lần hoãn thuốc vận mạch chạy hệ thống VA-ECMO ECLS làm ấm trung tâm 2-3°C/h CẤM công bố tử vong khi chưa ấm > 35°C "No one is dead until warm and dead" & CẤM sưởi ấm tứ chi trước gây tụt nhiệt Afterdrop tử vong Chợ Rẫy/115).<br>
+          ✅ <strong>Tự Vá Lỗi CSDL, Ong Đốt Ngừng Tim, Không Gian Kín Khí Độc, Ăn Thịt Người Vibrio & Toan Ceton DKA (Phân hệ 113-117):</strong> 20/20 tests pass (Subsystem 113 Tự vá lỗi CSDL Self-Healing Health Score 100/100, Sốc phản vệ ngừng tim ong vò vẽ đốt hàng chục nốt Vasopressin + Methylene Blue CẤM bóp nặn nọc/CẤM chườm nóng, Không gian kín cống ngầm Biogas H2S Knockdown SCBA Buddy System CẤM xuống hầm không đồ phòng độc, Nhiễm khuẩn ăn thịt người Vibrio vulnificus Doxycycline + Ceftriaxone Giờ Vàng mở cân mạc giải áp CẤM ngâm nước muối/đắp lá, Toan ceton DKA/HHS bù NaCl 0.9% Potassium Guard CẤM bolus Insulin khi K+ &lt; 3.3 mEq/L & CẤM truyền nhanh dịch nhược trương chống phù não Chợ Rẫy/115/Bệnh Nhiệt Đới).<br>
+          ✅ <strong>AI Crime Heatmap, Sốc Quá Liều Ma Túy Đá, Kẹt Thang Máy Solo, Tăng Kali Máu Chạy Thận, CICO Mở Nhẫn Giáp & Chống Đuối Nước Thông Minh (Phân hệ 118-123):</strong> 24/24 tests pass (Bản đồ nhiệt AI điểm đen an ninh Threat Shield GPS ping 5s Duress PIN 9999 & Né tránh điểm đen; Sốc quá liều ma túy đá MDMA Excited Delirium Diazepam hạ nhiệt CẤM chẹn Beta đơn độc Unopposed Alpha co mạch tử vong & CẤM Haloperidol xoắn đỉnh; Kẹt thang máy cao ốc Beacon sóng âm siêu tần 19.2 kHz Morse SOS 118dB Barometer ước tính tầng kẹt CẤM cạy cửa cabin nhảy ra ngoài & CẤM dùng lửa; Tăng Kali máu tối cấp K+ &gt;= 6.5 mEq/L Calcium Gluconate 10% IV ổn định màng tim 2-3 phút Insulin-Glucose lọc máu khẩn CẤM hoãn Canxi chờ xét nghiệm & CẤM thuốc uống đơn độc Resonium; Co thắt khí quản phù mạch Quinke CICO Mở màng nhẫn giáp ngoại viện 12G/14G Scalpel-Bougie-Tube 60s Adrenaline bắp CẤM đặt NKQ mù quá 3 lần & CẤM tiêm giãn cơ; Chống đuối nước thông minh Cảm biến áp suất thủy tĩnh chìm sâu &gt; 0.5m quá 30s tự bung phao khí CO2 cổ tay 150N lực nâng trong 420ms Water Geofence 200m CẤM dốc ngược xốc nước & BẮT BUỘC 5 nhịp thổi ngạt cứu não trước tiên Chợ Rẫy/Nhi Đồng 1/115/PCCC 114).<br>
+          ✅ <strong>Ong Bắp Cày Bão Cytokine, Sinh Tồn Biển Sâu H.E.L.P, Hạ Thân Nhiệt Cởi Áo Tử Thần, Ngộ Độc Paraquat Cửa Sổ Vàng & Xoắn Tinh Hoàn Cấp (Phân hệ 124-128):</strong> 20/20 tests pass (Ong bắp cày khổng lồ Vespa mandarinia đốt &gt; 30 nốt tiêu cơ vân myoglobin niệu Lọc máu hấp phụ than hoạt HA330 / CRRT PLEX trước 6-12h CẤM hoãn lọc máu chờ vô niệu & CẤM đắp vôi nóng/thuốc lá; Đắm thuyền/rơi biển sâu ban đêm phác đồ H.E.L.P che 3 vùng mất nhiệt kéo dài sống sót từ 2h lên 6-8h Đèn chớp Strobe SOS OLED 100% định vị SAR 1-2 hải lý CẤM cởi quần áo bơi cho nhẹ & CẤM uống nước biển; Hạ thân nhiệt nghịch lý Paradoxical Undressing thân nhiệt lõi &lt; 30°C liệt vận mạch ảo giác nóng bực cởi đồ Còi loa cực đại ngăn cởi áo tử thần Chăn ủ ấm lõi Bair Hugger dịch ấm 42°C CẤM uống rượu sưởi ấm & CẤM cọ xát tuyết/mát-xa kích hoạt rung thất Afterdrop; Ngộ độc Paraquat/Diquat đất sét Fuller's Earth Lọc máu hấp phụ kép than hoạt HA330 Cửa Sổ Vàng 2-4h NAC liều cao CẤM thở oxy liều cao khi SpO2 &gt;= 85% bùng nổ gốc superoxide phá hủy phổi & CẤM hoãn lọc máu qua mốc 4h; Xoắn tinh hoàn cấp tính đau bìu dữ dội Cửa Sổ Vàng &lt; 6h cứu tuyến sinh dục Nghiệm pháp Open-Book xoay từ trong ra ngoài 180-360° Phẫu thuật cố định 2 bên CẤM chườm nóng & CẤM dùng giảm đau mạnh che dấu triệu chứng & CẤM xoay sai chiều vào trong Chợ Rẫy/Bình Dân/115/175).<br>
+          ✅ <strong>CO Phòng Kín HBOT, Đứt Rách ĐM Cảnh, Sốc Điện Cao Thế Rung Thất Muộn, Hóc Dị Vật Dưới 1 Tuổi & Xuyên Thấu Mắt Mở Phụt Pha Lê (Phân hệ 129-133) — ĐẠT ĐỈNH CAO 133 PHÂN HỆ:</strong> 20/20 tests pass (Ngộ độc khí CO phòng kín Buồng Oxy cao áp HBOT 2.5-3.0 ATA trong 6h CẤM tin SpO2 xung & CẤM hoãn HBOT; Vết thương đứt rách ĐM cảnh cổ ngoại viện ép ngón trực tiếp & băng chéo nách đối diện CẤM garrot quanh cổ & CẤM ép 2 bên; Điện cao thế &gt; 1,000V rung thất muộn tiêu cơ vân bù RL 1.5-2.0 mL/kg/h NaHCO3 kiềm hóa CẤM tiếp cận khi chưa ngắt điện & CẤM xuất viện sớm thiếu ECG 24h; Trẻ &lt; 1 tuổi hóc dị vật tắc hoàn toàn 5 vỗ lưng dốc đầu + 5 ấn ngực 2 ngón CẤM móc mò mù & CẤM ép bụng Heimlich rách tạng; Xuyên thấu mắt vỡ nhãn cầu úp Rigid Eye Shield tì xương ổ mắt & băng 2 mắt CẤM tì ép mắt hở & CẤM rút dị vật/tra thuốc mỡ TT Oxy Cao Áp/Bình Dân/Chợ Rẫy/Nhi Đồng 1/Mắt TP.HCM/115).
+        </p>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: KẾT LUẬN & ĐÓNG GÓP -->
+    <div class="slide">
+      <div class="slide-header">
+        <div class="badge">CHƯƠNG 6 • KẾT LUẬN & HƯỚNG PHÁT TRIỂN</div>
+        <h2 class="slide-title">Đóng Góp Khoa Học & Tính Ứng Dụng Thực Tiễn</h2>
+        <p class="slide-subtitle">Sẵn sàng thương mại hóa và bàn giao tích hợp vào mạng lưới cấp cứu 115 quốc gia</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-title">🌟 Đóng Góp Học Thuật & Kỹ Thuật</div>
+          <p class="card-text">
+            • Hiện thực hóa thành công mô hình <strong>4 Phút Vàng</strong> bằng kỹ thuật Bypass 0s và Loa phát thanh quần chúng.<br>
+            • Đề xuất và tối ưu hóa giải thuật <strong>Skill-Based Dispatch đa biến</strong> kết hợp OpenAED Waypoint Routing.<br>
+            • Xây dựng trọn vẹn kiến trúc Đa nền tảng (Flutter + Wear OS + Node.js Microservices).
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">⚖️ Giá Trị Pháp Lý & Y Khoa Xã Hội</div>
+          <p class="card-text">
+            • Tuân thủ nghiêm ngặt <strong>Điều 87 Luật Khám chữa bệnh 2023</strong> (Bảo vệ pháp lý Good Samaritan).<br>
+            • Chuẩn hóa dữ liệu bàn giao cấp cứu tiền viện theo định dạng lâm sàng <strong>SBAR y tế quốc tế</strong>.<br>
+            • Giảm thiểu tải áp lực cho tổng đài 115 nhờ bộ lọc chống báo động giả 3 tầng.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">🚀 Hướng Mở Rộng Tiếp Theo</div>
+          <p class="card-text">
+            • Tích hợp thiết bị bay không người lái <strong>Drone giao máy AED</strong> tới hiện trường trong 3 phút.<br>
+            • Kết nối API chính thức với Tổng đài Cấp cứu 115 TP.HCM và Cục Quản lý Khám chữa bệnh.<br>
+            • Mở rộng mô hình mạng lưới tủ cứu sinh công cộng SafePoint tại các trạm tàu điện ngầm Metro và trường học.
+          </p>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 24px;">
+        <h3 style="color: #FFFFFF; font-size: 1.5rem;">KÍNH MỜI THẦY CÔ TRONG HỘI ĐỒNG ĐẶT CÂU HỎI CHẤT VẤN!</h3>
+        <p style="color: var(--primary); margin-top: 4px;">Sinh viên: Đoàn Minh Quân — MSSV: 2224801030137 — SafeSolo Ecosystem</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer-bar">
+    <div>
+      <span style="font-weight: 700; color: #FFF;">SafeSolo Defense Deck</span> • Slide <span id="currentSlideNum">1</span> / <span id="totalSlideNum">8</span>
+    </div>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <span style="font-size: 0.8rem; color: #64748B;">Sử dụng phím mũi tên [←] [→] để chuyển slide • [F11] Toàn màn hình</span>
+      <button class="nav-btn" onclick="prevSlide()">◀ Trước</button>
+      <button class="nav-btn" onclick="nextSlide()">Sau ▶</button>
+    </div>
+  </div>
+
+  <script>
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    const currentSlideNum = document.getElementById('currentSlideNum');
+    const totalSlideNum = document.getElementById('totalSlideNum');
+    const progressBar = document.getElementById('progressBar');
+
+    totalSlideNum.textContent = totalSlides;
+
+    function showSlide(index) {
+      if (index < 0) index = 0;
+      if (index >= totalSlides) index = totalSlides - 1;
+      currentSlide = index;
+
+      slides.forEach((s, idx) => {
+        s.classList.toggle('active', idx === currentSlide);
+      });
+
+      currentSlideNum.textContent = currentSlide + 1;
+      const progressPercent = ((currentSlide + 1) / totalSlides) * 100;
+      progressBar.style.width = progressPercent + '%';
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides - 1) showSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) showSlide(currentSlide - 1);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevSlide();
+      }
+    });
+
+    showSlide(0);
+  </script>
+</body>
+</html>

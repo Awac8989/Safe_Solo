@@ -14,7 +14,7 @@ import {
   MapPin,
   Lock,
 } from "lucide-react";
-import { fetchIncidentDossier, type IncidentDossier } from "@/lib/api";
+import { fetchIncidentDossier, verifySbarHandoffPublic, type IncidentDossier } from "@/lib/api";
 
 interface IncidentDossierModalProps {
   incidentId: string;
@@ -23,6 +23,22 @@ interface IncidentDossierModalProps {
 
 export function IncidentDossierModal({ incidentId, onClose }: IncidentDossierModalProps) {
   const [copied, setCopied] = useState(false);
+  const [sbarVerifyModalOpen, setSbarVerifyModalOpen] = useState(false);
+  const [sbarVerifyResult, setSbarVerifyResult] = useState<any>(null);
+  const [isVerifyingSbar, setIsVerifyingSbar] = useState(false);
+
+  const handleVerifySbar = async (hash: string) => {
+    setIsVerifyingSbar(true);
+    try {
+      const res = await verifySbarHandoffPublic(hash);
+      setSbarVerifyResult(res.data);
+      setSbarVerifyModalOpen(true);
+    } catch (e: any) {
+      alert("Lỗi xác thực hồ sơ SBAR: " + (e.message || e));
+    } finally {
+      setIsVerifyingSbar(false);
+    }
+  };
 
   const dossierQuery = useQuery({
     queryKey: ["incident-dossier", incidentId],

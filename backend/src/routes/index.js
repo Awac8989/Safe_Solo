@@ -54,6 +54,10 @@ const safePointRoutes = require('./safePointRoutes');
 const safeTagRoutes = require('./safeTagRoutes');
 const bloodRelayRoutes = require('./bloodRelayRoutes');
 const heroShieldRoutes = require('./heroShieldRoutes');
+const hospitalRoutes = require('./hospitalRoutes');
+const floodRoutes = require('./floodRoutes');
+const mciRoutes = require('./mciRoutes');
+const dataIntegrityRoutes = require('./dataIntegrityRoutes');
 
 const apiRouter = express.Router();
 
@@ -74,6 +78,10 @@ apiRouter.use('/safepoints', safePointRoutes);
 apiRouter.use('/safetags', safeTagRoutes);
 apiRouter.use('/blood-relay', bloodRelayRoutes);
 apiRouter.use('/heroshield', heroShieldRoutes);
+apiRouter.use('/hospitals', hospitalRoutes);
+apiRouter.use('/flood', floodRoutes);
+apiRouter.use('/mci', mciRoutes);
+apiRouter.use('/system/integrity', dataIntegrityRoutes);
 
 // Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);

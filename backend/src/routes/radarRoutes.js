@@ -5,7 +5,10 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
-// All routes require authentication
+// Public SBAR Handoff QR verification for 115 Doctors & Hospitals
+router.get('/sbar-verify/:hash', radarController.verifySbarHandoff);
+
+// All subsequent routes require authentication
 router.use(auth);
 
 // SOS broadcast and incident management
@@ -23,5 +26,16 @@ router.post('/:incidentId/beacon', radarController.triggerBeacon);
 router.post('/:incidentId/telemetry', radarController.updateTelemetry);
 router.post('/:incidentId/first-aid', radarController.recordFirstAid);
 router.post('/:incidentId/handoff', radarController.handoffToMedical);
+router.post('/:incidentId/scene-safety', radarController.assessSceneSafety);
+router.post('/:incidentId/bystander-guidance', radarController.triggerBystanderGuidance);
+router.get('/:incidentId/emergency-pass', radarController.getEmergencyPass);
+router.post('/:incidentId/clinical-assessment', radarController.recordClinicalAssessment);
+router.post('/:incidentId/aar', radarController.submitAfterActionReview);
+
+// Tele-FirstAid Live Consultation with 115 ER Doctor
+router.post('/tele-consult/request', radarController.initiateTeleConsultation);
+router.post('/tele-consult/doctor-join', radarController.connectDoctorTeleConsultation);
+router.post('/tele-consult/issue-order', radarController.issueVerbalMedicalOrder);
+router.post('/tele-consult/execute-order', radarController.confirmMedicalOrderExecuted);
 
 module.exports = router;

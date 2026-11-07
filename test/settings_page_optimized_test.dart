@@ -54,7 +54,7 @@ void main() {
     // 5. Developer options should now be visible
     expect(find.text('TÙY CHỌN NHÀ PHÁT TRIỂN'), findsOneWidget);
     expect(find.text('Địa chỉ máy chủ API'), findsOneWidget);
-    expect(find.text('Giả lập WearOS (Galaxy Watch 5)'), findsOneWidget);
+    expect(find.text('Hộp cát Trình diễn Hội đồng (Defense Demo Sandbox)'), findsOneWidget);
 
     // 6. Tap "Ẩn chế độ Dev"
     final hideDevFinder = find.text('Ẩn chế độ Dev');

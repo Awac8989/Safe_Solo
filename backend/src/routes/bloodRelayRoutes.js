@@ -8,5 +8,6 @@ router.post('/create', (req, res, next) => bloodRelayController.createRequest(re
 router.post('/', (req, res, next) => bloodRelayController.createRequest(req, res, next));
 router.post('/:id/accept', (req, res, next) => bloodRelayController.accept(req, res, next));
 router.post('/:id/fulfill', (req, res, next) => bloodRelayController.fulfill(req, res, next));
+router.get('/:id/certificate/:donorId', (req, res, next) => bloodRelayController.getCertificate(req, res, next));
 
 module.exports = router;

@@ -72,4 +72,34 @@ router.post('/:id/cancel', async (req, res, next) => {
   }
 });
 
+
+router.post('/safe-route/plan', async (req, res, next) => {
+  try {
+    const data = await journeyService.planSafeNightRoute(req.user ? req.user.id : 'GUEST', req.body);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/ghost-check', async (req, res, next) => {
+  try {
+    const { lat = 10.7769, lng = 106.7009 } = req.body;
+    const data = await journeyService.checkGhostCompanionAnomaly(req.params.id, lat, lng);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/safe-arrival', async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user.id : req.body.userId;
+    const data = await journeyService.confirmSafeArrival(req.params.id, userId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

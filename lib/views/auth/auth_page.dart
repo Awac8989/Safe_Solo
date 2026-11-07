@@ -479,7 +479,9 @@ class _AuthPageState extends State<AuthPage> {
                       child: (acc['isHero'] as bool? ?? false)
                           ? const Icon(Icons.shield_rounded, color: Color(0xFFD97706), size: 20)
                           : Text(
-                              (acc['name'] as String).substring(0, 1).toUpperCase(),
+                              (acc['name'] as String).trim().isNotEmpty
+                                  ? (acc['name'] as String).trim().substring(0, 1).toUpperCase()
+                                  : 'U',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Color(0xFF4285F4),

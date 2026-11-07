@@ -39,6 +39,7 @@ import '../../services/stroke_defense_service.dart';
 import '../../services/offline_sos_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
+import '../../models/rescue_incident_model.dart';
 import '../../views/emergency/watch_accident_alert_dialog.dart';
 
 enum Mood { calm, happy, tired, sick, focused }
@@ -151,6 +152,9 @@ class User {
   final int snoozeCountToday;
   final List<Map<String, dynamic>> pendingFamilyPings;
   final bool isProfileSetup;
+
+  String get fullName => name;
+  String get phone => phoneNumber;
 
   int get graceHours => (timerIntervalMinutes / 60).round();
 
@@ -899,6 +903,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   List<ChatThread> _chatThreads = const [];
   List<HeroProfile> _heroes = const [];
   List<RadarIncident> _radarIncidents = const [];
+  RescueIncidentModel? _activeRescueIncident;
+  RescueIncidentModel? get activeRescueIncident => _activeRescueIncident;
   AlertPolicyModel? _alertPolicy;
   List<InteractionEventModel> _interactionEvents = const [];
   LiveJourneyModel? _activeJourney;
@@ -3121,7 +3127,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     unawaited(_saveToStorage());
   }
 
-  Future<void> triggerEmergencyIncident({
+  Future<RescueIncidentModel?> triggerEmergencyIncident({
     String incidentType = 'FALL_DETECTED_P1',
     String? details,
     int severity = 2,
@@ -3134,11 +3140,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       unawaited(_saveToStorage());
     }
 
+    RescueIncidentModel? createdIncident;
+
     try {
       final position = await _locationService.getBestEffortLocation(
         fallbackLat: current?.lastKnownLocation?.lat,
         fallbackLng: current?.lastKnownLocation?.lng,
       );
+
+      final batteryLvl = WearOsService.instance.battery;
 
       if (current != null) {
         await _api.createInteraction(
@@ -3152,11 +3162,12 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
             'lng': position.lng,
             'severity': severity,
             'severityLevel': severityLevel,
+            'batteryLevel': batteryLvl,
             'triggeredAt': DateTime.now().toIso8601String(),
           },
         );
 
-        await _api.broadcastRadarSOS(
+        final res = await _api.broadcastRadarSOS(
           incidentType: incidentType,
           lat: position.lat,
           lng: position.lng,
@@ -3166,6 +3177,16 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           approxAddress: null,
           medicalNotes: details,
         );
+
+        if (res['data'] is Map && res['data']['incident'] is Map) {
+          createdIncident = RescueIncidentModel.fromJson(
+            Map<String, dynamic>.from(res['data']['incident'] as Map),
+          );
+        } else if (res['incident'] is Map) {
+          createdIncident = RescueIncidentModel.fromJson(
+            Map<String, dynamic>.from(res['incident'] as Map),
+          );
+        }
 
         unawaited(
           BlackboxService.instance.captureAndUploadEvidence(
@@ -3186,6 +3207,37 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           ),
         );
       }
+
+      // If createdIncident is still null, construct a complete local model
+      createdIncident ??= RescueIncidentModel(
+        id: 'INC-${DateTime.now().millisecondsSinceEpoch}',
+        victimId: current?.id ?? 'victim-local',
+        victimName: current?.name ?? 'Bạn (Đang gặp nạn)',
+        victimPhone: current?.phoneNumber,
+        incidentType: incidentType,
+        status: RescueIncidentStatus.dispatchingR1,
+        severityLevel: severityLevel == 'P0_SILENT'
+            ? RescueSeverityLevel.p0Silent
+            : RescueSeverityLevel.p1Critical,
+        exactLat: position.lat,
+        exactLng: position.lng,
+        fuzzedLat: position.lat,
+        fuzzedLng: position.lng,
+        batteryLevel: batteryLvl,
+        medicalNotes: details,
+        bloodType: _medical.bloodType.isNotEmpty ? _medical.bloodType : 'O+',
+        allergies: _medical.allergies.isNotEmpty
+            ? _medical.allergies.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+            : const [],
+        chronicConditions: _medical.conditions.isNotEmpty
+            ? _medical.conditions.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+            : const [],
+        createdAt: DateTime.now(),
+      );
+
+      _activeRescueIncident = createdIncident;
+      notifyListeners();
+      return createdIncident;
     } catch (e) {
       debugPrint('[AppProvider] triggerEmergencyIncident error: $e');
       // Tối ưu hóa: Fallback sang SMS khẩn cấp ngoại tuyến khi không có internet / sai wifi
@@ -3207,10 +3259,122 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           phoneNumber: phoneToUse, 
           message: msg,
         ));
+
+        // Create local emergency model so UI works offline
+        createdIncident = RescueIncidentModel(
+          id: 'OFFLINE-${DateTime.now().millisecondsSinceEpoch}',
+          victimId: current?.id ?? 'victim-offline',
+          victimName: current?.name ?? 'Tôi',
+          victimPhone: current?.phoneNumber,
+          incidentType: incidentType,
+          status: RescueIncidentStatus.dispatchingR1,
+          severityLevel: RescueSeverityLevel.p1Critical,
+          exactLat: position.lat,
+          exactLng: position.lng,
+          fuzzedLat: position.lat,
+          fuzzedLng: position.lng,
+          batteryLevel: 85,
+          medicalNotes: 'Chế độ ngoại tuyến (SMS fallback đã gửi)',
+          createdAt: DateTime.now(),
+        );
+        _activeRescueIncident = createdIncident;
+        notifyListeners();
+        return createdIncident;
       } catch (smsError) {
         debugPrint('SMS Fallback failed: $smsError');
       }
+      return null;
     }
+  }
+
+  /// Hủy báo động khẩn cấp an toàn với cơ chế bảo vệ PIN 2 lớp (Real PIN vs Duress PIN)
+  /// Trả về true nếu giải trừ an toàn thật, trả về false nếu nhập Duress PIN (ngụy trang)
+  Future<bool> resolveActiveRescueIncident({required String pin}) async {
+    final duress = _security.duressPin.trim();
+    final real = _security.realPin.trim();
+
+    // 1. KỊCH BẢN MÃ PIN CƯỠNG BỨC (DURESS PIN): Bị kẻ xấu ép tắt
+    if (duress.isNotEmpty && pin.trim() == duress) {
+      debugPrint('[AppProvider] DURESS PIN entered! Switching to SILENT SOS P0');
+      await triggerSilentSos();
+      if (_activeRescueIncident != null) {
+        _activeRescueIncident = _activeRescueIncident!.copyWith(
+          severityLevel: RescueSeverityLevel.p0Silent,
+          status: RescueIncidentStatus.dispatchingR1,
+        );
+        notifyListeners();
+      }
+      return false; // Trả về false để UI giả vờ hiện "Đã tắt báo động" lừa kẻ xấu
+    }
+
+    // 2. NẾU CÓ REAL PIN: Kiểm tra tính chính xác
+    if (real.isNotEmpty && pin.trim() != real) {
+      throw Exception('Mã PIN không đúng. Vui lòng nhập lại!');
+    }
+
+    // 3. XÁC NHẬN AN TOÀN THẬT: Giải trừ sự cố trên Backend & Local
+    final incidentId = _activeRescueIncident?.id;
+    if (incidentId != null && _user != null && !incidentId.startsWith('INC-') && !incidentId.startsWith('OFFLINE-')) {
+      try {
+        await _api.resolveIncident(incidentId, _user!.id);
+      } catch (err) {
+        debugPrint('[AppProvider] API resolve error: $err');
+      }
+    }
+
+    _activeRescueIncident = null;
+    if (_user != null) {
+      _user = _user!.copyWith(currentStatus: 'SAFE');
+      unawaited(_saveToStorage());
+    }
+    notifyListeners();
+    return true;
+  }
+
+  /// Hủy sự cố do báo động giả
+  Future<void> cancelEmergencyIncidentAsFalseAlarm() async {
+    _activeRescueIncident = null;
+    if (_user != null) {
+      _user = _user!.copyWith(currentStatus: 'SAFE');
+      unawaited(_saveToStorage());
+    }
+    notifyListeners();
+  }
+
+  /// Đồng bộ chi tiết sự cố từ server
+  Future<void> syncActiveIncidentFromBackend() async {
+    final incidentId = _activeRescueIncident?.id;
+    if (incidentId == null || _user == null || incidentId.startsWith('INC-') || incidentId.startsWith('OFFLINE-')) {
+      return;
+    }
+    try {
+      final res = await _api.getIncidentDetails(incidentId, _user!.id);
+      if (res.isNotEmpty) {
+        _activeRescueIncident = RescueIncidentModel.fromJson(res);
+        notifyListeners();
+      }
+    } catch (err) {
+      debugPrint('[AppProvider] syncActiveIncidentFromBackend error: $err');
+    }
+  }
+
+  /// Cập nhật trạng thái sự cố cục bộ
+  void updateActiveIncidentLocal({
+    RescueIncidentStatus? status,
+    String? assignedHeroName,
+    String? assignedHeroPhone,
+    double? heroDistance,
+    int? heroEta,
+  }) {
+    if (_activeRescueIncident == null) return;
+    _activeRescueIncident = _activeRescueIncident!.copyWith(
+      status: status ?? _activeRescueIncident!.status,
+      assignedVolunteerName: assignedHeroName ?? _activeRescueIncident!.assignedVolunteerName,
+      assignedVolunteerPhone: assignedHeroPhone ?? _activeRescueIncident!.assignedVolunteerPhone,
+      heroDistanceMeters: heroDistance ?? _activeRescueIncident!.heroDistanceMeters,
+      heroEtaMinutes: heroEta ?? _activeRescueIncident!.heroEtaMinutes,
+    );
+    notifyListeners();
   }
 
   Future<void> triggerSilentSos() async {

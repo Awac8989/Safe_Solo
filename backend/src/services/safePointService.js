@@ -180,6 +180,7 @@ class SafePointService {
       createdAt: raw.createdAt,
       asset: raw,
       name: raw.addressDetails?.buildingName || `Trạm ${raw.serialNumber}`,
+      addressDetails: raw.addressDetails || { buildingName: raw.addressDetails?.buildingName || '' },
       code: raw.serialNumber || `SP-${String(raw._id).slice(-4)}`,
       type: raw.assetType || 'AED',
       status: isReady ? 'ACTIVE' : (raw.status === 'IN_USE' ? 'IN_USE' : 'MAINTENANCE'),
@@ -347,6 +348,7 @@ class SafePointService {
     return {
       asset: optimal.asset || optimal,
       aedStation: optimal,
+      optimalSafePoint: optimal,
       detourMeters,
       distanceHeroToAedMeters: dHeroToAED,
       distanceAedToVictimMeters: dAedToVictim,
@@ -459,6 +461,215 @@ class SafePointService {
       success: true,
       message: 'Tủ AED đã được mở khóa thành công. Cảm biến cửa: MỞ.',
       safePointId: id,
+    };
+  }
+
+  /**
+   * Giám sát Telemetry Từ xa Tủ AED Thông Minh (IoT Smart Cabinet Telemetry)
+   * Tự động phát hiện cạy phá trái phép, cạn pin hoặc nhiệt độ buồng máy quá cao
+   */
+  async reportIotCabinetTelemetry(identifier, telemetry = {}) {
+    const {
+      batteryPercent = 92,
+      internalTemperatureCelsius = 25.4,
+      doorState = 'CLOSED',
+    } = telemetry;
+
+    const asset = await SafePointAsset.findOne({
+      $or: [{ serialNumber: identifier }, { _id: identifier }],
+    });
+    if (!asset) throw new Error('Không tìm thấy trạm cứu sinh SafePoint');
+
+    if (!asset.iotCabinet) {
+      asset.iotCabinet = {};
+    }
+
+    asset.iotCabinet.batteryPercent = batteryPercent;
+    asset.iotCabinet.internalTemperatureCelsius = internalTemperatureCelsius;
+    asset.iotCabinet.doorState = doorState;
+    asset.iotCabinet.lastPingAt = new Date();
+
+    // Kiểm tra cạy phá: Nếu cửa MỞ mà không có lệnh điều động hợp lệ hoặc không ở trạng thái IN_USE
+    const hasActiveUnlock = activeOtps.has(String(asset._id)) || activeOtps.has(asset.serialNumber) || asset.status === 'IN_USE';
+    if (doorState === 'OPEN' && !hasActiveUnlock) {
+      asset.iotCabinet.tamperAlertActive = true;
+      asset.iotCabinet.tamperDetectedAt = new Date();
+      asset.iotCabinet.tamperReason = 'CẢNH BÁO XÂM PHẬP: Cửa tủ AED mở bất thường không qua mã TOTP khẩn cấp!';
+      asset.status = 'MAINTENANCE_REQUIRED';
+    }
+
+    // Cảnh báo pin yếu
+    if (batteryPercent < 20 && asset.status !== 'IN_USE') {
+      asset.status = 'MAINTENANCE_REQUIRED';
+    }
+
+    await asset.save();
+
+    return {
+      success: true,
+      serialNumber: asset.serialNumber,
+      stationName: asset.addressDetails?.buildingName || 'Trạm Cứu Sinh',
+      telemetry: {
+        batteryPercent,
+        internalTemperatureCelsius,
+        doorState,
+        lastPingAt: asset.iotCabinet.lastPingAt,
+      },
+      status: asset.status,
+      tamperAlertActive: asset.iotCabinet.tamperAlertActive,
+      tamperReason: asset.iotCabinet.tamperReason,
+    };
+  }
+
+  /**
+   * Giải tỏa cảnh báo xâm nhập & xác nhận hoàn tất bảo trì tủ
+   */
+  async resolveTamperAlert(identifier, resolution = {}) {
+    const {
+      resolvedBy = 'Kỹ thuật viên Trung tâm TOC',
+      resolutionNotes = 'Đã kiểm định tại chỗ, tủ đóng an toàn và máy AED sẵn sàng hoạt động',
+    } = resolution;
+
+    const asset = await SafePointAsset.findOne({
+      $or: [{ serialNumber: identifier }, { _id: identifier }],
+    });
+    if (!asset) throw new Error('Không tìm thấy trạm cứu sinh SafePoint');
+
+    if (asset.iotCabinet) {
+      asset.iotCabinet.tamperAlertActive = false;
+      asset.iotCabinet.doorState = 'CLOSED';
+    }
+    asset.status = 'READY';
+    asset.lastInspectionAt = new Date();
+
+    await asset.save();
+
+    return {
+      success: true,
+      serialNumber: asset.serialNumber,
+      status: asset.status,
+      message: `Đã giải tỏa cảnh báo xâm phạm cho trạm ${asset.serialNumber} bởi ${resolvedBy}. Ghi chú: ${resolutionNotes}`,
+    };
+  }
+
+  /**
+   * Báo cáo Sức khỏe Toàn bộ Mạng lưới Tủ AED (AED Fleet Health Overview)
+   */
+  async getAedFleetHealthOverview() {
+    const list = await SafePointAsset.find();
+    const total = list.length;
+    const ready = list.filter((a) => a.status === 'READY').length;
+    const inUse = list.filter((a) => a.status === 'IN_USE').length;
+    const maintenance = list.filter((a) => a.status === 'MAINTENANCE_REQUIRED').length;
+    const tamperCount = list.filter((a) => a.iotCabinet?.tamperAlertActive).length;
+    const lowBattery = list.filter((a) => (a.iotCabinet?.batteryPercent || 100) < 25).length;
+
+    return {
+      totalStations: total,
+      readyStations: ready,
+      inUseStations: inUse,
+      maintenanceStations: maintenance,
+      tamperAlertStations: tamperCount,
+      lowBatteryStations: lowBattery,
+      operationalReadinessPercent: total > 0 ? Math.round((ready / total) * 100) : 100,
+    };
+  }
+
+  _calcDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const dPhi = ((lat2 - lat1) * Math.PI) / 180;
+    const dLambda = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dPhi / 2) * Math.sin(dPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) * Math.sin(dLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  /**
+   * Định vị trạm bình Oxy y tế khẩn cấp gần nhất (Emergency Oxygen Cylinder Bank)
+   */
+  async findNearestOxygenStation(lat, lng) {
+    await this.ensureSeededSafePoints();
+    const list = await SafePointAsset.find({ status: 'READY' });
+    if (!list || list.length === 0) throw new Error('Không tìm thấy trạm SafePoint khả dụng');
+    const sorted = list
+      .map((a) => {
+        const coords = a.location?.coordinates || [106.7, 10.77];
+        return { asset: a, distanceMeters: Math.round(this._calcDistance(lat, lng, coords[1], coords[0])) };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+    const best = sorted[0];
+    const pressure = best.asset.medicalEquipment?.oxygenCylinder?.currentPressureBar || 150;
+    const capacity = best.asset.medicalEquipment?.oxygenCylinder?.capacityLiters || 5;
+    return {
+      success: true,
+      station: this.formatSafePointDoc(best.asset),
+      distanceMeters: best.distanceMeters,
+      oxygenPressureBar: pressure,
+      capacityLiters: capacity,
+      regulatorType: best.asset.medicalEquipment?.oxygenCylinder?.regulatorType || 'PIN_INDEX_YOKE_O2',
+      isReady: pressure >= 50,
+      protocolGuidance:
+        'Bình Oxy y tế đạt chuẩn áp suất. Sử dụng Mask có túi dự trữ thở 10-15 L/phút cho bệnh nhân ngạt khói/suy hô hấp cấp.',
+    };
+  }
+
+  /**
+   * Định vị bút tiêm Epinephrine/Adrenaline chống sốc phản vệ gần nhất (Anaphylaxis EpiPen)
+   */
+  async findNearestEpiPenStation(lat, lng) {
+    await this.ensureSeededSafePoints();
+    const list = await SafePointAsset.find({ status: 'READY' });
+    if (!list || list.length === 0) throw new Error('Không tìm thấy trạm SafePoint khả dụng');
+    const sorted = list
+      .map((a) => {
+        const coords = a.location?.coordinates || [106.7, 10.77];
+        return { asset: a, distanceMeters: Math.round(this._calcDistance(lat, lng, coords[1], coords[0])) };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+    const best = sorted[0];
+    const dose = best.asset.medicalEquipment?.epiPenAutoInjector?.doseMg || 0.3;
+    const expiry =
+      best.asset.medicalEquipment?.epiPenAutoInjector?.expiryDate ||
+      new Date(Date.now() + 180 * 24 * 3600 * 1000);
+    return {
+      success: true,
+      station: this.formatSafePointDoc(best.asset),
+      distanceMeters: best.distanceMeters,
+      doseMg: dose,
+      expiryDate: expiry,
+      isAvailable: true,
+      recommendation:
+        'Tiêm bắp đùi trước ngoài góc 90 độ qua quần áo, giữ chặt 10 giây, sau đó đặt nạn nhân nằm nâng chân 30 độ chống tụt huyết áp.',
+    };
+  }
+
+  /**
+   * Định vị trạm túi đá lạnh hạ nhiệt & bù điện giải chống sốc nhiệt (Heatstroke Station)
+   */
+  async findNearestHeatstrokeStation(lat, lng) {
+    await this.ensureSeededSafePoints();
+    const list = await SafePointAsset.find({ status: 'READY' });
+    if (!list || list.length === 0) throw new Error('Không tìm thấy trạm SafePoint khả dụng');
+    const sorted = list
+      .map((a) => {
+        const coords = a.location?.coordinates || [106.7, 10.77];
+        return { asset: a, distanceMeters: Math.round(this._calcDistance(lat, lng, coords[1], coords[0])) };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+    const best = sorted[0];
+    return {
+      success: true,
+      station: this.formatSafePointDoc(best.asset),
+      distanceMeters: best.distanceMeters,
+      icePacksAvailable: true,
+      icePacksCount: best.asset.medicalEquipment?.heatstrokeSupplies?.icePacksCount || 6,
+      oralElectrolytesPackets: best.asset.medicalEquipment?.heatstrokeSupplies?.oralElectrolytesPackets || 20,
+      protocolGuidance:
+        'Túi đá chườm ngay vào nách, bẹn, cổ. Pha gói Oresol bù điện giải nếu nạn nhân còn tỉnh táo uống được.',
     };
   }
 }

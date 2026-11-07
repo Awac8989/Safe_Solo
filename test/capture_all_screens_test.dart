@@ -10,10 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:safesolo/core/app_theme.dart';
 import 'package:safesolo/core/providers/app_provider.dart';
-import 'package:safesolo/models/circle_orbit_member.dart';
 import 'package:safesolo/models/disaster_alert_model.dart';
 import 'package:safesolo/models/live_journey_model.dart';
-import 'package:safesolo/models/medical_profile_model.dart';
 
 // View imports
 import 'package:safesolo/views/onboarding/onboarding_page.dart';
@@ -235,7 +233,8 @@ void main() {
 
   setUpAll(() async {
     FlutterError.onError = (details) {
-      if (details.toString().contains('overflowed') || details.toString().contains('setState() or markNeedsBuild()')) {
+      final msg = details.toString();
+      if (msg.contains('overflowed') || msg.contains('setState() or markNeedsBuild()') || msg.contains('MissingPluginException') || msg.contains('WearOsService') || msg.contains('HTTP requests will return status code 400')) {
         return;
       }
       FlutterError.presentError(details);

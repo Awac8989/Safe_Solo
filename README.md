@@ -3,17 +3,35 @@
 > *Hệ sinh thái Cứu hộ Đa nền tảng: Flutter Mobile (Android/iOS) • Samsung Galaxy Watch 5 (Wear OS 4.0) • Web Admin Dispatch Portal • Cloud Backend Node.js / MongoDB • SoloCare AI & DSP Signal Processing*
 
 <p align="center">
+  <a href="https://awac8989.github.io/Safe_Solo/"><img src="https://img.shields.io/badge/🌐_Official_Showcase_Website-awac8989.github.io%2FSafe__Solo-EF4444?style=for-the-badge&logo=googlechrome&logoColor=white" alt="SafeSolo Showcase Website" /></a>
+  <a href="https://awac8989.github.io/Safe_Solo/SLIDE_THUYET_TRINH_BAO_VE_KHOA_LUAN_SAFESOLO.html"><img src="https://img.shields.io/badge/📽️_Slide_Bảo_Vệ_F11-Interactive_Deck-F59E0B?style=for-the-badge&logo=slideshare&logoColor=white" alt="Slide Bảo Vệ F11" /></a>
+  <a href="https://awac8989.github.io/Safe_Solo/BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx"><img src="https://img.shields.io/badge/🧪_Master_Tests-513%2F513_PASS_(100%25)-10B981?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" /></a>
+  <a href="#-phân-hệ-nghiệp-vụ-và-phác-đồ"><img src="https://img.shields.io/badge/🏥_Phân_hệ-128_Chuyên_Khoa-06B6D4?style=for-the-badge&logo=hospital&logoColor=white" alt="Phân hệ y tế" /></a>
+  <a href="#-131-phác-đồ-chống-chỉ-định-tử-vong"><img src="https://img.shields.io/badge/⚠️_Phác_đồ_Chống_Chỉ_Định-131_Phác_đồ-8B5CF6?style=for-the-badge&logo=shield&logoColor=white" alt="Phác đồ chống chỉ định" /></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.24+-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/Wear_OS-4.0_OneUI-4285F4?style=for-the-badge&logo=wear-os&logoColor=white" alt="Wear OS" />
   <img src="https://img.shields.io/badge/Node.js-18.x_%2F_20.x-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" alt="Node.js" />
   <img src="https://img.shields.io/badge/MongoDB-Atlas_%2F_Mongoose-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" />
   <img src="https://img.shields.io/badge/Socket.IO-4.8.x-010101?style=for-the-badge&logo=socketdotio&logoColor=white" alt="Socket.IO" />
-  <img src="https://img.shields.io/badge/React_18-Vite_%2B_TanStack-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Vite" />
+  <img src="https://img.shields.io/badge/React_19-Vite_%2B_TanStack-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React Vite" />
   <img src="https://img.shields.io/badge/AI_Engine-SoloCare_AI_24%2F7-10B981?style=for-the-badge&logo=openai&logoColor=white" alt="SoloCare AI" />
-  <img src="https://img.shields.io/badge/Tests_Passing-100%25_All_Passed-brightgreen?style=for-the-badge&logo=checkmarx&logoColor=white" alt="Tests Passing" />
-  <img src="https://img.shields.io/badge/Code_Analysis-0_Errors_0_Warnings-blue?style=for-the-badge" alt="Code Analysis" />
   <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
 </p>
+
+---
+
+## 🚀 CỔNG TRUY CẬP TRỰC TUYẾN & TÀI NGUYÊN KHÓA LUẬN
+> 🌐 **Website Giới thiệu & Trình Mô phỏng Tác chiến Cứu nạn Trực tuyến:**  
+> 👉 [https://awac8989.github.io/Safe_Solo/](https://awac8989.github.io/Safe_Solo/) *(Tích hợp Live Emergency Pipeline Simulator, Âm thanh Báo động Web Audio, Bộ lọc 128 Phân hệ & 131 Phác đồ chống tử vong, Thư viện 36 Màn hình thiết bị thật)*
+>
+> 📽️ **Slide Thuyết trình Bảo vệ Khóa luận (Chế độ F11 Toàn màn hình):**  
+> 👉 [https://awac8989.github.io/Safe_Solo/SLIDE_THUYET_TRINH_BAO_VE_KHOA_LUAN_SAFESOLO.html](https://awac8989.github.io/Safe_Solo/SLIDE_THUYET_TRINH_BAO_VE_KHOA_LUAN_SAFESOLO.html)
+>
+> 🧪 **Bảng Tổng hợp 513 Test Cases Chi tiết (File Excel chính thức):**  
+> 👉 [Tải file BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx](docs/BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx) *(466 KB - 100% PASS)*
 
 ---
 

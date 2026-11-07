@@ -111,51 +111,119 @@ async function triggerSosForMongoUser(io, userDoc) {
     notes: '',
   });
 
-  // 1. Dispatch SMS
-  const smsResults = await sendEmergencySms({
-    emergencyLogId: emergencyLog._id,
-    user,
-    contacts: user.emergencyContacts,
-    location: user.lastKnownLocation,
-  });
-
-  const successCount = smsResults.filter((item) => item.success).length;
-  emergencyLog.smsSentStatus = successCount > 0;
-  await emergencyLog.save();
-
   userDoc.currentStatus = 'SOS';
   userDoc.lastSosAt = new Date();
   await userDoc.save();
 
-  // 2. Dispatch Telegram Bot Webhook
-  const telegramResult = await sendTelegramEmergencyAlert({
-    user,
+  // Bắn Socket khẩn cấp tức thì (< 10ms) để màn hình Dashboard và người thân không bị delay
+  const initialPayload = {
+    type: 'EMERGENCY_SOS',
+    userId: user._id,
+    fullName: user.fullName,
+    phoneNumber: user.phoneNumber,
+    medicalNotes: user.medicalNotes,
+    emergencyContacts: user.emergencyContacts,
     location: user.lastKnownLocation,
+    triggeredAt: toIso(emergencyLog.triggeredAt),
     emergencyLogId: emergencyLog._id,
+    omnichannel: {
+      smsSent: 0,
+      telegramDispatched: false,
+      emailDispatched: false,
+      zaloDispatched: false,
+      voiceCallDispatched: false,
+      inProgress: true,
+    },
+  };
+
+  if (io) {
+    io.emit('EMERGENCY_SOS', initialPayload);
+  }
+
+  // TỰ ĐỘNG ĐIỀU PHỐI HIỆP SĨ TRÊN RADAR NẾU CHƯA CÓ CA CỨU NẠN (Ví dụ do Dead-man timeout)
+  setImmediate(async () => {
+    try {
+      const RescueIncident = require('../models/RescueIncident');
+      const radarService = require('./radarService');
+      const activeIncident = await RescueIncident.findOne({
+        victimId: user._id,
+        status: { $in: ['ACTIVE', 'DISPATCHING_R1', 'DISPATCHING_R2', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'] },
+      });
+      if (!activeIncident) {
+        await radarService.broadcastSOS(
+          user._id,
+          'DEADMAN_EXPIRED',
+          user.lastKnownLocation?.lat ?? 10.7769,
+          user.lastKnownLocation?.lng ?? 106.7009,
+          {
+            severity: 1,
+            severityLevel: 'P1_CRITICAL',
+            source: 'AUTO_DEADMAN_OMNICHANNEL',
+            medicalNotes: user.medicalNotes,
+          },
+        );
+      }
+    } catch (_radarErr) {
+      // non-blocking radar broadcast
+    }
   });
 
-  // 3. Dispatch Zalo ZNS
-  const zaloResult = await sendZaloZnsEmergencyAlert({
-    user,
-    location: user.lastKnownLocation,
-    contacts: user.emergencyContacts,
-  });
+  // ĐIỀU PHỐI ĐỒNG THỜI (CONCURRENT PARALLEL DISPATCH) TẤT CẢ 5 KÊNH ĐA PHƯƠNG THỨC
+  const [smsSettled, teleSettled, zaloSettled, voiceSettled, emailSettled] =
+    await Promise.allSettled([
+      sendEmergencySms({
+        emergencyLogId: emergencyLog._id,
+        user,
+        contacts: user.emergencyContacts,
+        location: user.lastKnownLocation,
+      }),
+      sendTelegramEmergencyAlert({
+        user,
+        location: user.lastKnownLocation,
+        emergencyLogId: emergencyLog._id,
+      }),
+      sendZaloZnsEmergencyAlert({
+        user,
+        location: user.lastKnownLocation,
+        contacts: user.emergencyContacts,
+      }),
+      triggerVoiceCallAlert({
+        user,
+        location: user.lastKnownLocation,
+        contacts: user.emergencyContacts,
+      }),
+      sendEmailEmergencyAlert({
+        user,
+        location: user.lastKnownLocation,
+        contacts: user.emergencyContacts,
+      }),
+    ]);
 
-  // 4. Dispatch Level 4 Rescue Voice Call
-  const voiceCallResult = await triggerVoiceCallAlert({
-    user,
-    location: user.lastKnownLocation,
-    contacts: user.emergencyContacts,
-  });
+  const smsResults = smsSettled.status === 'fulfilled' ? smsSettled.value : [];
+  const telegramResult =
+    teleSettled.status === 'fulfilled'
+      ? teleSettled.value
+      : { success: false, error: teleSettled.reason?.message, channel: 'Telegram Bot' };
+  const zaloResult =
+    zaloSettled.status === 'fulfilled'
+      ? zaloSettled.value
+      : { success: false, error: zaloSettled.reason?.message, channel: 'Zalo ZNS' };
+  const voiceCallResult =
+    voiceSettled.status === 'fulfilled'
+      ? voiceSettled.value
+      : { success: false, error: voiceSettled.reason?.message, channel: 'Voice Auto-Call' };
+  const emailResult =
+    emailSettled.status === 'fulfilled'
+      ? emailSettled.value
+      : { success: false, error: emailSettled.reason?.message, channel: 'Gmail SafeTag' };
 
-  // 5. Dispatch Gmail SafeTag Y Tế Khẩn Cấp
-  const emailResult = await sendEmailEmergencyAlert({
-    user,
-    location: user.lastKnownLocation,
-    contacts: user.emergencyContacts,
-  });
+  const successCount = Array.isArray(smsResults)
+    ? smsResults.filter((item) => item.success).length
+    : 0;
+  emergencyLog.smsSentStatus = successCount > 0;
+  await emergencyLog.save();
 
-  const payload = {
+  const finalPayload = {
     type: 'EMERGENCY_SOS',
     userId: user._id,
     fullName: user.fullName,
@@ -167,15 +235,15 @@ async function triggerSosForMongoUser(io, userDoc) {
     emergencyLogId: emergencyLog._id,
     omnichannel: {
       smsSent: successCount,
-      telegramDispatched: telegramResult.success,
-      emailDispatched: emailResult.success,
-      zaloDispatched: zaloResult.success,
-      voiceCallDispatched: voiceCallResult.success,
+      telegramDispatched: Boolean(telegramResult.success),
+      emailDispatched: Boolean(emailResult.success),
+      zaloDispatched: Boolean(zaloResult.success),
+      voiceCallDispatched: Boolean(voiceCallResult.success),
     },
   };
 
   if (io) {
-    io.emit('EMERGENCY_SOS', payload);
+    io.emit('EMERGENCY_SOS', finalPayload);
     io.emit('OMNICHANNEL_DISPATCH_UPDATE', {
       emergencyLogId: emergencyLog._id,
       userId: user._id,
@@ -200,8 +268,8 @@ async function triggerSosForMongoUser(io, userDoc) {
     metadata: {
       emergencyLogId: emergencyLog._id,
       smsSent: successCount,
-      smsAttempted: smsResults.length,
-      smsFailed: smsResults.length - successCount,
+      smsAttempted: Array.isArray(smsResults) ? smsResults.length : 0,
+      smsFailed: Array.isArray(smsResults) ? smsResults.length - successCount : 0,
       telegram: telegramResult,
       email: emailResult,
       zalo: zaloResult,
@@ -213,7 +281,7 @@ async function triggerSosForMongoUser(io, userDoc) {
     io.emit('ALERT_EVENT', alertEvent);
   }
 
-  return payload;
+  return finalPayload;
 }
 
 async function triggerSosForUser(io, userLike) {

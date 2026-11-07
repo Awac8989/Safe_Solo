@@ -190,7 +190,12 @@ void main() {
       expect(find.text('SỨC KHỎE SINH TỒN'), findsOneWidget);
       expect(find.text('♥ NHỊP TIM'), findsOneWidget);
 
-      // Swipe to Page 5: Medical ID
+      // Swipe to Page 5: Stroke Shield
+      await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('ĐỘT QUỴ 2 TAY'), findsOneWidget);
+
+      // Swipe to Page 6: Medical ID
       await tester.drag(find.byKey(const Key('watch_gesture_detector')), const Offset(-100, 0));
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('THẺ Y TẾ KHẨN CẤP'), findsOneWidget);

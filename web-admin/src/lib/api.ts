@@ -1474,3 +1474,1989 @@ export const lookupSafeTagPublicIce = async (tagUid: string) => {
   }>(`/safetags/public-ice/${tagUid}`);
 };
 
+// ─── Digital Blood Donor Certificate ──────────────────────────────────────
+
+export type BloodDonorCertificate = {
+  success: boolean;
+  certificateNumber: string;
+  issuedAt: string;
+  donorName: string;
+  bloodGroup: string;
+  hospitalName: string;
+  hospitalDepartment: string;
+  unitsDonated: number;
+  purpose: string;
+  legalBasis: string;
+  digitalSeal: {
+    issuer: string;
+    verified: boolean;
+    blockchainProofHash: string;
+  };
+};
+
+export const fetchBloodDonorCertificate = async (requestId: string, donorId: string) => {
+  return request<BloodDonorCertificate>('/blood-relay/' + requestId + '/certificate/' + donorId);
+};
+
+// ─── SBAR Protocol Public QR Verification ─────────────────────────────────
+
+export type SbarHandoffVerification = {
+  success: boolean;
+  data: {
+    status: string;
+    standard: string;
+    incidentId: string;
+    verificationHash: string;
+    victim: {
+      name: string;
+      bloodType?: string;
+      allergies?: string;
+    };
+    volunteer: {
+      name: string;
+      phone: string;
+    } | null;
+    clinicalVitals: {
+      avpu: string;
+      tourniquetTimeApplied: string | null;
+      cprCycles: number;
+      aedShockDelivered: boolean;
+    };
+    sbarDossier: {
+      situation: string;
+      background: string;
+      assessment: string;
+      recommendation: string;
+      ambulancePlate: string;
+      paramedicName: string;
+      handedOverAt: string;
+      notes?: string;
+      proofImageUrl?: string;
+    };
+    legalProtection: {
+      decree: string;
+      immunityClause: string;
+    };
+  };
+};
+
+export const verifySbarHandoffPublic = async (hash: string) => {
+  return request<SbarHandoffVerification>('/radar/sbar-verify/' + hash);
+};
+
+export const resolveSafePointTamper = async (id: string, notes?: string) => {
+  return request<{ success: true; message: string }>(`/safepoints/${id}/tamper-resolve`, {
+    method: "POST",
+    body: JSON.stringify({ resolutionNotes: notes }),
+  });
+};
+
+export const fetchAedFleetHealth = async () => {
+  return request<{
+    success: true;
+    data: {
+      totalStations: number;
+      readyStations: number;
+      inUseStations: number;
+      maintenanceStations: number;
+      tamperAlertStations: number;
+      lowBatteryStations: number;
+      operationalReadinessPercent: number;
+    };
+  }>("/safepoints/fleet-health");
+};
+
+export const declareMciIncident = async (incidentId: string, payload: { dispatcherName: string; estimatedCasualties: number; incidentNotes?: string }) => {
+  return request<{ success: true; isMCI: boolean; casualtyCounts: { red: number; yellow: number; green: number; black: number } }>(`/emergencies/${incidentId}/mci-declare`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const connectDoctorTeleFirstAid = async (payload: { incidentId: string; doctorProfile: { doctorId: string; doctorName: string; hospitalName: string } }) => {
+  return request<{ success: true; sessionId: string; videoStreamUrl: string; status: string }>("/radar/tele-consult/doctor-join", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const issueVerbalMedicalOrderApi = async (payload: { incidentId: string; orderData: { orderText: string; dosageOrAction: string; issuedBy: string } }) => {
+  return request<{ success: true; orderIndex: number; orderText: string; status: string }>("/radar/tele-consult/issue-order", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+
+export const fetchOxygenStation = async (lat = 10.7769, lng = 106.7009) => {
+  return request<{
+    success: true;
+    data: {
+      station: unknown;
+      distanceMeters: number;
+      oxygenPressureBar: number;
+      capacityLiters: number;
+      isReady: boolean;
+      protocolGuidance: string;
+    };
+  }>("/safepoints/oxygen/locate", {
+    method: "POST",
+    body: JSON.stringify({ lat, lng }),
+  });
+};
+
+export const fetchEpiPenStation = async (lat = 10.7769, lng = 106.7009) => {
+  return request<{
+    success: true;
+    data: {
+      station: unknown;
+      distanceMeters: number;
+      doseMg: number;
+      isAvailable: boolean;
+      recommendation: string;
+    };
+  }>("/safepoints/epipen/locate", {
+    method: "POST",
+    body: JSON.stringify({ lat, lng }),
+  });
+};
+
+export const fetchTraumaHospitals = async () => {
+  return request<{ success: true; count: number; data: unknown[] }>("/hospitals");
+};
+
+export const recommendTraumaHospital = async (incidentId: string, condition = "POLYTRAUMA") => {
+  return request<{
+    success: true;
+    data: {
+      conditionCategory: string;
+      recommendedHospital: {
+        hospitalCode: string;
+        hospitalName: string;
+        distanceKm: number;
+        etaMinutes: number;
+        matchScore: number;
+        emergencyDepartmentStatus: { availableIcuBeds: number; status: string };
+      };
+      triageDecisionRationale: string;
+    };
+  }>(`/hospitals/recommend/${incidentId}?condition=${condition}`);
+};
+
+export const notifyTraumaHospitalPreArrival = async (
+  incidentId: string,
+  payload: { hospitalCode: string; etaMinutes: number; chiefComplaint: string },
+) => {
+  return request<{ success: true; hospitalCode: string; hospitalName: string; etaMinutes: number }>(
+    `/hospitals/pre-arrival/${incidentId}`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+};
+
+export const recordDrowningCareApi = async (
+  incidentId: string,
+  payload: { submersionMinutes: number; waterType: string; fiveInitialRescueBreathsGiven: boolean },
+) => {
+  return request<{ success: true; waterType: string; fiveInitialRescueBreathsGiven: boolean; pathophysiologyGuidance: string }>(
+    `/emergencies/${incidentId}/drowning-care`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+};
+
+export const initiateSecondaryDrowningWatchdogApi = async (incidentId: string) => {
+  return request<{ success: true; monitoringActive: boolean; message: string }>(
+    `/emergencies/${incidentId}/secondary-drowning/initiate`,
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
+};
+
+export const treatHeatstrokeApi = async (
+  incidentId: string,
+  payload: { initialCoreTempCelsius: number; currentCoreTempCelsius: number; isExertional: boolean },
+) => {
+  return request<{ success: true; classification: string; targetTempReached: boolean; clinicalOutcome: string }>(
+    `/emergencies/${incidentId}/heatstroke-care`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+};
+
+export const evaluateFastEdStrokeApi = async (
+  incidentId: string,
+  payload: { lastKnownWellMinutesAgo: number; facialPalsy: number; armWeakness: number; speechChanges: number; eyeDeviation: number; denialNeglect: number },
+) => {
+  return request<{ success: true; isLargeVesselOcclusionRisk: boolean; strokeCodeRedActive: boolean; fastEdScore: { totalScore: number } }>(
+    `/emergencies/${incidentId}/stroke-fasted`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+};
+
+export const locateHeatstrokeStation = async (lat = 10.7769, lng = 106.7009) => {
+  return request<{
+    success: true;
+    data: {
+      station: unknown;
+      distanceMeters: number;
+      icePacksAvailable: boolean;
+      icePacksCount: number;
+      oralElectrolytesPackets: number;
+    };
+  }>("/safepoints/heatstroke/locate", {
+    method: "POST",
+    body: JSON.stringify({ lat, lng }),
+  });
+};
+
+
+// ==================== PHÂN HỆ 22: SAFETAG OTP & PARAMEDIC BYPASS ====================
+
+export const requestSafeTagOtpApi = async (tagCode: string) => {
+  return request<{
+    success: true;
+    tagCode: string;
+    maskedPhone: string;
+    expiresAt: string;
+    message: string;
+  }>(`/safetags/request-otp/${tagCode}`, {
+    method: "POST",
+  });
+};
+
+export const verifySafeTagOtpApi = async (tagCode: string, otp: string) => {
+  return request<{
+    success: true;
+    tagCode: string;
+    accessTier: string;
+    victim: unknown;
+    fullMedicalHistory: unknown;
+    digitalSignature: string;
+  }>(`/safetags/verify-otp/${tagCode}`, {
+    method: "POST",
+    body: JSON.stringify({ otp }),
+  });
+};
+
+export const emergencyBypassSafeTagApi = async (
+  tagCode: string,
+  payload: {
+    paramedicLicense: string;
+    clinicalJustification: string;
+    paramedicId?: string;
+    emergencyIncidentId?: string;
+  },
+) => {
+  return request<{
+    success: true;
+    tagCode: string;
+    accessMode: string;
+    paramedicLicense: string;
+    victim: unknown;
+    fullMedicalHistory: unknown;
+    guardianNotified: boolean;
+  }>(`/safetags/emergency-bypass/${tagCode}`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 23: BẢN ĐỒ CỨU HỘ LỤT LỘI & NGẬP NƯỚC ====================
+
+export const fetchFloodZonesApi = async () => {
+  return request<{
+    success: true;
+    count: number;
+    data: Array<{
+      zoneCode: string;
+      zoneName: string;
+      currentWaterDepthCm: number;
+      passabilityStatus: string;
+      electrocutionRisk: boolean;
+      activeWarnings: string[];
+    }>;
+  }>("/flood/zones");
+};
+
+export const updateFloodDepthApi = async (
+  zoneCode: string,
+  payload: {
+    depthCm: number;
+    tideState?: string;
+    electrocutionRisk?: boolean;
+    groundTransformerSubmerged?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    data: unknown;
+  }>(`/flood/zones/${zoneCode}/depth`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const calculateFloodSafeRouteApi = async (payload: {
+  origin: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  vehicleType?: string;
+}) => {
+  return request<{
+    success: true;
+    isDirectPassable: boolean;
+    detourRecommended: boolean;
+    detourPenaltyMinutes: number;
+    maxEncounteredDepthCm: number;
+    blockedZones: Array<{
+      zoneCode: string;
+      zoneName: string;
+      waterDepthCm: number;
+      reason: string;
+    }>;
+    safeCorridorGuidance: string;
+  }>("/flood/route/safe-plan", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const triggerFloodSosApi = async (payload: {
+  userId: string;
+  lat: number;
+  lng: number;
+  indoorWaterDepthCm?: number;
+  electrocutionHazard?: boolean;
+}) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    category: string;
+    evnGridShutdownNoticeDispatched: boolean;
+    safetyInstructionsForVictim: string[];
+  }>("/flood/sos", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 24: CẤP CỨU THẢM HỌA & START TRIAGE ====================
+
+export const declareMciApi = async (payload: {
+  title: string;
+  incidentType?: string;
+  initialVictimEstimate?: number;
+  lat?: number;
+  lng?: number;
+}) => {
+  return request<{
+    success: true;
+    data: {
+      _id: string;
+      mciCode: string;
+      title: string;
+      mciLevel: string;
+      status: string;
+    };
+  }>("/mci/declare", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const performStartTriageApi = async (
+  mciId: string,
+  assessmentData: {
+    victimTagId: string;
+    canWalk?: boolean;
+    spontaneousBreathing?: boolean;
+    airwayRepositioned?: boolean;
+    breathsAfterAirwayOpen?: boolean;
+    respiratoryRate?: number;
+    capillaryRefillSec?: number;
+    radialPulsePresent?: boolean;
+    canFollowSimpleCommands?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    mciCode: string;
+    victimTagId: string;
+    triageCategory: "RED" | "YELLOW" | "GREEN" | "BLACK";
+    priorityRank: number;
+    triageRationale: string;
+    colorHex: string;
+    immediateFirstAidAction: string;
+    casualtyTally: {
+      red: number;
+      yellow: number;
+      green: number;
+      black: number;
+      totalTagged: number;
+    };
+  }>(`/mci/${mciId}/triage`, {
+    method: "POST",
+    body: JSON.stringify({ assessmentData }),
+  });
+};
+
+export const autoBalanceMciEvacuationApi = async (mciId: string) => {
+  return request<{
+    success: true;
+    mciCode: string;
+    status: string;
+    totalEvacuatedCount: number;
+    evacuationAssignments: Array<{
+      victimTagId: string;
+      triageCategory: string;
+      hospitalCode: string;
+      hospitalName: string;
+    }>;
+  }>(`/mci/${mciId}/balance-evacuation`, {
+    method: "POST",
+  });
+};
+
+
+// ==================== PHÂN HỆ 25: CẤP CỨU RẮN CẮN ĐỘC (SNAKEBITE TRIAGE) ====================
+
+export const recordSnakebiteCareApi = async (
+  incidentId: string,
+  payload: {
+    biteLocation?: string;
+    snakeFamily?: "ELAPIDAE_NEUROTOXIC" | "VIPERIDAE_HEMOTOXIC" | "UNKNOWN";
+    pressureImmobilizationApplied?: boolean;
+    systemicSymptoms?: Record<string, boolean>;
+  },
+) => {
+  return request<{
+    success: true;
+    snakeFamily: string;
+    isNeurotoxic: boolean;
+    isHemotoxic: boolean;
+    pressureImmobilizationApplied: boolean;
+    firstAidGuidance: string;
+    antivenomType: string;
+    recommendedDestination: string;
+  }>(`/emergencies/${incidentId}/snakebite-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateAntivenomHospitalApi = async (payload: {
+  lat?: number;
+  lng?: number;
+  antivenomType?: string;
+}) => {
+  return request<{
+    success: true;
+    antivenomType: string;
+    hospitalCode: string;
+    hospitalName: string;
+    vialsAvailable: number;
+    distanceMeters: number;
+    etaMinutes: number;
+    clinicalGuidance: string;
+  }>("/hospitals/antivenom/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 26: SƠ CỨU BỎNG NHIỆT & CÔNG THỨC PARKLAND ====================
+
+export const recordBurnCareApi = async (
+  incidentId: string,
+  payload: {
+    burnEtiology?: string;
+    tbsaPercentage: number;
+    burnDegree?: string;
+    waterIrrigation20MinApplied?: boolean;
+    patientWeightKg?: number;
+    inhalationInjurySuspected?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    burnEtiology: string;
+    tbsaPercentage: number;
+    burnDegree: string;
+    isSevereBurn: boolean;
+    waterIrrigation20MinApplied: boolean;
+    inhalationInjurySuspected: boolean;
+    parklandFormula: {
+      patientWeightKg: number;
+      totalFluid24hMl: number;
+      first8hFluidRateMlPerHour: number;
+    };
+    clinicalActionDirectives: string[];
+  }>(`/emergencies/${incidentId}/burn-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateBurnCenterApi = async (payload: { lat?: number; lng?: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    availableBurnBeds: number;
+    distanceMeters: number;
+    etaMinutes: number;
+    preHospitalAdvice: string;
+  }>("/hospitals/burn-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 27: HỘI CHỨNG VÙI LẤP & SẬP ĐỔ CÔNG TRÌNH ====================
+
+export const manageCrushSyndromeApi = async (
+  incidentId: string,
+  payload: {
+    trappedStructure?: string;
+    trappedMuscleGroup?: string;
+    compressionDurationMinutes?: number;
+    ivHydrationPreExtricationStarted?: boolean;
+    provisionalTourniquetAppliedBeforeLifting?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    compressionDurationMinutes: number;
+    crushSyndromeRisk: string;
+    ivHydrationPreExtricationStarted: boolean;
+    reperfusionCardiacArrestPrevented: boolean;
+    usarRescueDirective: string;
+  }>(`/emergencies/${incidentId}/crush-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 28: CHẤN THƯƠNG NGỰC HỞ & TRÀN KHÍ MÀNG PHỔI ÁP LỰC ====================
+
+export const recordChestTraumaApi = async (
+  incidentId: string,
+  payload: {
+    hasSuckingChestWound?: boolean;
+    ventedChestSealApplied?: boolean;
+    chestSealBurped?: boolean;
+    tensionPneumothoraxSuspected?: boolean;
+    needleDecompressionPerformed?: boolean;
+    needleInsertionSite?: string;
+    needleGauge?: string;
+    airHissDecompressionConfirmed?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    hemodynamicStabilized: boolean;
+    needleDecompressionPerformed: boolean;
+    airHissDecompressionConfirmed: boolean;
+    clinicalDirectives: string[];
+    guidanceMessage: string;
+  }>(`/emergencies/${incidentId}/chest-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 29: BẤT ĐỘNG CỘT SỐNG CỔ (SMR) & SỐC THẦN KINH ====================
+
+export const recordSpinalTraumaApi = async (
+  incidentId: string,
+  payload: {
+    mechanismHighRisk?: boolean;
+    patientAge?: number;
+    extremityParesthesia?: boolean;
+    cervicalCollarApplied?: boolean;
+    cervicalCollarSize?: string;
+    manualInLineStabilizationMaintained?: boolean;
+    logRollTechniqueUsed?: boolean;
+    vacuumMattressSecured?: boolean;
+    systolicBp?: number;
+    heartRateBpm?: number;
+    skinCondition?: string;
+  },
+) => {
+  return request<{
+    success: true;
+    canadianCSpineRisk: string;
+    cervicalCollarApplied: boolean;
+    neurogenicShockSuspected: boolean;
+    shockType: string;
+    smrGuidance: string;
+    shockDirectives: string;
+  }>(`/emergencies/${incidentId}/spinal-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 30: HẠ ĐƯỜNG HUYẾT NẶNG & HÔN MÊ TIỂU ĐƯỜNG ====================
+
+export const recordDiabeticEmergencyApi = async (
+  incidentId: string,
+  payload: {
+    bloodGlucoseMmolL?: number;
+    bloodGlucoseMgDl?: number;
+    isConscious?: boolean;
+    swallowReflexIntact?: boolean;
+    ruleOf15Applied?: boolean;
+    glucagonOrIvDextroseAdministered?: boolean;
+    medicationType?: string;
+    postTreatmentGlucoseMmolL?: number;
+  },
+) => {
+  return request<{
+    success: true;
+    bloodGlucoseMmolL: number;
+    hypoglycemiaSeverity: string;
+    oralIntakeContraindicated: boolean;
+    patientConsciousnessRegained: boolean;
+    firstAidDirectives: string;
+  }>(`/emergencies/${incidentId}/diabetic-emergency`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 31: HÓC DỊ VẬT ĐƯỜNG THỞ TRẺ EM (FBAO) ====================
+
+export const recordPediatricChokingApi = async (
+  incidentId: string,
+  payload: {
+    patientAgeMonths?: number;
+    isUnconscious?: boolean;
+    backBlowsAndChestThrustsApplied?: boolean;
+    abdominalThrustsHeimlichApplied?: boolean;
+    foreignBodyExpelled?: boolean;
+    airwayClear?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    patientAgeMonths: number;
+    isInfantUnder1Year: boolean;
+    abdominalThrustsContraindicatedInfant: boolean;
+    blindFingerSweepProhibited: boolean;
+    backBlowsAndChestThrustsApplied: boolean;
+    abdominalThrustsHeimlichApplied: boolean;
+    foreignBodyExpelled: boolean;
+    airwayClear: boolean;
+    clinicalProtocol: string;
+    safetyWarnings: string[];
+  }>(`/emergencies/${incidentId}/choking-fbao`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 32: ĐỘNG KINH & CO GIẬT LIÊN TỤC (STATUS EPILEPTICUS) ====================
+
+export const recordSeizureCareApi = async (
+  incidentId: string,
+  payload: {
+    seizureDurationMinutes?: number;
+    headProtectedWithPadding?: boolean;
+    recoveryPositionPlacedPostIctal?: boolean;
+    midazolamOrDiazepamAdministered?: boolean;
+    convulsionCeased?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    seizureDurationMinutes: number;
+    isStatusEpilepticus: boolean;
+    oralObjectInsertionContraindicated: boolean;
+    physicalRestraintContraindicated: boolean;
+    headProtectedWithPadding: boolean;
+    recoveryPositionPlacedPostIctal: boolean;
+    midazolamOrDiazepamAdministered: boolean;
+    convulsionCeased: boolean;
+    statusSeverity: string;
+    rescueInstructions: string[];
+  }>(`/emergencies/${incidentId}/seizure-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 33: ĐIỆN GIẬT & AN TOÀN CAO THẾ (STEP POTENTIAL) ====================
+
+export const recordElectricalCareApi = async (
+  incidentId: string,
+  payload: {
+    voltageCategory?: string;
+    scenePowerCutConfirmed?: boolean;
+    safetyCordonMaintained10Meters?: boolean;
+    stepPotentialHopExitUsed?: boolean;
+    cardiacRhythmAssessed?: string;
+    aedShockDelivered?: boolean;
+    deepTissueBurnSuspected?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    voltageCategory: string;
+    scenePowerCutConfirmed: boolean;
+    safetyCordonMaintained10Meters: boolean;
+    stepPotentialHopExitUsed: boolean;
+    cardiacRhythmAssessed: string;
+    aedShockDelivered: boolean;
+    deepTissueBurnSuspected: boolean;
+    sceneSafetyDirectives: string;
+    stepPotentialWarning: string;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/electrical-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 34: NGỘ ĐỘC KHÍ CO & KHÓI CHÁY CHUNG CƯ ====================
+
+export const recordCoSmokeCareApi = async (
+  incidentId: string,
+  payload: {
+    sourceCategory?: string;
+    sootInNarisOrOralCavity?: boolean;
+    highFlowOxygen100Applied?: boolean;
+    oxygenFlowRateLpm?: number;
+    estimatedHbCoPercent?: number;
+    isPregnant?: boolean;
+    isUnconscious?: boolean;
+    cyanideAntidoteAdministered?: boolean;
+    antidoteType?: string;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    sourceCategory: string;
+    sootInNarisOrOralCavity: boolean;
+    highFlowOxygen100Applied: boolean;
+    hyperbaricOxygenIndicated: boolean;
+    cyanideAntidoteAdministered: boolean;
+    antidoteType: string;
+    oxygenHalfLifeReduction: string;
+    hbotAdvice: string;
+    cyanideDirectives: string;
+  }>(`/emergencies/${incidentId}/co-smoke-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 35: CHẤN THƯƠNG MẮT & BỎNG HÓA CHẤT MẮT ====================
+
+export const recordOcularTraumaCareApi = async (
+  incidentId: string,
+  payload: {
+    injuryCategory?: string;
+    immediateIrrigationPerformed?: boolean;
+    irrigationDurationMinutes?: number;
+    irrigationFluidVolumeMl?: number;
+    measuredConjunctivalPh?: number;
+    rigidEyeShieldApplied?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    injuryCategory: string;
+    immediateIrrigationPerformed: boolean;
+    irrigationDurationMinutes: number;
+    targetPhNeutralized: boolean;
+    rigidEyeShieldApplied: boolean;
+    globePressureProhibited: boolean;
+    irrigationProtocol: string;
+    penetratingTraumaWarnings: string[];
+  }>(`/emergencies/${incidentId}/ocular-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 36: SƠ CỨU ĐỨT LÌA CHI & BẢO QUẢN VI PHẪU ====================
+
+export const recordAmputationCareApi = async (
+  incidentId: string,
+  payload: {
+    amputationType?: string;
+    anatomicalPart?: string;
+    stumpHemostasisApplied?: boolean;
+    hemostasisMethod?: string;
+    amputatedPartRetrieved?: boolean;
+    threeTierPreservationApplied?: boolean;
+    ischemiaType?: string;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    amputationType: string;
+    anatomicalPart: string;
+    stumpHemostasisApplied: boolean;
+    hemostasisMethod: string;
+    amputatedPartRetrieved: boolean;
+    threeTierPreservationApplied: boolean;
+    directIceContactProhibited: boolean;
+    goldenWindowHours: number;
+    preservationProtocol: string;
+    prohibitions: string[];
+    surgicalTransportAdvice: string;
+  }>(`/emergencies/${incidentId}/amputation-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateEyeCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    preHospitalDirectives: string;
+  }>("/hospitals/eye-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateMicrovascularCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    replantationAdvice: string;
+  }>("/hospitals/microvascular-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateHyperbaricCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    hbotGuidance: string;
+  }>("/hospitals/hyperbaric-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 37: CHẤN THƯƠNG BỤNG & VỠ PHÌNH ĐM CHỦ BỤNG ====================
+
+export const recordAbdominalTraumaCareApi = async (
+  incidentId: string,
+  payload: {
+    traumaType?: string;
+    sterileMoistDressingApplied?: boolean;
+    occlusiveMoistureBarrierApplied?: boolean;
+    kneesFlexedPositionMaintained?: boolean;
+    actualSystolicBp?: number;
+    excessiveFluidAvoided?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    traumaType: string;
+    organReinsertionProhibited: boolean;
+    sterileMoistDressingApplied: boolean;
+    occlusiveMoistureBarrierApplied: boolean;
+    kneesFlexedPositionMaintained: boolean;
+    actualSystolicBp: number;
+    permissiveHypotensionTargetSbp: number;
+    excessiveFluidAvoided: boolean;
+    eviscerationProtocol: string;
+    aaaRuptureDirectives: string;
+  }>(`/emergencies/${incidentId}/abdominal-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 38: NGỘ ĐỘC THUỐC TRỪ SÂU PHOSPHO HỮU CƠ ====================
+
+export const recordToxicologyCareApi = async (
+  incidentId: string,
+  payload: {
+    toxinCategory?: string;
+    dermalDecontaminationPerformed?: boolean;
+    clothingSafelyDisposedInBags?: boolean;
+    pinpointPupilsObserved?: boolean;
+    bronchorrheaSecretionsSuctioned?: boolean;
+    atropineAdministeredMg?: number;
+    atropinizationAchieved?: boolean;
+    pralidoximePamAdministeredGrams?: number;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    toxinCategory: string;
+    dermalDecontaminationPerformed: boolean;
+    clothingSafelyDisposedInBags: boolean;
+    pinpointPupilsObserved: boolean;
+    bronchorrheaSecretionsSuctioned: boolean;
+    atropineAdministeredMg: number;
+    atropinizationAchieved: boolean;
+    pralidoximePamAdministeredGrams: number;
+    toxicologyDirectives: string[];
+  }>(`/emergencies/${incidentId}/toxicology-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 39: VỠ KHUNG CHẬU & ĐAI KẸP CẦM MÁU ====================
+
+export const recordPelvicTraumaCareApi = async (
+  incidentId: string,
+  payload: {
+    fracturePattern?: string;
+    pelvicBinderApplied?: boolean;
+    pelvicBinderPlacementSite?: string;
+    kneesAndFeetTiedTogether?: boolean;
+    scoopStretcherUsed?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    fracturePattern: string;
+    repeatedPelvicRockingProhibited: boolean;
+    pelvicBinderApplied: boolean;
+    pelvicBinderPlacementSite: string;
+    isCorrectPlacement: boolean;
+    kneesAndFeetTiedTogether: boolean;
+    retroperitonealBleedingRisk: string;
+    scoopStretcherUsed: boolean;
+    clinicalGuidance: string;
+    criticalDirectives: string[];
+  }>(`/emergencies/${incidentId}/pelvic-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateToxicologyCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    antidoteGuidance: string;
+  }>("/hospitals/toxicology-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateVascularCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    surgicalGuidance: string;
+  }>("/hospitals/vascular-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locatePelvicCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    pelvicCareDirectives: string;
+  }>("/hospitals/pelvic-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 40: CHẤN THƯƠNG SỌ NÃO NẶNG & TỤT KẸT NÃO ====================
+
+export const recordTbiCareApi = async (
+  incidentId: string,
+  payload: {
+    gcsScore?: number;
+    systolicBloodPressure?: number;
+    heartRateBpm?: number;
+    respiratoryPattern?: string;
+    dilatedPupilDiameterMm?: number;
+    headElevated30Degrees?: boolean;
+    controlledHyperventilationApplied?: boolean;
+    hypotensionHypoxiaPrevented?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    gcsScore: number;
+    cushingsTriadObserved: boolean;
+    anisocoriaPupilDilation: boolean;
+    cerebralHerniationImminent: boolean;
+    headElevated30Degrees: boolean;
+    controlledHyperventilationApplied: boolean;
+    targetEtCo2MmHg: number;
+    prophylacticHyperventilationAvoided: boolean;
+    hypotensionHypoxiaPrevented: boolean;
+    neurosurgeryTransferInitiated: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/tbi-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateNeurosurgeryCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    surgicalGuidance: string;
+  }>("/hospitals/neurosurgery-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 41: SẢN PHỤ CHẤN THƯƠNG & NGỪNG TIM THAI PHỤ ====================
+
+export const recordMaternalCareApi = async (
+  incidentId: string,
+  payload: {
+    gestationalAgeWeeks?: number;
+    manualLeftUterineDisplacementApplied?: boolean;
+    cardiacArrestDurationMinutes?: number;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    gestationalAgeWeeks: number;
+    uterineFundusAboveUmbilicus: boolean;
+    manualLeftUterineDisplacementApplied: boolean;
+    tiltWholeBodyProhibited: boolean;
+    aortocavalCompressionRelieved: boolean;
+    cardiacArrestDurationMinutes: number;
+    perimortemCesareanIndicated: boolean;
+    targetDeliveryWithin5Minutes: boolean;
+    maternalFetalSpecialtyHospitalNotified: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/maternal-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateObstetricCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    maternalGuidance: string;
+  }>("/hospitals/obstetric-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 42: TAI BIẾN LẶN BIỂN & BỆNH GIẢM ÁP KHÍ NÉN ====================
+
+export const recordDecompressionCareApi = async (
+  incidentId: string,
+  payload: {
+    exposureCategory?: string;
+    symptomType?: string;
+    highFlowOxygen100Applied?: boolean;
+    oxygenFlowRateLpm?: number;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    exposureCategory: string;
+    symptomType: string;
+    highFlowOxygen100Applied: boolean;
+    oxygenFlowRateLpm: number;
+    inWaterRecompressionStrictlyProhibited: boolean;
+    lowAltitudeEvacuationEnforced: boolean;
+    maximumFlightAltitudeMeters: number;
+    recompressionChamberIndicated: boolean;
+    usNavyTable6ProtocolReady: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/decompression-care`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateRecompressionCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    hyperbaricDirectives: string;
+  }>("/hospitals/recompression-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 43: SỐC MẤT MÁU NẶNG & DCR / TXA CRASH-2 / MTP 1:1:1 ====================
+
+export const recordHemorrhagicShockCareApi = async (
+  incidentId: string,
+  payload: {
+    shockClass?: string;
+    estimatedBloodLossMl?: number;
+    systolicBp?: number;
+    heartRate?: number;
+    injuryToTxaIntervalMinutes?: number;
+    crystalloidLimitedUnder1000Ml?: boolean;
+    mtpProtocol111Activated?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    shockClass: string;
+    estimatedBloodLossMl: number;
+    systolicBp: number;
+    heartRate: number;
+    injuryToTxaIntervalMinutes: number;
+    txaAdministeredWithin3Hours: boolean;
+    txaContraindicatedAfter3Hours: boolean;
+    txaDoseGrams: number;
+    crystalloidLimitedUnder1000Ml: boolean;
+    mtpProtocol111Activated: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/hemorrhagic-shock`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateTransfusionCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    transfusionGuidance: string;
+  }>("/hospitals/transfusion-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 44: HẠ THÂN NHIỆT SÂU & LÀM ẤM CHỦ ĐỘNG ====================
+
+export const recordSevereHypothermiaCareApi = async (
+  incidentId: string,
+  payload: {
+    coreTemperatureCelsius?: number;
+    gentleHandlingMaintained?: boolean;
+    activeExternalCoreRewarmingApplied?: boolean;
+    activeInternalRewarmingApplied?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    coreTemperatureCelsius: number;
+    hypothermiaStage: string;
+    gentleHandlingMaintained: boolean;
+    activeExternalCoreRewarmingApplied: boolean;
+    extremityRewarmingProhibitedBeforeCore: boolean;
+    rewarmingAfterdropPrevented: boolean;
+    activeInternalRewarmingApplied: boolean;
+    noOneDeadUntilWarmAndDeadRule: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/hypothermia-rewarming`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateHypothermiaCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    ecmoGuidance: string;
+  }>("/hospitals/hypothermia-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 45: CƠN BÃO GIÁP TRẠNG & HÔN MÊ SUY GIÁP ====================
+
+export const recordEndocrineCrisisCareApi = async (
+  incidentId: string,
+  payload: {
+    crisisType?: string;
+    burchWartofskyScore?: number;
+    coreTemperatureCelsius?: number;
+    heartRateBpm?: number;
+    betaBlockerAdministered?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    crisisType: string;
+    burchWartofskyScore: number;
+    coreTemperatureCelsius: number;
+    heartRateBpm: number;
+    aspirinStrictlyProhibited: boolean;
+    safeCoolingMethod: string;
+    betaBlockerAdministered: boolean;
+    levothyroxineHydrocortisoneReady: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/endocrine-crisis`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateEndocrineCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    endocrineGuidance: string;
+  }>("/hospitals/endocrine-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 46: NGỘ ĐỘC KHÍ ĐỘC CÔNG NGHIỆP H2S & CLO ====================
+
+export const recordIndustrialGasCareApi = async (
+  incidentId: string,
+  payload: {
+    gasType?: string;
+    rescuerHasScba?: boolean;
+    highFlowOxygen100Administered?: boolean;
+    antidoteAdministered?: string;
+    upwindEvacuationMaintained?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    gasType: string;
+    scbaEntryRequired: boolean;
+    rescuerEntryBlockedWithoutScba: boolean;
+    olfactoryFatigueWarningIssued: boolean;
+    highFlowOxygen100Administered: boolean;
+    antidoteAdministered: string;
+    upwindEvacuationMaintained: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/industrial-gas`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateIndustrialToxicologyCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    toxicologyGuidance: string;
+  }>("/hospitals/industrial-toxicology-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 47: SỐC TIM CẤP & PHÙ PHỔI CẤP HUYẾT ĐỘNG ====================
+
+export const recordCardiogenicShockCareApi = async (
+  incidentId: string,
+  payload: {
+    killipClass?: string;
+    systolicBp?: number;
+    cpapBiPapPositivePressureApplied?: boolean;
+    cpapPressureCmH2O?: number;
+    nitroglycerinAdministered?: boolean;
+    pde5InhibitorOrRvInfarctionScreened?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    killipClass: string;
+    patientPositioning: string;
+    cpapBiPapPositivePressureApplied: boolean;
+    cpapPressureCmH2O: number;
+    systolicBp: number;
+    nitroglycerinAdministered: boolean;
+    nitroglycerinContraindicated: boolean;
+    pde5InhibitorOrRvInfarctionScreened: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/cardiogenic-shock`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateCardiogenicCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    cardiologyGuidance: string;
+  }>("/hospitals/cardiogenic-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 48: SỐC NHIỄM KHUẨN & GÓI GIỜ VÀNG SEPSIS ====================
+
+export const recordSepticShockCareApi = async (
+  incidentId: string,
+  payload: {
+    respiratoryRatePerMin?: number;
+    systolicBp?: number;
+    gcsScore?: number;
+    crystalloidBolusMlPerKg?: number;
+    patientWeightKg?: number;
+    lactateMmolL?: number;
+    vasopressorNoradrenalineStarted?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    qSofaScore: number;
+    respiratoryRatePerMin: number;
+    systolicBp: number;
+    gcsScore: number;
+    crystalloidBolusMlPerKg: number;
+    totalCrystalloidInfusedMl: number;
+    lactateMmolL: number;
+    vasopressorNoradrenalineStarted: boolean;
+    targetMeanArterialPressureMmHg: number;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/septic-shock`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateSepsisCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    sepsisGuidance: string;
+  }>("/hospitals/sepsis-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 49: CHẤN THƯƠNG MẠCH MÁU GIÁP RANH & HỘI CHỨNG KHOANG ====================
+
+export const recordJunctionalVascularCareApi = async (
+  incidentId: string,
+  payload: {
+    injuryLocation?: string;
+    hemostaticWoundPackingApplied?: boolean;
+    junctionalTourniquetApplied?: boolean;
+    directPressureDurationMinutes?: number;
+    ischemiaTimeMinutes?: number;
+    compartmentSyndromeSuspected?: boolean;
+    passiveStretchPainPresent?: boolean;
+    elevationProhibitedIfCompartment?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    injuryLocation: string;
+    hemostaticWoundPackingApplied: boolean;
+    junctionalTourniquetApplied: boolean;
+    directPressureDurationMinutes: number;
+    ischemiaTimeMinutes: number;
+    compartmentSyndromeSuspected: boolean;
+    passiveStretchPainPresent: boolean;
+    elevationProhibitedIfCompartment: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/junctional-vascular`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateVascularInterventionCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    vascularGuidance: string;
+  }>("/hospitals/vascular-intervention-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 50: TĂNG THÂN NHIỆT ÁC TÍNH & HỘI CHỨNG SEROTONIN ====================
+
+export const recordHyperthermiaSerotoninCareApi = async (
+  incidentId: string,
+  payload: {
+    syndromeType?: string;
+    hunterCriteriaClonusPresent?: boolean;
+    leadPipeRigidityPresent?: boolean;
+    coreTemperatureCelsius?: number;
+    antidoteAdministered?: string;
+    physicalRestraintsProhibited?: boolean;
+    activeExternalCoolingApplied?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    syndromeType: string;
+    hunterCriteriaClonusPresent: boolean;
+    leadPipeRigidityPresent: boolean;
+    coreTemperatureCelsius: number;
+    antidoteAdministered: string;
+    physicalRestraintsProhibited: boolean;
+    activeExternalCoolingApplied: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/hyperthermia-serotonin`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateDantroleneCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    hyperthermiaGuidance: string;
+  }>("/hospitals/dantrolene-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 51: HỒI SINH TIM PHỔI NGOÀI CƠ THỂ TIỀN VIỆN (ECPR) ====================
+
+export const recordEcprCareApi = async (
+  incidentId: string,
+  payload: {
+    witnessedArrest?: boolean;
+    bystanderCprStartedWithin5Min?: boolean;
+    initialRhythmShockable?: boolean;
+    refractoryShocksCount?: number;
+    mechanicalCprDeviceActive?: boolean;
+    estimatedTimeToCannulationMinutes?: number;
+    ecprPreAlertAcknowledged?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    witnessedArrest: boolean;
+    bystanderCprStartedWithin5Min: boolean;
+    initialRhythmShockable: boolean;
+    refractoryShocksCount: number;
+    mechanicalCprDeviceActive: boolean;
+    estimatedTimeToCannulationMinutes: number;
+    ecprPreAlertAcknowledged: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/ecpr-arrest`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateEcprCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    ecprGuidance: string;
+  }>("/hospitals/ecpr-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 52: CHẤN THƯƠNG CỘT SỐNG NGỰC - THẮT LƯNG & LIỆT TỦY ====================
+
+export const recordThoracolumbarCareApi = async (
+  incidentId: string,
+  payload: {
+    asiaImpairmentScale?: string;
+    logRoll4PersonTechniqueApplied?: boolean;
+    vacuumMattressApplied?: boolean;
+    rigidSpineBoardRemovedWithin30Min?: boolean;
+    priapismOrSphincterLossDetected?: boolean;
+    spinalShockWatchdogActive?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    asiaImpairmentScale: string;
+    logRoll4PersonTechniqueApplied: boolean;
+    vacuumMattressApplied: boolean;
+    rigidSpineBoardRemovedWithin30Min: boolean;
+    priapismOrSphincterLossDetected: boolean;
+    spinalShockWatchdogActive: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/thoracolumbar-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateSpineSurgeryCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    spineGuidance: string;
+  }>("/hospitals/spine-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 53: PHÙ NÃO & PHÙ PHỔI ĐỘ CAO (HACE & HAPE) ====================
+
+export const recordHighAltitudeCareApi = async (
+  incidentId: string,
+  payload: {
+    altitudeMeters?: number;
+    lakeLouiseScore?: number;
+    immediateDescentStarted?: boolean;
+    descentAltitudeMeters?: number;
+    gamowHyperbaricBagApplied?: boolean;
+    dexamethasoneAdministered?: boolean;
+    nifedipineAdministered?: boolean;
+    highFlowOxygenApplied?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    altitudeMeters: number;
+    lakeLouiseScore: number;
+    immediateDescentStarted: boolean;
+    descentAltitudeMeters: number;
+    gamowHyperbaricBagApplied: boolean;
+    dexamethasoneAdministered: boolean;
+    nifedipineAdministered: boolean;
+    highFlowOxygenApplied: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/high-altitude`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateAltitudeCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    altitudeGuidance: string;
+  }>("/hospitals/altitude-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 54: SƠ CỨU BỎNG LẠNH & KHÍ HÓA LỎNG ====================
+
+export const recordCryogenicFrostbiteCareApi = async (
+  incidentId: string,
+  payload: {
+    frostbiteDegree?: string;
+    rapidRewarmingWaterTempCelsius?: number;
+    frictionRubbingStrictlyProhibited?: boolean;
+    refreezingRiskPrevented?: boolean;
+    thromboxaneInhibitorIbuprofenGiven?: boolean;
+    aloeVeraSterileDressingApplied?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    frostbiteDegree: string;
+    rapidRewarmingWaterTempCelsius: number;
+    frictionRubbingStrictlyProhibited: boolean;
+    refreezingRiskPrevented: boolean;
+    thromboxaneInhibitorIbuprofenGiven: boolean;
+    aloeVeraSterileDressingApplied: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/cryogenic-frostbite`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateCryogenicCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    cryogenicGuidance: string;
+  }>("/hospitals/cryogenic-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 55: VIÊM CÂN MẠC HOẠI TỬ & SỐC ĐỘC TỐ LRINEC ====================
+
+export const recordNecrotizingFasciitisCareApi = async (
+  incidentId: string,
+  payload: {
+    lrinecScore?: number;
+    painOutOfProportion?: boolean;
+    subcutaneousCrepitusPresent?: boolean;
+    clindamycinToxinInhibitionGiven?: boolean;
+    emergencySurgicalDebridementAlerted?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    lrinecScore: number;
+    painOutOfProportion: boolean;
+    subcutaneousCrepitusPresent: boolean;
+    clindamycinToxinInhibitionGiven: boolean;
+    emergencySurgicalDebridementAlerted: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/necrotizing-fasciitis`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateNecrotizingCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    necrotizingFasciitisGuidance: string;
+  }>("/hospitals/necrotizing-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 56: KHỐI MÁU TỤ HỐC MẮT & MỞ GÓC MẮT NGOÀI ====================
+
+export const recordRetrobulbarHematomaCareApi = async (
+  incidentId: string,
+  payload: {
+    rockHardProptosis?: boolean;
+    relativeAfferentPupillaryDefect?: boolean;
+    intraocularPressureMmHg?: number;
+    ischemiaTimeMinutes?: number;
+    lateralCanthotomyCantholysisPrepared?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    rockHardProptosis: boolean;
+    relativeAfferentPupillaryDefect: boolean;
+    intraocularPressureMmHg: number;
+    ischemiaTimeMinutes: number;
+    lateralCanthotomyCantholysisPrepared: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/retrobulbar-hematoma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateOrbitalCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    orbitalGuidance: string;
+  }>("/hospitals/orbital-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 57: NGỘ ĐỘC THUỐC TÊ & NHŨ DỊCH LIPID 20% ====================
+
+export const recordLastToxicityLipidCareApi = async (
+  incidentId: string,
+  payload: {
+    localAnestheticAgent?: string;
+    perioralNumbnessMetallicTaste?: boolean;
+    seizuresOrRefractoryArrhythmia?: boolean;
+    lipidEmulsion20PercentBolusGiven?: boolean;
+    lipidInfusionRateMlKgMin?: number;
+    vasopressinAndCalciumBlockersProhibited?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    localAnestheticAgent: string;
+    perioralNumbnessMetallicTaste: boolean;
+    seizuresOrRefractoryArrhythmia: boolean;
+    lipidEmulsion20PercentBolusGiven: boolean;
+    lipidInfusionRateMlKgMin: number;
+    vasopressinAndCalciumBlockersProhibited: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/last-lipid-rescue`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateLipidRescueCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    lipidRescueGuidance: string;
+  }>("/hospitals/lipid-rescue-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 58: THUYÊN TẮC PHỔI DIỆN RỘNG & TẮC MẠCH ỐI ====================
+
+export const recordMassivePulmonaryEmbolismCareApi = async (
+  incidentId: string,
+  payload: {
+    wellsScore?: number;
+    isAmnioticFluidEmbolism?: boolean;
+    acuteRightHeartStrainSigns?: boolean;
+    systemicThrombolysisIndicated?: boolean;
+    cautiousFluidsUnder500Ml?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    wellsScore: number;
+    isAmnioticFluidEmbolism: boolean;
+    acuteRightHeartStrainSigns: boolean;
+    systemicThrombolysisIndicated: boolean;
+    cautiousFluidsUnder500Ml: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/massive-pulmonary-embolism`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locatePulmonaryEmbolismCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    pulmonaryEmbolismGuidance: string;
+  }>("/hospitals/pulmonary-embolism-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 59: VỠ THỰC QUẢN BOERHAAVE & TRÀN KHÍ TRUNG THẤT ====================
+
+export const recordEsophagealRuptureCareApi = async (
+  incidentId: string,
+  payload: {
+    macklerTriadPresent?: boolean;
+    hammanSignCrunchPresent?: boolean;
+    strictNpoProhibitedOralIntake?: boolean;
+    blindNasogastricTubeProhibited?: boolean;
+    broadSpectrumAntibioticsGiven?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    macklerTriadPresent: boolean;
+    hammanSignCrunchPresent: boolean;
+    strictNpoProhibitedOralIntake: boolean;
+    blindNasogastricTubeProhibited: boolean;
+    broadSpectrumAntibioticsGiven: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/esophageal-rupture`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateEsophagealCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    esophagealSurgeryGuidance: string;
+  }>("/hospitals/esophageal-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// ==================== PHÂN HỆ 60: VỠ BÀNG QUANG & ĐỨT NIỆU ĐẠO PHỨC TẠP ====================
+
+export const recordBladderUrethralTraumaCareApi = async (
+  incidentId: string,
+  payload: {
+    bloodAtUrethralMeatus?: boolean;
+    butterflyPerinealHematoma?: boolean;
+    blindFoleyCatheterizationStrictlyProhibited?: boolean;
+    retrogradeUrethrographyIndicated?: boolean;
+    suprapubicCystostomyPrepared?: boolean;
+  },
+) => {
+  return request<{
+    success: true;
+    incidentId: string;
+    bloodAtUrethralMeatus: boolean;
+    butterflyPerinealHematoma: boolean;
+    blindFoleyCatheterizationStrictlyProhibited: boolean;
+    retrogradeUrethrographyIndicated: boolean;
+    suprapubicCystostomyPrepared: boolean;
+    clinicalDirectives: string[];
+  }>(`/emergencies/${incidentId}/bladder-urethral-trauma`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const locateUrologyCenterApi = async (payload: { lat: number; lng: number }) => {
+  return request<{
+    success: true;
+    hospitalCode: string;
+    hospitalName: string;
+    specialty: string;
+    distanceMeters: number;
+    etaMinutes: number;
+    urologyTraumaGuidance: string;
+  }>("/hospitals/urology-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};

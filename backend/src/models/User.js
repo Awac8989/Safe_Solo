@@ -193,6 +193,41 @@ const UserSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    // Vi địa chỉ căn hộ / phòng trọ & Chỉ dẫn tiếp cận khẩn cấp
+    microLocation: {
+      buildingName: { type: String, default: '' },
+      roomNumber: { type: String, default: '' },
+      floorNumber: { type: String, default: '' },
+      doorCode: { type: String, default: '' },
+      landlordPhone: { type: String, default: '' },
+      securityPhone: { type: String, default: '' },
+      accessNotes: { type: String, default: '' },
+    },
+    // Chế độ Bảo vệ Người Cao Tuổi & Bệnh Nền Độc Hành (Senior Solo Living Protection)
+    seniorSafety: {
+      isSeniorMode: { type: Boolean, default: false },
+      caregiverPhone: { type: String, default: '' },
+      caregiverName: { type: String, default: '' },
+      dementiaGeofence: {
+        enabled: { type: Boolean, default: false },
+        centerLat: { type: Number, default: 10.7769 },
+        centerLng: { type: Number, default: 106.7009 },
+        radiusMeters: { type: Number, default: 500 },
+        isOutsideSafeZone: { type: Boolean, default: false },
+        lastWanderingAlertAt: { type: Date, default: null },
+      },
+      criticalMedications: [
+        {
+          medicationName: { type: String, required: true },
+          dosage: { type: String, default: '1 viên' },
+          scheduleTime: { type: String, default: '08:00' },
+          isCriticalLifeSupport: { type: Boolean, default: true },
+          lastTakenAt: { type: Date, default: null },
+          adherenceRatePercent: { type: Number, default: 100 },
+          missedAlertCount: { type: Number, default: 0 },
+        },
+      ],
+    },
   },
   {
     timestamps: true,

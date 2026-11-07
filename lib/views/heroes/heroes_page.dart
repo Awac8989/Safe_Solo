@@ -1346,9 +1346,10 @@ class _HeroesPageState extends State<HeroesPage> {
                               color: AppColors.primarySoft,
                               shape: BoxShape.circle,
                             ),
-                            alignment: Alignment.center,
                             child: Text(
-                              rows.first.name.substring(0, 1).toUpperCase(),
+                              rows.first.name.trim().isNotEmpty
+                                  ? rows.first.name.trim().substring(0, 1).toUpperCase()
+                                  : 'H',
                               style: AppTextStyles.h3.copyWith(
                                 color: AppColors.primary,
                               ),

@@ -41,6 +41,11 @@ class HeroIncidentItem {
   final String notes;
   final double lat;
   final double lng;
+  final String? buildingRoom;
+  final String? doorCode;
+  final String? landlordPhone;
+  final String? accessNotes;
+  final String? emergencyPassCode;
 
   const HeroIncidentItem({
     required this.id,
@@ -56,6 +61,11 @@ class HeroIncidentItem {
     required this.notes,
     required this.lat,
     required this.lng,
+    this.buildingRoom,
+    this.doorCode,
+    this.landlordPhone,
+    this.accessNotes,
+    this.emergencyPassCode,
   });
 }
 
@@ -96,6 +106,31 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     'Kiểm tra tri giác AVPU: Nạn nhân V (đáp ứng lời nói) (14:33)',
   ];
 
+  // Micro-location & Lệnh Can Thiệp Cứu Sinh (Điều 23 BLHS)
+  bool _isEmergencyPassRevealed = false;
+
+  // Đánh giá An toàn hiện trường (Scene Safety & Hazard Assessment)
+  bool _isSceneSafetyAssessed = false;
+  bool _isSafeToEnter = true;
+  final Set<String> _detectedHazards = {};
+  String _escalatedEmergencyService = 'NONE';
+
+  // Loa ngoài chỉ dẫn sơ cứu 0-Giây cho người bên cạnh (Bystander Co-Pilot T+0s)
+  bool _isBystanderCoPilotActive = false;
+  int _bystanderCoPilotCount = 0;
+  Timer? _bystanderCoPilotTimer;
+
+  // Tourniquet Time-Lock Tracker (Bộ đếm thời gian thắt Garô cầm máu bất biến)
+  bool _isTourniquetActive = false;
+  DateTime? _tourniquetAppliedTime;
+  String _tourniquetLimbLocation = 'Cánh tay Trái';
+  int _tourniquetElapsedMinutes = 0;
+  Timer? _tourniquetTimer;
+
+  // Đánh giá tri giác AVPU & Cột sống cổ C-Spine
+  String _selectedAvpuLevel = 'V'; // 'A', 'V', 'P', 'U'
+  bool _isCSpineStabilized = false;
+
   late final AnimationController _pulseAnim = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1200),
@@ -117,6 +152,11 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       notes: 'Đồng hồ phát hiện té ngã cầu thang, nhịp tim bất thường 138 bpm. Cần kiểm tra ý thức & chuẩn bị CPR nếu ngưng thở.',
       lat: 10.7602,
       lng: 106.6685,
+      buildingRoom: 'Lầu 3, Phòng 302 (Khu tập thể 420 cũ)',
+      doorCode: 'Mã số mở cổng sắt: 9911#',
+      landlordPhone: '0903.115.888 (Chủ nhà chú Bảy)',
+      accessNotes: 'Hẻm sâu 2 sẹc, chỉ xe máy vào được. Cầu thang bộ góc phải sau sân chung.',
+      emergencyPassCode: 'SAFE-PASS-20261028-7491',
     ),
     const HeroIncidentItem(
       id: 'SOS-HCM-7492',
@@ -132,6 +172,11 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       notes: 'Va quẹt xe máy, nạn nhân bị trầy xước sâu cẳng tay, cần hỗ trợ băng ép cầm máu và phân luồng đường vắng.',
       lat: 10.7628,
       lng: 106.6582,
+      buildingRoom: 'Hiện trường ngoài trời (Gần cột đèn số 4)',
+      doorCode: 'Không khóa (Hiện trường công cộng)',
+      landlordPhone: '113 (CSGT Trực ban)',
+      accessNotes: 'Đường vắng, bật xi nhan xe máy để phân luồng cảnh báo xe lớn từ xa.',
+      emergencyPassCode: 'SAFE-PASS-20261028-7492',
     ),
     const HeroIncidentItem(
       id: 'SOS-HCM-7493',
@@ -178,6 +223,245 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     } catch (_) {
       if (mounted) setState(() => _isLoadingHeroShield = false);
     }
+  }
+
+  Future<void> _showFileClaimBottomSheet(BuildContext context) async {
+    final app = context.read<AppProvider>();
+    final policyNumber = _heroPolicies.isNotEmpty
+        ? _heroPolicies.first['policyNumber']?.toString() ?? 'POL-HERO-ACTIVE'
+        : 'POL-HERO-${DateTime.now().millisecondsSinceEpoch % 10000}';
+
+    String selectedType = 'BLOOD_EXPOSURE';
+    int estimatedLoss = 1500000;
+    final noteController = TextEditingController(
+      text: 'Tiếp xúc máu nạn nhân khi ép tim CPR & thắt garô, cần dùng phác đồ thuốc PEP 72h khẩn cấp.',
+    );
+    final hospitalController = TextEditingController(
+      text: 'Bệnh viện Bệnh Nhiệt Đới TP.HCM - Khoa Khám Cấp Cứu',
+    );
+    bool isSubmitting = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomCtx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E293B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF43F5E).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shield_rounded, color: Color(0xFFF43F5E), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'BÁO CÁO PHƠI NHIỄM PEP & TRỢ CẤP',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900),
+                          ),
+                          Text(
+                            'Quỹ Bảo Hiểm Pháp Lý & Y Tế Hiệp Sĩ HeroShield',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Chứng thư bảo hộ: $policyNumber (Hạn mức 500Tr)',
+                          style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 11, fontFamily: 'monospace'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Loại rủi ro phát sinh trong ca cứu hộ:',
+                  style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Phơi nhiễm máu PEP (72h)'),
+                      selected: selectedType == 'BLOOD_EXPOSURE',
+                      onSelected: (val) {
+                        if (val) setModalState(() => selectedType = 'BLOOD_EXPOSURE');
+                      },
+                      selectedColor: const Color(0xFFF43F5E),
+                      backgroundColor: const Color(0xFF0F172A),
+                      labelStyle: TextStyle(
+                        color: selectedType == 'BLOOD_EXPOSURE' ? Colors.white : const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Tai nạn di chuyển'),
+                      selected: selectedType == 'VEHICLE_ACCIDENT',
+                      onSelected: (val) {
+                        if (val) setModalState(() => selectedType = 'VEHICLE_ACCIDENT');
+                      },
+                      selectedColor: const Color(0xFFF59E0B),
+                      backgroundColor: const Color(0xFF0F172A),
+                      labelStyle: TextStyle(
+                        color: selectedType == 'VEHICLE_ACCIDENT' ? Colors.white : const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Hư hại trang bị / Chấn thương'),
+                      selected: selectedType == 'PERSONAL_INJURY',
+                      onSelected: (val) {
+                        if (val) setModalState(() => selectedType = 'PERSONAL_INJURY');
+                      },
+                      selectedColor: const Color(0xFF38BDF8),
+                      backgroundColor: const Color(0xFF0F172A),
+                      labelStyle: TextStyle(
+                        color: selectedType == 'PERSONAL_INJURY' ? Colors.white : const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text('Cơ sở y tế khám / xét nghiệm:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: hospitalController,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF334155))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Mô tả tình huống phơi nhiễm:', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 12, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: noteController,
+                  maxLines: 2,
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFF0F172A),
+                    contentPadding: const EdgeInsets.all(10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF334155))),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF94A3B8),
+                          side: const BorderSide(color: Color(0xFF475569)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Đóng'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                setModalState(() => isSubmitting = true);
+                                try {
+                                  await ApiService.instance.fileHeroInsuranceClaim(
+                                    policyId: policyNumber,
+                                    claimType: selectedType,
+                                    estimatedLossVND: estimatedLoss,
+                                    hospitalReportUrl: hospitalController.text,
+                                    doctorDiagnosis: noteController.text,
+                                    volunteerId: app.user?.id,
+                                  );
+                                  if (!context.mounted) return;
+                                  Navigator.pop(ctx);
+                                  TopToast.show(
+                                    context,
+                                    message: 'Đã nộp hồ sơ yêu cầu bồi thường PEP 72h tới Quỹ HeroShield!',
+                                    icon: Icons.check_circle_outline_rounded,
+                                  );
+                                  _loadHeroShieldData();
+                                } catch (e) {
+                                  setModalState(() => isSubmitting = false);
+                                  TopToast.show(
+                                    context,
+                                    message: 'Lỗi nộp hồ sơ: $e',
+                                    icon: Icons.error_outline_rounded,
+                                  );
+                                }
+                              },
+                        icon: isSubmitting
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.send_rounded, size: 16),
+                        label: Text(
+                          isSubmitting ? 'Đang gửi...' : 'Gửi Yêu Cầu Trợ Cấp',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFF43F5E),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchNearbyIncidents() async {
@@ -242,6 +526,8 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     _pulseAnim.dispose();
     _missionTimer?.cancel();
     _cprTimer?.cancel();
+    _bystanderCoPilotTimer?.cancel();
+    _tourniquetTimer?.cancel();
     super.dispose();
   }
 
@@ -1027,6 +1313,10 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
         ),
         const SizedBox(height: 14),
 
+        // 1. Vi địa chỉ căn hộ / phòng trọ & Lệnh Can Thiệp Cứu Sinh (Điều 23 BLHS)
+        _buildMicroLocationCard(mission),
+        const SizedBox(height: 14),
+
         // Live Telemetry sinh tồn nạn nhân truyền về
         Container(
           padding: const EdgeInsets.all(12),
@@ -1174,6 +1464,16 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
         _buildStageItem(HeroMissionStage.onScene, '2. Đã tiếp cận hiện trường', 'Xác định nạn nhân & kiểm tra dấu hiệu sinh tồn'),
         _buildStageItem(HeroMissionStage.firstAidGiven, '3. Thực hiện sơ cứu / Hồi sức', 'Thực hiện ép tim CPR / dán máy sốc tim AED'),
         _buildStageItem(HeroMissionStage.completed, '4. Bàn giao 115 & Hoàn tất ca', 'Bàn giao xe cấp cứu 115 & nhận chứng nhận cứu trợ'),
+
+        const SizedBox(height: 14),
+
+        // 2. Đánh giá An toàn hiện trường (Scene Safety & Hazard Assessment)
+        _buildSceneSafetyCard(mission),
+
+        const SizedBox(height: 14),
+
+        // 3. Loa ngoài chỉ dẫn sơ cứu 0-Giây cho người bên cạnh (Bystander Co-Pilot T+0s)
+        _buildBystanderCoPilotCard(mission),
 
         const SizedBox(height: 14),
 
@@ -1327,6 +1627,35 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
       });
       TopToast.show(context, message: 'Đang kích hoạt máy đếm nhịp CPR (110 bpm, chu kỳ 30:2)');
     }
+  }
+
+  void _toggleTourniquetTracker() {
+    setState(() {
+      _isTourniquetActive = !_isTourniquetActive;
+      if (_isTourniquetActive) {
+        _tourniquetAppliedTime = DateTime.now();
+        _tourniquetElapsedMinutes = 0;
+        _tourniquetTimer?.cancel();
+        _tourniquetTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+          if (!mounted) {
+            t.cancel();
+            return;
+          }
+          if (_tourniquetAppliedTime != null) {
+            final diff = DateTime.now().difference(_tourniquetAppliedTime!).inMinutes;
+            if (diff != _tourniquetElapsedMinutes) {
+              setState(() => _tourniquetElapsedMinutes = diff);
+            }
+          }
+        });
+        _logClinicalAction('ĐÃ ĐẶT GARÔ C-A-T tại $_tourniquetLimbLocation (Khóa giờ bất biến)');
+        TopToast.show(context, message: 'ĐÃ KHÓA GIỜ GARÔ C-A-T: Giới hạn an toàn tối đa 120 phút!');
+      } else {
+        _tourniquetTimer?.cancel();
+        _logClinicalAction('Đã nới/tháo garô dưới giám sát y khoa');
+        TopToast.show(context, message: 'Đã dừng theo dõi garô.');
+      }
+    });
   }
 
   void _logClinicalAction(String action) {
@@ -1734,12 +2063,14 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
                       children: [
                         const Icon(Icons.qr_code_2_rounded, color: Color(0xFF10B981), size: 28),
                         const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('BIÊN BẢN BÀN GIAO CẤP CỨU SBAR', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                            Text('Mã ca: ${mission.id} · Chuẩn EMR / 115', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('BIÊN BẢN BÀN GIAO CẤP CỨU SBAR', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                              Text('Mã ca: ${mission.id} · Chuẩn EMR / 115', style: const TextStyle(color: Colors.white54, fontSize: 11), overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -2280,6 +2611,415 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
     );
   }
 
+  // 1. THẺ VI ĐỊA CHỈ & LỆNH CAN THIỆP CỨU SINH (ĐIỀU 23 BLHS)
+  Widget _buildMicroLocationCard(HeroIncidentItem mission) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.home_work_rounded, color: Color(0xFF10B981), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'VI ĐỊA CHỈ & CHỈ DẪN TIẾP CẬN TẬN PHÒNG',
+                    style: TextStyle(color: Color(0xFF10B981), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('GIẢI MÃ P0', style: TextStyle(color: Color(0xFF10B981), fontSize: 9.5, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.meeting_room_rounded, color: Colors.amber, size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        mission.buildingRoom ?? 'Lầu 3, Phòng 302',
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.pin_rounded, color: Color(0xFF38BDF8), size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      mission.doorCode ?? 'Mã mở cửa: 9911#',
+                      style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF34D399), size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Liên hệ khẩn cấp: ${mission.landlordPhone ?? "0903.115.888 (Chủ nhà / Bảo vệ)"}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+                if (mission.accessNotes != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline_rounded, color: Colors.orangeAccent, size: 16),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          mission.accessNotes!,
+                          style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Lệnh Can Thiệp Cứu Sinh (Điều 23 BLHS 2015)
+          InkWell(
+            onTap: () {
+              setState(() => _isEmergencyPassRevealed = !_isEmergencyPassRevealed);
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_rounded, color: Color(0xFF38BDF8), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'LỆNH CAN THIỆP SINH MẠNG: ${mission.emergencyPassCode ?? "SAFE-PASS-7491"}',
+                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10.5, fontWeight: FontWeight.bold),
+                        ),
+                        const Text(
+                          'Căn cứ Điều 23 BLHS 2015 (Tình thế cấp thiết) - Miễn trừ trách nhiệm phá khóa cứu người',
+                          style: TextStyle(color: Colors.white54, fontSize: 9),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _isEmergencyPassRevealed ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: const Color(0xFF38BDF8),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isEmergencyPassRevealed)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: const Text(
+                'GIẤY XÁC THỰC PHÁP LÝ TỨC THÌ:\n'
+                '• Đối tượng: Nạn nhân bất tỉnh có chỉ số sinh tồn đe dọa tính mạng (P0).\n'
+                '• Quyền hạn Hiệp sĩ SafeSolo: Được phép tiếp cận, mở khóa hoặc phá chốt khẩn cấp để tiến hành hồi sức tim phổi CPR trong 4 phút vàng.\n'
+                '• Đã đồng bộ biên bản âm thanh và GPS về Trung tâm chỉ huy TOC làm bằng chứng số.',
+                style: TextStyle(color: Colors.white70, fontSize: 9.5, height: 1.4),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 2. ĐÁNH GIÁ AN TOÀN HIỆN TRƯỜNG (SCENE SAFETY & HAZARD ASSESSMENT)
+  Widget _buildSceneSafetyCard(HeroIncidentItem mission) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isSceneSafetyAssessed
+              ? (_isSafeToEnter ? const Color(0xFF10B981) : Colors.red)
+              : const Color(0xFFF59E0B).withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.health_and_safety_rounded, color: Color(0xFFF59E0B), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'KIỂM ĐỊNH AN TOÀN HIỆN TRƯỜNG (3S SOP)',
+                    style: TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _isSceneSafetyAssessed
+                      ? (_isSafeToEnter ? const Color(0xFF10B981).withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2))
+                      : const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _isSceneSafetyAssessed
+                      ? (_isSafeToEnter
+                          ? 'AN TOÀN TIẾN VÀO'
+                          : (_escalatedEmergencyService != 'NONE'
+                              ? 'NGUY HIỂM: BÁO $_escalatedEmergencyService'
+                              : 'NGUY HIỂM: DỪNG LẠI'))
+                      : 'CHƯA ĐÁNH GIÁ',
+                  style: TextStyle(
+                    color: _isSceneSafetyAssessed
+                        ? (_isSafeToEnter ? const Color(0xFF10B981) : Colors.red)
+                        : const Color(0xFFF59E0B),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Quy tắc vàng 3S (Scene Safety First): Hiệp sĩ KHÔNG chạm vào nạn nhân nếu hiện trường có nguy cơ điện giật, rò khí gas hoặc kẻ tấn công!',
+            style: TextStyle(color: Colors.white60, fontSize: 10),
+          ),
+          const SizedBox(height: 10),
+
+          // Hazard checklist buttons
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildHazardChip('⚡ Điện rò rỉ', 'ELECTRICAL_HAZARD'),
+              _buildHazardChip('🔥 Khí gas / Cháy', 'GAS_LEAK'),
+              _buildHazardChip('🔪 Hung khí / Bạo lực', 'VIOLENCE_WEAPON'),
+              _buildHazardChip('🧱 Sập đổ cấu trúc', 'STRUCTURAL_COLLAPSE'),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isSceneSafetyAssessed = true;
+                      _isSafeToEnter = true;
+                      _detectedHazards.clear();
+                      _clinicalLogs.add('Đánh giá hiện trường an toàn (Scene Safe) lúc 14:35');
+                    });
+                    TopToast.show(context, message: 'XÁC NHẬN: Hiện trường an toàn. Hiệp sĩ bắt đầu sơ cứu!');
+                  },
+                  icon: const Icon(Icons.check_circle_rounded, size: 16),
+                  label: const Text('HIỆN TRƯỜNG AN TOÀN', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isSceneSafetyAssessed = true;
+                      _isSafeToEnter = false;
+                      _escalatedEmergencyService = '114_FIRE_POLICE';
+                      _clinicalLogs.add('CẢNH BÁO HIỆN TRƯỜNG NGUY HIỂM: Đã chuyển hướng gọi 113/114 chi viện');
+                    });
+                    TopToast.show(context, message: 'CẢNH BÁO: Đã ghi nhận hiện trường nguy hiểm. Đang kết nối 113/114!');
+                  },
+                  icon: const Icon(Icons.warning_amber_rounded, size: 16),
+                  label: const Text('BÁO NGUY HIỂM 113/114', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHazardChip(String label, String code) {
+    final isSelected = _detectedHazards.contains(code);
+    return FilterChip(
+      label: Text(label, style: TextStyle(fontSize: 10, color: isSelected ? Colors.white : Colors.white70)),
+      selected: isSelected,
+      selectedColor: const Color(0xFFDC2626),
+      backgroundColor: const Color(0xFF1E293B),
+      checkmarkColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      onSelected: (selected) {
+        setState(() {
+          if (selected) {
+            _detectedHazards.add(code);
+            _isSafeToEnter = false;
+            _isSceneSafetyAssessed = true;
+          } else {
+            _detectedHazards.remove(code);
+            if (_detectedHazards.isEmpty) {
+              _isSafeToEnter = true;
+            }
+          }
+        });
+      },
+    );
+  }
+
+  // 3. LOA NGOÀI HƯỚNG DẪN SƠ CỨU 0-GIÂY CHO NGƯỜI BÊN CẠNH (BYSTANDER CO-PILOT)
+  Widget _buildBystanderCoPilotCard(HeroIncidentItem mission) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFA855F7).withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.volume_up_rounded, color: Color(0xFFA855F7), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'LOA NGOÀI CHỈ DẪN SƠ CỨU T+0S (BYSTANDER CO-PILOT)',
+                    style: TextStyle(color: Color(0xFFA855F7), fontSize: 10.5, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _isBystanderCoPilotActive
+                      ? const Color(0xFFA855F7).withValues(alpha: 0.3)
+                      : Colors.white10,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _isBystanderCoPilotActive ? 'ĐANG PHÁT LOA 110BPM' : 'SẴN SÀNG',
+                  style: TextStyle(
+                    color: _isBystanderCoPilotActive ? const Color(0xFFA855F7) : Colors.white54,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Phát lệnh thoại to nhất qua loa máy nạn nhân để người nhà / bạn cùng phòng ép tim CPR ngay trong lúc chờ Hiệp sĩ di chuyển tới!',
+            style: TextStyle(color: Colors.white60, fontSize: 10),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isBystanderCoPilotActive ? const Color(0xFFEF4444) : const Color(0xFFA855F7),
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 42),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              setState(() {
+                _isBystanderCoPilotActive = !_isBystanderCoPilotActive;
+                if (_isBystanderCoPilotActive) {
+                  _bystanderCoPilotCount = 0;
+                  _bystanderCoPilotTimer?.cancel();
+                  _bystanderCoPilotTimer = Timer.periodic(const Duration(milliseconds: 545), (t) {
+                    if (!mounted) {
+                      t.cancel();
+                      return;
+                    }
+                    setState(() => _bystanderCoPilotCount++);
+                  });
+                  _clinicalLogs.add('Kích hoạt Loa ngoài chỉ dẫn ép tim T+0s cho người tại chỗ (110 BPM)');
+                  TopToast.show(context, message: 'ĐÃ BẬT LOA NGOÀI: "Đặt 2 tay giữa ngực nạn nhân, ép liên tục theo nhịp!"');
+                } else {
+                  _bystanderCoPilotTimer?.cancel();
+                  TopToast.show(context, message: 'Đã tạm dừng loa ngoài hướng dẫn sơ cứu.');
+                }
+              });
+            },
+            icon: Icon(_isBystanderCoPilotActive ? Icons.stop_circle_rounded : Icons.campaign_rounded, size: 18),
+            label: Text(
+              _isBystanderCoPilotActive
+                  ? 'DỪNG PHÁT LOA (ĐÃ ĐẾM $_bystanderCoPilotCount NHỊP ÉP TIM)'
+                  : 'BẬT LOA NGOÀI HƯỚNG DẪN CPR 110 BPM QUA MÁY NẠN NHÂN',
+              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildClinicalToolkit() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2419,7 +3159,15 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
           ),
           const SizedBox(height: 10),
 
-          // 2. Thao tác can thiệp lâm sàng nhanh
+          // 2. Đồng hồ Khóa giờ Garô Cầm Máu C-A-T (Tối đa 120 phút)
+          _buildTourniquetTrackerCard(),
+          const SizedBox(height: 10),
+
+          // 3. Đánh giá tri giác AVPU & Cột sống cổ C-Spine
+          _buildNeuroAssessmentCard(),
+          const SizedBox(height: 10),
+
+          // 4. Thao tác can thiệp lâm sàng nhanh
           const Text(
             'CAN THIỆP SƠ CỨU NHANH (BẤM ĐỂ GHI NHẬT KÝ):',
             style: TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
@@ -2429,7 +3177,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
             spacing: 6,
             runSpacing: 6,
             children: [
-              _buildClinicalActionButton('🩸 Garô CAT', () => _logClinicalAction('Đặt garô cầm máu CAT')),
+              _buildClinicalActionButton('🩸 Garô CAT', _toggleTourniquetTracker),
               _buildClinicalActionButton('🛡️ Cố định C-Spine', _showCSpineGuideDialog),
               _buildClinicalActionButton('🦴 Nẹp gãy xương', () => _logClinicalAction('Nẹp cố định chi qua 2 khớp')),
               _buildClinicalActionButton('⚡ Sốc tim AED', () => _logClinicalAction('Dán điện cực AED & phân tích nhịp')),
@@ -2545,6 +3293,291 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
             color: isSelected ? Colors.white : Colors.white54,
             fontSize: 9.5,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTourniquetTrackerCard() {
+    final hasApplied = _isTourniquetActive && _tourniquetAppliedTime != null;
+    final timeStr = hasApplied
+        ? '${_tourniquetAppliedTime!.hour.toString().padLeft(2, '0')}:${_tourniquetAppliedTime!.minute.toString().padLeft(2, '0')}'
+        : '--:--';
+    final elapsedMin = _tourniquetElapsedMinutes;
+    final isDanger = elapsedMin >= 90;
+    final isNecrosis = elapsedMin >= 120;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasApplied
+              ? (isDanger ? const Color(0xFFEF4444) : const Color(0xFFF59E0B))
+              : Colors.white12,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.timer_rounded,
+                    color: hasApplied ? (isDanger ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)) : Colors.white54,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'ĐỒNG HỒ KHÓA GIỜ GA-RÔ C-A-T',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: hasApplied
+                      ? (isDanger ? const Color(0xFFEF4444).withValues(alpha: 0.25) : const Color(0xFFF59E0B).withValues(alpha: 0.2))
+                      : Colors.white10,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  hasApplied
+                      ? (isNecrosis ? 'NGUY HIỂM: >120 PHÚT' : (isDanger ? 'CẢNH BÁO: >90 PHÚT' : 'ĐANG KHÓA GIỜ'))
+                      : 'CHƯA ĐẶT',
+                  style: TextStyle(
+                    color: hasApplied ? (isDanger ? const Color(0xFFEF4444) : const Color(0xFFF59E0B)) : Colors.white54,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Vị trí chi đặt ga-rô
+          Row(
+            children: [
+              const Text('Vị trí đặt: ', style: TextStyle(color: Colors.white70, fontSize: 10)),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: ['Cánh tay T', 'Cánh tay P', 'Đùi T', 'Đùi P'].map((loc) {
+                    final isSel = _tourniquetLimbLocation.contains(loc.split(' ')[0]) && _tourniquetLimbLocation.contains(loc.split(' ')[1]);
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _tourniquetLimbLocation = loc == 'Cánh tay T' ? 'Cánh tay Trái'
+                              : loc == 'Cánh tay P' ? 'Cánh tay Phải'
+                              : loc == 'Đùi T' ? 'Đùi Trái' : 'Đùi Phải';
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFFF59E0B).withValues(alpha: 0.3) : const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: isSel ? const Color(0xFFF59E0B) : Colors.white12),
+                        ),
+                        child: Text(loc, style: TextStyle(color: isSel ? const Color(0xFFF59E0B) : Colors.white60, fontSize: 9)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasApplied ? 'Đã khóa: $timeStr (Trôi qua: $elapsedMin phút)' : 'Chưa kích hoạt ga-rô',
+                    style: TextStyle(
+                      color: hasApplied ? (isDanger ? const Color(0xFFEF4444) : const Color(0xFF38BDF8)) : Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  const Text(
+                    'PHTLS SOP: Tự động khóa bất biến chuyển kíp mổ 115',
+                    style: TextStyle(color: Colors.white38, fontSize: 8.5),
+                  ),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _isTourniquetActive ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                onPressed: _toggleTourniquetTracker,
+                icon: Icon(_isTourniquetActive ? Icons.stop_rounded : Icons.lock_clock_rounded, size: 14),
+                label: Text(
+                  _isTourniquetActive ? 'DỪNG' : 'KHÓA GIỜ',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNeuroAssessmentCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.psychology_rounded, color: Color(0xFF38BDF8), size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'TRI GIÁC AVPU & CỘT SỐNG CỔ (C-SPINE)',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'AVPU: $_selectedAvpuLevel',
+                  style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 9.5, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // AVPU buttons
+          Row(
+            children: [
+              _buildAvpuChip('A', 'Alert (Tỉnh táo)'),
+              const SizedBox(width: 4),
+              _buildAvpuChip('V', 'Voice (Đáp ứng tiếng)'),
+              const SizedBox(width: 4),
+              _buildAvpuChip('P', 'Pain (Đáp ứng đau)'),
+              const SizedBox(width: 4),
+              _buildAvpuChip('U', 'Unresponsive (Hôn mê)'),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // C-Spine stabilization switch
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isCSpineStabilized = !_isCSpineStabilized;
+                if (_isCSpineStabilized) {
+                  _logClinicalAction('ĐÃ CỐ ĐỊNH CỘT SỐNG CỔ (C-Collar) - Chống chỉ định xoay gập cổ');
+                  TopToast.show(context, message: 'ĐÃ CỐ ĐỊNH CỘT SỐNG CỔ: Nghiêm cấm di lệch tư thế đầu nạn nhân!');
+                } else {
+                  _logClinicalAction('Hủy xác nhận cố định C-Spine');
+                }
+              });
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isCSpineStabilized ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _isCSpineStabilized ? const Color(0xFF10B981) : Colors.white12,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isCSpineStabilized ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                    color: _isCSpineStabilized ? const Color(0xFF10B981) : Colors.white54,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isCSpineStabilized ? 'ĐÃ CỐ ĐỊNH CỘT SỐNG CỔ (C-SPINE COLLAR)' : 'CỐ ĐỊNH CỘT SỐNG CỔ C-SPINE (CHƯA THỰC HIỆN)',
+                          style: TextStyle(
+                            color: _isCSpineStabilized ? const Color(0xFF10B981) : Colors.white70,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Text(
+                          'PHTLS: Cố định thẳng trục đầu - cổ - ngực, chống chỉ định xoay trở nạn nhân',
+                          style: TextStyle(color: Colors.white38, fontSize: 8.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvpuChip(String code, String label) {
+    final isSelected = _selectedAvpuLevel == code;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedAvpuLevel = code;
+            _logClinicalAction('Thang điểm tri giác AVPU: $code ($label)');
+          });
+        },
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF0F172A),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: isSelected ? const Color(0xFF38BDF8) : Colors.white12),
+          ),
+          child: Text(
+            code,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.white60,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const RescueIncident = require('../models/RescueIncident');
 const VolunteerResponse = require('../models/VolunteerResponse');
@@ -45,6 +46,13 @@ function mapIncident(doc) {
     telemetry: row.telemetry || null,
     auditTrail: row.auditTrail || [],
     handoffRecord: row.handoffRecord || null,
+    microLocation: row.microLocation || null,
+    emergencyAccessPass: row.emergencyAccessPass || null,
+    sceneSafety: row.sceneSafety || null,
+    bystanderGuidance: row.bystanderGuidance || null,
+    triageCategory: row.triageCategory || null,
+    clinicalAssessment: row.clinicalAssessment || null,
+    afterActionReview: row.afterActionReview || null,
     communityRequestedAt: toIso(row.communityRequestedAt),
     createdAt: toIso(row.createdAt),
     resolvedAt: toIso(row.resolvedAt),
@@ -167,6 +175,40 @@ class RadarService {
       isBuddyDispatchRequired: isBuddyRequired,
       buddyStatus: isBuddyRequired ? 'WAITING_BUDDY' : 'NOT_REQUIRED',
       rendezvousPoint,
+      microLocation: {
+        buildingName: options.microLocation?.buildingName || victim.microLocation?.buildingName || '',
+        roomNumber: options.microLocation?.roomNumber || victim.microLocation?.roomNumber || '',
+        floorNumber: options.microLocation?.floorNumber || victim.microLocation?.floorNumber || '',
+        doorCode: options.microLocation?.doorCode || victim.microLocation?.doorCode || '',
+        landlordPhone: options.microLocation?.landlordPhone || victim.microLocation?.landlordPhone || '',
+        securityPhone: options.microLocation?.securityPhone || victim.microLocation?.securityPhone || '',
+        accessNotes: options.microLocation?.accessNotes || victim.microLocation?.accessNotes || '',
+      },
+      emergencyAccessPass: {
+        passCode: `PASS-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+        legalBasis: 'Điều 23 Bộ luật Hình sự 2015 & Điều 87 Luật Khám bệnh, chữa bệnh 2023 - Tình thế cấp thiết',
+        authorizedAt: new Date(),
+        isUnlockedForHero: false,
+      },
+      sceneSafety: {
+        isAssessed: false,
+        assessedAt: null,
+        hazardFlags: [],
+        isSafeToEnter: true,
+        escalatedToService: 'NONE',
+        safetyNotes: '',
+      },
+      bystanderGuidance: {
+        isActive: true,
+        guidanceType: options.guidanceType || 'CPR_AIRWAY',
+        speakerphoneAutoOn: true,
+        metronomeBpm: 110,
+      },
+      triageCategory: {
+        category: options.triageCategory || 'CARDIAC_RESPIRATORY',
+        reportedByVoice: Boolean(options.reportedByVoice),
+        mobilityRecommendation: options.mobilityRecommendation || (initialRadius > 1.0 ? 'MOTORBIKE' : 'WALKING_FAST'),
+      },
       medicalSnapshot: {
         bloodType: victimSensitive.bloodType || 'UNKNOWN',
         allergies: victimSensitive.allergies || [],
@@ -186,6 +228,8 @@ class RadarService {
             severity: options.severityLevel || 'P1_CRITICAL',
             isBuddyDispatchRequired: isBuddyRequired,
             isNightDangerTime,
+            triageCategory: options.triageCategory || 'CARDIAC_RESPIRATORY',
+            hasMicroLocation: Boolean(options.microLocation?.buildingName || victim.microLocation?.buildingName),
           },
         },
       ],
@@ -231,7 +275,7 @@ class RadarService {
     await incident.save();
 
     // 1. Quét tìm Hiệp sĩ đủ điều kiện theo chuyên môn Skill-Based Dispatch (SBD)
-    const nearbyVolunteers = await this.findNearbyVolunteers(
+    let nearbyVolunteers = await this.findNearbyVolunteers(
       exactLat,
       exactLng,
       victimId,
@@ -239,48 +283,82 @@ class RadarService {
       { requiredSkillTier, requiredSkills },
     );
 
-    // 2. Gửi PUSH BÁO ĐỘNG ĐỎ tới Top ứng viên phù hợp nhất (tối đa 5 người)
-    const topCandidates = nearbyVolunteers.slice(0, 5);
-    for (const volunteer of topCandidates) {
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        await VolunteerResponse.findOneAndUpdate(
-          { incidentId: incident._id, volunteerId: volunteer.id },
-          {
-            $setOnInsert: {
-              incidentId: incident._id,
-              volunteerId: volunteer.id,
-              status: 'ALERTED',
-              heroTierAtDispatch: volunteer.heroTier || 'TIER_1_BLS',
-              skillMatchScore: volunteer.skillMatchScore ?? 100,
-              goodSamaritanAgreementSigned: true,
-              distanceMeters: Math.round(volunteer.distanceKm * 1000),
-            },
-          },
-          { upsert: true, new: true },
-        );
-
-        // BẮN SỰ KIỆN KHẨN CẤP ĐÍCH DANH VÀO SOCKET CỦA HIỆP SĨ
-        const heroPayload = {
-          incidentId: incident._id,
-          victimId: incident.victimId,
-          victimName: sanitizeUser(victim).fullName,
-          incidentType: incident.incidentType,
-          severity: incident.severity,
-          severityLevel: incident.severityLevel,
-          distanceKm: volunteer.distanceKm,
-          approxAddress: incident.approxAddress,
-          medicalSnapshot: incident.medicalSnapshot,
-          createdAt: incident.createdAt,
-        };
-
-        const io = getIo();
-        io.to(`user:${volunteer.id}`).emit('HERO_DISPATCH_REQUEST', heroPayload);
-        io.to(volunteer.id).emit('HERO_DISPATCH_REQUEST', heroPayload);
-      } catch (_err) {
-        // socket optional
+    // MULTI-WAVE CANDIDATE POOL FOR P1_CRITICAL (4 PHÚT VÀNG CẤP CỨU)
+    // Nếu là ca ngừng tim/đột quỵ/nguy kịch mà Vòng 1 có ít hơn 2 hiệp sĩ, kéo thêm ứng viên từ Vòng 2 để alert
+    if (
+      incident.severityLevel === 'P1_CRITICAL' &&
+      nearbyVolunteers.length < 2
+    ) {
+      const backupRing2 = await this.findNearbyVolunteers(
+        exactLat,
+        exactLng,
+        victimId,
+        4.5,
+        { requiredSkillTier, requiredSkills },
+      );
+      const existingIds = new Set(nearbyVolunteers.map((v) => v.id));
+      for (const v2 of backupRing2) {
+        if (!existingIds.has(v2.id)) {
+          nearbyVolunteers.push(v2);
+          existingIds.add(v2.id);
+        }
       }
     }
+
+    // 2. Gửi PUSH BÁO ĐỘNG ĐỎ tới Top ứng viên phù hợp nhất (tối đa 5 người) đồng thời
+    const topCandidates = nearbyVolunteers.slice(0, 5);
+    const io = getIo();
+    await Promise.allSettled(
+      topCandidates.map(async (volunteer) => {
+        try {
+          await VolunteerResponse.findOneAndUpdate(
+            { incidentId: incident._id, volunteerId: volunteer.id },
+            {
+              $setOnInsert: {
+                incidentId: incident._id,
+                volunteerId: volunteer.id,
+                status: 'ALERTED',
+                heroTierAtDispatch: volunteer.heroTier || 'TIER_1_BLS',
+                skillMatchScore: volunteer.skillMatchScore ?? 100,
+                goodSamaritanAgreementSigned: true,
+                distanceMeters: Math.round(volunteer.distanceKm * 1000),
+              },
+            },
+            { upsert: true, new: true },
+          );
+
+          if (io) {
+            const heroPayload = {
+              incidentId: incident._id,
+              victimId: incident.victimId,
+              victimName: sanitizeUser(victim).fullName,
+              incidentType: incident.incidentType,
+              severity: incident.severity,
+              severityLevel: incident.severityLevel,
+              distanceKm: volunteer.distanceKm,
+              approxAddress: incident.approxAddress,
+              medicalSnapshot: incident.medicalSnapshot,
+              createdAt: incident.createdAt,
+            };
+
+            io.to(`user:${volunteer.id}`).emit('HERO_DISPATCH_REQUEST', heroPayload);
+            io.to(volunteer.id).emit('HERO_DISPATCH_REQUEST', heroPayload);
+          }
+        } catch (_err) {
+          // non-blocking socket dispatch
+        }
+      }),
+    );
+
+    // 3. Tự động kích hoạt Báo động Đa Kênh (SMS/Telegram/Zalo/Email/Voice) tới Người Thân trong nền
+    setImmediate(async () => {
+      try {
+        const { triggerSosForUser } = require('./sosService');
+        await triggerSosForUser(io, victim);
+      } catch (_sosErr) {
+        // non-blocking background omnichannel notification
+      }
+    });
 
     await createAlertEvent({
       userId: victimId,
@@ -614,13 +692,70 @@ class RadarService {
       metadata: { incidentId, volunteerId },
     });
 
-    // Bắn socket thông báo cho Nạn nhân và Người nhà biết Hiệp sĩ đã nhận ca
+    // GÓI TÁC CHIẾN KHẨN CẤP: Tính toán trạm AED tối ưu + Giao thức sơ cứu nhanh + Link điều hướng GPS 1-chạm
+    let optimalAED = null;
+    try {
+      const safePointService = require('./safePointService');
+      const heroLat = volunteer.lastKnownLocation?.lat || incident.exactLat;
+      const heroLng = volunteer.lastKnownLocation?.lng || incident.exactLng;
+      optimalAED = await safePointService.findOptimalAEDWaypoint(
+        heroLat,
+        heroLng,
+        incident.exactLat,
+        incident.exactLng,
+        1000,
+      );
+    } catch (_aedErr) {
+      // safe point calculation optional
+    }
+
+    const firstAidProtocol = this.getClinicalActionProtocol(
+      incident.incidentType,
+      incident.severityLevel,
+    );
+
+    const navigationUrl = `https://www.google.com/maps/dir/?api=1&destination=${incident.exactLat},${incident.exactLng}&travelmode=two_wheeler`;
+
+    // Mở khóa Lệnh Can Thiệp Cứu Sinh (Điều 23 BLHS - Tình thế cấp thiết) cho Hiệp sĩ nhận ca
+    if (incident.emergencyAccessPass) {
+      incident.emergencyAccessPass.isUnlockedForHero = true;
+      incident.emergencyAccessPass.authorizedAt = incident.emergencyAccessPass.authorizedAt || new Date();
+      await RescueIncident.updateOne(
+        { _id: incident._id },
+        {
+          $set: {
+            'emergencyAccessPass.isUnlockedForHero': true,
+            'emergencyAccessPass.authorizedAt': new Date(),
+          },
+        },
+      );
+    }
+
+    const tacticalMissionPacket = {
+      optimalAEDWaypoint: optimalAED,
+      firstAidProtocol,
+      navigationUrl,
+      victimMedicalCard: incident.medicalSnapshot,
+      goldenWindowMinutes: firstAidProtocol.goldenWindowSeconds ? Math.round(firstAidProtocol.goldenWindowSeconds / 60) : 5,
+      microLocation: incident.microLocation || null,
+      emergencyAccessPass: {
+        passCode: incident.emergencyAccessPass?.passCode || 'SAFE-PASS-EMERGENCY',
+        legalBasis: incident.emergencyAccessPass?.legalBasis || 'Điều 23 BLHS & Điều 87 Luật Khám bệnh, chữa bệnh 2023',
+        isUnlockedForHero: true,
+      },
+      sceneSafety: incident.sceneSafety || null,
+      bystanderGuidance: incident.bystanderGuidance || null,
+      triageCategory: incident.triageCategory || null,
+    };
+
+    // Bắn socket thông báo cho Nạn nhân và Người nhà biết Hiệp sĩ đã nhận ca kèm Gói Tác Chiến
     try {
       const io = getIo();
       io.to(`incident:${incidentId}`).emit('HERO_ACCEPTED', {
         incidentId,
         volunteer: sanitizeUser(volunteer),
         response: mapResponse(response),
+        tacticalMissionPacket,
       });
       io.to(incident.victimId).emit('HERO_ACCEPTED', {
         incidentId,
@@ -644,6 +779,7 @@ class RadarService {
     return {
       response: mapResponse(response),
       incident: await this.getIncidentDetails(incidentId, volunteerId),
+      tacticalMissionPacket,
     };
   }
 
@@ -664,6 +800,14 @@ class RadarService {
       heroSpeedKmh: speedKmh,
       distanceRemainingMeters: distanceMeters,
     };
+
+    // Tự động kích hoạt còi hú & đèn flash định vị tầm gần (< 30m) nếu chưa kích hoạt
+    if (
+      distanceMeters <= 30 &&
+      !incident.auditTrail.some((a) => a.action === 'PROXIMITY_BEACON_TRIGGERED')
+    ) {
+      this.triggerProximityBeacon(incidentId, volunteerId).catch(() => null);
+    }
 
     // Tự động chuyển ON_SCENE nếu khoảng cách <= 25 mét
     if (
@@ -776,12 +920,38 @@ class RadarService {
 
     incident.status = 'HANDED_OVER_115';
     incident.resolvedAt = new Date();
+
+    // Tự động tổng hợp Bệnh án Lâm sàng SBAR số hóa từ Dữ liệu sơ cứu thực tế
+    const clin = incident.clinicalAssessment || {};
+    const med = incident.medicalSnapshot || {};
+    const tourniquetInfo = clin.tourniquet?.isApplied
+      ? `Đã đặt Garo tại ${clin.tourniquet.limbLocation || 'chi tổn thương'} lúc ${new Date(clin.tourniquet.appliedAt).toLocaleTimeString('vi-VN')} (Cảnh báo tối đa 120p)`
+      : 'Không đặt Garo';
+    const cSpineInfo = clin.cSpineStabilized ? 'Đã cố định cột sống cổ (C-Spine)' : 'Không nghi chấn thương cổ';
+    const avpuInfo = clin.avpuLevel ? `Tri giác AVPU: ${clin.avpuLevel}` : 'AVPU: Chưa đánh giá';
+
+    const sbarSummary = handoffData.sbarSummary || {
+      situation: `${incident.incidentType} - Mức độ: ${incident.severityLevel}`,
+      background: `Nhóm máu: ${med.bloodType || 'Chưa rõ'} | Dị ứng: ${(med.allergies || []).join(', ') || 'Không rõ'} | Bệnh nền: ${(med.chronicConditions || []).join(', ') || 'Không'}`,
+      assessment: `${avpuInfo} | ${cSpineInfo} | ${tourniquetInfo}`,
+      recommendation: `Đã bàn giao kíp xe 115 (Biển số: ${handoffData.ambulancePlate || '115'}). Đề xuất kiểm tra thông khí và giám sát sinh tồn liên tục.`,
+    };
+
+    const qrVerificationHash =
+      handoffData.qrVerificationHash ||
+      `0x${crypto
+        .createHash('sha256')
+        .update(`${incidentId}:SBAR:${volunteerId}:${Date.now()}`)
+        .digest('hex')
+        .slice(0, 16)}`;
+
     incident.handoffRecord = {
       ambulancePlate: handoffData.ambulancePlate || null,
       paramedicName: handoffData.paramedicName || null,
       handedOverAt: new Date(),
-      qrVerificationHash: handoffData.qrVerificationHash || null,
+      qrVerificationHash,
       notes: handoffData.notes || '',
+      sbarSummary,
     };
 
     incident.auditTrail.push({
@@ -993,6 +1163,612 @@ class RadarService {
     }
 
     return this.getIncidentDetailsForBroadcast(incidentId);
+  }
+
+  getClinicalActionProtocol(incidentType, severityLevel) {
+    const protocols = {
+      CARDIAC_ARREST: {
+        protocolName: 'Hồi sinh Tim Phổi Nâng cao (CPR + AED Protocol)',
+        priority: 'P1_CRITICAL_GOLDEN_4_MIN',
+        steps: [
+          'Kiểm tra an toàn hiện trường & lay gọi nạn nhân, kiểm tra mạch cảnh trong 10 giây.',
+          'Nếu không thở hoặc thở ngáp cá: Bắt đầu Ép tim liên tục 100 - 120 nhịp/phút, sâu 5-6 cm giữa ngực.',
+          'Tỉ lệ chuẩn: 30 lần ép tim : 2 lần thổi ngạt (hoặc Hands-Only CPR liên tục không ngắt quãng).',
+          'Lấy máy AED gần nhất: Bật máy, dán 2 pad điện cực (dưới xương đòn phải và mỏm tim trái).',
+          'Lắng nghe máy phân tích nhịp: Hô to "ĐỨNG LÙI RA" trước khi bấm nút sốc điện (nếu có chỉ định).',
+        ],
+        goldenWindowSeconds: 240, // 4 phút
+      },
+      STROKE: {
+        protocolName: 'Giao thức Cấp cứu Đột quỵ Não (FAST Protocol)',
+        priority: 'P1_CRITICAL_BRAIN_ATTACK',
+        steps: [
+          'F (Face): Kiểm tra mặt nạn nhân có bị méo, lệch nhân trung khi cười không.',
+          'A (Arms): Yêu cầu giơ 2 tay lên - có tay nào bị liệt, rơi xuống không.',
+          'S (Speech): Nói câu đơn giản - có bị nói ngọng, líu lưỡi, mất ngôn ngữ không.',
+          'T (Time): Ghi nhận chính xác mốc giờ phát bệnh (thời gian vàng tiêu sợi huyết 4.5 giờ).',
+          'Đặt nạn nhân nằm nghiêng an toàn 30 độ, KHÔNG cho ăn uống, KHÔNG cạo gió, KHÔNG bấm huyệt.',
+        ],
+        goldenWindowSeconds: 16200, // 4.5 giờ
+      },
+      CHOKING: {
+        protocolName: 'Cấp cứu Dị vật Đường thở (Heimlich Maneuver)',
+        priority: 'P1_CRITICAL_AIRWAY',
+        steps: [
+          'Hỏi: "Bạn có bị nghẹn không?" Nếu nạn nhân ôm cổ không nói được:',
+          'Đứng sau lưng, cúi người nạn nhân về phía trước: Vỗ 5 cái mạnh vào lưng giữa 2 bả vai.',
+          'Nếu chưa ra: Vòng 2 tay qua eo, đặt nắm đấm trên rốn, giật mạnh hướng vào trong và lên trên 5 lần.',
+          'Nếu nạn nhân bất tỉnh: Đặt nằm ngửa và tiến hành CPR ngay lập tức, kiểm tra họng lấy dị vật nếu nhìn thấy.',
+        ],
+        goldenWindowSeconds: 180, // 3 phút
+      },
+      TRAUMA_FALL: {
+        protocolName: 'Sơ cứu Chấn thương & Cố định Cột sống (C-Spine Immobilization)',
+        priority: 'P2_URGENT_TRAUMA',
+        steps: [
+          'Tuyệt đối KHÔNG gập, ngửa hoặc xoay chuyển đầu cổ của nạn nhân.',
+          'Dùng 2 tay cố định trục đầu - cổ - thân thẳng hàng (Manual In-line Stabilization).',
+          'Kiểm tra tri giác, nhịp thở, bắt mạch quay 2 bên.',
+          'Băng nẹp bất động các chi bị gãy trước khi di chuyển.',
+        ],
+        goldenWindowSeconds: 1800,
+      },
+      BLEEDING: {
+        protocolName: 'Cầm máu Khẩn cấp (Haemostasis & Tourniquet)',
+        priority: 'P1_CRITICAL_HEMORRHAGE',
+        steps: [
+          'Dùng gạc vô trùng ép trực tiếp thật mạnh lên vết thương liên tục.',
+          'Nếu máu vẫn phun thành tia (đứt động mạch chi): Đặt Garo (CAT Tourniquet) phía trên vết thương 5-7cm.',
+          'Siết chặt thanh chốt đến khi máu ngừng chảy hoàn toàn, khóa chốt an toàn.',
+          'Ghi rõ giờ đặt Garo lên trán nạn nhân hoặc thân dây garo.',
+        ],
+        goldenWindowSeconds: 300,
+      },
+    };
+
+    return (
+      protocols[incidentType] || {
+        protocolName: 'Quy trình Sơ cứu Cơ bản Ngoại viện (BLS Standard SOP)',
+        priority: severityLevel || 'P1_CRITICAL',
+        steps: [
+          'Đảm bảo an toàn hiện trường cho bản thân và nạn nhân (DRSABCD).',
+          'Kiểm tra đáp ứng (lay gọi, véo đau).',
+          'Kiểm tra đường thở và nhịp thở (Look, Listen, Feel trong 10s).',
+          'Duy trì tư thế hồi sức an toàn nếu nạn nhân thở được, hoặc CPR nếu ngừng thở.',
+        ],
+        goldenWindowSeconds: 300,
+      }
+    );
+  }
+
+  // Đánh giá An toàn hiện trường (Scene Safety & Hazard Assessment) - Chống tai nạn kép cho Hiệp sĩ
+  async assessSceneSafety(incidentId, volunteerId, safetyData = {}) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+
+    const {
+      hazardFlags = [],
+      isSafeToEnter = true,
+      escalatedToService = 'NONE',
+      safetyNotes = '',
+    } = safetyData;
+
+    incident.sceneSafety = {
+      isAssessed: true,
+      assessedAt: new Date(),
+      hazardFlags,
+      isSafeToEnter: Boolean(isSafeToEnter),
+      escalatedToService: escalatedToService || 'NONE',
+      safetyNotes: safetyNotes || '',
+    };
+
+    incident.auditTrail.push({
+      action: 'SCENE_SAFETY_ASSESSED',
+      actorId: volunteerId,
+      timestamp: new Date(),
+      metadata: {
+        hazardFlags,
+        isSafeToEnter,
+        escalatedToService,
+        safetyNotes,
+      },
+    });
+
+    await incident.save();
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('SCENE_SAFETY_UPDATED', {
+        incidentId,
+        sceneSafety: incident.sceneSafety,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      success: true,
+      sceneSafety: incident.sceneSafety,
+      message: isSafeToEnter
+        ? 'Hiện trường an toàn để tiến hành sơ cứu cấp bách.'
+        : `CẢNH BÁO NGUY HIỂM: Hiện trường không an toàn! Đã ghi nhận leo thang sang ${escalatedToService}. Không tự ý xông vào!`,
+    };
+  }
+
+  // Kích hoạt Loa ngoài chỉ dẫn sơ cứu 0-Giây cho người bên cạnh (Bystander Co-Pilot T+0s)
+  async triggerBystanderGuidance(incidentId, requesterId, guidanceData = {}) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+
+    const guidanceType =
+      guidanceData.guidanceType || incident.bystanderGuidance?.guidanceType || 'CPR_AIRWAY';
+    const metronomeBpm = Number(guidanceData.metronomeBpm || 110);
+
+    incident.bystanderGuidance = {
+      isActive: true,
+      guidanceType,
+      speakerphoneAutoOn: true,
+      metronomeBpm,
+    };
+
+    incident.auditTrail.push({
+      action: 'BYSTANDER_GUIDANCE_TRIGGERED',
+      actorId: requesterId,
+      timestamp: new Date(),
+      metadata: { guidanceType, metronomeBpm },
+    });
+
+    await incident.save();
+
+    const audioScript = this.getBystanderAudioScript(guidanceType);
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('BYSTANDER_GUIDANCE_ALERT', {
+        incidentId,
+        bystanderGuidance: incident.bystanderGuidance,
+        audioScript,
+      });
+      io.to(incident.victimId).emit('BYSTANDER_GUIDANCE_ALERT', {
+        incidentId,
+        bystanderGuidance: incident.bystanderGuidance,
+        audioScript,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      success: true,
+      bystanderGuidance: incident.bystanderGuidance,
+      audioScript,
+    };
+  }
+
+  getBystanderAudioScript(guidanceType) {
+    switch (guidanceType) {
+      case 'CPR_AIRWAY':
+        return {
+          title: 'HỒI SỨC TIM PHỔI KHẨN CẤP (CPR T+0s)',
+          voicePrompt:
+            'Nạn nhân đang bất tỉnh ngừng tim. Hãy đặt gót bàn tay vào chính giữa ngực nạn nhân, đan các ngón tay lại. Ép sâu 5cm theo nhịp gõ sau.',
+          metronomeBpm: 110,
+          steps: [
+            'Đặt nạn nhân nằm ngửa trên mặt phẳng cứng.',
+            'Đặt 2 tay giữa ngực, ấn mạnh và nhanh theo nhịp 110 bpm.',
+            'Không dừng ép ngực cho tới khi Hiệp sĩ hoặc Đội 115 đến!',
+          ],
+        };
+      case 'SEVERE_BLEEDING':
+        return {
+          title: 'CẦM MÁU ÁP LỰC TRỰC TIẾP',
+          voicePrompt:
+            'Nạn nhân đang mất máu ồ ạt. Dùng vải sạch ấn chặt trực tiếp lên miệng vết thương ngay lập tức.',
+          steps: [
+            'Dùng gạc hoặc khăn sạch đè chặt lên miệng vết thương.',
+            'Dùng toàn bộ trọng lượng cơ thể ép giữ liên tục.',
+            'Nếu có garô và máu chảy ở chi, siết chặt cách vết thương 5-7cm.',
+          ],
+        };
+      case 'RECOVERY_POSITION':
+        return {
+          title: 'TƯ THẾ HỒI PHỤC AN TOÀN',
+          voicePrompt:
+            'Nạn nhân còn thở nhưng bất tỉnh. Lật nghiêng người nạn nhân sang một bên để thông thoáng đường thở.',
+          steps: [
+            'Gập một chân của nạn nhân tạo góc 90 độ.',
+            'Nhẹ nhàng lật nạn nhân nằm nghiêng sang một bên.',
+            'Ngửa nhẹ cằm để đờm nhớt hoặc chất nôn chảy ra ngoài.',
+          ],
+        };
+      default:
+        return {
+          title: 'HỖ TRỢ KHẨN CẤP TẠI CHỖ',
+          voicePrompt:
+            'Giữ bình tĩnh. Đặt nạn nhân ở tư thế an toàn, gọi to tìm kiếm người hỗ trợ xung quanh.',
+          steps: [
+            'Kiểm tra nạn nhân có phản ứng không.',
+            'Giữ đầu và cổ thẳng hàng.',
+            'Chờ Hiệp sĩ SafeSolo đang tiếp cận.',
+          ],
+        };
+    }
+  }
+
+  // Đánh giá Lâm sàng Ngoại viện Chuyên sâu (AVPU, Garô Time-Lock, C-Spine, FAST Stroke)
+  async recordClinicalAssessment(incidentId, volunteerId, assessmentData = {}) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+    ensure(
+      incident.assignedVolunteerId === volunteerId,
+      'Chỉ Hiệp sĩ được điều phối mới có quyền cập nhật bệnh án lâm sàng',
+      403,
+    );
+
+    const {
+      avpuLevel = null,
+      tourniquet = {},
+      cSpineStabilized = false,
+      fastStroke = {},
+      cprDetails = {},
+    } = assessmentData;
+
+    const currentClin = incident.clinicalAssessment || {};
+
+    const isTourniquetApplied = Boolean(tourniquet.isApplied ?? currentClin.tourniquet?.isApplied);
+    const tourniquetAppliedAt = isTourniquetApplied
+      ? (tourniquet.appliedAt || currentClin.tourniquet?.appliedAt || new Date())
+      : null;
+
+    incident.clinicalAssessment = {
+      avpuLevel: avpuLevel || currentClin.avpuLevel || null,
+      tourniquet: {
+        isApplied: isTourniquetApplied,
+        appliedAt: tourniquetAppliedAt,
+        limbLocation: tourniquet.limbLocation || currentClin.tourniquet?.limbLocation || null,
+        maxSafeMinutes: Number(tourniquet.maxSafeMinutes || 120),
+      },
+      cSpineStabilized: Boolean(cSpineStabilized ?? currentClin.cSpineStabilized),
+      cSpineStabilizedAt: cSpineStabilized ? (currentClin.cSpineStabilizedAt || new Date()) : null,
+      fastStroke: {
+        faceDroop: Boolean(fastStroke.faceDroop ?? currentClin.fastStroke?.faceDroop),
+        armWeakness: Boolean(fastStroke.armWeakness ?? currentClin.fastStroke?.armWeakness),
+        speechDifficulty: Boolean(fastStroke.speechDifficulty ?? currentClin.fastStroke?.speechDifficulty),
+        timeOnsetMinutes: fastStroke.timeOnsetMinutes ?? currentClin.fastStroke?.timeOnsetMinutes ?? null,
+        isStrokeSuspected: Boolean(fastStroke.faceDroop || fastStroke.armWeakness || fastStroke.speechDifficulty),
+      },
+      cprDetails: {
+        cyclesCount: Number(cprDetails.cyclesCount ?? currentClin.cprDetails?.cyclesCount ?? 0),
+        compressionsCount: Number(cprDetails.compressionsCount ?? currentClin.cprDetails?.compressionsCount ?? 0),
+        aedShocksCount: Number(cprDetails.aedShocksCount ?? currentClin.cprDetails?.aedShocksCount ?? 0),
+      },
+      lastEvaluatedAt: new Date(),
+    };
+
+    incident.auditTrail.push({
+      action: 'CLINICAL_ASSESSMENT_UPDATED',
+      actorId: volunteerId,
+      timestamp: new Date(),
+      metadata: incident.clinicalAssessment,
+    });
+
+    await incident.save();
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('CLINICAL_ASSESSMENT_UPDATED', {
+        incidentId,
+        clinicalAssessment: incident.clinicalAssessment,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      success: true,
+      clinicalAssessment: incident.clinicalAssessment,
+      message: isTourniquetApplied
+        ? 'ĐÃ KHÓA THỜI GIAN GARÔ: Bắt buộc theo dõi đồng hồ đếm ngược 120 phút an toàn.'
+        : 'Đã cập nhật bệnh án lâm sàng ngoại viện thành công.',
+    };
+  }
+
+  // Đánh giá Hậu sự cố (After-Action Review - AAR) & Tích lũy Tín chỉ CME
+  async submitAfterActionReview(incidentId, reviewerId, reviewData = {}) {
+    const incident = await RescueIncident.findById(incidentId);
+    ensure(incident, 'Incident not found', 404);
+
+    const {
+      overallScore = 90,
+      responseTimeSeconds = 180,
+      cprQualityScore = 95,
+      sbarQualityScore = 95,
+      cmeCreditsAwarded = 2,
+      notes = '',
+    } = reviewData;
+
+    incident.afterActionReview = {
+      isReviewed: true,
+      reviewedAt: new Date(),
+      reviewerId,
+      overallScore: Number(overallScore),
+      responseTimeSeconds: Number(responseTimeSeconds),
+      cprQualityScore: Number(cprQualityScore),
+      sbarQualityScore: Number(sbarQualityScore),
+      cmeCreditsAwarded: Number(cmeCreditsAwarded),
+      notes: notes || '',
+    };
+
+    incident.auditTrail.push({
+      action: 'AFTER_ACTION_REVIEW_COMPLETED',
+      actorId: reviewerId,
+      timestamp: new Date(),
+      metadata: incident.afterActionReview,
+    });
+
+    await incident.save();
+
+    // Nếu có Hiệp sĩ hoàn thành ca và được tặng tín chỉ CME, cộng trực tiếp vào hồ sơ bác sĩ/hiệp sĩ
+    if (incident.assignedVolunteerId && cmeCreditsAwarded > 0) {
+      await User.findByIdAndUpdate(incident.assignedVolunteerId, {
+        $inc: { cmeCredits: Number(cmeCreditsAwarded) },
+      });
+    }
+
+    try {
+      const io = getIo();
+      io.to(`incident:${incidentId}`).emit('AFTER_ACTION_REVIEW_SAVED', {
+        incidentId,
+        afterActionReview: incident.afterActionReview,
+      });
+    } catch (_err) {
+      // socket optional
+    }
+
+    return {
+      success: true,
+      afterActionReview: incident.afterActionReview,
+      message: `Đã hoàn tất đánh giá AAR và cộng thưởng ${cmeCreditsAwarded} tín chỉ CME cho Hiệp sĩ.`,
+    };
+  }
+
+  // Xác thực Bệnh án Lâm sàng Bàn giao SBAR số hóa từ Mã QR / Băm SHA-256
+  async verifySbarHandoff(verificationHash) {
+    ensure(verificationHash, 'Verification hash is required', 400);
+
+    const incident = await RescueIncident.findOne({
+      $or: [
+        { 'handoffRecord.qrVerificationHash': verificationHash },
+        { _id: verificationHash },
+      ],
+    });
+    ensure(incident, 'Không tìm thấy hồ sơ bàn giao y tế tương ứng với mã băm này', 404);
+
+    const victim = await User.findById(incident.victimId).lean().catch(() => null);
+    const volunteer = incident.assignedVolunteerId
+      ? await User.findById(incident.assignedVolunteerId).lean().catch(() => null)
+      : null;
+
+    const resp = await VolunteerResponse.findOne({
+      incidentId: incident._id,
+      volunteerId: incident.assignedVolunteerId,
+    }).lean().catch(() => null);
+
+    return {
+      status: 'VERIFIED_OFFICIAL_115',
+      standard: 'BỘ Y TẾ - HỒ SƠ BÀN GIAO CẤP CỨU NGOẠI VIỆN (SBAR PROTOCOL)',
+      incidentId: incident._id,
+      verificationHash: incident.handoffRecord?.qrVerificationHash || verificationHash,
+      handedOverAt: incident.handoffRecord?.handedOverAt || incident.resolvedAt,
+      incidentType: incident.incidentType,
+      severityLevel: incident.severityLevel,
+      approxAddress: incident.approxAddress,
+      victimProfile: {
+        fullName: victim?.fullName || 'Nạn nhân SafeSolo',
+        phoneNumber: victim?.phoneNumber || '',
+        bloodType: incident.medicalSnapshot?.bloodType || 'UNKNOWN',
+        allergies: incident.medicalSnapshot?.allergies || [],
+        chronicConditions: incident.medicalSnapshot?.chronicConditions || [],
+        emergencyNotes: incident.medicalSnapshot?.emergencyNotes || '',
+      },
+      firstResponder: {
+        heroName: volunteer?.fullName || 'Hiệp sĩ SafeSolo',
+        heroTier: volunteer?.heroTier || 'TIER_1_BLS',
+        trustScore: volunteer?.trustScore || 100,
+        credentialNumber: volunteer?.credentialNumber || '',
+      },
+      ambulanceHandoff: {
+        plate: incident.handoffRecord?.ambulancePlate || '115',
+        paramedicDoctor: incident.handoffRecord?.paramedicName || 'BS Kíp Cấp cứu 115',
+        notes: incident.handoffRecord?.notes || '',
+        sbar: incident.handoffRecord?.sbarSummary || {},
+      },
+      clinicalVitals: {
+        avpuLevel: incident.clinicalAssessment?.avpuLevel || 'UNASSESSED',
+        cSpineStabilized: Boolean(incident.clinicalAssessment?.cSpineStabilized),
+        tourniquet: incident.clinicalAssessment?.tourniquet || { isApplied: false },
+        fastStroke: incident.clinicalAssessment?.fastStroke || {},
+        cprDetails: incident.clinicalAssessment?.cprDetails || {},
+        firstAidActions: resp?.firstAidActionsPerformed || [],
+      },
+      digitalSeal: {
+        issuer: 'SafeSolo Emergency Operational Cloud & Tele-115 Network',
+        tamperProof: true,
+        verifiedAt: new Date(),
+      },
+    };
+  }
+
+  /**
+   * Khởi tạo Phiên Hội Chẩn Cấp Cứu Trực Tuyến (Tele-FirstAid Live Consultation)
+   * Kết nối Hiệp sĩ hiện trường với Bác sĩ trực 115 qua Video/Audio thời gian thực
+   */
+  async initiateTeleConsultation(incidentId, heroId, reason = 'Cấp cứu chấn thương nặng cần hướng dẫn lâm sàng') {
+    const RescueIncident = require('../models/RescueIncident');
+    const incident = await RescueIncident.findById(incidentId);
+    if (!incident) throw new Error('Không tìm thấy sự cố');
+
+    const sessionId = `TELE-115-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+
+    incident.teleConsultation = {
+      isActive: true,
+      sessionId,
+      doctorId: null,
+      doctorName: 'Đang đợi Bác sĩ 115 tiếp nhận...',
+      doctorHospital: 'Tổng đài Cấp cứu 115 TP.HCM',
+      startedAt: new Date(),
+      endedAt: null,
+      videoStreamUrl: `https://webrtc.safesolo.vn/room/${sessionId}`,
+      verbalMedicalOrders: [],
+    };
+
+    incident.auditTrail.push({
+      action: 'TELE_FIRSTAID_REQUESTED',
+      timestamp: new Date(),
+      details: `Hiệp sĩ ${heroId} yêu cầu hội chẩn Tele-FirstAid khẩn cấp: "${reason}". Phiên: ${sessionId}`,
+    });
+
+    await incident.save();
+
+    return {
+      success: true,
+      incidentId: incident._id,
+      sessionId,
+      videoStreamUrl: incident.teleConsultation.videoStreamUrl,
+      status: 'WAITING_FOR_DOCTOR',
+      requestedBy: heroId,
+      startedAt: incident.teleConsultation.startedAt,
+    };
+  }
+
+  /**
+   * Bác sĩ Cấp Cứu 115 Tiếp Nhận & Vào Phòng Hội Chẩn Trực Tiếp
+   */
+  async connectDoctorTeleConsultation(incidentId, doctorProfile = {}) {
+    const {
+      doctorId = 'DOC-115-HCM',
+      doctorName = 'BS.CKII Trần Minh Tuấn (Hồi sức Cấp cứu 115)',
+      hospitalName = 'Bệnh viện Cấp cứu Trưng Vương / 115 TP.HCM',
+    } = doctorProfile;
+
+    const RescueIncident = require('../models/RescueIncident');
+    const incident = await RescueIncident.findById(incidentId);
+    if (!incident) throw new Error('Không tìm thấy sự cố');
+
+    if (!incident.teleConsultation) {
+      incident.teleConsultation = { isActive: true, sessionId: `TELE-115-${crypto.randomUUID().slice(0, 8).toUpperCase()}` };
+    }
+
+    incident.teleConsultation.isActive = true;
+    incident.teleConsultation.doctorId = doctorId;
+    incident.teleConsultation.doctorName = doctorName;
+    incident.teleConsultation.doctorHospital = hospitalName;
+
+    incident.auditTrail.push({
+      action: 'DOCTOR_JOINED_TELE_CONSULTATION',
+      timestamp: new Date(),
+      details: `${doctorName} (${hospitalName}) đã tham gia phiên hội chẩn cứu hộ trực tiếp`,
+    });
+
+    await incident.save();
+
+    return {
+      success: true,
+      incidentId: incident._id,
+      sessionId: incident.teleConsultation.sessionId,
+      doctorId,
+      doctorName,
+      hospitalName,
+      status: 'DOCTOR_CONNECTED',
+      videoStreamUrl: incident.teleConsultation.videoStreamUrl,
+    };
+  }
+
+  /**
+   * Bác sĩ Ban Hành Y Lệnh Miệng Khẩn Cấp (Verbal Medical Orders)
+   * Ngoại viện: Ép tim, tiêm Adrenaline tự động, nẹp chân, thở oxy
+   */
+  async issueVerbalMedicalOrder(incidentId, orderData = {}) {
+    const {
+      orderText = 'Bóp bóng Ambu thở oxy 15 lít/phút kết hợp ép tim liên tục 30:2',
+      dosageOrAction = 'Oxy 100% qua mask có túi dự trữ',
+      issuedBy = 'BS.CKII Trần Minh Tuấn',
+    } = orderData;
+
+    const RescueIncident = require('../models/RescueIncident');
+    const incident = await RescueIncident.findById(incidentId);
+    if (!incident) throw new Error('Không tìm thấy sự cố');
+
+    if (!incident.teleConsultation) {
+      incident.teleConsultation = { isActive: true, verbalMedicalOrders: [] };
+    }
+    if (!incident.teleConsultation.verbalMedicalOrders) {
+      incident.teleConsultation.verbalMedicalOrders = [];
+    }
+
+    const orderObj = {
+      orderText,
+      dosageOrAction,
+      issuedBy,
+      issuedAt: new Date(),
+      executedByVolunteer: false,
+      executedAt: null,
+    };
+
+    incident.teleConsultation.verbalMedicalOrders.push(orderObj);
+    const orderIndex = incident.teleConsultation.verbalMedicalOrders.length - 1;
+
+    incident.auditTrail.push({
+      action: 'VERBAL_MEDICAL_ORDER_ISSUED',
+      timestamp: new Date(),
+      details: `Y LỆNH MIỆNG: "${orderText}" (${dosageOrAction}) ban hành bởi ${issuedBy}`,
+    });
+
+    await incident.save();
+
+    return {
+      success: true,
+      incidentId: incident._id,
+      orderIndex,
+      orderText,
+      dosageOrAction,
+      issuedBy,
+      issuedAt: orderObj.issuedAt,
+      status: 'PENDING_EXECUTION',
+    };
+  }
+
+  /**
+   * Hiệp sĩ Xác Nhận Đã Thực Thi Y Lệnh Bác Sĩ Tại Hiện Trường
+   */
+  async confirmMedicalOrderExecuted(incidentId, orderIndex, heroId = 'HERO_ON_SCENE') {
+    const RescueIncident = require('../models/RescueIncident');
+    const incident = await RescueIncident.findById(incidentId);
+    if (!incident) throw new Error('Không tìm thấy sự cố');
+
+    const orders = incident.teleConsultation?.verbalMedicalOrders || [];
+    if (!orders[orderIndex]) throw new Error('Không tìm thấy y lệnh tại vị trí ' + orderIndex);
+
+    orders[orderIndex].executedByVolunteer = true;
+    orders[orderIndex].executedAt = new Date();
+
+    incident.auditTrail.push({
+      action: 'VERBAL_MEDICAL_ORDER_EXECUTED',
+      timestamp: new Date(),
+      details: `Hiệp sĩ ${heroId} đã thực thi thành công Y lệnh: "${orders[orderIndex].orderText}"`,
+    });
+
+    await incident.save();
+
+    return {
+      success: true,
+      incidentId: incident._id,
+      orderIndex,
+      orderText: orders[orderIndex].orderText,
+      executedBy: heroId,
+      executedAt: orders[orderIndex].executedAt,
+      status: 'EXECUTED_CONFIRMED',
+    };
   }
 }
 

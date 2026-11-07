@@ -191,7 +191,9 @@ class _BiometricResonanceSheetState extends State<BiometricResonanceSheet>
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      member.name.substring(0, 1).toUpperCase(),
+                      member.name.trim().isNotEmpty
+                          ? member.name.trim().substring(0, 1).toUpperCase()
+                          : 'M',
                       style: AppTextStyles.h2.copyWith(color: Colors.white, fontSize: 20),
                     ),
                   ),

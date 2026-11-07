@@ -65,3 +65,4 @@ watch-interface/
 scratch/
 tools/
 *.exe
+~$*

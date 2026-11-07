@@ -347,6 +347,215 @@ class _BloodRelayPageState extends State<BloodRelayPage> {
     );
   }
 
+  Future<void> _showDonorCertificateModal(String requestId, String donorId) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => FutureBuilder<Map<String, dynamic>>(
+        future: ApiService.instance.getBloodDonorCertificate(requestId, donorId),
+        builder: (ctx, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Dialog(
+              backgroundColor: Color(0xFF0F172A),
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFFEF4444)),
+                    SizedBox(height: 16),
+                    Text(
+                      'Đang truy xuất chứng thư mật mã số hóa...',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final cert = snapshot.data ?? {};
+          final certNum = cert['certificateNumber']?.toString() ?? 'CERT-BLOOD-2026';
+          final donorName = cert['donorName']?.toString() ?? 'Hiệp Sĩ SafeBlood';
+          final bloodGroup = cert['bloodGroup']?.toString() ?? 'O-';
+          final units = cert['unitsDonated'] ?? 1;
+          final hospital = cert['hospitalName']?.toString() ?? 'Bệnh viện Chợ Rẫy TP.HCM';
+          final seal = cert['digitalSeal'] as Map<String, dynamic>? ?? {};
+          final proofHash = seal['blockchainProofHash']?.toString() ?? '0xSAFEBLOOD...';
+
+          return Dialog(
+            backgroundColor: const Color(0xFF0F172A),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: Color(0xFFF59E0B), width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            certNum,
+                            style: const TextStyle(
+                              color: Color(0xFFF59E0B),
+                              fontWeight: FontWeight.w800,
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(dialogCtx),
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8), size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.volunteer_activism_rounded, color: Color(0xFFEF4444), size: 32),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'HỘI CHỮ THẬP ĐỎ · MẠNG LƯỚI SAFEBLOOD',
+                      style: TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'GIẤY CHỨNG NHẬN HIẾN MÁU\nTÌNH NGUYỆN',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Trân trọng tri ân nghĩa cử cao đẹp vì cộng đồng của:',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      donorName,
+                      style: const TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Nhóm máu hiến:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                              Text(bloodGroup, style: const TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w900, fontSize: 13)),
+                            ],
+                          ),
+                          const Divider(color: Color(0xFF334155), height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Thể tích máu:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                              Text('${units * 250} ml ($units đơn vị)', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ],
+                          ),
+                          const Divider(color: Color(0xFF334155), height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Cơ sở tiếp nhận:', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                              Expanded(
+                                child: Text(
+                                  hospital,
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 11),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: QrImageView(
+                          data: 'SAFESOLO:BLOOD-CERT:$certNum:$proofHash',
+                          version: QrVersions.auto,
+                          size: 110.0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Bằng chứng số SHA-256: ${proofHash.length > 20 ? proofHash.substring(0, 20) : proofHash}...',
+                      style: const TextStyle(color: Color(0xFF64748B), fontSize: 9, fontFamily: 'monospace'),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                        label: const Text('Đã Lưu Vào Ví Hồ Sơ Y Tế', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _callHospital(String phone) async {
     final clean = phone.replaceAll(RegExp(r'[^0-9+]'), '');
     if (clean.isEmpty) return;
@@ -854,17 +1063,34 @@ class _BloodRelayPageState extends State<BloodRelayPage> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _handleAccept(r),
-                    icon: const Icon(Icons.volunteer_activism_rounded, size: 16),
-                    label: const Text('Nhận Ca Tiếp Ứng', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFEF4444),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
+                  child: r['status'] == 'DELIVERED_AND_FULFILLED'
+                      ? ElevatedButton.icon(
+                          onPressed: () {
+                            final reqId = r['_id']?.toString() ?? r['id']?.toString() ?? '';
+                            final donors = r['matchedDonors'] as List<dynamic>? ?? [];
+                            final donorId = donors.isNotEmpty ? donors.first['donorId']?.toString() ?? 'DONOR' : 'DONOR';
+                            _showDonorCertificateModal(reqId, donorId);
+                          },
+                          icon: const Icon(Icons.military_tech_rounded, size: 16),
+                          label: const Text('Xem Chứng Nhận Điện Tử', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD97706),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () => _handleAccept(r),
+                          icon: const Icon(Icons.volunteer_activism_rounded, size: 16),
+                          label: const Text('Nhận Ca Tiếp Ứng', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFEF4444),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
                 ),
               ],
             ),

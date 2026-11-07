@@ -60,6 +60,46 @@ class SafePointController {
       next(err);
     }
   }
+
+  async reportTelemetry(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await safePointService.reportIotCabinetTelemetry(id, req.body);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async resolveTamper(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await safePointService.resolveTamperAlert(id, req.body);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getFleetHealth(req, res, next) {
+    try {
+      const result = await safePointService.getAedFleetHealthOverview();
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async locateHeatstroke(req, res, next) {
+    try {
+      const lat = Number(req.body.lat || req.query.lat || 10.7769);
+      const lng = Number(req.body.lng || req.query.lng || 106.7009);
+      const result = await safePointService.findNearestHeatstrokeStation(lat, lng);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new SafePointController();

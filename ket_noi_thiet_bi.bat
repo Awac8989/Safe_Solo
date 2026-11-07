@@ -12,22 +12,37 @@ echo    CÔNG CỤ KẾT NỐI TỰ ĐỘNG THIẾT BỊ ANDROID ^& GALAXY WATCH
 echo =========================================================================
 echo.
 echo [1] KẾT NỐI QUA DÂY CÁP USB (KHUYÊN DÙNG - CẮM LÀ TỰ ĐỘNG NHẬN, BẤT KỂ WIFI NÀO)
-echo [2] Kết nối Điện thoại qua Wi-Fi (IP: 192.168.1.8)
-echo [3] Kết nối Đồng hồ Galaxy Watch qua Wi-Fi (IP: 192.168.1.9)
-echo [4] Cố định cổng Wi-Fi 5555 (Cắm cáp 1 lần rồi rút ra dùng Wi-Fi không đổi port)
-echo [5] Kiểm tra danh sách thiết bị đang kết nối (adb devices)
-echo [6] Khởi động lại trình dịch ADB (adb kill-server)
+echo [2] Kết nối Điện thoại qua Wi-Fi (IP: 192.168.1.7)
+echo [3] Ghép nối thiết bị mới bằng mã 6 số (Pairing code)
+echo [4] Kết nối Đồng hồ Galaxy Watch qua Wi-Fi (IP: 192.168.1.9)
+echo [5] Cố định cổng Wi-Fi 5555 (Cắm cáp 1 lần rồi rút ra dùng Wi-Fi không đổi port)
+echo [6] Kiểm tra danh sách thiết bị đang kết nối (adb devices)
+echo [7] Khởi động lại trình dịch ADB (adb kill-server)
 echo [0] Thoát
 echo.
-set /p opt="Chọn thao tác [1-6, 0]: "
+set /p opt="Chọn thao tác [1-7, 0]: "
 
 if "%opt%"=="1" goto CONNECT_USB
 if "%opt%"=="2" goto CONNECT_PHONE_WIFI
-if "%opt%"=="3" goto CONNECT_WATCH_WIFI
-if "%opt%"=="4" goto SETUP_TCPIP_5555
-if "%opt%"=="5" goto CHECK_DEVICES
-if "%opt%"=="6" goto RESTART_ADB
+if "%opt%"=="3" goto PAIR_CODE
+if "%opt%"=="4" goto CONNECT_WATCH_WIFI
+if "%opt%"=="5" goto SETUP_TCPIP_5555
+if "%opt%"=="6" goto CHECK_DEVICES
+if "%opt%"=="7" goto RESTART_ADB
 if "%opt%"=="0" exit
+goto MENU
+
+:PAIR_CODE
+cls
+echo [GHÉP NỐI THIẾT BỊ BẰNG MÃ 6 SỐ]:
+echo Bấm "Ghép nối thiết bị bằng mã ghép nối" trên màn hình điện thoại/đồng hồ.
+set /p p_ip=">> Nhập IP thiết bị (Mặc định 192.168.1.7): "
+if "%p_ip%"=="" set p_ip=192.168.1.7
+set /p p_port=">> Nhập CỔNG ghép nối (VD: 39485): "
+set /p p_code=">> Nhập MÃ ghép nối 6 số: "
+%ADB% pair %p_ip%:%p_port% %p_code%
+echo.
+pause
 goto MENU
 
 :CONNECT_USB
@@ -49,10 +64,13 @@ goto MENU
 :CONNECT_PHONE_WIFI
 cls
 echo [KẾT NỐI ĐIỆN THOẠI QUA WI-FI]:
-set /p phone_port="Nhập số cổng Port trên màn hình điện thoại (VD: 41647): "
-if "%phone_port%"=="" set phone_port=41647
-echo Đang kết nối tới 192.168.1.8:%phone_port% ...
-%ADB% connect 192.168.1.8:%phone_port%
+set /p phone_ip="Nhập IP điện thoại (Mặc định: 192.168.1.7): "
+if "%phone_ip%"=="" set phone_ip=192.168.1.7
+set /p phone_port="Nhập số cổng Port trên màn hình điện thoại (VD: 40817): "
+if "%phone_port%"=="" set phone_port=40817
+echo Đang kết nối tới %phone_ip%:%phone_port% ...
+%ADB% connect %phone_ip%:%phone_port%
+%ADB% reverse tcp:4000 tcp:4000
 echo.
 %ADB% devices
 echo.

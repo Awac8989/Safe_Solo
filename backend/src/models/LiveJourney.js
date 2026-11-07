@@ -32,6 +32,23 @@ const LiveJourneySchema = new mongoose.Schema(
     lastPingAt: { type: Date, default: Date.now },
     batteryLevel: { type: Number, default: null },
     waypoints: [WaypointSchema],
+
+    // Chế độ Lộ trình An toàn Đêm khuya & Hộ tống Ảo (Nighttime Safe Route & Ghost Companion)
+    safeRouteScore: { type: Number, default: 85 },
+    travelMode: { type: String, enum: ['WALKING', 'MOTORBIKE', 'BICYCLE'], default: 'WALKING' },
+    ghostCompanionActive: { type: Boolean, default: true },
+    deviationAlertTriggered: { type: Boolean, default: false },
+    lastAnomalyDetectedAt: { type: Date, default: null },
+    anomalyReason: { type: String, default: '' },
+    safePoisAlongRoute: [
+      {
+        name: { type: String },
+        type: { type: String, default: 'CONVENIENCE_STORE_247' },
+        lat: { type: Number },
+        lng: { type: Number },
+      },
+    ],
+    autoSosOnTimeout: { type: Boolean, default: true },
   },
   {
     timestamps: true,

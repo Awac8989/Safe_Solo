@@ -23,8 +23,9 @@ ADB_PATH = r"C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe"
 if not os.path.exists(ADB_PATH):
     ADB_PATH = "adb"
 
-PHONE_IP = "192.168.1.8"
-WATCH_IP = "192.168.1.9"
+PHONE_IPS = ["192.168.1.12", "192.168.1.8"]
+WATCH_IPS = ["192.168.1.7", "192.168.1.9"]
+WATCH_IP = "192.168.1.7"
 
 def run_adb(args, timeout=10):
     cmd = [ADB_PATH] + args
@@ -47,9 +48,10 @@ def is_port_open(ip, port, timeout=0.15):
     return False
 
 def find_active_port(ip, port_range=(32000, 47000)):
-    # 1. Thử port 5555 chuẩn trước (chờ tối đa 0.35s)
-    if is_port_open(ip, 5555, timeout=0.35):
-        return 5555
+    # 1. Thử port 5555 chuẩn và các cổng gần nhất trước (rất nhanh)
+    for quick_p in [5555, 38235, 41815]:
+        if is_port_open(ip, quick_p, timeout=0.25):
+            return quick_p
     
     # 2. Quét đa luồng dải Wireless Debugging
     with ThreadPoolExecutor(max_workers=200) as executor:
@@ -72,9 +74,9 @@ def get_connected_devices():
             connected.append(parts[0])
     return connected
 
-def connect_device(name, ip):
+def connect_device(name, ip, explicit_port=None):
     print(f"\n[*] Đang kiểm tra {name} ({ip})...")
-    port = find_active_port(ip)
+    port = explicit_port or find_active_port(ip)
     if not port:
         print(f"    [-] Không tìm thấy cổng mở trên {ip}.")
         print(f"        -> Vui lòng kiểm tra: 'Gỡ lỗi qua Wi-Fi' đã BẬT và màn hình sáng chưa.")
@@ -103,48 +105,69 @@ def connect_device(name, ip):
     return True
 
 def pair_wizard():
-    print("\n" + "="*60)
-    print("      HƯỚNG DẪN GHÉP NỐI THIẾT BỊ LẦN ĐẦU (GALAXY WATCH / PHONE)")
-    print("="*60)
-    print("1. Trên màn hình Đồng hồ hoặc Điện thoại:")
-    print("   Vào 'Gỡ lỗi qua Wi-Fi' -> Bấm 'Ghép đôi thiết bị mới' (Pair new device).")
-    print("2. Màn hình sẽ hiển thị:")
-    print("   - Địa chỉ IP và Cổng ghép nối (Ví dụ: 192.168.1.9:38123)")
-    print("   - Mã ghép nối Wi-Fi (6 chữ số, Ví dụ: 849201)")
-    print("-"*60)
+    print("\n" + "="*65)
+    print("      HƯỚNG DẪN GHÉP NỐI THIẾT BỊ LẦN ĐẦU (PAIRING)")
+    print("="*65)
+    print("1. Trên màn hình 'Gỡ lỗi qua Wi-Fi' của Điện thoại / Đồng hồ:")
+    print("   Bấm: 'Ghép nối thiết bị bằng mã ghép nối' (Pair device with pairing code).")
+    print("2. Hộp thoại trên máy sẽ hiển thị:")
+    print("   - Địa chỉ IP & Cổng ghép nối (Ví dụ: 192.168.1.7:39485)")
+    print("   - Mã ghép nối Wi-Fi (6 chữ số)")
+    print("-"*65)
+    print("[1] Đồng hồ Galaxy Watch (SM-R900 - IP mặc định: 192.168.1.7)")
+    print("[2] Điện thoại Samsung A71 (IP mặc định: 192.168.1.12)")
+    print("[3] Nhập địa chỉ IP khác")
+    dev_choice = input(">> Chọn thiết bị cần ghép nối [1-3] (Mặc định: 1): ").strip()
     
-    target_input = input(">> Nhập [IP:Cổng] ghép nối (Mặc định 192.168.1.9:.....): ").strip()
-    if not target_input:
-        print("[-] Bạn chưa nhập địa chỉ!")
-        return
-    
-    if ":" not in target_input:
-        target_input = f"{WATCH_IP}:{target_input}"
+    if dev_choice == "2":
+        default_ip = "192.168.1.12"
+        dev_name = "Điện thoại Samsung A71"
+    elif dev_choice == "3":
+        default_ip = input(">> Nhập IP thiết bị: ").strip()
+        dev_name = "Thiết bị tùy chỉnh"
+    else:
+        default_ip = "192.168.1.7"
+        dev_name = "Đồng hồ Galaxy Watch (SM-R900)"
         
-    code_input = input(">> Nhập [Mã ghép nối 6 chữ số]: ").strip()
+    port_input = input(f">> Nhập CỔNG GHÉP NỐI (5 số cuối sau dấu hai chấm, VD 39485): ").strip()
+    if not port_input:
+        print("[-] Bạn chưa nhập cổng ghép nối!")
+        return
+        
+    target_pair = f"{default_ip}:{port_input}" if ":" not in port_input else port_input
+    code_input = input(">> Nhập MÃ GHÉP NỐI 6 CHỮ SỐ: ").strip()
     if not code_input:
         print("[-] Bạn chưa nhập mã ghép nối!")
         return
         
-    print(f"\n[*] Đang gửi yêu cầu ghép nối tới {target_input} với mã {code_input}...")
-    pair_res = run_adb(["pair", target_input, code_input])
+    print(f"\n[*] Đang gửi yêu cầu ghép nối tới {target_pair} với mã {code_input}...")
+    pair_res = run_adb(["pair", target_pair, code_input])
     print(f"-> Kết quả: {pair_res}")
     
     if "Successfully paired" in pair_res or "paired" in pair_res.lower():
-        print("[+] Ghép nối thành công! Thiết bị đã ghi nhớ máy tính này vĩnh viễn.")
-        ip_only = target_input.split(":")[0]
+        print(f"[+] Ghép nối thành công {dev_name}! Máy tính đã được ghi nhớ vĩnh viễn.")
+        ip_only = target_pair.split(":")[0]
         time.sleep(1)
-        connect_device("Thiết bị vừa ghép nối", ip_only)
+        connect_device(dev_name, ip_only)
     else:
-        print("[-] Ghép nối chưa thành công. Vui lòng kiểm tra lại mã số hoặc đảm bảo đồng hồ không tắt màn hình.")
+        print("[-] Ghép nối chưa thành công. Vui lòng kiểm tra lại mã số hoặc đảm bảo màn hình thiết bị đang sáng.")
 
 def run_once():
     print("="*65)
     print("        SAFESOLO - TỰ ĐỘNG DÒ TÌM & KẾT NỐI THIẾT BỊ KHÔNG DÂY")
     print("="*65)
     
-    p_ok = connect_device("Điện thoại Samsung A71", PHONE_IP)
-    w_ok = connect_device("Đồng hồ Galaxy Watch (SM-R900)", WATCH_IP)
+    p_ok = False
+    for p_ip in PHONE_IPS:
+        if connect_device(f"Điện thoại Samsung A71 ({p_ip})", p_ip):
+            p_ok = True
+            break
+            
+    w_ok = False
+    for w_ip in WATCH_IPS:
+        if connect_device(f"Đồng hồ Galaxy Watch (SM-R900 - {w_ip})", w_ip):
+            w_ok = True
+            break
     
     print("\n" + "="*65)
     print("               DANH SÁCH THIẾT BỊ HIỆN TẠI TRONG ADB")
@@ -169,15 +192,17 @@ def monitor_mode():
     while True:
         try:
             connected = get_connected_devices()
-            phone_connected = any(PHONE_IP in d for d in connected)
+            phone_connected = any(p_ip in d for p_ip in PHONE_IPS for d in connected)
             watch_connected = any(WATCH_IP in d for d in connected)
             
             if not phone_connected:
                 # Kiểm tra xem điện thoại có đang mở port không
-                port = find_active_port(PHONE_IP)
-                if port:
-                    print(f"\n[PHÁT HIỆN] Điện thoại A71 vừa bật Wi-Fi Debugging ở cổng {port}!")
-                    connect_device("Điện thoại Samsung A71", PHONE_IP)
+                for p_ip in PHONE_IPS:
+                    port = find_active_port(p_ip)
+                    if port:
+                        print(f"\n[PHÁT HIỆN] Điện thoại A71 vừa bật Wi-Fi Debugging ({p_ip}) ở cổng {port}!")
+                        connect_device(f"Điện thoại Samsung A71 ({p_ip})", p_ip, port)
+                        break
                     
             if not watch_connected:
                 port = find_active_port(WATCH_IP)

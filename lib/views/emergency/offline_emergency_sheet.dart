@@ -7,6 +7,7 @@ import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/offline_resilience_service.dart';
 import '../../services/offline_sos_service.dart';
+import '../../services/api_service.dart';
 import 'ble_mesh_radar_sheet.dart';
 
 class OfflineEmergencySheet extends StatefulWidget {

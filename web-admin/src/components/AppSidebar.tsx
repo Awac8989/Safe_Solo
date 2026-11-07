@@ -16,6 +16,8 @@ import {
   Compass,
   Droplets,
   Scale,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import {
@@ -64,15 +66,15 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-sos/15 text-sos pulse-sos">
-            <ShieldAlert className="h-5 w-5" />
+        <div className="flex items-center gap-2.5 px-3 py-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20">
+            <ShieldAlert className="h-4 w-4" />
           </div>
           {!collapsed && (
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-bold tracking-wide">Alive?</span>
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                Điều phối khẩn cấp
+              <span className="text-sm font-bold tracking-wide text-foreground">SafeSolo</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                Trung tâm Điều phối TOC
               </span>
             </div>
           )}
@@ -132,6 +134,43 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Group 4: Cổng thông tin & Phác đồ */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Showcase & Tài liệu</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <a
+                    href="https://awac8989.github.io/Safe_Solo/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-rose-400 hover:text-rose-300"
+                  >
+                    <Globe className="h-4 w-4 text-rose-500" />
+                    {!collapsed && <span>Cổng Showcase Đề Tài</span>}
+                    {!collapsed && <ExternalLink className="h-3 w-3 ml-auto opacity-70" />}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <a
+                    href="https://awac8989.github.io/Safe_Solo/SLIDE_THUYET_TRINH_BAO_VE_KHOA_LUAN_SAFESOLO.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-cyan-400 hover:text-cyan-300"
+                  >
+                    <ScrollText className="h-4 w-4 text-cyan-500" />
+                    {!collapsed && <span>Slide Bảo Vệ F11</span>}
+                    {!collapsed && <ExternalLink className="h-3 w-3 ml-auto opacity-70" />}
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

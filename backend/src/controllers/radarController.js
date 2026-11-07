@@ -241,6 +241,161 @@ class RadarController {
       next(error);
     }
   }
+
+  // @desc    Assess scene safety & hazards before entering (< 50m)
+  // @route   POST /api/radar/:incidentId/scene-safety
+  // @access  Private (Assigned Hero)
+  async assessSceneSafety(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.assessSceneSafety(
+        incidentId,
+        req.user.id,
+        req.body,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Trigger or update bystander guidance & CPR audio metronome
+  // @route   POST /api/radar/:incidentId/bystander-guidance
+  // @access  Private
+  async triggerBystanderGuidance(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.triggerBystanderGuidance(
+        incidentId,
+        req.user.id,
+        req.body,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Get Emergency Access Pass & Micro-address for assigned hero
+  // @route   GET /api/radar/:incidentId/emergency-pass
+  // @access  Private
+  async getEmergencyPass(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const incident = await radarService.getIncidentDetails(incidentId, req.user.id);
+      res.status(200).json({
+        success: true,
+        data: {
+          incidentId: incident.id,
+          emergencyAccessPass: incident.emergencyAccessPass,
+          microLocation: incident.microLocation,
+          sceneSafety: incident.sceneSafety,
+          bystanderGuidance: incident.bystanderGuidance,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Record clinical assessment (AVPU, Tourniquet time-lock, C-Spine, FAST)
+  // @route   POST /api/radar/:incidentId/clinical-assessment
+  // @access  Private (Assigned Hero)
+  async recordClinicalAssessment(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.recordClinicalAssessment(
+        incidentId,
+        req.user.id,
+        req.body,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Submit After-Action Review (AAR) & CME Credit Award
+  // @route   POST /api/radar/:incidentId/aar
+  // @access  Private
+  async submitAfterActionReview(req, res, next) {
+    try {
+      const { incidentId } = req.params;
+      const result = await radarService.submitAfterActionReview(
+        incidentId,
+        req.user.id,
+        req.body,
+      );
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Verify SBAR Handoff QR Code / SHA-256 Hash for 115 Paramedics & Hospital
+  // @route   GET /api/radar/sbar-verify/:hash
+  // @access  Public
+  async verifySbarHandoff(req, res, next) {
+    try {
+      const { hash } = req.params;
+      const result = await radarService.verifySbarHandoff(hash);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Initiate live Tele-FirstAid consultation session with 115 ER doctor
+  // @route   POST /api/radar/tele-consult/request
+  // @access  Private
+  async initiateTeleConsultation(req, res, next) {
+    try {
+      const { incidentId, reason } = req.body;
+      const result = await radarService.initiateTeleConsultation(incidentId, req.user?.id || 'HERO_ON_SCENE', reason);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Doctor connects to Tele-FirstAid live room
+  // @route   POST /api/radar/tele-consult/doctor-join
+  // @access  Private
+  async connectDoctorTeleConsultation(req, res, next) {
+    try {
+      const { incidentId, doctorProfile } = req.body;
+      const result = await radarService.connectDoctorTeleConsultation(incidentId, doctorProfile);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Doctor issues verbal medical order
+  // @route   POST /api/radar/tele-consult/issue-order
+  // @access  Private
+  async issueVerbalMedicalOrder(req, res, next) {
+    try {
+      const { incidentId, orderData } = req.body;
+      const result = await radarService.issueVerbalMedicalOrder(incidentId, orderData);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Hero confirms execution of verbal medical order
+  // @route   POST /api/radar/tele-consult/execute-order
+  // @access  Private
+  async confirmMedicalOrderExecuted(req, res, next) {
+    try {
+      const { incidentId, orderIndex } = req.body;
+      const result = await radarService.confirmMedicalOrderExecuted(incidentId, orderIndex, req.user?.id || 'HERO_ON_SCENE');
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new RadarController();

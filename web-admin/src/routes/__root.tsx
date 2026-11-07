@@ -60,10 +60,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Alive? - Trung tâm điều phối SafeSolo" },
+      { title: "SafeSolo - Trung tâm Điều phối Khẩn cấp (TOC)" },
       {
         name: "description",
-        content: "Bảng điều phối khẩn cấp theo thời gian thực cho nền tảng SafeSolo.",
+        content: "Bảng điều phối khẩn cấp thời gian thực & tác chiến cứu hộ ngoại viện SafeSolo.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],

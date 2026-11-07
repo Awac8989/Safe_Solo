@@ -1869,4 +1869,1675 @@ class ApiService {
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return json;
   }
+
+  // ==================== PHÂN HỆ 22: SAFETAG OTP & PARAMEDIC BYPASS ====================
+
+  /// Yêu cầu OTP gửi đến người bảo hộ để mở khóa hồ sơ y tế Tầng 2
+  Future<Map<String, dynamic>> requestSafeTagOtp(String tagCode) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safetags/request-otp/$tagCode');
+    final response = await _safeRequest(
+      _client.post(uri, headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'}),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Xác thực mã OTP mở khóa hồ sơ y tế Tầng 2
+  Future<Map<String, dynamic>> verifySafeTagOtp(String tagCode, String otp) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safetags/verify-otp/$tagCode');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'otp': otp}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Bác sĩ cấp cứu giải tỏa khẩn cấp trực tiếp với Chứng chỉ hành nghề (Emergency Bypass)
+  Future<Map<String, dynamic>> emergencyBypassSafeTag({
+    required String tagCode,
+    required String paramedicLicense,
+    required String clinicalJustification,
+    String? emergencyIncidentId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/safetags/emergency-bypass/$tagCode');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'paramedicLicense': paramedicLicense,
+          'clinicalJustification': clinicalJustification,
+          'emergencyIncidentId': emergencyIncidentId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 23: BẢN ĐỒ CỨU HỘ LỤT LỘI & NGẬP NƯỚC ====================
+
+  /// Định tuyến né tránh ngập lụt đô thị theo chiều sâu và loại phương tiện cứu trợ
+  Future<Map<String, dynamic>> calculateFloodSafeRoute({
+    required Map<String, double> origin,
+    required Map<String, double> destination,
+    String vehicleType = 'AMBULANCE_VAN',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/flood/route/safe-plan');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'origin': origin,
+          'destination': destination,
+          'vehicleType': vehicleType,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Phát tín hiệu SOS khẩn cấp ngập lụt tầng trệt và nguy cơ giật điện
+  Future<Map<String, dynamic>> triggerFloodSos({
+    required String userId,
+    required double lat,
+    required double lng,
+    int indoorWaterDepthCm = 35,
+    bool electrocutionHazard = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/flood/sos');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'userId': userId,
+          'lat': lat,
+          'lng': lng,
+          'indoorWaterDepthCm': indoorWaterDepthCm,
+          'electrocutionHazard': electrocutionHazard,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 24: CẤP CỨU THẢM HỌA & START TRIAGE ====================
+
+  /// Tuyên bố Tình trạng Cấp cứu Thảm họa Đa nạn nhân (MCI)
+  Future<Map<String, dynamic>> declareMassCasualtyIncident({
+    required String title,
+    String incidentType = 'APARTMENT_FIRE',
+    int initialVictimEstimate = 12,
+    double lat = 10.792,
+    double lng = 106.718,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/mci/declare');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'title': title,
+          'incidentType': incidentType,
+          'initialVictimEstimate': initialVictimEstimate,
+          'lat': lat,
+          'lng': lng,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Phân loại nạn nhân tại hiện trường theo chuẩn START Triage
+  Future<Map<String, dynamic>> performStartTriage({
+    required String mciId,
+    required String victimTagId,
+    bool canWalk = false,
+    bool spontaneousBreathing = true,
+    bool airwayRepositioned = false,
+    bool breathsAfterAirwayOpen = false,
+    int respiratoryRate = 22,
+    double capillaryRefillSec = 1.5,
+    bool radialPulsePresent = true,
+    bool canFollowSimpleCommands = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/mci/$mciId/triage');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'assessmentData': {
+            'victimTagId': victimTagId,
+            'canWalk': canWalk,
+            'spontaneousBreathing': spontaneousBreathing,
+            'airwayRepositioned': airwayRepositioned,
+            'breathsAfterAirwayOpen': breathsAfterAirwayOpen,
+            'respiratoryRate': respiratoryRate,
+            'capillaryRefillSec': capillaryRefillSec,
+            'radialPulsePresent': radialPulsePresent,
+            'canFollowSimpleCommands': canFollowSimpleCommands,
+          },
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Phân bổ cân bằng tải chuyển viện nạn nhân thảm họa về các Trung tâm Chấn thương
+  Future<Map<String, dynamic>> autoBalanceMciEvacuation(String mciId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/mci/$mciId/balance-evacuation');
+    final response = await _safeRequest(
+      _client.post(uri, headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'}),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Giải tỏa sự cố khẩn cấp
+  Future<Map<String, dynamic>> resolveIncident(String incidentId, String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/resolve');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'userId': userId}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? json;
+  }
+
+  /// Lấy thông tin chi tiết sự cố cứu hộ
+  Future<Map<String, dynamic>> getIncidentDetails(String incidentId, String userId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId?userId=$userId');
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? json;
+  }
+
+  /// Lấy chứng nhận hiến máu điện tử
+  Future<Map<String, dynamic>> getBloodDonorCertificate(String requestId, String donorId) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/blood-relay/requests/$requestId/donors/$donorId/certificate');
+    final response = await _safeRequest(
+      _client.get(
+        uri,
+        headers: {'x-api-key': 'android-app-key-abc'},
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? json;
+  }
+
+  /// Nộp hồ sơ yêu cầu bảo hiểm HeroShield
+  Future<Map<String, dynamic>> fileHeroInsuranceClaim({
+    required String policyId,
+    required String claimType,
+    required num estimatedLossVND,
+    String? hospitalReportUrl,
+    String? doctorDiagnosis,
+    String? volunteerId,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/heroshield/claims');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'policyId': policyId,
+          'claimType': claimType,
+          'estimatedLossVND': estimatedLossVND,
+          'hospitalReportUrl': hospitalReportUrl,
+          'doctorDiagnosis': doctorDiagnosis,
+          'volunteerId': volunteerId,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? json;
+  }
+
+  // ==================== PHÂN HỆ 25: CẤP CỨU RẮN CẮN ĐỘC (SNAKEBITE TRIAGE) ====================
+
+  /// Ghi nhận phác đồ cấp cứu rắn cắn độc & Băng ép bất động PIT
+  Future<Map<String, dynamic>> recordSnakebiteCare({
+    required String incidentId,
+    String biteLocation = 'Chi dưới',
+    String snakeFamily = 'ELAPIDAE_NEUROTOXIC',
+    bool pressureImmobilizationApplied = true,
+    Map<String, dynamic>? systemicSymptoms,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/snakebite-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'biteLocation': biteLocation,
+          'snakeFamily': snakeFamily,
+          'pressureImmobilizationApplied': pressureImmobilizationApplied,
+          'systemicSymptoms': systemicSymptoms ?? {},
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị bệnh viện có sẵn Huyết thanh kháng nọc rắn đặc hiệu
+  Future<Map<String, dynamic>> locateAntivenomHospital({
+    double lat = 10.7769,
+    double lng = 106.7009,
+    String antivenomType = 'POLYVALENT',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/antivenom/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng, 'antivenomType': antivenomType}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 26: SƠ CỨU BỎNG NHIỆT & CÔNG THỨC PARKLAND ====================
+
+  /// Ghi nhận phân loại bỏng, tưới nước 20p & Bù dịch Parkland
+  Future<Map<String, dynamic>> recordBurnCare({
+    required String incidentId,
+    String burnEtiology = 'THERMAL_FLAME',
+    num tbsaPercentage = 25,
+    String burnDegree = 'SECOND_DEGREE_PARTIAL',
+    bool waterIrrigation20MinApplied = true,
+    num patientWeightKg = 60,
+    bool inhalationInjurySuspected = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/burn-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'burnEtiology': burnEtiology,
+          'tbsaPercentage': tbsaPercentage,
+          'burnDegree': burnDegree,
+          'waterIrrigation20MinApplied': waterIrrigation20MinApplied,
+          'patientWeightKg': patientWeightKg,
+          'inhalationInjurySuspected': inhalationInjurySuspected,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị Trung tâm Cấp cứu Bỏng gần nhất
+  Future<Map<String, dynamic>> locateBurnCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/burn-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 27: HỘI CHỨNG VÙI LẤP & SẬP ĐỔ CÔNG TRÌNH ====================
+
+  /// Quản lý giải phóng vùi lấp & Chống ngừng tim tái tưới máu (Crush Syndrome)
+  Future<Map<String, dynamic>> manageCrushSyndrome({
+    required String incidentId,
+    String trappedStructure = 'Dầm bê tông sập đổ',
+    String trappedMuscleGroup = 'BILATERAL_LOWER_EXTREMITIES',
+    int compressionDurationMinutes = 150,
+    bool ivHydrationPreExtricationStarted = true,
+    bool provisionalTourniquetAppliedBeforeLifting = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/crush-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'trappedStructure': trappedStructure,
+          'trappedMuscleGroup': trappedMuscleGroup,
+          'compressionDurationMinutes': compressionDurationMinutes,
+          'ivHydrationPreExtricationStarted': ivHydrationPreExtricationStarted,
+          'provisionalTourniquetAppliedBeforeLifting': provisionalTourniquetAppliedBeforeLifting,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 28: CHẤN THƯƠNG NGỰC HỞ & TRÀN KHÍ MÀNG PHỔI ÁP LỰC ====================
+
+  /// Cấp cứu vết thương ngực hở, Băng dán ngực van 1 chiều & Chọc kim giải áp
+  Future<Map<String, dynamic>> recordChestTrauma({
+    required String incidentId,
+    bool hasSuckingChestWound = false,
+    bool ventedChestSealApplied = false,
+    bool chestSealBurped = false,
+    bool tensionPneumothoraxSuspected = false,
+    bool needleDecompressionPerformed = false,
+    String needleInsertionSite = '2ND_ICS_MIDCLAVICULAR',
+    String needleGauge = '14G',
+    bool airHissDecompressionConfirmed = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/chest-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'hasSuckingChestWound': hasSuckingChestWound,
+          'ventedChestSealApplied': ventedChestSealApplied,
+          'chestSealBurped': chestSealBurped,
+          'tensionPneumothoraxSuspected': tensionPneumothoraxSuspected,
+          'needleDecompressionPerformed': needleDecompressionPerformed,
+          'needleInsertionSite': needleInsertionSite,
+          'needleGauge': needleGauge,
+          'airHissDecompressionConfirmed': airHissDecompressionConfirmed,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 29: BẤT ĐỘNG CỘT SỐNG CỔ (SMR) & SỐC THẦN KINH ====================
+
+  /// Bất động cột sống cổ theo Canadian C-Spine & Phân loại sốc thần kinh vs mất máu
+  Future<Map<String, dynamic>> recordSpinalTrauma({
+    required String incidentId,
+    bool mechanismHighRisk = false,
+    int patientAge = 35,
+    bool extremityParesthesia = false,
+    bool cervicalCollarApplied = false,
+    String cervicalCollarSize = 'REGULAR',
+    bool manualInLineStabilizationMaintained = true,
+    bool logRollTechniqueUsed = true,
+    bool vacuumMattressSecured = false,
+    num systolicBp = 110,
+    num heartRateBpm = 80,
+    String skinCondition = 'WARM_DRY_PINK',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/spinal-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'mechanismHighRisk': mechanismHighRisk,
+          'patientAge': patientAge,
+          'extremityParesthesia': extremityParesthesia,
+          'cervicalCollarApplied': cervicalCollarApplied,
+          'cervicalCollarSize': cervicalCollarSize,
+          'manualInLineStabilizationMaintained': manualInLineStabilizationMaintained,
+          'logRollTechniqueUsed': logRollTechniqueUsed,
+          'vacuumMattressSecured': vacuumMattressSecured,
+          'systolicBp': systolicBp,
+          'heartRateBpm': heartRateBpm,
+          'skinCondition': skinCondition,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 30: HẠ ĐƯỜNG HUYẾT NẶNG & HÔN MÊ TIỂU ĐƯỜNG ====================
+
+  /// Cấp cứu hạ đường huyết nặng, Quy tắc 15-15 & Phác đồ tiêm bắp Glucagon khẩn cấp
+  Future<Map<String, dynamic>> recordDiabeticEmergency({
+    required String incidentId,
+    num bloodGlucoseMmolL = 5.5,
+    bool isConscious = true,
+    bool swallowReflexIntact = true,
+    bool ruleOf15Applied = false,
+    bool glucagonOrIvDextroseAdministered = false,
+    String medicationType = 'NONE',
+    num? postTreatmentGlucoseMmolL,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/diabetic-emergency');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'bloodGlucoseMmolL': bloodGlucoseMmolL,
+          'isConscious': isConscious,
+          'swallowReflexIntact': swallowReflexIntact,
+          'ruleOf15Applied': ruleOf15Applied,
+          'glucagonOrIvDextroseAdministered': glucagonOrIvDextroseAdministered,
+          'medicationType': medicationType,
+          if (postTreatmentGlucoseMmolL != null) 'postTreatmentGlucoseMmolL': postTreatmentGlucoseMmolL,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 31: HÓC DỊ VẬT ĐƯỜNG THỞ TRẺ EM (FBAO) ====================
+
+  /// Cấp cứu hóc dị vật đường thở trẻ em (AHA/ERC Pediatric Choking & FBAO)
+  Future<Map<String, dynamic>> recordPediatricChoking({
+    required String incidentId,
+    num patientAgeMonths = 24,
+    bool isUnconscious = false,
+    bool backBlowsAndChestThrustsApplied = false,
+    bool abdominalThrustsHeimlichApplied = false,
+    bool foreignBodyExpelled = false,
+    bool airwayClear = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/choking-fbao');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'patientAgeMonths': patientAgeMonths,
+          'isUnconscious': isUnconscious,
+          'backBlowsAndChestThrustsApplied': backBlowsAndChestThrustsApplied,
+          'abdominalThrustsHeimlichApplied': abdominalThrustsHeimlichApplied,
+          'foreignBodyExpelled': foreignBodyExpelled,
+          'airwayClear': airwayClear,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 32: ĐỘNG KINH & CO GIẬT LIÊN TỤC ====================
+
+  /// Cấp cứu động kinh cơn lớn & trạng thái co giật liên tục (ILAE Status Epilepticus)
+  Future<Map<String, dynamic>> recordSeizureCare({
+    required String incidentId,
+    num seizureDurationMinutes = 2,
+    bool headProtectedWithPadding = true,
+    bool recoveryPositionPlacedPostIctal = false,
+    bool midazolamOrDiazepamAdministered = false,
+    bool convulsionCeased = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/seizure-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'seizureDurationMinutes': seizureDurationMinutes,
+          'headProtectedWithPadding': headProtectedWithPadding,
+          'recoveryPositionPlacedPostIctal': recoveryPositionPlacedPostIctal,
+          'midazolamOrDiazepamAdministered': midazolamOrDiazepamAdministered,
+          'convulsionCeased': convulsionCeased,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 33: ĐIỆN GIẬT & AN TOÀN CAO THẾ ====================
+
+  /// Cấp cứu điện giật đô thị & an toàn hiện trường cao thế (Urban Electrical Injury & Step Potential)
+  Future<Map<String, dynamic>> recordElectricalCare({
+    required String incidentId,
+    String voltageCategory = 'LOW_VOLTAGE_HOUSEHOLD_220V',
+    bool scenePowerCutConfirmed = false,
+    bool safetyCordonMaintained10Meters = false,
+    bool stepPotentialHopExitUsed = false,
+    String cardiacRhythmAssessed = 'UNKNOWN',
+    bool aedShockDelivered = false,
+    bool deepTissueBurnSuspected = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/electrical-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'voltageCategory': voltageCategory,
+          'scenePowerCutConfirmed': scenePowerCutConfirmed,
+          'safetyCordonMaintained10Meters': safetyCordonMaintained10Meters,
+          'stepPotentialHopExitUsed': stepPotentialHopExitUsed,
+          'cardiacRhythmAssessed': cardiacRhythmAssessed,
+          'aedShockDelivered': aedShockDelivered,
+          'deepTissueBurnSuspected': deepTissueBurnSuspected,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 34: NGỘ ĐỘC KHÍ CO & KHÓI CHÁY CHUNG CƯ ====================
+
+  /// Cấp cứu ngộ độc khí CO & Khói cháy chung cư đô thị (CO/Cyanide Poisoning & HBOT)
+  Future<Map<String, dynamic>> recordCoSmokeCare({
+    required String incidentId,
+    String sourceCategory = 'BUILDING_FIRE_SMOKE',
+    bool sootInNarisOrOralCavity = false,
+    bool highFlowOxygen100Applied = true,
+    num oxygenFlowRateLpm = 15,
+    num? estimatedHbCoPercent,
+    bool isPregnant = false,
+    bool isUnconscious = false,
+    bool cyanideAntidoteAdministered = false,
+    String antidoteType = 'NONE',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/co-smoke-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'sourceCategory': sourceCategory,
+          'sootInNarisOrOralCavity': sootInNarisOrOralCavity,
+          'highFlowOxygen100Applied': highFlowOxygen100Applied,
+          'oxygenFlowRateLpm': oxygenFlowRateLpm,
+          if (estimatedHbCoPercent != null) 'estimatedHbCoPercent': estimatedHbCoPercent,
+          'isPregnant': isPregnant,
+          'isUnconscious': isUnconscious,
+          'cyanideAntidoteAdministered': cyanideAntidoteAdministered,
+          'antidoteType': antidoteType,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 35: CHẤN THƯƠNG MẮT & BỎNG HÓA CHẤT MẮT ====================
+
+  /// Cấp cứu chấn thương mắt & bỏng hóa chất nhãn cầu ngoại viện (Ocular Trauma & Chemical Burns)
+  Future<Map<String, dynamic>> recordOcularTraumaCare({
+    required String incidentId,
+    String injuryCategory = 'CHEMICAL_ALKALI_BASE',
+    bool immediateIrrigationPerformed = false,
+    num irrigationDurationMinutes = 20,
+    num irrigationFluidVolumeMl = 1500,
+    num measuredConjunctivalPh = 7.2,
+    bool rigidEyeShieldApplied = false,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/ocular-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'injuryCategory': injuryCategory,
+          'immediateIrrigationPerformed': immediateIrrigationPerformed,
+          'irrigationDurationMinutes': irrigationDurationMinutes,
+          'irrigationFluidVolumeMl': irrigationFluidVolumeMl,
+          'measuredConjunctivalPh': measuredConjunctivalPh,
+          'rigidEyeShieldApplied': rigidEyeShieldApplied,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 36: SƠ CỨU ĐỨT LÌA CHI & BẢO QUẢN VI PHẪU ====================
+
+  /// Sơ cứu bẫy đứt lìa chi & bảo quản phần chi đứt rời chuẩn vi phẫu (Traumatic Amputation & Replantation)
+  Future<Map<String, dynamic>> recordAmputationCare({
+    required String incidentId,
+    String amputationType = 'COMPLETE_AMPUTATION',
+    String anatomicalPart = 'DIGIT_FINGER_TOE',
+    bool stumpHemostasisApplied = true,
+    String hemostasisMethod = 'PRESSURE_DRESSING',
+    bool amputatedPartRetrieved = true,
+    bool threeTierPreservationApplied = true,
+    String ischemiaType = 'COLD_ISCHEMIA_2_TO_4C',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/amputation-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'amputationType': amputationType,
+          'anatomicalPart': anatomicalPart,
+          'stumpHemostasisApplied': stumpHemostasisApplied,
+          'hemostasisMethod': hemostasisMethod,
+          'amputatedPartRetrieved': amputatedPartRetrieved,
+          'threeTierPreservationApplied': threeTierPreservationApplied,
+          'ischemiaType': ischemiaType,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 37: CHẤN THƯƠNG BỤNG & VỠ PHÌNH ĐM CHỦ BỤNG ====================
+
+  /// Cấp cứu vỡ phình ĐM chủ bụng & thoát vị tạng vùng bụng (Abdominal Trauma & Ruptured AAA)
+  Future<Map<String, dynamic>> recordAbdominalTraumaCare({
+    required String incidentId,
+    String traumaType = 'EVISCERATION_OPEN_BOWEL',
+    bool sterileMoistDressingApplied = true,
+    bool occlusiveMoistureBarrierApplied = true,
+    bool kneesFlexedPositionMaintained = true,
+    num actualSystolicBp = 85,
+    bool excessiveFluidAvoided = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/abdominal-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'traumaType': traumaType,
+          'sterileMoistDressingApplied': sterileMoistDressingApplied,
+          'occlusiveMoistureBarrierApplied': occlusiveMoistureBarrierApplied,
+          'kneesFlexedPositionMaintained': kneesFlexedPositionMaintained,
+          'actualSystolicBp': actualSystolicBp,
+          'excessiveFluidAvoided': excessiveFluidAvoided,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 38: NGỘ ĐỘC THUỐC TRỪ SÂU PHOSPHO HỮU CƠ ====================
+
+  /// Cấp cứu ngộ độc thuốc trừ sâu phospho hữu cơ (Organophosphate Poisoning & Atropine/PAM)
+  Future<Map<String, dynamic>> recordToxicologyCare({
+    required String incidentId,
+    String toxinCategory = 'ORGANOPHOSPHATE_INSECTICIDE',
+    bool dermalDecontaminationPerformed = true,
+    bool clothingSafelyDisposedInBags = true,
+    bool pinpointPupilsObserved = true,
+    bool bronchorrheaSecretionsSuctioned = true,
+    num atropineAdministeredMg = 2,
+    bool atropinizationAchieved = true,
+    num pralidoximePamAdministeredGrams = 1,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/toxicology-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'toxinCategory': toxinCategory,
+          'dermalDecontaminationPerformed': dermalDecontaminationPerformed,
+          'clothingSafelyDisposedInBags': clothingSafelyDisposedInBags,
+          'pinpointPupilsObserved': pinpointPupilsObserved,
+          'bronchorrheaSecretionsSuctioned': bronchorrheaSecretionsSuctioned,
+          'atropineAdministeredMg': atropineAdministeredMg,
+          'atropinizationAchieved': atropinizationAchieved,
+          'pralidoximePamAdministeredGrams': pralidoximePamAdministeredGrams,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 39: VỠ KHUNG CHẬU & ĐAI KẸP CẦM MÁU ====================
+
+  /// Cấp cứu vỡ khung chậu nặng & đai kẹp cầm máu vùng chậu (Pelvic Ring Fracture & Binder)
+  Future<Map<String, dynamic>> recordPelvicTraumaCare({
+    required String incidentId,
+    String fracturePattern = 'OPEN_BOOK_UNSTABLE',
+    bool pelvicBinderApplied = true,
+    String pelvicBinderPlacementSite = 'GREATER_TROCHANTERS_SYMPHYSIS_PUBIS',
+    bool kneesAndFeetTiedTogether = true,
+    bool scoopStretcherUsed = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/pelvic-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'fracturePattern': fracturePattern,
+          'pelvicBinderApplied': pelvicBinderApplied,
+          'pelvicBinderPlacementSite': pelvicBinderPlacementSite,
+          'kneesAndFeetTiedTogether': kneesAndFeetTiedTogether,
+          'scoopStretcherUsed': scoopStretcherUsed,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 40: CHẤN THƯƠNG SỌ NÃO & TỤT KẸT NÃO ====================
+
+  /// Cấp cứu chấn thương sọ não nặng & tụt kẹt não (Severe TBI & Cushing Herniation)
+  Future<Map<String, dynamic>> recordTbiCare({
+    required String incidentId,
+    num gcsScore = 7,
+    num systolicBloodPressure = 175,
+    num heartRateBpm = 48,
+    String respiratoryPattern = 'CHEYNE_STOKES',
+    num dilatedPupilDiameterMm = 5.5,
+    bool headElevated30Degrees = true,
+    bool controlledHyperventilationApplied = true,
+    bool hypotensionHypoxiaPrevented = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/tbi-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'gcsScore': gcsScore,
+          'systolicBloodPressure': systolicBloodPressure,
+          'heartRateBpm': heartRateBpm,
+          'respiratoryPattern': respiratoryPattern,
+          'dilatedPupilDiameterMm': dilatedPupilDiameterMm,
+          'headElevated30Degrees': headElevated30Degrees,
+          'controlledHyperventilationApplied': controlledHyperventilationApplied,
+          'hypotensionHypoxiaPrevented': hypotensionHypoxiaPrevented,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 41: SẢN PHỤ CHẤN THƯƠNG & NGỪNG TIM THAI PHỤ ====================
+
+  /// Cấp cứu sản phụ chấn thương & ngừng tim thai phụ (Maternal Cardiac Arrest & PMCD)
+  Future<Map<String, dynamic>> recordMaternalCare({
+    required String incidentId,
+    num gestationalAgeWeeks = 28,
+    bool manualLeftUterineDisplacementApplied = true,
+    num cardiacArrestDurationMinutes = 4,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/maternal-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'gestationalAgeWeeks': gestationalAgeWeeks,
+          'manualLeftUterineDisplacementApplied': manualLeftUterineDisplacementApplied,
+          'cardiacArrestDurationMinutes': cardiacArrestDurationMinutes,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 42: TAI BIẾN LẶN BIỂN & BỆNH GIẢM ÁP KHÍ NÉN ====================
+
+  /// Cấp cứu tai biến lặn biển & bệnh giảm áp khí nén (Decompression Sickness & Caisson)
+  Future<Map<String, dynamic>> recordDecompressionCare({
+    required String incidentId,
+    String exposureCategory = 'METRO_TUNNEL_CAISSON_WORKER',
+    String symptomType = 'TYPE_2_SPINAL_PARALYSIS_CHOKES',
+    bool highFlowOxygen100Applied = true,
+    num oxygenFlowRateLpm = 15,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/decompression-care');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'exposureCategory': exposureCategory,
+          'symptomType': symptomType,
+          'highFlowOxygen100Applied': highFlowOxygen100Applied,
+          'oxygenFlowRateLpm': oxygenFlowRateLpm,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 43: SỐC MẤT MÁU NẶNG & DCR / TXA CRASH-2 / MTP 1:1:1 ====================
+
+  /// Cấp cứu sốc mất máu nặng & hồi sức kiểm soát tổn thương
+  Future<Map<String, dynamic>> recordHemorrhagicShockCare({
+    required String incidentId,
+    String shockClass = 'CLASS_4_SEVERE_COLLAPSE',
+    num estimatedBloodLossMl = 2200,
+    num systolicBp = 65,
+    num heartRate = 145,
+    num injuryToTxaIntervalMinutes = 45,
+    bool crystalloidLimitedUnder1000Ml = true,
+    bool mtpProtocol111Activated = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/hemorrhagic-shock');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'shockClass': shockClass,
+          'estimatedBloodLossMl': estimatedBloodLossMl,
+          'systolicBp': systolicBp,
+          'heartRate': heartRate,
+          'injuryToTxaIntervalMinutes': injuryToTxaIntervalMinutes,
+          'crystalloidLimitedUnder1000Ml': crystalloidLimitedUnder1000Ml,
+          'mtpProtocol111Activated': mtpProtocol111Activated,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 44: HẠ THÂN NHIỆT SÂU & LÀM ẤM CHỦ ĐỘNG ====================
+
+  /// Cấp cứu hạ thân nhiệt sâu & kỹ thuật làm ấm tích cực chống Afterdrop
+  Future<Map<String, dynamic>> recordSevereHypothermiaCare({
+    required String incidentId,
+    num coreTemperatureCelsius = 27.5,
+    bool gentleHandlingMaintained = true,
+    bool activeExternalCoreRewarmingApplied = true,
+    bool activeInternalRewarmingApplied = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/hypothermia-rewarming');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'coreTemperatureCelsius': coreTemperatureCelsius,
+          'gentleHandlingMaintained': gentleHandlingMaintained,
+          'activeExternalCoreRewarmingApplied': activeExternalCoreRewarmingApplied,
+          'activeInternalRewarmingApplied': activeInternalRewarmingApplied,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 45: CƠN BÃO GIÁP TRẠNG & HÔN MÊ SUY GIÁP ====================
+
+  /// Cấp cứu cơn bão giáp trạng & hôn mê suy giáp
+  Future<Map<String, dynamic>> recordEndocrineCrisisCare({
+    required String incidentId,
+    String crisisType = 'THYROID_STORM',
+    num burchWartofskyScore = 60,
+    num coreTemperatureCelsius = 40.8,
+    num heartRateBpm = 160,
+    bool betaBlockerAdministered = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/endocrine-crisis');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'crisisType': crisisType,
+          'burchWartofskyScore': burchWartofskyScore,
+          'coreTemperatureCelsius': coreTemperatureCelsius,
+          'heartRateBpm': heartRateBpm,
+          'betaBlockerAdministered': betaBlockerAdministered,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 46: NGỘ ĐỘC KHÍ ĐỘC CÔNG NGHIỆP H2S & CLO ====================
+
+  /// Cấp cứu ngộ độc khí độc công nghiệp H2S & khí Clo
+  Future<Map<String, dynamic>> recordIndustrialGasCare({
+    required String incidentId,
+    String gasType = 'HYDROGEN_SULFIDE_H2S',
+    bool rescuerHasScba = true,
+    bool highFlowOxygen100Administered = true,
+    String antidoteAdministered = 'SODIUM_NITRITE_300MG',
+    bool upwindEvacuationMaintained = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/industrial-gas');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'gasType': gasType,
+          'rescuerHasScba': rescuerHasScba,
+          'highFlowOxygen100Administered': highFlowOxygen100Administered,
+          'antidoteAdministered': antidoteAdministered,
+          'upwindEvacuationMaintained': upwindEvacuationMaintained,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 47: SỐC TIM CẤP & PHÙ PHỔI CẤP HUYẾT ĐỘNG ====================
+
+  /// Cấp cứu sốc tim cấp & phù phổi cấp Killip IV
+  Future<Map<String, dynamic>> recordCardiogenicShockCare({
+    required String incidentId,
+    String killipClass = 'KILLIP_3_PULMONARY_EDEMA',
+    num systolicBp = 160,
+    bool cpapBiPapPositivePressureApplied = true,
+    num cpapPressureCmH2O = 10,
+    bool nitroglycerinAdministered = true,
+    bool pde5InhibitorOrRvInfarctionScreened = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/cardiogenic-shock');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'killipClass': killipClass,
+          'systolicBp': systolicBp,
+          'cpapBiPapPositivePressureApplied': cpapBiPapPositivePressureApplied,
+          'cpapPressureCmH2O': cpapPressureCmH2O,
+          'nitroglycerinAdministered': nitroglycerinAdministered,
+          'pde5InhibitorOrRvInfarctionScreened': pde5InhibitorOrRvInfarctionScreened,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 48: SỐC NHIỄM KHUẨN & GÓI GIỜ VÀNG SEPSIS ====================
+
+  /// Cấp cứu sốc nhiễm khuẩn & gói giờ vàng Surviving Sepsis Campaign
+  Future<Map<String, dynamic>> recordSepticShockCare({
+    required String incidentId,
+    num respiratoryRatePerMin = 28,
+    num systolicBp = 85,
+    num gcsScore = 13,
+    num crystalloidBolusMlPerKg = 30,
+    num patientWeightKg = 60,
+    num lactateMmolL = 4.2,
+    bool vasopressorNoradrenalineStarted = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/septic-shock');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'respiratoryRatePerMin': respiratoryRatePerMin,
+          'systolicBp': systolicBp,
+          'gcsScore': gcsScore,
+          'crystalloidBolusMlPerKg': crystalloidBolusMlPerKg,
+          'patientWeightKg': patientWeightKg,
+          'lactateMmolL': lactateMmolL,
+          'vasopressorNoradrenalineStarted': vasopressorNoradrenalineStarted,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 49: CHẤN THƯƠNG MẠCH MÁU GIÁP RANH & HỘI CHỨNG KHOANG ====================
+
+  /// Cấp cứu chấn thương mạch máu vùng giáp ranh & phòng ngừa hội chứng khoang
+  Future<Map<String, dynamic>> recordJunctionalVascularCare({
+    required String incidentId,
+    String injuryLocation = 'GROIN_FEMORAL',
+    bool hemostaticWoundPackingApplied = true,
+    bool junctionalTourniquetApplied = true,
+    num directPressureDurationMinutes = 3,
+    num ischemiaTimeMinutes = 45,
+    bool compartmentSyndromeSuspected = true,
+    bool passiveStretchPainPresent = true,
+    bool elevationProhibitedIfCompartment = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/junctional-vascular');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'injuryLocation': injuryLocation,
+          'hemostaticWoundPackingApplied': hemostaticWoundPackingApplied,
+          'junctionalTourniquetApplied': junctionalTourniquetApplied,
+          'directPressureDurationMinutes': directPressureDurationMinutes,
+          'ischemiaTimeMinutes': ischemiaTimeMinutes,
+          'compartmentSyndromeSuspected': compartmentSyndromeSuspected,
+          'passiveStretchPainPresent': passiveStretchPainPresent,
+          'elevationProhibitedIfCompartment': elevationProhibitedIfCompartment,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm can thiệp phẫu thuật mạch máu gần nhất
+  Future<Map<String, dynamic>> locateVascularInterventionCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/vascular-intervention-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 50: TĂNG THÂN NHIỆT ÁC TÍNH & HỘI CHỨNG SEROTONIN ====================
+
+  /// Cấp cứu tăng thân nhiệt ác tính và hội chứng serotonin ngoại viện
+  Future<Map<String, dynamic>> recordHyperthermiaSerotoninCare({
+    required String incidentId,
+    String syndromeType = 'SEROTONIN_SYNDROME',
+    bool hunterCriteriaClonusPresent = true,
+    bool leadPipeRigidityPresent = true,
+    num coreTemperatureCelsius = 41.2,
+    String antidoteAdministered = 'CYPROHEPTADINE_12MG',
+    bool physicalRestraintsProhibited = true,
+    bool activeExternalCoolingApplied = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/hyperthermia-serotonin');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'syndromeType': syndromeType,
+          'hunterCriteriaClonusPresent': hunterCriteriaClonusPresent,
+          'leadPipeRigidityPresent': leadPipeRigidityPresent,
+          'coreTemperatureCelsius': coreTemperatureCelsius,
+          'antidoteAdministered': antidoteAdministered,
+          'physicalRestraintsProhibited': physicalRestraintsProhibited,
+          'activeExternalCoolingApplied': activeExternalCoolingApplied,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm cấp phát thuốc giải độc Dantrolene & Chống độc gần nhất
+  Future<Map<String, dynamic>> locateDantroleneCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/dantrolene-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 51: HỒI SINH TIM PHỔI NGOÀI CƠ THỂ TIỀN VIỆN (ECPR) ====================
+
+  /// Giao thức hồi sinh tim phổi ngoài cơ thể ECPR tiền viện
+  Future<Map<String, dynamic>> recordEcprCare({
+    required String incidentId,
+    bool witnessedArrest = true,
+    bool bystanderCprStartedWithin5Min = true,
+    bool initialRhythmShockable = true,
+    int refractoryShocksCount = 3,
+    bool mechanicalCprDeviceActive = true,
+    num estimatedTimeToCannulationMinutes = 42,
+    bool ecprPreAlertAcknowledged = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/ecpr-arrest');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'witnessedArrest': witnessedArrest,
+          'bystanderCprStartedWithin5Min': bystanderCprStartedWithin5Min,
+          'initialRhythmShockable': initialRhythmShockable,
+          'refractoryShocksCount': refractoryShocksCount,
+          'mechanicalCprDeviceActive': mechanicalCprDeviceActive,
+          'estimatedTimeToCannulationMinutes': estimatedTimeToCannulationMinutes,
+          'ecprPreAlertAcknowledged': ecprPreAlertAcknowledged,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm tiếp nhận ECPR & ECMO khẩn cấp gần nhất
+  Future<Map<String, dynamic>> locateEcprCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/ecpr-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 52: CHẤN THƯƠNG CỘT SỐNG NGỰC - THẮT LƯNG & LIỆT TỦY ====================
+
+  /// Cấp cứu chấn thương cột sống ngực - thắt lưng & phân độ ASIA
+  Future<Map<String, dynamic>> recordThoracolumbarCare({
+    required String incidentId,
+    String asiaImpairmentScale = 'ASIA_A_COMPLETE',
+    bool logRoll4PersonTechniqueApplied = true,
+    bool vacuumMattressApplied = true,
+    bool rigidSpineBoardRemovedWithin30Min = true,
+    bool priapismOrSphincterLossDetected = false,
+    bool spinalShockWatchdogActive = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/thoracolumbar-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'asiaImpairmentScale': asiaImpairmentScale,
+          'logRoll4PersonTechniqueApplied': logRoll4PersonTechniqueApplied,
+          'vacuumMattressApplied': vacuumMattressApplied,
+          'rigidSpineBoardRemovedWithin30Min': rigidSpineBoardRemovedWithin30Min,
+          'priapismOrSphincterLossDetected': priapismOrSphincterLossDetected,
+          'spinalShockWatchdogActive': spinalShockWatchdogActive,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm phẫu thuật cột sống & hồi sức tủy cấp gần nhất
+  Future<Map<String, dynamic>> locateSpineSurgeryCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/spine-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 53: PHÙ NÃO & PHÙ PHỔI ĐỘ CAO (HACE & HAPE) ====================
+
+  /// Cấp cứu phù não và phù phổi độ cao theo thang điểm Lake Louise
+  Future<Map<String, dynamic>> recordHighAltitudeCare({
+    required String incidentId,
+    num altitudeMeters = 3143,
+    num lakeLouiseScore = 5,
+    bool immediateDescentStarted = true,
+    num descentAltitudeMeters = 1000,
+    bool gamowHyperbaricBagApplied = true,
+    bool dexamethasoneAdministered = true,
+    bool nifedipineAdministered = true,
+    bool highFlowOxygenApplied = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/high-altitude');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'altitudeMeters': altitudeMeters,
+          'lakeLouiseScore': lakeLouiseScore,
+          'immediateDescentStarted': immediateDescentStarted,
+          'descentAltitudeMeters': descentAltitudeMeters,
+          'gamowHyperbaricBagApplied': gamowHyperbaricBagApplied,
+          'dexamethasoneAdministered': dexamethasoneAdministered,
+          'nifedipineAdministered': nifedipineAdministered,
+          'highFlowOxygenApplied': highFlowOxygenApplied,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm điều trị oxy cao áp & bệnh lý độ cao gần nhất
+  Future<Map<String, dynamic>> locateAltitudeCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/altitude-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 54: SƠ CỨU BỎNG LẠNH & KHÍ HÓA LỎNG ====================
+
+  /// Sơ cứu bỏng lạnh đô thị và tổn thương khí hóa lỏng nitơ/CO2
+  Future<Map<String, dynamic>> recordCryogenicFrostbiteCare({
+    required String incidentId,
+    String frostbiteDegree = 'GRADE_2_CLEAR_BLISTER',
+    num rapidRewarmingWaterTempCelsius = 38.5,
+    bool frictionRubbingStrictlyProhibited = true,
+    bool refreezingRiskPrevented = true,
+    bool thromboxaneInhibitorIbuprofenGiven = true,
+    bool aloeVeraSterileDressingApplied = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/cryogenic-frostbite');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'frostbiteDegree': frostbiteDegree,
+          'rapidRewarmingWaterTempCelsius': rapidRewarmingWaterTempCelsius,
+          'frictionRubbingStrictlyProhibited': frictionRubbingStrictlyProhibited,
+          'refreezingRiskPrevented': refreezingRiskPrevented,
+          'thromboxaneInhibitorIbuprofenGiven': thromboxaneInhibitorIbuprofenGiven,
+          'aloeVeraSterileDressingApplied': aloeVeraSterileDressingApplied,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm bỏng lạnh & vi phẫu tạo hình gần nhất
+  Future<Map<String, dynamic>> locateCryogenicCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/cryogenic-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 55: VIÊM CÂN MẠC HOẠI TỬ & SỐC ĐỘC TỐ LRINEC ====================
+
+  /// Đánh giá thang điểm LRINEC và xử trí viêm cân mạc hoại tử / TSS
+  Future<Map<String, dynamic>> recordNecrotizingFasciitisCare({
+    required String incidentId,
+    num lrinecScore = 6,
+    bool painOutOfProportion = true,
+    bool subcutaneousCrepitusPresent = false,
+    bool clindamycinToxinInhibitionGiven = true,
+    bool emergencySurgicalDebridementAlerted = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/necrotizing-fasciitis');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'lrinecScore': lrinecScore,
+          'painOutOfProportion': painOutOfProportion,
+          'subcutaneousCrepitusPresent': subcutaneousCrepitusPresent,
+          'clindamycinToxinInhibitionGiven': clindamycinToxinInhibitionGiven,
+          'emergencySurgicalDebridementAlerted': emergencySurgicalDebridementAlerted,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm phẫu thuật cắt lọc viêm cân mạc hoại tử gần nhất
+  Future<Map<String, dynamic>> locateNecrotizingCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/necrotizing-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 56: KHỐI MÁU TỤ HỐC MẮT & MỞ GÓC MẮT NGOÀI ====================
+
+  /// Cấp cứu khối máu tụ sau nhãn cầu và chuẩn bị mở góc mắt ngoài giải áp
+  Future<Map<String, dynamic>> recordRetrobulbarHematomaCare({
+    required String incidentId,
+    bool rockHardProptosis = true,
+    bool relativeAfferentPupillaryDefect = true,
+    num intraocularPressureMmHg = 45,
+    num ischemiaTimeMinutes = 35,
+    bool lateralCanthotomyCantholysisPrepared = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/retrobulbar-hematoma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'rockHardProptosis': rockHardProptosis,
+          'relativeAfferentPupillaryDefect': relativeAfferentPupillaryDefect,
+          'intraocularPressureMmHg': intraocularPressureMmHg,
+          'ischemiaTimeMinutes': ischemiaTimeMinutes,
+          'lateralCanthotomyCantholysisPrepared': lateralCanthotomyCantholysisPrepared,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm phẫu thuật cấp cứu mắt và giải áp hốc mắt gần nhất
+  Future<Map<String, dynamic>> locateOrbitalCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/orbital-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 57: NGỘ ĐỘC THUỐC TÊ & NHŨ DỊCH LIPID 20% ====================
+
+  /// Cấp cứu ngộ độc thuốc tê toàn thân LAST và giải độc bằng nhũ dịch lipid 20%
+  Future<Map<String, dynamic>> recordLastToxicityLipidCare({
+    required String incidentId,
+    String localAnestheticAgent = 'BUPIVACAINE',
+    bool perioralNumbnessMetallicTaste = true,
+    bool seizuresOrRefractoryArrhythmia = true,
+    bool lipidEmulsion20PercentBolusGiven = true,
+    num lipidInfusionRateMlKgMin = 0.25,
+    bool vasopressinAndCalciumBlockersProhibited = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/last-lipid-rescue');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'localAnestheticAgent': localAnestheticAgent,
+          'perioralNumbnessMetallicTaste': perioralNumbnessMetallicTaste,
+          'seizuresOrRefractoryArrhythmia': seizuresOrRefractoryArrhythmia,
+          'lipidEmulsion20PercentBolusGiven': lipidEmulsion20PercentBolusGiven,
+          'lipidInfusionRateMlKgMin': lipidInfusionRateMlKgMin,
+          'vasopressinAndCalciumBlockersProhibited': vasopressinAndCalciumBlockersProhibited,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm cấp cứu ngộ độc thuốc tê và có dự trữ Lipid 20% gần nhất
+  Future<Map<String, dynamic>> locateLipidRescueCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/lipid-rescue-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 58: THUYÊN TẮC PHỔI DIỆN RỘNG & TẮC MẠCH ỐI ====================
+
+  /// Cấp cứu thuyên tắc phổi diện rộng và tắc mạch ối (Massive PE & AFE)
+  Future<Map<String, dynamic>> recordMassivePulmonaryEmbolismCare({
+    required String incidentId,
+    num wellsScore = 6,
+    bool isAmnioticFluidEmbolism = false,
+    bool acuteRightHeartStrainSigns = true,
+    bool systemicThrombolysisIndicated = true,
+    bool cautiousFluidsUnder500Ml = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/massive-pulmonary-embolism');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'wellsScore': wellsScore,
+          'isAmnioticFluidEmbolism': isAmnioticFluidEmbolism,
+          'acuteRightHeartStrainSigns': acuteRightHeartStrainSigns,
+          'systemicThrombolysisIndicated': systemicThrombolysisIndicated,
+          'cautiousFluidsUnder500Ml': cautiousFluidsUnder500Ml,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm can thiệp thuyên tắc phổi & ECMO gần nhất
+  Future<Map<String, dynamic>> locatePulmonaryEmbolismCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/pulmonary-embolism-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 59: VỠ THỰC QUẢN BOERHAAVE & TRÀN KHÍ TRUNG THẤT ====================
+
+  /// Cấp cứu vỡ thực quản do áp lực Boerhaave và tràn khí trung thất
+  Future<Map<String, dynamic>> recordEsophagealRuptureCare({
+    required String incidentId,
+    bool macklerTriadPresent = true,
+    bool hammanSignCrunchPresent = false,
+    bool strictNpoProhibitedOralIntake = true,
+    bool blindNasogastricTubeProhibited = true,
+    bool broadSpectrumAntibioticsGiven = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/esophageal-rupture');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'macklerTriadPresent': macklerTriadPresent,
+          'hammanSignCrunchPresent': hammanSignCrunchPresent,
+          'strictNpoProhibitedOralIntake': strictNpoProhibitedOralIntake,
+          'blindNasogastricTubeProhibited': blindNasogastricTubeProhibited,
+          'broadSpectrumAntibioticsGiven': broadSpectrumAntibioticsGiven,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm phẫu thuật lồng ngực khâu vỡ thực quản gần nhất
+  Future<Map<String, dynamic>> locateEsophagealCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/esophageal-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  // ==================== PHÂN HỆ 60: VỠ BÀNG QUANG & ĐỨT NIỆU ĐẠO PHỨC TẠP ====================
+
+  /// Cấp cứu vỡ bàng quang và chấn thương đứt niệu đạo tầng sinh môn
+  Future<Map<String, dynamic>> recordBladderUrethralTraumaCare({
+    required String incidentId,
+    bool bloodAtUrethralMeatus = true,
+    bool butterflyPerinealHematoma = true,
+    bool blindFoleyCatheterizationStrictlyProhibited = true,
+    bool retrogradeUrethrographyIndicated = true,
+    bool suprapubicCystostomyPrepared = true,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/emergencies/$incidentId/bladder-urethral-trauma');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({
+          'bloodAtUrethralMeatus': bloodAtUrethralMeatus,
+          'butterflyPerinealHematoma': butterflyPerinealHematoma,
+          'blindFoleyCatheterizationStrictlyProhibited': blindFoleyCatheterizationStrictlyProhibited,
+          'retrogradeUrethrographyIndicated': retrogradeUrethrographyIndicated,
+          'suprapubicCystostomyPrepared': suprapubicCystostomyPrepared,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// Định vị trung tâm phẫu thuật cấp cứu tiết niệu gần nhất
+  Future<Map<String, dynamic>> locateUrologyCenter({
+    double lat = 10.7769,
+    double lng = 106.7009,
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/hospitals/urology-center/locate');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {'Content-Type': 'application/json', 'x-api-key': 'android-app-key-abc'},
+        body: jsonEncode({'lat': lat, 'lng': lng}),
+      ),
+    );
+    _throwIfFailed(response);
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return json['data'] as Map<String, dynamic>? ?? {};
+  }
 }

@@ -307,7 +307,7 @@ class _CirclePageState extends State<CirclePage> {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      userName.substring(0, 1).toUpperCase(),
+                      userName.trim().isNotEmpty ? userName.trim().substring(0, 1).toUpperCase() : 'U',
                       style: AppTextStyles.title.copyWith(color: Colors.white),
                     ),
                   ),
@@ -544,7 +544,7 @@ class _CirclePostCard extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  post.author.substring(0, 1).toUpperCase(),
+                  post.author.trim().isNotEmpty ? post.author.trim().substring(0, 1).toUpperCase() : 'U',
                   style: AppTextStyles.title.copyWith(color: AppColors.primary),
                 ),
               ),

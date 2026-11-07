@@ -501,7 +501,7 @@ async function checkin(req, res) {
 
     const now = new Date();
     const normalizedType = String(type || 'HARD_TAP').toUpperCase();
-    const isDuressCheckin = Boolean(isDuress || normalizedType === 'DURESS_FAKE');
+    const isDuressCheckin = Boolean(isDuress || req.body.isDuressCoercion || normalizedType === 'DURESS_FAKE' || (metadata?.pin && userDoc.duressPin && String(metadata.pin) === String(userDoc.duressPin)));
 
     const validRoutineTypes = [
       'MEDICINE',
@@ -1700,9 +1700,44 @@ async function createDeviceSignal(req, res) {
       metadata: payload,
     });
     action = 'SOS_TRIGGERED';
+  } else if (
+    signalType === 'BATTERY_CRITICAL' ||
+    signalType === 'LOW_BATTERY_SURVIVAL_BEACON' ||
+    (payload.batteryLevel !== undefined && Number(payload.batteryLevel) <= 15)
+  ) {
+    const batt = Number(payload.batteryLevel ?? userDoc.batteryLevel ?? 12);
+    userDoc.batteryLevel = batt;
+    if (payload.lat && payload.lng) {
+      userDoc.lastKnownLocation = {
+        lat: Number(payload.lat),
+        lng: Number(payload.lng),
+        updatedAt: new Date(),
+      };
+    }
+    await userDoc.save();
+
+    await createAlertEvent({
+      userId: id,
+      level: batt <= 5 ? 'LEVEL_2_ALARM' : 'INFO',
+      status: 'LOW_BATTERY_SURVIVAL_BEACON',
+      source: 'SURVIVAL_BEACON',
+      title: 'Phao Cứu Sinh: Pin Thiết Bị Nguy Cấp',
+      message: 'Thiết bị của ' + (userDoc.fullName || userDoc.name) + ' sắp cạn pin (' + batt + '%). Đã đóng băng tọa độ GPS sinh tồn cuối cùng.',
+      metadata: {
+        batteryLevel: batt,
+        lastKnownLocation: userDoc.lastKnownLocation,
+        activatedAt: new Date(),
+      },
+    });
+    action = 'SURVIVAL_BEACON_ACTIVATED';
   }
 
-  return res.status(201).json({ message: 'Device signal recorded', action });
+  return res.status(201).json({
+    message: 'Device signal recorded',
+    action,
+    survivalBeaconActivated: action === 'SURVIVAL_BEACON_ACTIVATED',
+    frozenLocation: userDoc.lastKnownLocation,
+  });
 }
 
 async function registerPushToken(req, res) {

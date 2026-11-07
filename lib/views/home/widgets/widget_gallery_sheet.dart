@@ -302,8 +302,14 @@ class WidgetGallerySheet extends StatelessWidget {
             children: [
               const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 16),
               const SizedBox(width: 6),
-              const Text('SafeSolo Pro • BS. CKII Lê Hoàng Nam', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-              const Spacer(),
+              const Expanded(
+                child: Text(
+                  'SafeSolo Pro • BS. CKII Lê Hoàng Nam',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: const Color(0xFF064E3B), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFF10B981))),
@@ -432,8 +438,14 @@ class WidgetGallerySheet extends StatelessWidget {
             children: [
               const Icon(Icons.groups_rounded, color: Color(0xFF38BDF8), size: 16),
               const SizedBox(width: 6),
-              const Text('SafeSolo Family Orbit • BS. Nam', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-              const Spacer(),
+              const Expanded(
+                child: Text(
+                  'SafeSolo Family Orbit • BS. Nam',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: const Color(0xFF0F1F38), borderRadius: BorderRadius.circular(999), border: Border.all(color: const Color(0xFF0284C7))),
@@ -546,8 +558,14 @@ class WidgetGallerySheet extends StatelessWidget {
             children: [
               const Icon(Icons.medical_services_rounded, color: Color(0xFFEF4444), size: 16),
               const SizedBox(width: 6),
-              const Text('Medical I.C.E • BS. CKII Lê Hoàng Nam', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-              const Spacer(),
+              const Expanded(
+                child: Text(
+                  'Medical I.C.E • BS. CKII Lê Hoàng Nam',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: const Color(0xFFDC2626), borderRadius: BorderRadius.circular(999)),

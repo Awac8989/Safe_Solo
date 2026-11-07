@@ -244,7 +244,7 @@ class _CircleOrbitVisualizerState extends State<CircleOrbitVisualizer>
           ),
           alignment: Alignment.center,
           child: Text(
-            userName.substring(0, 1).toUpperCase(),
+            userName.trim().isNotEmpty ? userName.trim().substring(0, 1).toUpperCase() : 'U',
             style: AppTextStyles.h3.copyWith(color: Colors.white, fontSize: 18),
           ),
         ),
@@ -332,7 +332,7 @@ class _CircleOrbitVisualizerState extends State<CircleOrbitVisualizer>
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            member.name.substring(0, 1).toUpperCase(),
+                            member.name.trim().isNotEmpty ? member.name.trim().substring(0, 1).toUpperCase() : 'M',
                             style: AppTextStyles.bodyStrong.copyWith(
                               color: member.auraColor,
                               fontSize: 14,

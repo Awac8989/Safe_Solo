@@ -267,7 +267,9 @@ class _ChatCard extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: Text(
-                chat.name.substring(0, 1).toUpperCase(),
+                chat.name.trim().isNotEmpty
+                    ? chat.name.trim().substring(0, 1).toUpperCase()
+                    : 'C',
                 style: AppTextStyles.title.copyWith(
                   color: avatarTextColor,
                 ),

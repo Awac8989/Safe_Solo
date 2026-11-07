@@ -36,6 +36,25 @@ const safeTagSchema = new mongoose.Schema(
     // Chữ ký bảo mật xác thực nguồn gốc tránh giả mạo
     digitalSignature: { type: String, default: null },
 
+    // Quản lý mã OTP truy cập Tầng 2 lâm sàng
+    pendingOtp: {
+      code: { type: String, default: null },
+      expiresAt: { type: Date, default: null },
+      targetPhone: { type: String, default: null },
+    },
+
+    // Lịch sử giải tỏa khẩn cấp trực tiếp của Bác sĩ 115 (Emergency Bypass)
+    emergencyAccessBypasses: [
+      {
+        accessedAt: { type: Date, default: Date.now },
+        paramedicId: { type: String, required: true },
+        paramedicLicense: { type: String, required: true },
+        emergencyIncidentId: { type: String, default: null },
+        clinicalJustification: { type: String, required: true },
+        ipAddress: { type: String, default: '0.0.0.0' },
+      },
+    ],
+
     // Lịch sử quét thẻ khẩn cấp ngoại viện
     scanHistory: [
       {

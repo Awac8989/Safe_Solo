@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Award,
+  X,
   Building2,
   CheckCircle2,
   Clock,
@@ -34,6 +36,7 @@ import {
   createBloodRelayRequest,
   acceptBloodRelayRequest,
   fulfillBloodRelayRequest,
+  fetchBloodDonorCertificate,
   type BloodRelayItem,
   type MatchingDonor,
 } from "@/lib/api";
@@ -48,6 +51,17 @@ function BloodRelayManagementPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedRelay, setSelectedRelay] = useState<BloodRelayItem | null>(null);
   const [fulfillModalOpen, setFulfillModalOpen] = useState(false);
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [selectedCertDonor, setSelectedCertDonor] = useState<{
+    requestId: string;
+    donorId: string;
+  } | null>(null);
+
+  const { data: certResponse, isLoading: isCertLoading } = useQuery({
+    queryKey: ["blood-donor-certificate", selectedCertDonor?.requestId, selectedCertDonor?.donorId],
+    queryFn: () => (selectedCertDonor ? fetchBloodDonorCertificate(selectedCertDonor.requestId, selectedCertDonor.donorId) : null),
+    enabled: Boolean(selectedCertDonor && certModalOpen),
+  });
   const [radarModalOpen, setRadarModalOpen] = useState(false);
   const [qrPassModalOpen, setQrPassModalOpen] = useState(false);
   const [activeDonorPass, setActiveDonorPass] = useState<{
@@ -414,6 +428,19 @@ function BloodRelayManagementPage() {
                     </td>
 
                     <td className="px-4 py-3.5 text-right space-x-1.5 whitespace-nowrap">
+                      {item.status === "DELIVERED_AND_FULFILLED" && (
+                        <button
+                          onClick={() => {
+                            const donorId = item.matchedDonors?.[0]?.donorId || "SYSTEM_DONOR";
+                            setSelectedCertDonor({ requestId: item._id, donorId });
+                            setCertModalOpen(true);
+                          }}
+                          className="rounded-lg bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 text-xs font-semibold shadow-sm transition-all inline-flex items-center gap-1"
+                        >
+                          <Award className="h-3.5 w-3.5" />
+                          Xem Chứng Nhận
+                        </button>
+                      )}
                       {item.status !== "DELIVERED_AND_FULFILLED" && (
                         <>
                           <button
@@ -760,6 +787,124 @@ function BloodRelayManagementPage() {
       )}
 
       {/* Modal Xác Nhận Hoàn Tất Tiếp Máu */}
+      
+      {/* Modal: Chứng Nhận Hiến Máu Điện Tử */}
+      {certModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm overflow-y-auto">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-amber-500/40 bg-card p-6 md:p-8 shadow-2xl text-card-foreground">
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <div className="flex items-center gap-2">
+                <Award className="h-6 w-6 text-amber-500" />
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    Chứng Nhận Hiến Máu Cứu Người Tình Nguyện
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Tiêu chuẩn ISBT-128 & Quyết định số 1996/QĐ-BYT Bộ Y Tế
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted flex items-center gap-1.5"
+                >
+                  <Printer className="h-3.5 w-3.5" /> In / PDF
+                </button>
+                <button
+                  onClick={() => setCertModalOpen(false)}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {isCertLoading ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">
+                <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-amber-500" />
+                Đang truy xuất chứng thư mật mã số hóa...
+              </div>
+            ) : certResponse ? (
+              <div className="mt-6 space-y-6">
+                <div className="rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/5 p-6 text-center relative overflow-hidden">
+                  <div className="absolute top-2 right-3 font-mono text-[10px] text-amber-400 font-bold">
+                    {certResponse.certificateNumber}
+                  </div>
+                  
+                  <div className="mx-auto h-12 w-12 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-500 mb-3">
+                    <Heart className="h-7 w-7 fill-rose-500" />
+                  </div>
+
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-amber-500">
+                    HỘI CHỮ THẬP ĐỎ VIỆT NAM · MẠNG LƯỚI SAFEBLOOD RELAY
+                  </div>
+                  <h2 className="text-xl font-black text-foreground mt-1">
+                    GIẤY CHỨNG NHẬN HIẾN MÁU TÌNH NGUYỆN
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Trân trọng ghi nhận và tôn vinh nghĩa cử cao đẹp cứu người của:
+                  </p>
+
+                  <div className="text-2xl font-black text-rose-500 my-3">
+                    {certResponse.donorName}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-left max-w-md mx-auto text-xs bg-background/80 p-3.5 rounded-lg border border-border">
+                    <div>
+                      <span className="text-muted-foreground">Nhóm máu:</span>
+                      <div className="font-bold text-rose-400 text-sm">{certResponse.bloodGroup}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Lượng máu hiến:</span>
+                      <div className="font-bold text-foreground text-sm">{certResponse.unitsDonated * 250} ml ({certResponse.unitsDonated} đơn vị)</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Cơ sở tiếp nhận:</span>
+                      <div className="font-semibold text-foreground">{certResponse.hospitalName}</div>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Khoa / Đơn vị:</span>
+                      <div className="font-semibold text-foreground">{certResponse.hospitalDepartment}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 text-[11px] text-muted-foreground italic max-w-lg mx-auto">
+                    Mục đích: &quot;{certResponse.purpose}&quot;
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-amber-500/20 flex items-center justify-between text-left text-[11px]">
+                    <div>
+                      <div className="font-semibold text-foreground flex items-center gap-1">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                        {certResponse.digitalSeal?.issuer || "SafeBlood Verified"}
+                      </div>
+                      <div className="font-mono text-[9px] text-muted-foreground truncate max-w-[280px]">
+                        Proof: {certResponse.digitalSeal?.blockchainProofHash}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-muted-foreground">Thời gian cấp:</div>
+                      <div className="font-mono font-bold text-foreground">
+                        {new Date(certResponse.issuedAt).toLocaleDateString("vi-VN")}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-muted-foreground text-center">
+                  Căn cứ pháp lý: {certResponse.legalBasis} · Được bảo lưu quyền lợi hoàn máu tương đương theo quy định Bộ Y Tế.
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm text-destructive">
+                Không thể tải thông tin chứng nhận hiến máu.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {fulfillModalOpen && selectedRelay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95">

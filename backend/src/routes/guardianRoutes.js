@@ -23,4 +23,9 @@ router.put('/respond', validate(guardianSchemas.respondToRequest), guardianContr
 router.delete('/:relationshipId', guardianController.removeRelationship);
 router.put('/:relationshipId/block', guardianController.blockUser);
 
+// Senior Solo Living, Dementia Geofence & Family Peace of Mind
+router.post('/senior/dementia-check', guardianController.checkDementiaGeofence);
+router.post('/senior/medication-confirm', guardianController.recordCriticalMedication);
+router.get('/senior/peace-of-mind/:userId', guardianController.getPeaceOfMindIndex);
+
 module.exports = router;

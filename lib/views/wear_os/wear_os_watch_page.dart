@@ -1631,20 +1631,20 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
           setState(() {
             _selectedMood = i;
             _dashboardSeconds = _dashboardTotal;
-            _checkinDone = true;
           });
           WatchSyncManager.instance.emitDeadmanCheckin(mood: m['label'] as String? ?? 'Tuyệt vời');
           _checkinTimer1?.cancel();
           _checkinTimer2?.cancel();
-          _checkinTimer1 = Timer(const Duration(milliseconds: 600), () {
+          _checkinTimer1 = Timer(const Duration(milliseconds: 300), () {
             if (mounted) setState(() => _checkinDone = true);
           });
-          _checkinTimer2 = Timer(const Duration(milliseconds: 1600), () {
+          _checkinTimer2 = Timer(const Duration(milliseconds: 1800), () {
             if (mounted) {
               setState(() {
                 _checkinDone = false;
                 _selectedMood = null;
               });
+              _nav(WatchScreen.watchface);
             }
           });
         },
@@ -1700,10 +1700,11 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
           ),
         ),
 
-        // Cụm nội dung trung tâm: Mood Check-in (Thiết kế tinh gọn, sạch sẽ, không tràn viền)
+        // Cụm nội dung trung tâm: Mood Check-in (Thiết kế an toàn vừa vặn trong mặt tròn)
         Center(
           child: SizedBox(
-            width: size * 0.88,
+            width: size * 0.82,
+            height: size * 0.82,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.center,
@@ -1767,7 +1768,25 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                     children: [
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: _performInstantCheckin,
+                        onTap: () {
+                          HapticFeedback.heavyImpact();
+                          setState(() {
+                            _dashboardSeconds = _dashboardTotal;
+                            _checkinDone = true;
+                          });
+                          WatchSyncManager.instance.emitDeadmanCheckin(mood: 'Tuyệt vời');
+                          _checkinTimer1?.cancel();
+                          _checkinTimer2?.cancel();
+                          _checkinTimer2 = Timer(const Duration(milliseconds: 1800), () {
+                            if (mounted) {
+                              setState(() {
+                                _checkinDone = false;
+                                _selectedMood = null;
+                              });
+                              _nav(WatchScreen.watchface);
+                            }
+                          });
+                        },
                         child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: isNativeWatch ? 8 : 11,
@@ -1798,7 +1817,21 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                       const SizedBox(width: 5),
                       GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: _triggerWristTwistCheckin,
+                        onTap: () {
+                          _triggerWristTwistCheckin();
+                          setState(() => _checkinDone = true);
+                          _checkinTimer1?.cancel();
+                          _checkinTimer2?.cancel();
+                          _checkinTimer2 = Timer(const Duration(milliseconds: 1800), () {
+                            if (mounted) {
+                              setState(() {
+                                _checkinDone = false;
+                                _selectedMood = null;
+                              });
+                              _nav(WatchScreen.watchface);
+                            }
+                          });
+                        },
                         child: Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: isNativeWatch ? 8 : 11,
@@ -1833,23 +1866,6 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
             ),
           ),
         ),
-
-        if (_checkinDone)
-          Positioned(
-            top: isNativeWatch ? 20 : 26,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00C853),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [BoxShadow(color: Color(0x6600C853), blurRadius: 10)],
-              ),
-              child: const Text(
-                '✓ ĐÃ ĐIỂM DANH',
-                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-            ),
-          ),
       ],
     );
   }

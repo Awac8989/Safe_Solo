@@ -959,7 +959,7 @@ class _ProfileCard extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              name.substring(0, 1).toUpperCase(),
+              name.trim().isNotEmpty ? name.trim().substring(0, 1).toUpperCase() : 'U',
               style: AppTextStyles.h3.copyWith(color: Colors.white),
             ),
           ),

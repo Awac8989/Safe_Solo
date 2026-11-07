@@ -25,10 +25,12 @@ import '../health/health_history_page.dart';
 import '../sos_map/sos_map_page.dart';
 import '../watch/widgets/add_smartwatch_sheet.dart';
 import '../journey/widgets/home_journey_card.dart';
+import '../emergency/false_alarm_verification_dialog.dart';
 import '../emergency/first_aid_guide_page.dart';
 import '../emergency/offline_emergency_sheet.dart';
 import '../emergency/solocare_ai_sheet.dart';
 import '../heroes/hero_workspace_page.dart';
+import '../../services/survival_siren_service.dart';
 import 'widgets/disaster_alert_card.dart';
 import 'widgets/disaster_live_feed_section.dart';
 import 'widgets/widget_gallery_sheet.dart';
@@ -51,6 +53,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Timer? _ticker;
   Timer? _demoPushTimer;
   Timer? _holdTimer;
+  Timer? _holdProgressTimer;
+  double _holdProgress = 0.0;
+  bool _isHoldingSos = false;
   DateTime _now = DateTime.now();
 
   @override
@@ -80,6 +85,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     _ticker?.cancel();
     _demoPushTimer?.cancel();
     _holdTimer?.cancel();
+    _holdProgressTimer?.cancel();
     super.dispose();
   }
 
@@ -128,21 +134,131 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
 
   void _startHoldSos() {
     _holdTimer?.cancel();
-    _holdTimer = Timer(const Duration(seconds: 3), () async {
-      if (!mounted) {
+    _holdProgressTimer?.cancel();
+    setState(() {
+      _isHoldingSos = true;
+      _holdProgress = 0.0;
+    });
+
+    try {
+      HapticFeedback.lightImpact();
+    } catch (_) {}
+
+    final startTime = DateTime.now();
+    const totalDurationMs = 3000;
+
+    _holdProgressTimer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
+      if (!mounted || !_isHoldingSos) {
+        timer.cancel();
         return;
       }
+      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+      final progress = (elapsed / totalDurationMs).clamp(0.0, 1.0);
+      setState(() => _holdProgress = progress);
+
+      if (elapsed >= 1000 && elapsed < 1050) {
+        try {
+          HapticFeedback.mediumImpact();
+        } catch (_) {}
+      } else if (elapsed >= 2000 && elapsed < 2050) {
+        try {
+          HapticFeedback.heavyImpact();
+        } catch (_) {}
+      }
+    });
+
+    _holdTimer = Timer(const Duration(milliseconds: totalDurationMs), () async {
+      if (!mounted || !_isHoldingSos) return;
+      _cancelHoldSos();
+
+      try {
+        HapticFeedback.vibrate();
+      } catch (_) {}
+
+      final appProvider = context.read<AppProvider>();
+      final victimName = appProvider.user?.fullName ?? appProvider.user?.name ?? 'Bạn';
+
+      // 1. Kích hoạt sự cố thực tế với backend & hộp đen sinh tồn
+      final incident = await appProvider.triggerEmergencyIncident(
+        incidentType: 'MANUAL_SOS_P1',
+        details: 'Kích hoạt trực tiếp bằng nút Đại Cứu Hộ SOS 3 giây trên màn hình chính',
+        severity: 2,
+        severityLevel: 'P1_CRITICAL',
+      );
+
+      if (!mounted) return;
+
+      TopToast.show(
+        context,
+        message: '🚨 ĐÃ PHÁT TÍN HIỆU CỨU NẠN KHẨN CẤP P1!',
+        icon: Icons.emergency_rounded,
+      );
+
+      // 2. Chuyển vào Bàn Tác Chiến Cứu Nạn Thời Gian Thực
       await Navigator.push(
         context,
         MaterialPageRoute<void>(
-          builder: (_) => const SosMapPage(victimName: 'Hồ Văn Tài'),
+          builder: (_) => SosMapPage(
+            victimName: victimName,
+            incident: incident,
+          ),
         ),
       );
     });
   }
 
+  Future<void> _triggerInstantCriticalSos({
+    required String reason,
+    required String code,
+    bool openCprGuide = false,
+  }) async {
+    try {
+      HapticFeedback.heavyImpact();
+    } catch (_) {}
+
+    final appProvider = context.read<AppProvider>();
+    final victimName = appProvider.user?.fullName ?? appProvider.user?.name ?? 'Bạn';
+
+    // 1. Tự động bật Loa Trợ Giúp Quần Chúng (Bystander Broadcast) & Còi Hú Sinh Tồn
+    SurvivalSirenService.instance.startBystanderBroadcast();
+
+    TopToast.show(
+      context,
+      message: '🚨 ĐÃ KÍCH HOẠT QUY TRÌNH CỨU NGƯỜI GẤP ($reason)!',
+      icon: Icons.emergency_rounded,
+    );
+
+    // 2. Phát tín hiệu khẩn cấp đa tầng ngầm trong nền (không block giao diện cấp cứu)
+    unawaited(
+      appProvider.triggerEmergencyIncident(
+        incidentType: 'CRITICAL_$code',
+        details: '⚡ CẤP CỨU KHẨN CẤP 0-GIÂY: $reason',
+        severity: 2,
+        severityLevel: 'P1_CRITICAL',
+      ),
+    );
+
+    // 3. Chuyển ngay lập tức (0ms) vào Bàn Tác Chiến Cứu Nạn Thời Gian Thực
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => SosMapPage(
+          victimName: victimName,
+          incident: appProvider.activeRescueIncident,
+        ),
+      ),
+    );
+  }
+
   void _cancelHoldSos() {
     _holdTimer?.cancel();
+    _holdProgressTimer?.cancel();
+    if (_isHoldingSos) {
+      setState(() {
+        _isHoldingSos = false;
+        _holdProgress = 0.0;
+      });
+    }
   }
 
   Future<void> _handleCircleTap() async {
@@ -475,7 +591,22 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                       for (final ring in [0.0, 0.18, 0.36, 0.54])
                         _PulseRing(
                           progress: (_pulseController.value + ring) % 1,
-                          color: _statusStripColor(state),
+                          color: _isHoldingSos
+                              ? const Color(0xFFEF4444)
+                              : _statusStripColor(state),
+                        ),
+                      if (_isHoldingSos)
+                        SizedBox(
+                          width: 312,
+                          height: 312,
+                          child: CircularProgressIndicator(
+                            value: _holdProgress,
+                            strokeWidth: 8,
+                            backgroundColor: Colors.white24,
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Color(0xFFFF2E56),
+                            ),
+                          ),
                         ),
                       Transform.scale(scale: pulse, child: child),
                       SizedBox(
@@ -497,13 +628,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   width: 292,
                   height: 292,
                   decoration: BoxDecoration(
-                    gradient: state.gradient,
+                    gradient: _isHoldingSos
+                        ? const LinearGradient(
+                            colors: [Color(0xFFDC2626), Color(0xFF7F1D1D)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : state.gradient,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.85),
+                      color: _isHoldingSos
+                          ? const Color(0xFFFF4D6D)
+                          : Colors.white.withValues(alpha: 0.85),
                       width: 6,
                     ),
-                    boxShadow: state.shadow,
+                    boxShadow: _isHoldingSos
+                        ? [
+                            BoxShadow(
+                              color: Colors.red.withValues(alpha: 0.8),
+                              blurRadius: 32,
+                              spreadRadius: 4,
+                            ),
+                          ]
+                        : state.shadow,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -519,25 +666,31 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         )
                       else
                         Icon(
-                          state.icon,
+                          _isHoldingSos ? Icons.warning_rounded : state.icon,
                           size: 68,
                           color: Colors.white,
                         ),
                       const SizedBox(height: 12),
                       Text(
-                        state.title(strings),
+                        _isHoldingSos
+                            ? 'GIỮ ĐỂ BÁO ĐỘNG!'
+                            : state.title(strings),
                         style: AppTextStyles.h2.copyWith(
                           color: Colors.white,
                           fontSize: 22,
+                          fontWeight: FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        state.subtitle(strings),
+                        _isHoldingSos
+                            ? 'Kích hoạt trong ${(3.0 - (_holdProgress * 3.0)).clamp(0.0, 3.0).toStringAsFixed(1)}s'
+                            : state.subtitle(strings),
                         textAlign: TextAlign.center,
                         style: AppTextStyles.bodyLarge.copyWith(
                           color: Colors.white.withValues(alpha: 0.94),
+                          fontWeight: _isHoldingSos ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -620,6 +773,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          _buildInstantCriticalSosBar(context, appProvider, strings, isDark),
           const SizedBox(height: 12),
           _buildQuickCheckInActionBar(context, appProvider, strings),
           const SizedBox(height: 18),
@@ -824,7 +979,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           ],
           const SizedBox(height: 18),
           _buildWatchHealthGlanceCard(context, strings),
-          _buildHomeScreenWidgetSyncCard(context, strings, appProvider),
           const HomeJourneyCard(),
           const SizedBox(height: 10),
           _buildSoloCareAiCard(context, strings),
@@ -863,10 +1017,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      strings.text('Điểm danh & Trạng thái', 'Check-in & Status'),
-                      style: AppTextStyles.h3.copyWith(fontSize: 18),
+                    Expanded(
+                      child: Text(
+                        strings.text('Điểm danh & Trạng thái', 'Check-in & Status'),
+                        style: AppTextStyles.h3.copyWith(fontSize: 18),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     // Secret Duress gesture button (Long press 3s triggers Duress SOS silently)
                     Tooltip(
                       message: strings.text('Bảo mật', 'Security'),
@@ -964,6 +1122,24 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   ),
                 ),
                 const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    icon: const Icon(Icons.emergency_rounded, size: 20),
+                    label: Text(
+                      strings.text('PHÁT SOS KHẨN CẤP (15S ĐẾM NGƯỢC)', 'TRIGGER SOS (15S COUNTDOWN)'),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    onPressed: () => Navigator.pop(dialogContext, {'action': 'TRIGGER_SOS_MODAL'}),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -991,6 +1167,30 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
 
     final action = result['action'] as String?;
+    if (action == 'TRIGGER_SOS_MODAL') {
+      if (!mounted) return;
+      final escalated = await FalseAlarmVerificationDialog.show(
+        context,
+        incidentType: 'MANUAL_SOS_P1',
+        details: 'Kích hoạt từ menu khẩn cấp tại màn hình chính',
+        initialSeconds: 15,
+      );
+      if (escalated == true && mounted) {
+        final currentProvider = context.read<AppProvider>();
+        final victimName = currentProvider.user?.fullName ?? currentProvider.user?.name ?? 'Bạn';
+        await Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => SosMapPage(
+              victimName: victimName,
+              incident: currentProvider.activeRescueIncident,
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     if (action == 'DURESS') {
       try {
         await appProvider.performDuressCheckIn();
@@ -1145,6 +1345,169 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInstantCriticalSosBar(
+    BuildContext context,
+    AppProvider provider,
+    AppStrings strings,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F1218) : const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFF43F5E).withValues(alpha: isDark ? 0.6 : 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE11D48).withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE11D48),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.flash_on_rounded, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.text('⚡ CỨU NGƯỜI GẤP · BYPASS 0-GIÂY', '⚡ CRITICAL RESCUE · 0-SEC BYPASS'),
+                      style: AppTextStyles.bodyStrong.copyWith(
+                        color: const Color(0xFFE11D48),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    Text(
+                      strings.text(
+                        'Chạm 1 lần kích hoạt P0 + Loa quần chúng + Chỉ đường AED ngay',
+                        '1-tap trigger P0 + Vocal siren + Instant AED guidance',
+                      ),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              // 1. Ngừng tim / CPR
+              Expanded(
+                child: _buildCriticalActionTile(
+                  title: '🫀 Ngừng tim',
+                  sub: 'CPR & AED',
+                  color: const Color(0xFFE11D48),
+                  isDark: isDark,
+                  onTap: () => _triggerInstantCriticalSos(
+                    reason: 'Ngừng tuần hoàn / Ngừng tim đột ngột',
+                    code: 'CARDIAC_ARREST',
+                    openCprGuide: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 2. Chấn thương nặng / Tai nạn
+              Expanded(
+                child: _buildCriticalActionTile(
+                  title: '🩸 Chấn thương',
+                  sub: 'Máu & 115',
+                  color: const Color(0xFFEA580C),
+                  isDark: isDark,
+                  onTap: () => _triggerInstantCriticalSos(
+                    reason: 'Chấn thương nặng / Xuất huyết ồ ạt',
+                    code: 'TRAUMA_HEMORRHAGE',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 3. Đột quỵ / Bất tỉnh
+              Expanded(
+                child: _buildCriticalActionTile(
+                  title: '🧠 Đột quỵ FAST',
+                  sub: 'Bất tỉnh / Hôn mê',
+                  color: const Color(0xFF7C3AED),
+                  isDark: isDark,
+                  onTap: () => _triggerInstantCriticalSos(
+                    reason: 'Đột quỵ não cấp FAST / Bất tỉnh không phản ứng',
+                    code: 'COMA_STROKE',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCriticalActionTile({
+    required String title,
+    required String sub,
+    required Color color,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: isDark ? 0.22 : 0.10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.45), width: 1.2),
+        ),
+        child: Column(
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                color: isDark ? Colors.white : color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              sub,
+              style: TextStyle(
+                color: isDark ? Colors.white60 : Colors.black54,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1378,36 +1741,43 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.shield_rounded, color: Color(0xFF6366F1), size: 22),
-                              const SizedBox(width: 6),
-                              Text(
-                                strings.text('7 CƠ CHẾ ĐIỂM DANH SINH TỒN', '7 SURVIVAL CHECK-IN MODES'),
-                                style: TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.shield_rounded, color: Color(0xFF6366F1), size: 22),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    strings.text('7 CƠ CHẾ ĐIỂM DANH SINH TỒN', '7 SURVIVAL CHECK-IN MODES'),
+                                    style: TextStyle(
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              strings.text(
+                                'Bộ sưu tập công nghệ điểm danh đa kênh cho SafeSolo',
+                                'Multi-channel check-in technology suite for SafeSolo',
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            strings.text(
-                              'Bộ sưu tập công nghệ điểm danh đa kênh cho SafeSolo',
-                              'Multi-channel check-in technology suite for SafeSolo',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
                             ),
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.close_rounded),
                         onPressed: () => Navigator.pop(sheetContext),
@@ -2975,191 +3345,207 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   width: 1.2,
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              isOkay ? '● ĐANG AN TOÀN' : '● QUÁ HẠN ĐIỂM DANH',
-                              style: TextStyle(
-                                color: isOkay ? const Color(0xFF34D399) : const Color(0xFFEF4444),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              'BS. CKII Lê Hoàng Nam',
-                              style: TextStyle(
-                                color: isDark ? Colors.white54 : Colors.white60,
-                                fontSize: 9.5,
-                              ),
-                            ),
-                          ],
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: (isOkay ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'DEAD-MAN SWITCH: $diffStr',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13.5,
+                        child: Text(
+                          isOkay ? '● ĐANG AN TOÀN' : '● QUÁ HẠN ĐIỂM DANH',
+                          style: TextStyle(
+                            color: isOkay ? const Color(0xFF34D399) : const Color(0xFFEF4444),
+                            fontSize: 10.5,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          WearOsService.instance.heartRate > 0
-                              ? '❤️ ${WearOsService.instance.heartRate} BPM • 🫁 98% • ⌚ ${WearOsService.instance.battery}%'
-                              : '❤️ 78 BPM • 🫁 98% • ⌚ 100%',
-                          style: const TextStyle(color: Color(0xFF93C5FD), fontSize: 10.5),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '🛡️ Vòng tròn bảo hộ: 🟢 Mẹ Lan (88%) • 🟢 Ba Hùng (94%)',
-                          style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 10, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          minimumSize: Size.zero,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          WidgetGallerySheet.show(context);
-                        },
-                        icon: const Icon(Icons.widgets_rounded, size: 13),
-                        label: Text(
-                          strings.text('4 Mẫu Widget', '4 Widgets'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
                       ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                          minimumSize: Size.zero,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: () async {
-                          HapticFeedback.mediumImpact();
-                          final success = await WidgetService.requestPinSafeSoloWidget();
-                          if (context.mounted) {
-                            if (success) {
-                              TopToast.show(
-                                context,
-                                message: strings.text(
-                                  'Đã gửi yêu cầu ghim Widget! Chạm "Thêm" trên thông báo để đặt ra màn hình chính.',
-                                  'Pin request sent! Tap "Add" to place Widget on Home screen.',
-                                ),
-                                icon: Icons.push_pin_rounded,
-                              );
-                            } else {
-                              TopToast.show(
-                                context,
-                                message: strings.text(
-                                  'Không thể tự ghim. Hãy nhấn giữ màn hình chính để thêm Widget thủ công.',
-                                  'Auto-pin not supported. Please long-press home screen to add manually.',
-                                ),
-                                icon: Icons.info_outline_rounded,
-                              );
-                            }
-                          }
-                        },
-                        icon: const Icon(Icons.push_pin_rounded, size: 13),
-                        label: Text(
-                          strings.text('Ghim Widget', 'Pin Widget'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF34D399),
-                          side: const BorderSide(color: Color(0xFF10B981)),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          minimumSize: Size.zero,
-                        ),
-                        onPressed: () async {
-                          HapticFeedback.lightImpact();
-                          final activeMembers = appProvider.orbitMembers;
-                          final emergency = appProvider.user?.emergencyContacts ?? const [];
-                          final totalGuardians = activeMembers.isNotEmpty ? activeMembers.length : emergency.length;
-                          final guardiansHeader = '🛡️ BẢO HỘ ONLINE ($totalGuardians)';
-
-                          String g1 = '';
-                          String g2 = '';
-                          String g3 = '';
-
-                          if (activeMembers.isNotEmpty) {
-                            final m1 = activeMembers[0];
-                            g1 = '🟢 ${m1.name}: ${m1.batteryLevel}% ${m1.isCharging ? '⚡' : '🔋'} • ${m1.relation}';
-                            if (activeMembers.length > 1) {
-                              final m2 = activeMembers[1];
-                              g2 = '🟢 ${m2.name}: ${m2.batteryLevel}% ${m2.isCharging ? '⚡' : '🔋'} • ${m2.relation}';
-                            }
-                            if (activeMembers.length > 2) {
-                              final m3 = activeMembers[2];
-                              g3 = '🟢 ${m3.name}: ${m3.batteryLevel}% 🔋 • ${m3.locationLabel}';
-                            }
-                          } else if (emergency.isNotEmpty) {
-                            g1 = '🟢 ${emergency[0].name} (${emergency[0].relation})';
-                            if (emergency.length > 1) {
-                              g2 = '🟢 ${emergency[1].name} (${emergency[1].relation})';
-                            }
-                          } else {
-                            g1 = '🟢 Mẹ Lan: 88% 🔋 Ở nhà';
-                            g2 = '🟢 Ba Hùng: 94% ⚡ Phòng ngủ';
-                          }
-
-                          await WidgetService.updateWidgetStatus(
-                            isOkay: isOkay,
-                            timeRemaining: diffStr,
-                            heartRate: WearOsService.instance.heartRate > 0 ? WearOsService.instance.heartRate : 78,
-                            steps: appProvider.stepsToday > 0 ? appProvider.stepsToday : null,
-                            batteryLevel: WearOsService.instance.battery > 0 ? WearOsService.instance.battery : 100,
-                            spo2: 98,
-                            isVacation: appProvider.isVacation,
-                            isNightShield: appProvider.isNightShieldActive,
-                            userName: appProvider.user?.name.isNotEmpty == true ? appProvider.user!.name : 'BS. CKII Lê Hoàng Nam',
-                            guardiansHeader: guardiansHeader,
-                            guardian1: g1,
-                            guardian2: g2,
-                            guardian3: g3,
-                          );
-                          if (context.mounted) {
-                            TopToast.show(
-                              context,
-                              message: strings.text(
-                                'Đã đồng bộ dữ liệu mới nhất ra Tiện ích màn hình chính!',
-                                'Synced fresh data to Home Screen Widget!',
-                              ),
-                              icon: Icons.check_circle_rounded,
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.sync_rounded, size: 13),
-                        label: Text(
-                          strings.text('Đồng bộ', 'Sync'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      const Spacer(),
+                      Text(
+                        appProvider.user?.name.isNotEmpty == true ? appProvider.user!.name : 'BS. CKII Lê Hoàng Nam',
+                        style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.white60,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'DEAD-MAN SWITCH: $diffStr',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    WearOsService.instance.heartRate > 0
+                        ? '❤️ ${WearOsService.instance.heartRate} BPM • 🫁 98% • ⌚ ${WearOsService.instance.battery}%'
+                        : '❤️ 78 BPM • 🫁 98% • ⌚ 100%',
+                    style: const TextStyle(color: Color(0xFF93C5FD), fontSize: 11),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '🛡️ Vòng tròn bảo hộ: 🟢 Mẹ Lan (88%) • 🟢 Ba Hùng (94%)',
+                    style: const TextStyle(color: Color(0xFF6EE7B7), fontSize: 10.5, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                            minimumSize: Size.zero,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            WidgetGallerySheet.show(context);
+                          },
+                          icon: const Icon(Icons.widgets_rounded, size: 14),
+                          label: Text(
+                            strings.text('4 Mẫu Widget', '4 Widgets'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                            minimumSize: Size.zero,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () async {
+                            HapticFeedback.mediumImpact();
+                            final success = await WidgetService.requestPinSafeSoloWidget();
+                            if (context.mounted) {
+                              if (success) {
+                                TopToast.show(
+                                  context,
+                                  message: strings.text(
+                                    'Đã gửi yêu cầu ghim Widget! Chạm "Thêm" trên thông báo để đặt ra màn hình chính.',
+                                    'Pin request sent! Tap "Add" to place Widget on Home screen.',
+                                  ),
+                                  icon: Icons.push_pin_rounded,
+                                );
+                              } else {
+                                TopToast.show(
+                                  context,
+                                  message: strings.text(
+                                    'Không thể tự ghim. Hãy nhấn giữ màn hình chính để thêm Widget thủ công.',
+                                    'Auto-pin not supported. Please long-press home screen to add manually.',
+                                  ),
+                                  icon: Icons.info_outline_rounded,
+                                );
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.push_pin_rounded, size: 14),
+                          label: Text(
+                            strings.text('Ghim Widget', 'Pin Widget'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF34D399),
+                        side: const BorderSide(color: Color(0xFF10B981)),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        minimumSize: Size.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        HapticFeedback.lightImpact();
+                        final activeMembers = appProvider.orbitMembers;
+                        final emergency = appProvider.user?.emergencyContacts ?? const [];
+                        final totalGuardians = activeMembers.isNotEmpty ? activeMembers.length : emergency.length;
+                        final guardiansHeader = '🛡️ BẢO HỘ ONLINE ($totalGuardians)';
+
+                        String g1 = '';
+                        String g2 = '';
+                        String g3 = '';
+
+                        if (activeMembers.isNotEmpty) {
+                          final m1 = activeMembers[0];
+                          g1 = '🟢 ${m1.name}: ${m1.batteryLevel}% ${m1.isCharging ? '⚡' : '🔋'} • ${m1.relation}';
+                          if (activeMembers.length > 1) {
+                            final m2 = activeMembers[1];
+                            g2 = '🟢 ${m2.name}: ${m2.batteryLevel}% ${m2.isCharging ? '⚡' : '🔋'} • ${m2.relation}';
+                          }
+                          if (activeMembers.length > 2) {
+                            final m3 = activeMembers[2];
+                            g3 = '🟢 ${m3.name}: ${m3.batteryLevel}% 🔋 • ${m3.locationLabel}';
+                          }
+                        } else if (emergency.isNotEmpty) {
+                          g1 = '🟢 ${emergency[0].name} (${emergency[0].relation})';
+                          if (emergency.length > 1) {
+                            g2 = '🟢 ${emergency[1].name} (${emergency[1].relation})';
+                          }
+                        } else {
+                          g1 = '🟢 Mẹ Lan: 88% 🔋 Ở nhà';
+                          g2 = '🟢 Ba Hùng: 94% ⚡ Phòng ngủ';
+                        }
+
+                        await WidgetService.updateWidgetStatus(
+                          isOkay: isOkay,
+                          timeRemaining: diffStr,
+                          heartRate: WearOsService.instance.heartRate > 0 ? WearOsService.instance.heartRate : 78,
+                          steps: appProvider.stepsToday > 0 ? appProvider.stepsToday : null,
+                          batteryLevel: WearOsService.instance.battery > 0 ? WearOsService.instance.battery : 100,
+                          spo2: 98,
+                          isVacation: appProvider.isVacation,
+                          isNightShield: appProvider.isNightShieldActive,
+                          userName: appProvider.user?.name.isNotEmpty == true ? appProvider.user!.name : 'BS. CKII Lê Hoàng Nam',
+                          guardiansHeader: guardiansHeader,
+                          guardian1: g1,
+                          guardian2: g2,
+                          guardian3: g3,
+                        );
+                        if (context.mounted) {
+                          TopToast.show(
+                            context,
+                            message: strings.text(
+                              'Đã đồng bộ dữ liệu mới nhất ra Tiện ích màn hình chính!',
+                              'Synced fresh data to Home Screen Widget!',
+                            ),
+                            icon: Icons.check_circle_rounded,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.sync_rounded, size: 14),
+                      label: Text(
+                        strings.text('Đồng bộ dữ liệu ra Widget', 'Sync data to Widget'),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -3342,13 +3728,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
             children: [
               Icon(badgeIcon, size: 14, color: badgeColor),
               const SizedBox(width: 6),
-              Text(
-                state.labelVi.toUpperCase(),
-                style: TextStyle(
-                  color: badgeColor,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                  letterSpacing: 0.6,
+              Flexible(
+                child: Text(
+                  state.labelVi.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: badgeColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    letterSpacing: 0.4,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -3704,24 +4094,33 @@ class _MoodOption extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         decoration: BoxDecoration(
           color: isDark ? AppDarkColors.cardSoft : AppColors.secondary,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: isDark ? Border.all(color: AppDarkColors.border) : null,
         ),
-        child: Column(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 30)),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyStrong.copyWith(
-                color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+        child: SizedBox(
+          height: 64,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 26)),
+              const SizedBox(height: 6),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

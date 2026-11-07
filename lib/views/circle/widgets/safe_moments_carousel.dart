@@ -439,7 +439,9 @@ class _SafeMomentsCarouselState extends State<SafeMomentsCarousel> {
                               radius: 27,
                               backgroundColor: AppColors.primarySoft,
                               child: Text(
-                                moment.authorName.substring(0, 1).toUpperCase(),
+                                moment.authorName.trim().isNotEmpty
+                                    ? moment.authorName.trim().substring(0, 1).toUpperCase()
+                                    : 'M',
                                 style: AppTextStyles.title.copyWith(
                                   color: AppColors.primary,
                                   fontSize: 18,
@@ -564,7 +566,9 @@ class _SafeMomentViewerModalState extends State<_SafeMomentViewerModal> {
                 radius: 24,
                 backgroundColor: AppColors.primary,
                 child: Text(
-                  m.authorName.substring(0, 1).toUpperCase(),
+                  m.authorName.trim().isNotEmpty
+                      ? m.authorName.trim().substring(0, 1).toUpperCase()
+                      : 'M',
                   style: AppTextStyles.title.copyWith(color: Colors.white),
                 ),
               ),

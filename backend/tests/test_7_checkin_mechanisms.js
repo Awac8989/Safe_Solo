@@ -189,6 +189,7 @@ async function runTests() {
   await database.$disconnect();
 
   console.log('\n🎉 ALL 7 CHECK-IN MECHANISMS VERIFIED SUCCESSFULLY IN BACKEND LOGIC!');
+  process.exit(0);
 }
 
 runTests().catch(async (err) => {

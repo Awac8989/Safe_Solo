@@ -167,6 +167,47 @@ class GuardianController {
       next(error);
     }
   }
+
+  // @desc    Check Dementia Wandering Safe Zone Geofence
+  // @route   POST /api/guardians/senior/dementia-check
+  // @access  Private
+  async checkDementiaGeofence(req, res, next) {
+    try {
+      const userId = req.body.userId || req.user.id;
+      const { lat, lng } = req.body;
+      const result = await guardianService.checkDementiaGeofence(userId, lat, lng);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Record Critical Life-Support Medication intake
+  // @route   POST /api/guardians/senior/medication-confirm
+  // @access  Private
+  async recordCriticalMedication(req, res, next) {
+    try {
+      const userId = req.body.userId || req.user.id;
+      const { medicationName } = req.body;
+      const result = await guardianService.recordCriticalMedicationIntake(userId, medicationName);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // @desc    Calculate Family Peace of Mind Index (0-100%)
+  // @route   GET /api/guardians/senior/peace-of-mind/:userId
+  // @access  Private
+  async getPeaceOfMindIndex(req, res, next) {
+    try {
+      const userId = req.params.userId || req.user.id;
+      const result = await guardianService.calculateGuardianPeaceOfMindIndex(userId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new GuardianController();

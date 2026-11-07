@@ -447,6 +447,181 @@ class GuardianService {
       channels,
     };
   }
+
+  /**
+   * Giám sát Vùng An Toàn Người Cao Tuổi Sa Sút Trí Tuệ (Dementia Geofence)
+   * Tự động phát hiện đi lạc và phát báo động khẩn cấp tới Người bảo trợ
+   */
+  async checkDementiaGeofence(userId, currentLat, currentLng) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('Không tìm thấy người dùng');
+
+    const geofence = user.seniorSafety?.dementiaGeofence || {
+      enabled: false,
+      centerLat: 10.7769,
+      centerLng: 106.7009,
+      radiusMeters: 500,
+    };
+
+    if (!geofence.enabled) {
+      return { enabled: false, message: 'Chế độ Dementia Geofence chưa bật' };
+    }
+
+    // Tính khoảng cách Haversine từ tâm vùng an toàn (nhà) tới vị trí hiện tại
+    const R = 6371e3; // bán kính Trái Đất mét
+    const phi1 = (geofence.centerLat * Math.PI) / 180;
+    const phi2 = (currentLat * Math.PI) / 180;
+    const deltaPhi = ((currentLat - geofence.centerLat) * Math.PI) / 180;
+    const deltaLambda = ((currentLng - geofence.centerLng) * Math.PI) / 180;
+
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceMeters = Math.round(R * c);
+
+    const isOutside = distanceMeters > geofence.radiusMeters;
+
+    if (!user.seniorSafety) user.seniorSafety = {};
+    if (!user.seniorSafety.dementiaGeofence) user.seniorSafety.dementiaGeofence = geofence;
+
+    user.seniorSafety.dementiaGeofence.isOutsideSafeZone = isOutside;
+    if (isOutside) {
+      user.seniorSafety.dementiaGeofence.lastWanderingAlertAt = new Date();
+    }
+    await user.save();
+
+    return {
+      success: true,
+      userId,
+      currentLocation: { lat: currentLat, lng: currentLng },
+      safeZoneCenter: { lat: geofence.centerLat, lng: geofence.centerLng },
+      radiusMeters: geofence.radiusMeters,
+      distanceFromCenterMeters: distanceMeters,
+      isOutsideSafeZone: isOutside,
+      status: isOutside ? 'WANDERING_ALERT' : 'INSIDE_SAFE_ZONE',
+      alertMessage: isOutside
+        ? `[CẢNH BÁO ĐI LẠC] Người cao tuổi ${user.fullName} đã rời khỏi Vùng An Toàn (${distanceMeters}m > ${geofence.radiusMeters}m). Đang định vị GPS gửi tới Người chăm sóc: ${user.seniorSafety.caregiverPhone || 'Người bảo trợ'}!`
+        : 'Người cao tuổi đang trong Vùng An Toàn quanh nhà.',
+    };
+  }
+
+  /**
+   * Điểm danh Uống Thuốc Hỗ Trợ Sự Sống (Critical Life-Support Medication)
+   * Tim mạch, Tiểu đường, Huyết áp
+   */
+  async recordCriticalMedicationIntake(userId, medicationName) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('Không tìm thấy người dùng');
+
+    if (!user.seniorSafety) user.seniorSafety = { criticalMedications: [] };
+    if (!user.seniorSafety.criticalMedications) user.seniorSafety.criticalMedications = [];
+
+    let med = user.seniorSafety.criticalMedications.find(
+      (m) => m.medicationName.toLowerCase() === medicationName.toLowerCase()
+    );
+
+    if (!med) {
+      med = {
+        medicationName,
+        dosage: '1 viên',
+        scheduleTime: '08:00',
+        isCriticalLifeSupport: true,
+        lastTakenAt: new Date(),
+        adherenceRatePercent: 100,
+        missedAlertCount: 0,
+      };
+      user.seniorSafety.criticalMedications.push(med);
+    } else {
+      med.lastTakenAt = new Date();
+      med.missedAlertCount = 0;
+      med.adherenceRatePercent = 100;
+    }
+
+    await user.save();
+
+    return {
+      success: true,
+      userId,
+      medicationName: med.medicationName,
+      dosage: med.dosage,
+      lastTakenAt: med.lastTakenAt,
+      adherenceRatePercent: med.adherenceRatePercent,
+      message: `Đã xác nhận uống thuốc: ${med.medicationName} (${med.dosage}) lúc ${new Date().toLocaleTimeString('vi-VN')}. Tuân thủ: 100%.`,
+    };
+  }
+
+  /**
+   * Tính toán Chỉ Số An Tâm Thời Gian Thực Cho Gia Đình (Family Peace of Mind Index 0-100%)
+   */
+  async calculateGuardianPeaceOfMindIndex(userId) {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('Không tìm thấy người dùng');
+
+    let score = 0;
+    const now = Date.now();
+
+    // 1. Điểm Check-in gần nhất (Tối đa 35 điểm)
+    const lastCheckinDiffMinutes = (now - new Date(user.lastCheckinTime || now).getTime()) / 60000;
+    let checkinPoints = 0;
+    if (lastCheckinDiffMinutes <= 120) checkinPoints = 35; // Trong vòng 2h
+    else if (lastCheckinDiffMinutes <= 360) checkinPoints = 25; // Trong 6h
+    else if (lastCheckinDiffMinutes <= 720) checkinPoints = 15; // Trong 12h
+    else checkinPoints = 0;
+    score += checkinPoints;
+
+    // 2. Điểm Mức Pin Thiết bị (Tối đa 25 điểm)
+    const battery = user.batteryLevel ?? 80;
+    let batteryPoints = 0;
+    if (battery >= 50) batteryPoints = 25;
+    else if (battery >= 20) batteryPoints = 15;
+    else batteryPoints = 5;
+    score += batteryPoints;
+
+    // 3. Vùng An Toàn / Vị trí (Tối đa 25 điểm)
+    const isWandering = user.seniorSafety?.dementiaGeofence?.isOutsideSafeZone || false;
+    let locationPoints = 25;
+    if (isWandering) locationPoints = 0;
+    else if (user.currentStatus === 'SAFE') locationPoints = 25;
+    else locationPoints = 10;
+    score += locationPoints;
+
+    // 4. Tuân thủ thuốc bệnh nền (Tối đa 15 điểm)
+    const meds = user.seniorSafety?.criticalMedications || [];
+    let medPoints = 15;
+    if (meds.some((m) => m.missedAlertCount > 0)) {
+      medPoints = 0;
+    }
+    score += medPoints;
+
+    let evaluation = 'EXCELLENT_PEACE_OF_MIND';
+    let statusLabel = 'An tâm tuyệt đối: Người thân sinh hoạt bình thường';
+    if (score < 50) {
+      evaluation = 'CRITICAL_INTERVENTION';
+      statusLabel = 'Cảnh báo nguy cơ: Cần gọi điện hoặc ghé thăm kiểm tra ngay';
+    } else if (score < 70) {
+      evaluation = 'ATTENTION_NEEDED';
+      statusLabel = 'Cần chú ý: Pin yếu hoặc trễ giờ uống thuốc';
+    } else if (score < 85) {
+      evaluation = 'GOOD_PEACE_OF_MIND';
+      statusLabel = 'Tình trạng tốt: Sinh hoạt ổn định';
+    }
+
+    return {
+      userId,
+      userName: user.fullName,
+      peaceOfMindIndex: Math.min(100, score),
+      evaluation,
+      statusLabel,
+      breakdown: {
+        checkinRecencyPoints: checkinPoints,
+        batteryPoints,
+        locationSafetyPoints: locationPoints,
+        medicationPoints: medPoints,
+      },
+      lastEvaluatedAt: new Date(),
+    };
+  }
 }
 
 module.exports = new GuardianService();

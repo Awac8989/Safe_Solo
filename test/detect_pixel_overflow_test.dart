@@ -6,10 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:safesolo/core/app_theme.dart';
 import 'package:safesolo/core/providers/app_provider.dart';
-import 'package:safesolo/models/circle_orbit_member.dart';
 import 'package:safesolo/models/disaster_alert_model.dart';
 import 'package:safesolo/models/live_journey_model.dart';
-import 'package:safesolo/models/medical_profile_model.dart';
 
 // View imports
 import 'package:safesolo/views/onboarding/onboarding_page.dart';
@@ -30,7 +28,6 @@ import 'package:safesolo/views/community/hazard_feed_page.dart';
 import 'package:safesolo/views/community/accident_report_page.dart';
 import 'package:safesolo/views/community/safety_guides_page.dart';
 import 'package:safesolo/views/heroes/heroes_page.dart';
-import 'package:safesolo/views/heroes/hero_workspace_page.dart';
 import 'package:safesolo/views/stealth/stealth_page.dart';
 import 'package:safesolo/views/audio/fake_call_screen.dart';
 import 'package:safesolo/views/vault/vault_page.dart';
@@ -221,6 +218,44 @@ void main() {
           await tester.pump(const Duration(seconds: 1));
         }
         if (entry.key == '28_BloodRelayPage' || entry.key == '29_SafePointsMapPage') {
+          await tester.pump(const Duration(seconds: 3));
+        }
+      });
+    }
+  });
+
+  group('Check Mobile Screens - Samsung Galaxy A53 5G (412x915)', () {
+    final keyScreensA53 = <String, Widget Function()>{
+      'A53_05_HomePage': () => const HomePage(),
+      'A53_10_MedicalPage': () => const MedicalPage(),
+      'A53_13_SosMapPage': () => const SosMapPage(),
+      'A53_28_BloodRelayPage': () => const BloodRelayPage(),
+      'A53_29_SafePointsMapPage': () => const SafePointsMapPage(),
+    };
+
+    for (final entry in keyScreensA53.entries) {
+      testWidgets('Check ${entry.key} on Galaxy A53 5G viewport', (tester) async {
+        await runOverflowCheck(tester, entry.value(), entry.key, size: const Size(412, 915));
+        if (entry.key.contains('BloodRelay') || entry.key.contains('SafePointsMap')) {
+          await tester.pump(const Duration(seconds: 3));
+        }
+      });
+    }
+  });
+
+  group('Check Mobile Screens - Honor Magic 7 Pro (426x933)', () {
+    final keyScreensHonor = <String, Widget Function()>{
+      'Honor_05_HomePage': () => const HomePage(),
+      'Honor_10_MedicalPage': () => const MedicalPage(),
+      'Honor_13_SosMapPage': () => const SosMapPage(),
+      'Honor_28_BloodRelayPage': () => const BloodRelayPage(),
+      'Honor_29_SafePointsMapPage': () => const SafePointsMapPage(),
+    };
+
+    for (final entry in keyScreensHonor.entries) {
+      testWidgets('Check ${entry.key} on Honor Magic 7 Pro viewport', (tester) async {
+        await runOverflowCheck(tester, entry.value(), entry.key, size: const Size(426, 933));
+        if (entry.key.contains('BloodRelay') || entry.key.contains('SafePointsMap')) {
           await tester.pump(const Duration(seconds: 3));
         }
       });
