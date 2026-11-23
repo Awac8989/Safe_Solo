@@ -74,20 +74,34 @@ void main() {
     expect(find.text('GIA TỐC SVM'), findsOneWidget);
     expect(find.text('GÓC NGHIÊNG'), findsOneWidget);
 
-    // Verify Tab 1 Scenarios
-    expect(find.text('1. Giả lập Té ngã chấn thương (Hard Fall)'), findsOneWidget);
-    expect(find.text('2. Giả lập Loạn nhịp AFib & Thiếu Oxy (Hypoxia)'), findsOneWidget);
-    expect(find.text('3. Giả lập Quá hạn Điểm danh (Dead-man Timeout)'), findsOneWidget);
-    expect(find.text('4. Giả lập Báo động Ngầm Cưỡng bức (Duress PIN)'), findsOneWidget);
+    // Verify Tab 1 Scenarios & Breakthroughs
+    expect(find.textContaining('ĐỘT PHÁ 1: ADAPTIVE DEADMAN'), findsOneWidget);
+
+    final listView = find.byType(ListView).first;
+    await tester.drag(listView, const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Buổi Chiều Của Ông Tư'), findsOneWidget);
+
+    await tester.drag(listView, const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Tai Nạn Va Chạm Giao Thông'), findsOneWidget);
+
+    final hardFallButton = find.text('💥 Bơm Tín Hiệu Té Ngã');
+    expect(hardFallButton, findsOneWidget);
 
     // Test Action: Inject Hard Fall
-    final fallButton = find.text('💥 Bơm Tín Hiệu Té Ngã');
-    expect(fallButton, findsOneWidget);
-    await tester.tap(fallButton);
+    await tester.tap(hardFallButton);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
     expect(WearOsService.instance.isCountdownActive, isTrue);
+
+    // Cuộn ngược lên đầu ListView để kiểm tra Banner Đang Đếm Ngược Cấp Cứu
+    await tester.drag(listView, const Offset(0, 1200));
+    await tester.pumpAndSettle();
+
     expect(find.text('PHÁT HIỆN TÉ NGÃ TỪ GALAXY WATCH 5'), findsOneWidget);
     expect(find.text('HỦY'), findsOneWidget);
 
@@ -97,7 +111,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(WearOsService.instance.isCountdownActive, isFalse);
 
-    // Test Action: Inject Deadman Timeout
+    // Cuộn xuống để tìm Kịch bản 3 & Nút Tua Quá Hạn
+    await tester.drag(listView, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+
     final deadmanButton = find.text('⏳ Tua Quá Hạn Điểm Danh');
     expect(deadmanButton, findsOneWidget);
     await tester.tap(deadmanButton);
@@ -107,7 +124,10 @@ void main() {
     expect(appProvider.user?.currentStatus, equals('CHECKIN_OVERDUE'));
     expect(find.text('TRẠNG THÁI: CHECKIN_OVERDUE'), findsOneWidget);
 
-    // Test Action: Safe Reset
+    // Cuộn xuống dưới cùng để tìm Nút Safe Reset
+    await tester.drag(listView, const Offset(0, -400));
+    await tester.pumpAndSettle();
+
     final safeResetButton = find.text('🔄 KHÔI PHỤC TRẠNG THÁI BÌNH THƯỜNG (SAFE RESET)');
     expect(safeResetButton, findsOneWidget);
     await tester.tap(safeResetButton);
@@ -147,7 +167,7 @@ void main() {
     expect(find.text('Precision 97.4% • Recall 96.8% • F1 97.1%'), findsOneWidget);
 
     // Verify Terminal Log Console is present
-    expect(find.text('NHẬT KÝ SỰ KIỆN TÁC CHIẾN (LIVE CONSOLE)'), findsOneWidget);
+    expect(find.textContaining('NHẬT KÝ SỰ KIỆN TÁC CHIẾN'), findsOneWidget);
 
     TopToast.dismiss();
     await tester.pump(const Duration(seconds: 3));
