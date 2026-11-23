@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/cpr_metronome_service.dart';
 import 'fast_ai_assessment_dialog.dart';
+import 'cpr_coach_screen.dart';
+import 'stroke_timelock_widget.dart';
 
 class FirstAidGuidePage extends StatefulWidget {
   const FirstAidGuidePage({super.key});
@@ -166,6 +168,30 @@ class _FirstAidGuidePageState extends State<FirstAidGuidePage> with SingleTicker
                   ),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Nút mở Huấn luyện Ép tim Cảm biến Chuyên sâu (Phân hệ 139)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(builder: (_) => const CprCoachScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.speed_rounded, color: AppColors.primary),
+                  label: const Text(
+                    'HUẤN LUYỆN ÉP TIM CẢM BIẾN AHA (PHÂN HỆ 139)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
 
               const Align(
@@ -213,6 +239,9 @@ class _FirstAidGuidePageState extends State<FirstAidGuidePage> with SingleTicker
         _fastCard('A - Arms (Tay & Chân)', 'Yếu hoặc liệt một bên chi. Yêu cầu giơ 2 tay lên: một bên tay có bị rơi xuống hoặc không nâng lên được không?'),
         _fastCard('S - Speech (Giọng nói)', 'Nói ngọng, líu lưỡi hoặc không nói được từ đơn giản. Yêu cầu nhắc lại một câu ngắn: giọng có bị biến đổi không?'),
         _fastCard('T - Time (Thời gian)', 'Nếu có BẤT KỲ dấu hiệu nào trên, gọi ngay 115 và đưa nạn nhân tới bệnh viện có khoa đột quỵ gần nhất!'),
+        const SizedBox(height: 16),
+        // Bộ đếm cửa sổ vàng đột quỵ 4.5h (Phân hệ 136)
+        const StrokeTimelockWidget(),
         const SizedBox(height: 20),
         ElevatedButton.icon(
           onPressed: () => FastAiAssessmentDialog.show(context),

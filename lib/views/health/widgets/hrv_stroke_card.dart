@@ -60,7 +60,12 @@ class _HrvStrokeCardState extends State<HrvStrokeCard>
 
   /// Mở bảng tầm soát đột quỵ F.A.S.T Thông minh (AI Vision & Speech)
   void _openFastScreeningSheet(BuildContext context, StrokeCardiacRiskAssessment assessment) {
-    FastAiAssessmentDialog.show(context);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FastScreeningModal(assessment: assessment),
+    );
   }
 
   @override

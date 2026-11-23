@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,6 +58,10 @@ class OfflineSyncEngine {
         _queue = list.map((e) => QueuedRequest.fromJson(e as Map<String, dynamic>)).toList();
         _queue.sort((a, b) => a.timestampMs.compareTo(b.timestampMs));
         pendingCount.value = _queue.length;
+        if (_queue.isNotEmpty) {
+          isOfflineMode.value = true;
+          unawaited(flushQueue());
+        }
       } catch (e) {
         debugPrint('Failed to load sync queue: $e');
       }

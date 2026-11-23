@@ -323,37 +323,51 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     builder: (context, pendingCount, child) {
                       if (pendingCount == 0) return const SizedBox.shrink();
                       final isSyncing = progress > 0.0 && progress < 1.0;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppDarkColors.surfaceElevated : AppColors.surfaceElevated,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  isSyncing ? Icons.sync : Icons.wifi_off,
-                                  color: AppColors.warning,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    isSyncing 
-                                        ? strings.text('Đang đồng bộ dữ liệu...', 'Syncing data...')
-                                        : strings.text('Mất kết nối. Còn $pendingCount mục đang chờ đồng bộ.', 'Offline mode. $pendingCount items pending sync.'),
-                                    style: AppTextStyles.body.copyWith(
-                                      color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                      return GestureDetector(
+                        onTap: isSyncing ? null : () => OfflineSyncEngine.instance.flushQueue(),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppDarkColors.surfaceElevated : AppColors.surfaceElevated,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    isSyncing ? Icons.sync : Icons.wifi_off,
+                                    color: AppColors.warning,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      isSyncing 
+                                          ? strings.text('Đang đồng bộ dữ liệu...', 'Syncing data...')
+                                          : strings.text('Mất kết nối. Còn $pendingCount mục đang chờ đồng bộ.', 'Offline mode. $pendingCount items pending sync.'),
+                                      style: AppTextStyles.body.copyWith(
+                                        color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                  if (!isSyncing)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.warning.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        strings.text('Đồng bộ', 'Sync'),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.warning),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             if (isSyncing) ...[
                               const SizedBox(height: 8),
                               LinearProgressIndicator(
@@ -365,7 +379,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ]
                           ],
                         ),
-                      );
+                      ),
+                    );
                     },
                   );
                 },
@@ -4100,20 +4115,21 @@ class _MoodOption extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: isDark ? Border.all(color: AppDarkColors.border) : null,
         ),
-        child: SizedBox(
-          height: 64,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 26)),
-              const SizedBox(height: 6),
+              Text(emoji, style: const TextStyle(fontSize: 24)),
+              const SizedBox(height: 4),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                   ),
