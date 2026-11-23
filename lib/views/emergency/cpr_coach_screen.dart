@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/app_theme.dart';
 import '../../services/cpr_quality_coach_service.dart';
 
 /// ============================================================================
@@ -39,7 +38,6 @@ class _CprCoachScreenState extends State<CprCoachScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = _coach.isActive;
     final isVentilation = _coach.currentPhase == CprPhase.ventilations;
 
     return Scaffold(

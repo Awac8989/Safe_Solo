@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../services/drug_shield_service.dart';
 

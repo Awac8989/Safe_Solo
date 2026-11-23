@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppConstants {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-  static const String _defaultLanBaseUrl = 'http://192.168.1.4:4000/api';
+  static const String _defaultLanBaseUrl = 'http://192.168.1.10:4000/api';
   static const String _localhostBaseUrl = 'http://127.0.0.1:4000/api';
   static const String _defaultMapTilerStyle = 'streets-v2';
 
@@ -41,13 +41,13 @@ class AppConstants {
       final saved = prefs.getString(customBaseUrlStorageKey);
       if (saved != null && saved.trim().isNotEmpty) {
         if (saved.contains('192.168.1.')) {
-          _customBaseUrl = saved.replaceAll(RegExp(r'192\.168\.1\.\d+'), '192.168.1.4');
+          _customBaseUrl = saved.replaceAll(RegExp(r'192\.168\.1\.\d+'), '192.168.1.10');
           await _persistCustomBaseUrl(_customBaseUrl);
         } else {
           _customBaseUrl = saved.trim();
         }
       } else {
-        _customBaseUrl = 'http://192.168.1.4:4000/api';
+        _customBaseUrl = 'http://192.168.1.10:4000/api';
         await _persistCustomBaseUrl(_customBaseUrl);
       }
     } catch (_) {}

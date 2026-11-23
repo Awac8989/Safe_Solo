@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../core/app_theme.dart';
 import '../../services/vneid_nfc_service.dart';
 
 /// ============================================================================
@@ -26,7 +24,6 @@ class _VneidNfcScanPageState extends State<VneidNfcScanPage>
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
   final _service = VneidNfcService.instance;
-  bool _scanning = false;
 
   @override
   void initState() {
@@ -62,9 +59,7 @@ class _VneidNfcScanPageState extends State<VneidNfcScanPage>
   }
 
   Future<void> _startScan() async {
-    setState(() => _scanning = true);
     await _service.scanAndAutoFill();
-    setState(() => _scanning = false);
   }
 
   @override

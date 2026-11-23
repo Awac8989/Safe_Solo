@@ -43,6 +43,7 @@ import 'core/widgets/main_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConstants.loadPersistedBaseUrl();
   try {
     await WidgetService.initialize(onAction: (action) {
       final navContext = AppConstants.navigatorKey.currentContext;
