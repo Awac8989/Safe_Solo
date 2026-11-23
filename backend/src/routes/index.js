@@ -58,6 +58,7 @@ const hospitalRoutes = require('./hospitalRoutes');
 const floodRoutes = require('./floodRoutes');
 const mciRoutes = require('./mciRoutes');
 const dataIntegrityRoutes = require('./dataIntegrityRoutes');
+const ambulancePreAlertRoutes = require('./ambulancePreAlertRoutes');
 
 const apiRouter = express.Router();
 
@@ -82,6 +83,7 @@ apiRouter.use('/hospitals', hospitalRoutes);
 apiRouter.use('/flood', floodRoutes);
 apiRouter.use('/mci', mciRoutes);
 apiRouter.use('/system/integrity', dataIntegrityRoutes);
+apiRouter.use('/prealert', ambulancePreAlertRoutes);
 
 // Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);

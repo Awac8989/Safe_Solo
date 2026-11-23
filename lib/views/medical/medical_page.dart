@@ -6,6 +6,9 @@ import '../../core/app_strings.dart';
 import '../../core/app_theme.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../services/vneid_nfc_service.dart';
+import 'drug_shield_page.dart';
+import 'vneid_nfc_scan_page.dart';
 
 class MedicalPage extends StatefulWidget {
   const MedicalPage({super.key});
@@ -292,6 +295,141 @@ class _MedicalPageState extends State<MedicalPage> {
                                   ),
                                   Text(
                                     strings.text('Mở tủ TOTP 300s', 'TOTP Cabinet Unlock'),
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      onTap: () async {
+                        final result = await Navigator.push<CccdNfcResult>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VneidNfcScanPage(
+                              onSuccess: (res) {
+                                setState(() {
+                                  _fullNameController.text = res.displayFullName;
+                                  _citizenIdController.text = res.documentNumber;
+                                  if (res.birthYear.isNotEmpty) {
+                                    _birthYearController.text = res.birthYear;
+                                  }
+                                  if (res.permanentAddress.isNotEmpty) {
+                                    _permanentAddressController.text = res.permanentAddress;
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        );
+                        if (result != null) {
+                          setState(() {
+                            _fullNameController.text = result.displayFullName;
+                            _citizenIdController.text = result.documentNumber;
+                            if (result.birthYear.isNotEmpty) {
+                              _birthYearController.text = result.birthYear;
+                            }
+                            if (result.permanentAddress.isNotEmpty) {
+                              _permanentAddressController.text = result.permanentAddress;
+                            }
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF3B82F6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.nfc_rounded, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    strings.text('Quét CCCD NFC VNeID', 'VNeID NFC AutoFill'),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    strings.text('Điền hồ sơ tự động', 'Instant Auto-Fill'),
+                                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const DrugShieldPage()),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF59E0B),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.medication_liquid_rounded, color: Colors.white, size: 16),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    strings.text('Khóa thuốc Drug Shield', 'Drug Contraindication'),
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Colors.white),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    strings.text('Chống sốc phản vệ', 'Allergy Interlock'),
                                     style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,

@@ -33,6 +33,10 @@ import 'views/medical/blood_relay_page.dart';
 import 'views/emergency/safepoints_map_page.dart';
 import 'views/notifications/notification_center_page.dart';
 import 'views/sos_map/sos_map_page.dart';
+import 'views/medical/vneid_nfc_scan_page.dart';
+import 'views/medical/drug_shield_page.dart';
+import 'views/emergency/cpr_coach_screen.dart';
+import 'views/circle/family_circle_hub_page.dart';
 import 'services/widget_service.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/widgets/main_navigation.dart';
@@ -141,6 +145,10 @@ class SafeSoloApp extends StatelessWidget {
               '/blood-relay': (_) => const BloodRelayPage(),
               '/safepoints-map': (_) => const SafePointsMapPage(),
               '/notifications': (_) => const NotificationCenterPage(),
+              '/cpr-coach': (_) => const CprCoachScreen(),
+              '/family-circle': (_) => const FamilyCircleHubPage(),
+              '/drug-shield': (_) => const DrugShieldPage(),
+              '/vneid-nfc': (_) => const VneidNfcScanPage(),
             },
             onGenerateRoute: (settings) {
               if (settings.name == '/' || settings.name == null) {

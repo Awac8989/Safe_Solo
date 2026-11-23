@@ -21,7 +21,7 @@
 * [x] **Kiểm tra thiết bị thật:** 
   * Điện thoại **Samsung Galaxy A71**: Bật chế độ Nhà phát triển, gỡ lỗi USB, sạc đầy pin 100%.
   * Đồng hồ **Galaxy Watch 5**: Ghép đôi Bluetooth sẵn sàng, bật đo nhịp tim liên tục.
-* [x] **Kiểm thử tự động:** Chạy lệnh `node scripts/run_all_feature_test_cases.js` đạt 537/537 test cases pass (100% bao phủ 134 phân hệ & 136 phác đồ chống chỉ định tử vong) và `flutter test test/detect_pixel_overflow_test.dart` đạt 36/36 màn hình & 46 kịch bản đa kích thước 0 lỗi tràn pixel.
+* [x] **Kiểm thử tự động:** Chạy lệnh `node scripts/run_all_feature_test_cases.js` đạt 569/569 test cases pass (100% bao phủ 142 phân hệ & 144 phác đồ chống chỉ định tử vong) và `flutter test test/detect_pixel_overflow_test.dart` đạt 36/36 màn hình & 46 kịch bản đa kích thước 0 lỗi tràn pixel.
 
 ### 24 Giờ Trước Giờ G:
 * [x] **Thiết lập kết nối an toàn:** Mang theo cáp sạc USB Type-C chính hãng (không dựa vào Wi-Fi của trường).
@@ -1312,7 +1312,7 @@ Khi đi bảo vệ đồ án tốt nghiệp, **sự cố kỹ thuật (mất m�
 | **Wi-Fi phòng hội đồng bị chặn kết nối nội bộ** | 👉 **Cắm dây cáp USB trực tiếp từ điện thoại vào máy tính**.<br>Mở CMD chạy lệnh: `adb reverse tcp:4000 tcp:4000`. Khi đó điện thoại gọi thẳng vào `localhost:4000` của máy tính qua dây cáp, tốc độ 100MB/s không cần Wi-Fi! |
 | **Mất sóng 4G / Rớt mạng Internet** | 👉 Bật tính năng **Phát Wi-Fi di động (Hotspot)** từ điện thoại cá nhân cho máy tính kết nối. Mọi API của SafeSolo đều có bộ đệm Offline SQLite hoạt động trơn tru. |
 | **Màn hình điện thoại bị khóa hoặc tắt ngẫu nhiên** | 👉 Vào Cài đặt Android -> Màn hình -> Thời gian chờ màn hình: Chọn **"Không bao giờ tắt"** hoặc **"10 phút"**. |
-| **Hội đồng hỏi số liệu kiểm thử cụ thể** | 👉 Mở ngay file [scripts/run_all_feature_test_cases.js](file:///c:/Users/Admin/SafeSolo/scripts/run_all_feature_test_cases.js) và cho chạy lệnh `node scripts/run_all_feature_test_cases.js` trước mặt Hội đồng để thấy **537/537 Test Cases PASS màu xanh 100% (134 Phân hệ & 136 Phác đồ)**, hoặc mở báo cáo bảng tổng hợp [BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx](file:///c:/Users/Admin/SafeSolo/docs/BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx). |
+| **Hội đồng hỏi số liệu kiểm thử cụ thể** | 👉 Mở ngay file [scripts/run_all_feature_test_cases.js](file:///c:/Users/Admin/SafeSolo/scripts/run_all_feature_test_cases.js) và cho chạy lệnh `node scripts/run_all_feature_test_cases.js` trước mặt Hội đồng để thấy **569/569 Test Cases PASS màu xanh 100% (134 Phân hệ & 136 Phác đồ)**, hoặc mở báo cáo bảng tổng hợp [BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx](file:///c:/Users/Admin/SafeSolo/docs/BANG_TONG_HOP_TEST_CASES_CHI_TIET_TAT_CA_TINH_NANG_SAFESOLO.xlsx). |
 | **Hội đồng muốn xem báo cáo văn bản chi tiết** | 👉 Mở file [BAO_CAO_CHUYEN_DE_5_YEU_CAU_HOI_DONG_SAFESOLO.md](file:///c:/Users/Admin/SafeSolo/docs/BAO_CAO_CHUYEN_DE_5_YEU_CAU_HOI_DONG_SAFESOLO.md), [BAO_CAO_DO_AN_TOT_NGHIEP_SAFESOLO_DOAN_MINH_QUAN.docx](file:///c:/Users/Admin/SafeSolo/BAO_CAO_DO_AN_TOT_NGHIEP_SAFESOLO_DOAN_MINH_QUAN.docx) và [QUY_TRINH_XU_LY_NGUOI_GAP_NAN_SAFESOLO.docx](file:///c:/Users/Admin/SafeSolo/QUY_TRINH_XU_LY_NGUOI_GAP_NAN_SAFESOLO.docx). |
 
 ---

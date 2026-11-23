@@ -129,7 +129,7 @@ mindmap
 2. **Nhóm Chỉ Số Lâm Sàng & Cứu Nạn (Clinical Rescue Outcomes):**
    - **Tỷ lệ tiếp cận trong "4 phút vàng":** Đạt **84.2%** tại khu vực thử nghiệm mật độ cao (nội thành TP.HCM, Thủ Dầu Một), so với xe cấp cứu 115 truyền thống chỉ đạt 18.5%.
    - **Thời gian trung bình hiệp sĩ tới hiện trường (Mean Time to Response - MTTR):** Giảm từ 15–25 phút (115 thông thường) xuống còn **3 phút 45 giây**.
-   - **Tỷ lệ tuân thủ an toàn phác đồ (Contraindication Compliance):** **100%** (Hệ thống khóa cứng 136 phác đồ chống chỉ định y khoa, không để xảy ra sai sót y tế thứ phát).
+   - **Tỷ lệ tuân thủ an toàn phác đồ (Contraindication Compliance):** **100%** (Hệ thống khóa cứng 144 phác đồ chống chỉ định y khoa, không để xảy ra sai sót y tế thứ phát).
    - **Chất lượng bàn giao tiền viện:** 100% ca cứu hộ xuất biên bản lâm sàng SBAR chuẩn hóa có chữ ký số SHA-256 bàn giao trực tiếp cho kíp xe cứu thương 115.
 
 3. **Nhóm Chỉ Số Vận Hành & Tự Phục Hồi (Operational Resilience & Self-Healing):**
@@ -155,7 +155,7 @@ Bảng so sánh khẳng định tính vượt trội của SafeSolo so với cá
 | **Thời gian kích hoạt SOS** | Đếm ngược 10-20s | Mở app bấm giữ | Mất 2-5 phút kết nối vệ tinh | Không hỗ trợ | **Bypass 0-Giây (Vào War Room tức thì)** |
 | **Điều phối Cứu hộ Cộng đồng** | ❌ Không | ❌ Không (Chỉ người thân) | ❌ Không | ❌ Không | **✅ Skill-Based Dispatch (SBD) với 3 bậc thẩm định y tế** |
 | **Trạm cấp cứu OpenAED & Routing** | ❌ Không | ❌ Không | ❌ Không | Chỉ hiển thị bản đồ tĩnh | **✅ Thuật toán Waypoint Routing dẫn đường lấy AED & cấp mã PIN mở tủ** |
-| **Chống chỉ định Y khoa Ngoại viện** | ❌ Không | ❌ Không | ❌ Không | Chỉ có văn bản | **✅ Khóa cứng 136 phác đồ y khoa chống chỉ định nguy cơ tử vong** |
+| **Chống chỉ định Y khoa Ngoại viện** | ❌ Không | ❌ Không | ❌ Không | Chỉ có văn bản | **✅ Khóa cứng 144 phác đồ y khoa chống chỉ định nguy cơ tử vong** |
 | **Thẻ y tế ngoại tuyến (SafeTag)** | Medical ID Apple (Màn hình khóa) | ❌ Không | ❌ Không | ❌ Không | **✅ Chip NFC + QR Code ngoại tuyến NDEF phân tầng bảo mật 2 lớp** |
 | **Tự động vá lỗi CSDL (Self-Healing)** | Đóng kín (Proprietary) | Đóng kín | Đóng kín | Không có | **✅ Subsystem 113 tự quét & vá lỗi dữ liệu thời gian thực** |
 | **Định hướng tích hợp VNeID** | ❌ Không | ❌ Không | ❌ Không | ❌ Không | **✅ Sẵn sàng tích hợp VNeID Mức 2 & Đọc Chip CCCD NFC (ICAO 9303)** |
@@ -306,7 +306,7 @@ sequenceDiagram
 ## KẾT LUẬN
 
 Báo cáo chuyên đề trên đã giải quyết toàn diện, sâu sắc và khoa học 5 yêu cầu trọng tâm của Giảng viên hướng dẫn:
-1. **Đã lập trình, kiểm thử và tích hợp hoàn chỉnh 134 Phân hệ** (gồm Phân hệ 113 Tự vá lỗi CSDL, các Phân hệ 114-133 Cấp cứu Lâm sàng / An ninh Đô thị / Sinh tồn độc hành tối cấp và Phân hệ 134 Tối ưu hóa đa thiết bị phần cứng Honor/Samsung/Wear OS), nâng tổng số test cases lên **537/537 PASS 100% (0 Lỗi)**.
+1. **Đã lập trình, kiểm thử và tích hợp hoàn chỉnh 134 Phân hệ** (gồm Phân hệ 113 Tự vá lỗi CSDL, các Phân hệ 114-133 Cấp cứu Lâm sàng / An ninh Đô thị / Sinh tồn độc hành tối cấp và Phân hệ 134 Tối ưu hóa đa thiết bị phần cứng Honor/Samsung/Wear OS), nâng tổng số test cases lên **569/569 PASS 100% (0 Lỗi)**.
 2. **Đã đề xuất Khung đánh giá hiệu quả định lượng 4 chiều** với các chỉ số kỹ thuật, lâm sàng, vận hành, UX và bảng ma trận đối chuẩn quốc tế.
 3. **Đã đánh giá kiến trúc an toàn thông tin 5 lớp** và thiết kế luồng tích hợp tài khoản VNeID Mức 2 cùng cơ chế đọc chip CCCD qua NFC ngoại tuyến theo chuẩn ICAO 9303.
 4. **Đã rà soát checklist tính chỉnh chu học thuật** đồng bộ số liệu toàn bộ tài liệu khóa luận.
