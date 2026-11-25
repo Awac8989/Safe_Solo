@@ -59,6 +59,8 @@ const floodRoutes = require('./floodRoutes');
 const mciRoutes = require('./mciRoutes');
 const dataIntegrityRoutes = require('./dataIntegrityRoutes');
 const ambulancePreAlertRoutes = require('./ambulancePreAlertRoutes');
+const momentRoutes = require('./momentRoutes');
+const { requireAdminAuth, requireAdminRole } = require('../middleware/adminAuth');
 
 const apiRouter = express.Router();
 
@@ -84,6 +86,7 @@ apiRouter.use('/flood', floodRoutes);
 apiRouter.use('/mci', mciRoutes);
 apiRouter.use('/system/integrity', dataIntegrityRoutes);
 apiRouter.use('/prealert', ambulancePreAlertRoutes);
+apiRouter.use('/moments', momentRoutes);
 
 // Legacy/Admin Routes (SQLite)
 apiRouter.post('/users/register', registerUser);
@@ -117,9 +120,10 @@ apiRouter.post('/users/:id/family-ping/respond', respondFamilyPing);
 apiRouter.get('/users/:id/checkin/moments', listCheckInMoments);
 apiRouter.get('/users/:id/notifications', listUserNotifications);
 
-apiRouter.get('/admin/emergencies', listEmergencies);
-apiRouter.patch('/admin/emergencies/:id/resolve', resolveEmergencyLog);
-apiRouter.get('/admin/emergencies/:id/sms-logs', listEmergencySmsLogs);
-apiRouter.get('/admin/alerts', listAlertTimeline);
+const requireLegacyAdmin = [requireAdminAuth, requireAdminRole('superadmin', 'dispatcher')];
+apiRouter.get('/admin/emergencies', ...requireLegacyAdmin, listEmergencies);
+apiRouter.patch('/admin/emergencies/:id/resolve', ...requireLegacyAdmin, resolveEmergencyLog);
+apiRouter.get('/admin/emergencies/:id/sms-logs', ...requireLegacyAdmin, listEmergencySmsLogs);
+apiRouter.get('/admin/alerts', ...requireLegacyAdmin, listAlertTimeline);
 
 module.exports = { apiRouter };

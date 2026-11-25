@@ -18,6 +18,7 @@ router.post('/:id/confirm', (req, res, next) => safePointController.confirmUnloc
 
 router.get('/fleet-health', (req, res, next) => safePointController.getFleetHealth(req, res, next));
 router.post('/:id/telemetry', (req, res, next) => safePointController.reportTelemetry(req, res, next));
+router.post('/:id/test-iot', (req, res, next) => safePointController.testIotDevice(req, res, next));
 router.post('/:id/tamper-resolve', (req, res, next) => safePointController.resolveTamper(req, res, next));
 
 module.exports = router;

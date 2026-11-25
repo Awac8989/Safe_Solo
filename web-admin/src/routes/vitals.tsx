@@ -11,6 +11,7 @@ import {
   FileText,
   Flame,
   HeartPulse,
+  Link2,
   MapPin,
   Phone,
   Printer,
@@ -22,6 +23,7 @@ import {
   Siren,
   Sparkles,
   Stethoscope,
+  Vibrate,
   Volume2,
   Watch,
   Wifi,
@@ -29,7 +31,16 @@ import {
 } from "lucide-react";
 import { Topbar } from "@/components/Topbar";
 import { Tag } from "@/components/Badge";
-import { fetchMultiVictimVitals, instantDispatchVictim, type MultiVictimVitalsItem } from "@/lib/api";
+import {
+  fetchMultiVictimVitals,
+  fetchWatchDevices,
+  getWatchStreamUrl,
+  instantDispatchVictim,
+  quickPairWatchToUser,
+  sendWatchCommand,
+  type MultiVictimVitalsItem,
+  type WatchEventEntry,
+} from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 
 export const Route = createFileRoute("/vitals")({
@@ -116,6 +127,7 @@ function MultiVictimVitalsPage() {
     dispatchId: string;
     dispatchedAt: string;
     telegramStatus: string;
+    watchNotification?: string;
     sbarSummary: string;
   } | null>(null);
   const [copiedSbar, setCopiedSbar] = useState(false);
@@ -123,10 +135,126 @@ function MultiVictimVitalsPage() {
   // SafeTag NFC / ICE Profile State
   const [selectedIceVictim, setSelectedIceVictim] = useState<MultiVictimVitalsItem | null>(null);
 
+  // Real-time Watch 5 SSE Stream & Bi-directional Command State
+  const [sseConnected, setSseConnected] = useState(false);
+  const [liveWatchEvents, setLiveWatchEvents] = useState<WatchEventEntry[]>([]);
+  const [watchCommandPending, setWatchCommandPending] = useState<string | null>(null);
+
   const vitalsQuery = useQuery({
     queryKey: ["multi-victim-vitals"],
     queryFn: fetchMultiVictimVitals,
-    refetchInterval: 6000,
+    refetchInterval: 4000,
+  });
+
+  const watchDevicesQuery = useQuery({
+    queryKey: ["watch-devices"],
+    queryFn: fetchWatchDevices,
+    refetchInterval: 3000,
+  });
+
+  const prioritizeWatchEvents = (events: WatchEventEntry[]): WatchEventEntry[] => {
+    const priority: WatchEventEntry[] = [];
+    let latestHeartbeat: WatchEventEntry | null = null;
+    for (const ev of events) {
+      if (ev.type === "VITALS_UPDATE" || ev.type === "WATCH_VITALS") {
+        if (!latestHeartbeat) {
+          latestHeartbeat = { ...ev, id: "latest_vitals_heartbeat" };
+        }
+      } else {
+        priority.push(ev);
+      }
+    }
+    const merged = latestHeartbeat ? [...priority.slice(0, 9), latestHeartbeat] : priority.slice(0, 10);
+    return merged;
+  };
+
+  useEffect(() => {
+    const es = new EventSource(getWatchStreamUrl());
+    es.onopen = () => setSseConnected(true);
+    es.onerror = () => setSseConnected(false);
+    es.addEventListener("watch", (evt) => {
+      try {
+        const parsed = JSON.parse((evt as MessageEvent).data || "{}");
+        if (parsed?.eventType === "WATCH_SNAPSHOT" && Array.isArray(parsed?.data?.recentEvents)) {
+          setLiveWatchEvents(prioritizeWatchEvents(parsed.data.recentEvents));
+        } else if (parsed?.eventType) {
+          const entry: WatchEventEntry = {
+            id: `sse_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
+            timestamp: parsed.timestamp || new Date().toISOString(),
+            type: parsed.data?.action || parsed.eventType,
+            sender: parsed.data?.sender || "watch",
+            deviceId: parsed.data?.deviceId || "watch_galaxy_5",
+            userId: parsed.data?.userId || null,
+            note:
+              parsed.data?.payload?.note ||
+              parsed.data?.note ||
+              (parsed.eventType === "WATCH_VITALS"
+                ? `HR ${parsed.data?.heartRate ?? "--"} BPM · SpO2 ${parsed.data?.spO2 ?? "--"}% · Pin ${parsed.data?.battery ?? "--"}%`
+                : parsed.eventType),
+          };
+          setLiveWatchEvents((prev) => prioritizeWatchEvents([entry, ...prev]));
+        }
+        void queryClient.invalidateQueries({ queryKey: ["watch-devices"] });
+        void queryClient.invalidateQueries({ queryKey: ["multi-victim-vitals"] });
+      } catch (_) {}
+    });
+    return () => {
+      es.close();
+      setSseConnected(false);
+    };
+  }, [queryClient]);
+
+  const watchDevices = watchDevicesQuery.data?.data?.devices ?? [];
+  const mergedWatchEvents =
+    liveWatchEvents.length > 0 ? liveWatchEvents : prioritizeWatchEvents(watchDevicesQuery.data?.data?.recentEvents ?? []);
+
+  const watchCommandMutation = useMutation({
+    mutationFn: async (vars: {
+      deviceId?: string;
+      userId?: string | null;
+      action: "FIND_WATCH_PING" | "INSTANT_MEASURE_REQ" | "TOC_DISPATCH_ACK";
+      payload?: Record<string, unknown>;
+      key: string;
+    }) => {
+      setWatchCommandPending(vars.key);
+      return sendWatchCommand({
+        deviceId: vars.deviceId,
+        userId: vars.userId,
+        action: vars.action,
+        payload: vars.payload,
+        issuedBy: "Web Admin TOC (/vitals)",
+      });
+    },
+    onSuccess: (res, vars) => {
+      const labelMap = {
+        FIND_WATCH_PING: "Rung kiểm tra phản xạ Watch 5",
+        INSTANT_MEASURE_REQ: "Yêu cầu đo BioActive PPG 10s",
+        TOC_DISPATCH_ACK: "Báo tin cứu hộ lên mặt Watch 5",
+      };
+      setActionNotice(
+        `Đã gửi lệnh [${labelMap[vars.action]}] tới ${res.data.deviceId} (Queue: ${res.data.pendingWatchQueueSize})`
+      );
+      setTimeout(() => setActionNotice(null), 4000);
+      void queryClient.invalidateQueries({ queryKey: ["watch-devices"] });
+    },
+    onSettled: () => {
+      setWatchCommandPending(null);
+    },
+  });
+
+  const quickPairMutation = useMutation({
+    mutationFn: (victimUserId: string) =>
+      quickPairWatchToUser({
+        deviceId: "watch_galaxy_5",
+        deviceModel: "Samsung Galaxy Watch 5 (SM-R900)",
+        userId: victimUserId,
+      }),
+    onSuccess: (res) => {
+      setActionNotice(`Đã liên kết ${res.deviceModel} với userId=${res.userId}`);
+      setTimeout(() => setActionNotice(null), 4000);
+      void queryClient.invalidateQueries({ queryKey: ["watch-devices"] });
+      void queryClient.invalidateQueries({ queryKey: ["multi-victim-vitals"] });
+    },
   });
 
   const victims = vitalsQuery.data?.data ?? [];
@@ -290,6 +418,169 @@ function MultiVictimVitalsPage() {
           </div>
         </div>
 
+        {/* 1b. Live Galaxy Watch 5 <-> Web Admin TOC Bi-directional Bridge */}
+        <div className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-950/30 via-card to-card p-3.5 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/20 text-sky-400">
+                <Watch className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Cầu Kết Nối Galaxy Watch 5 ↔ Web Admin TOC
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
+                      sseConnected
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    }`}
+                  >
+                    <Wifi className="h-2.5 w-2.5" />
+                    {sseConnected ? "SSE STREAM LIVE" : "POLLING 3S"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Nhận telemetry BioActive PPG/IMU tức thì & gửi lệnh điều khiển 2 chiều xuống mặt đồng hồ SM-R900
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {victims[0]?.userId && watchDevices.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => quickPairMutation.mutate(victims[0].userId!)}
+                  disabled={quickPairMutation.isPending}
+                  className="inline-flex items-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/15 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-500/25 transition"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Ghép Watch 5 với {victims[0].victimName}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() =>
+                  watchCommandMutation.mutate({
+                    deviceId: watchDevices[0]?.deviceId || "watch_galaxy_5",
+                    userId: watchDevices[0]?.userId || victims[0]?.userId,
+                    action: "INSTANT_MEASURE_REQ",
+                    key: "bridge-ppg",
+                  })
+                }
+                disabled={watchCommandPending === "bridge-ppg"}
+                className="inline-flex items-center gap-1 rounded-lg bg-sky-600 hover:bg-sky-500 px-2.5 py-1.5 text-[11px] font-bold text-white transition"
+              >
+                <HeartPulse className="h-3.5 w-3.5" />
+                Đo BioActive PPG Ngay
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  watchCommandMutation.mutate({
+                    deviceId: watchDevices[0]?.deviceId || "watch_galaxy_5",
+                    userId: watchDevices[0]?.userId || victims[0]?.userId,
+                    action: "FIND_WATCH_PING",
+                    key: "bridge-ping",
+                  })
+                }
+                disabled={watchCommandPending === "bridge-ping"}
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 transition"
+              >
+                <Vibrate className="h-3.5 w-3.5" />
+                Rung Kiểm Tra Watch 5
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  watchCommandMutation.mutate({
+                    deviceId: watchDevices[0]?.deviceId || "watch_galaxy_5",
+                    userId: watchDevices[0]?.userId || victims[0]?.userId,
+                    action: "TOC_DISPATCH_ACK",
+                    payload: { ambulanceUnit: "Đội Hiệp Sĩ & Xe 115 TOC" },
+                    key: "bridge-ack",
+                  })
+                }
+                disabled={watchCommandPending === "bridge-ack"}
+                className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 px-2.5 py-1.5 text-[11px] font-bold text-emerald-300 transition"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Báo Watch: Cứu Hộ Đang Tới
+              </button>
+            </div>
+          </div>
+
+          {/* Connected Watch Hardware Chips + Live Bidirectional Event Feed */}
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1.5">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground">
+                Thiết bị Galaxy Watch đang liên kết ({watchDevices.length})
+              </div>
+              {watchDevices.length === 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  Chưa có thiết bị Watch 5 gửi telemetry trong phiên Backend hiện tại — nhấn &quot;Ghép Watch 5&quot; hoặc bật đồng bộ từ Galaxy A53 / Watch 5.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {watchDevices.map((wd) => (
+                    <div
+                      key={wd.deviceId}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-500/20 bg-sky-950/10 px-2.5 py-1.5 text-[11px]"
+                    >
+                      <div>
+                        <span className="font-bold text-foreground">{wd.deviceModel}</span>
+                        <span className="ml-1.5 font-mono text-[10px] text-sky-400">({wd.deviceId})</span>
+                        <div className="text-[10px] text-muted-foreground">
+                          Chủ sở hữu: <strong className="text-foreground">{wd.userName}</strong>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 font-mono text-[10px]">
+                        <span className="text-rose-400 font-bold">{wd.vitals?.heartRate ?? "--"} BPM</span>
+                        <span className="text-sky-400 font-bold">SpO2 {wd.vitals?.spO2 ?? "--"}%</span>
+                        <span className="text-emerald-400">Pin {wd.vitals?.battery ?? "--"}%</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-bold ${
+                            wd.vitals?.isOffWrist
+                              ? "bg-rose-500/20 text-rose-400"
+                              : "bg-emerald-500/15 text-emerald-400"
+                          }`}
+                        >
+                          {wd.vitals?.isOffWrist ? "THÁO TAY" : "ĐANG ĐEO"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-border/60 bg-background/50 p-2.5 space-y-1.5">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground">
+                Luồng gói tin & ACK hai chiều Watch 5 ↔ TOC
+              </div>
+              {mergedWatchEvents.length === 0 ? (
+                <div className="text-[11px] text-muted-foreground">
+                  Chờ tín hiệu nhịp tim, té ngã hoặc phản hồi lệnh từ đồng hồ...
+                </div>
+              ) : (
+                <div className="max-h-32 overflow-y-auto space-y-1 text-[10px] font-mono">
+                  {mergedWatchEvents.slice(0, 8).map((ev) => (
+                    <div key={ev.id} className="flex items-center justify-between gap-2 text-muted-foreground">
+                      <span className="truncate">
+                        <strong className="text-sky-400">[{ev.type}]</strong> {ev.note}
+                      </span>
+                      <span className="shrink-0 text-[9px]">
+                        {new Date(ev.timestamp).toLocaleTimeString("vi-VN")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* 2. Victims Vitals Grid */}
         {vitalsQuery.isLoading ? (
           <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
@@ -420,6 +711,21 @@ function MultiVictimVitalsPage() {
                         </span>
                       </div>
 
+                      <div className="flex items-center justify-between rounded-lg border border-border/60 bg-background/40 px-2.5 py-1.5">
+                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                          <Watch className="h-3 w-3 text-emerald-400" /> Cảm biến đeo cổ tay & IMU:
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                            v.vitals.isOffWrist
+                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                              : "bg-emerald-500/15 text-emerald-400"
+                          }`}
+                        >
+                          {v.vitals.isOffWrist ? "ĐÃ THÁO ĐỒNG HỒ" : `Đang đeo · ${v.vitals.svmG ?? 1.0}g`}
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate pt-1">
                         <MapPin className="h-3 w-3 text-rose-400 shrink-0" />
                         <span className="truncate">{v.address}</span>
@@ -428,23 +734,59 @@ function MultiVictimVitalsPage() {
                   </div>
 
                   {/* Operational Action Buttons Bar */}
-                  <div className="mt-4 pt-3 border-t border-border/60 grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleOpenDispatch(v)}
-                      className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-bold transition shadow-md ${
-                        isP1
-                          ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50 animate-pulse"
-                          : "bg-amber-600/90 hover:bg-amber-500 text-white"
-                      }`}
-                    >
-                      <Siren className="h-3.5 w-3.5" /> Điều Phối STAT
-                    </button>
-                    <button
-                      onClick={() => setSelectedIceVictim(v)}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-semibold border border-border bg-background/70 hover:bg-accent text-foreground transition"
-                    >
-                      <QrCode className="h-3.5 w-3.5 text-sky-400" /> SafeTag NFC / ICE
-                    </button>
+                  <div className="mt-4 pt-3 border-t border-border/60 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          watchCommandMutation.mutate({
+                            deviceId: v.vitals.watchDeviceId || undefined,
+                            userId: v.userId,
+                            action: "INSTANT_MEASURE_REQ",
+                            payload: { incidentId: v.incidentId },
+                            key: `ppg-${v.incidentId}`,
+                          })
+                        }
+                        disabled={watchCommandPending === `ppg-${v.incidentId}`}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 py-1.5 px-2 text-[11px] font-semibold text-sky-300 transition"
+                      >
+                        <HeartPulse className="h-3 w-3" /> Đo PPG Watch
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          watchCommandMutation.mutate({
+                            deviceId: v.vitals.watchDeviceId || undefined,
+                            userId: v.userId,
+                            action: "FIND_WATCH_PING",
+                            payload: { incidentId: v.incidentId },
+                            key: `ping-${v.incidentId}`,
+                          })
+                        }
+                        disabled={watchCommandPending === `ping-${v.incidentId}`}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 py-1.5 px-2 text-[11px] font-semibold text-amber-300 transition"
+                      >
+                        <Vibrate className="h-3 w-3" /> Rung Watch 5
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleOpenDispatch(v)}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-bold transition shadow-md ${
+                          isP1
+                            ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-950/50 animate-pulse"
+                            : "bg-amber-600/90 hover:bg-amber-500 text-white"
+                        }`}
+                      >
+                        <Siren className="h-3.5 w-3.5" /> Điều Phối STAT
+                      </button>
+                      <button
+                        onClick={() => setSelectedIceVictim(v)}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl py-2 px-3 text-xs font-semibold border border-border bg-background/70 hover:bg-accent text-foreground transition"
+                      >
+                        <QrCode className="h-3.5 w-3.5 text-sky-400" /> SafeTag NFC / ICE
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -612,7 +954,11 @@ function MultiVictimVitalsPage() {
                     <span className="font-mono text-[11px]">{dispatchResult.dispatchId}</span>
                   </div>
                   <p className="text-muted-foreground text-[11px]">
-                    Kênh Telegram Bot: <strong className="text-foreground">{dispatchResult.telegramStatus}</strong> · Thời điểm: {new Date(dispatchResult.dispatchedAt).toLocaleTimeString("vi-VN")}
+                    Kênh Telegram Bot: <strong className="text-foreground">{dispatchResult.telegramStatus}</strong>
+                    {dispatchResult.watchNotification ? (
+                      <> · Đồng hồ Watch 5: <strong className="text-sky-400 font-mono">{dispatchResult.watchNotification}</strong></>
+                    ) : null}
+                    {" "}· Thời điểm: {new Date(dispatchResult.dispatchedAt).toLocaleTimeString("vi-VN")}
                   </p>
                   <div className="rounded-lg bg-black/60 p-2.5 font-mono text-[11px] text-zinc-300 whitespace-pre-line border border-border/40">
                     {dispatchResult.sbarSummary}

@@ -311,6 +311,8 @@ class _SafePointsMapPageState extends State<SafePointsMapPage> {
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E293B),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         title: const Row(
           children: [
@@ -417,10 +419,13 @@ class _SafePointsMapPageState extends State<SafePointsMapPage> {
                         ),
                       );
                     }
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: displayStations.length,
-                      itemBuilder: (ctx, idx) => _buildStationCard(displayStations[idx]),
+                    return SafeArea(
+                      top: false,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        itemCount: displayStations.length,
+                        itemBuilder: (ctx, idx) => _buildStationCard(displayStations[idx]),
+                      ),
                     );
                   }(),
           ),
@@ -496,43 +501,49 @@ class _SafePointsMapPageState extends State<SafePointsMapPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: isAed ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isAed ? 'MÁY SỐC TIM AED' : type,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      code,
-                      style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                    if (distanceLabel != null) ...[
-                      const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(4),
+                          color: isAed ? const Color(0xFF10B981) : const Color(0xFF3B82F6),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          distanceLabel,
-                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.w800),
+                          isAed ? 'MÁY SỐC TIM AED' : type,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
                         ),
                       ),
+                      Text(
+                        code,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF94A3B8), fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                      if (distanceLabel != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F172A),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            distanceLabel,
+                            style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.w800),
+                          ),
+                        ),
                     ],
-                  ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       margin: const EdgeInsets.only(right: 8),

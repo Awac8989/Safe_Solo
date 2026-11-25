@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
+import '../../services/journey_anomaly_service.dart';
 import '../sos_map/sos_map_page.dart';
 
 class ActiveJourneyPage extends StatefulWidget {
@@ -189,6 +190,68 @@ class _ActiveJourneyPageState extends State<ActiveJourneyPage> with SingleTicker
                 ),
               ),
               const Spacer(),
+
+              AnimatedBuilder(
+                animation: JourneyAnomalyService.instance,
+                builder: (context, _) {
+                  final detector = JourneyAnomalyService.instance;
+                  if (!detector.isAwaitingConfirm) return const SizedBox.shrink();
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.shade700, width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.watch_rounded, color: Colors.amber.shade800, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'WATCH 5 ĐANG HỎI: BẠN ỔN CHỨ? (${detector.confirmRemainingSeconds}s)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.amber.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          detector.anomalyReason ?? 'Phát hiện lệch tuyến hoặc đứng im > 3 phút.',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => context.read<AppProvider>().confirmJourneyAnomalySafe(),
+                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+                                child: const Text('✓ Tôi ổn', style: TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: detector.escalateNow,
+                                child: const Text('Báo SOS ngay'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
 
               // Vòng tròn đếm ngược radar
               AnimatedBuilder(

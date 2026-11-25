@@ -84,8 +84,22 @@ router.post('/safe-route/plan', async (req, res, next) => {
 
 router.post('/:id/ghost-check', async (req, res, next) => {
   try {
-    const { lat = 10.7769, lng = 106.7009 } = req.body;
-    const data = await journeyService.checkGhostCompanionAnomaly(req.params.id, lat, lng);
+    const { lat = 10.7769, lng = 106.7009, stationarySeconds = 0, forceTest = false } = req.body || {};
+    const data = await journeyService.checkGhostCompanionAnomaly(req.params.id, lat, lng, {
+      stationarySeconds: Number(stationarySeconds) || 0,
+      forceTest: Boolean(forceTest),
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:id/anomaly-ack', async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user.id : req.body.userId;
+    const { action = 'CONFIRM_SAFE', reason = '' } = req.body || {};
+    const data = await journeyService.handleAnomalyAck(req.params.id, userId, action, reason);
     res.json({ success: true, data });
   } catch (err) {
     next(err);

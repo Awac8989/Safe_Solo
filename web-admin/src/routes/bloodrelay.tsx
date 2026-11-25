@@ -391,7 +391,7 @@ function BloodRelayManagementPage() {
                                       hospitalName: item.hospitalLocation.hospitalName,
                                       address: item.hospitalLocation.address,
                                       requestCode: item.requestCode,
-                                      fastTrackCode: d.fastTrackCode,
+                                      fastTrackCode: d.fastTrackCode || "",
                                       etaMinutes: d.etaMinutes,
                                     });
                                     setQrPassModalOpen(true);

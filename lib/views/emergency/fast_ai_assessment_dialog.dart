@@ -344,10 +344,15 @@ class _FastAiAssessmentDialogState extends State<FastAiAssessmentDialog>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Chỉ số Đối xứng Cơ Mặt (FSI):',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  const Expanded(
+                    child: Text(
+                      'Chỉ số Đối xứng Cơ Mặt (FSI):',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     '${(service.faceSymmetryScore * 100).toStringAsFixed(0)}% (Ngưỡng >= 70%)',
                     style: TextStyle(
@@ -530,10 +535,15 @@ class _FastAiAssessmentDialogState extends State<FastAiAssessmentDialog>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Độ Lệch BMAI Cảm biến 2 Cổ tay:',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  const Expanded(
+                    child: Text(
+                      'Độ Lệch BMAI Cảm biến 2 Cổ tay:',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     '${service.armAsymmetryScore.toStringAsFixed(2)}g',
                     style: TextStyle(
@@ -694,10 +704,15 @@ class _FastAiAssessmentDialogState extends State<FastAiAssessmentDialog>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Độ Rõ Nét Âm Tiết (Clarity Index):',
-                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                  const Expanded(
+                    child: Text(
+                      'Độ Rõ Nét Âm Tiết (Clarity Index):',
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     '${(service.speechClarityScore * 100).toStringAsFixed(0)}%',
                     style: TextStyle(

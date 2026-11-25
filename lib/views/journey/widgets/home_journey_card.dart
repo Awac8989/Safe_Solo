@@ -18,8 +18,8 @@ class HomeJourneyCard extends StatelessWidget {
 
     if (!hasActiveJourney) {
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppDarkColors.card : AppColors.card,
           borderRadius: BorderRadius.circular(16),
@@ -44,7 +44,7 @@ class HomeJourneyCard extends StatelessWidget {
               ),
               child: const Icon(Icons.navigation_rounded, color: AppColors.primary, size: 20),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,32 +52,41 @@ class HomeJourneyCard extends StatelessWidget {
                   Text(
                     'Check-in theo lộ trình (30–60p)',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.w700,
                       color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    'Bảo vệ ca đêm & đường vắng · Tự động phát SOS định vị nếu chưa về an toàn',
+                    'Bảo vệ ca đêm & đường vắng · Tự động SOS định vị',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            ElevatedButton(
-              onPressed: () => LiveJourneySetupSheet.show(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(64, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            const SizedBox(width: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: ElevatedButton(
+                onPressed: () => LiveJourneySetupSheet.show(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(60, 34),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+                child: const Text('Bật bảo vệ'),
               ),
-              child: const Text('Bật bảo vệ'),
             ),
           ],
         ),
@@ -87,7 +96,7 @@ class HomeJourneyCard extends StatelessWidget {
     final isOverdue = journey.isOverdue;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: isOverdue
             ? (isDark ? const Color(0xFF2E1214) : const Color(0xFFFEF2F2))
@@ -140,22 +149,29 @@ class HomeJourneyCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            isOverdue ? 'HÀNH TRÌNH QUÁ HẠN' : 'ĐANG GIÁM SÁT HÀNH TRÌNH',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
-                              letterSpacing: 0.5,
+                          Expanded(
+                            child: Text(
+                              isOverdue ? 'HÀNH TRÌNH QUÁ HẠN' : 'ĐANG GIÁM SÁT HÀNH TRÌNH',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
+                                letterSpacing: 0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
-                          Text(
-                            journey.remainingFormatted,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
+                          const SizedBox(width: 8),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              journey.remainingFormatted,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: isOverdue ? AppColors.destructive : (isDark ? AppDarkColors.primary : AppColors.success),
+                              ),
                             ),
                           ),
                         ],

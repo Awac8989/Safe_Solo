@@ -210,12 +210,17 @@ class _MomentsFeedState extends State<MomentsFeed> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Khoảnh khắc Locket',
-                style: AppTextStyles.h3.copyWith(
-                  color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+              Expanded(
+                child: Text(
+                  'Khoảnh khắc Locket',
+                  style: AppTextStyles.h3.copyWith(
+                    color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               IconButton(
                 onPressed: _isUploading ? null : () => _captureMoment(appProvider),
                 icon: _isUploading 

@@ -61,6 +61,7 @@
     "react-i18next": "^17.0.15",
     "react-resizable-panels": "^4.6.5",
     "recharts": "^2.15.4",
+    "socket.io-client": "^4.8.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",

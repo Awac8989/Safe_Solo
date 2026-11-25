@@ -15,10 +15,16 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
+import java.security.MessageDigest
+import kotlin.math.abs
+import kotlin.math.acos
+import kotlin.math.sqrt
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.wear.tiles.TileService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.RenderMode
 import io.flutter.embedding.engine.FlutterEngine
@@ -35,6 +41,7 @@ class MainActivity : FlutterActivity() {
     private var stepDetectorSensor: Sensor? = null
     private var spo2Sensor: Sensor? = null
     private var offbodySensor: Sensor? = null
+    private var accelerometerSensor: Sensor? = null
 
     private var sensorEventListener: SensorEventListener? = null
     private var eventSink: EventChannel.EventSink? = null
@@ -42,12 +49,33 @@ class MainActivity : FlutterActivity() {
 
     private var batteryReceiver: BroadcastReceiver? = null
     private var isOffWrist = false
+    private var lastAccelEmitMs = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
         initSensors()
+        handleWearLaunchIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleWearLaunchIntent(intent)
+    }
+
+    private fun handleWearLaunchIntent(intent: Intent?) {
+        val action = intent?.getStringExtra("safesolo_wear_action") ?: return
+        val packet = intent.getStringExtra("safesolo_wear_packet") ?: ""
+        WatchNativeBridgeBus.emitToFlutter(
+            mapOf(
+                "sensorType" to "WEAR_LAUNCH_ACTION",
+                "action" to action,
+                "payloadJson" to packet,
+                "timestamp" to System.currentTimeMillis()
+            )
+        )
     }
 
     override fun getRenderMode(): RenderMode {
@@ -75,7 +103,6 @@ class MainActivity : FlutterActivity() {
         stepDetectorSensor = sm.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR)
 
         // 3. SpO2 / Oxygen Saturation
-        // Kiểm tra loại chuẩn Android hoặc cảm biến quang học BioActive của Samsung
         val allSensors = sm.getSensorList(Sensor.TYPE_ALL)
         for (s in allSensors) {
             val name = s.name.lowercase()
@@ -95,12 +122,14 @@ class MainActivity : FlutterActivity() {
         } else {
             null
         }
+
+        // 5. Real 3-axis Accelerometer for 3-Phase Sensor Fusion (IMU + Off-body + PPG)
+        accelerometerSensor = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Method Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -110,16 +139,21 @@ class MainActivity : FlutterActivity() {
                         val isWatch = packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH)
                         val isSmR900 = model.contains("SM-R900", ignoreCase = true) ||
                                        model.contains("Watch5", ignoreCase = true)
+                        val hardwareDeviceId = buildStableHardwareDeviceId(model, isWatch, isSmR900)
                         val info = mapOf(
                             "model" to model,
                             "manufacturer" to manufacturer,
                             "brand" to (Build.BRAND ?: "Unknown"),
                             "isWatch" to isWatch,
                             "isSmR900" to isSmR900,
+                            "hardwareDeviceId" to hardwareDeviceId,
                             "hasHeartRate" to (heartRateSensor != null),
                             "hasStepCounter" to (stepCounterSensor != null),
                             "hasSpO2" to (spo2Sensor != null),
-                            "hasOffbody" to (offbodySensor != null)
+                            "hasOffbody" to (offbodySensor != null),
+                            "hasAccelerometer" to (accelerometerSensor != null),
+                            "hasTelephony" to EmergencySmsHelper.hasTelephonyFeature(this),
+                            "hasSmsPermission" to EmergencySmsHelper.hasSmsPermission(this)
                         )
                         result.success(info)
                     }
@@ -133,23 +167,167 @@ class MainActivity : FlutterActivity() {
                     "isOffWrist" -> {
                         result.success(isOffWrist)
                     }
+                    "hasSmsPermission" -> {
+                        result.success(mapOf(
+                            "granted" to EmergencySmsHelper.hasSmsPermission(this),
+                            "hasTelephony" to EmergencySmsHelper.hasTelephonyFeature(this)
+                        ))
+                    }
+                    "requestSmsPermission" -> {
+                        if (EmergencySmsHelper.hasSmsPermission(this)) {
+                            result.success(true)
+                        } else {
+                            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.SEND_SMS), 1002)
+                            result.success(false)
+                        }
+                    }
+                    "sendDirectSms" -> {
+                        val phone = call.argument<String>("phoneNumber") ?: ""
+                        val message = call.argument<String>("message") ?: ""
+                        val res = EmergencySmsHelper.sendDirectSms(this, phone, message)
+                        result.success(res)
+                    }
+                    "saveEmergencyContactsForBackground" -> {
+                        val phones = call.argument<List<String>>("phoneNumbers") ?: emptyList()
+                        val victimName = call.argument<String>("victimName")
+                        val lat = call.argument<Double>("lat")
+                        val lng = call.argument<Double>("lng")
+                        WatchNativeBridgeBus.saveEmergencyContacts(this, phones, victimName, lat, lng)
+                        result.success(true)
+                    }
+                    "sendWearMessage" -> {
+                        val path = call.argument<String>("path") ?: WearDataLayerHelper.PATH_PACKET
+                        val payloadJson = call.argument<String>("payloadJson") ?: "{}"
+                        WearDataLayerHelper.sendPacket(this, path, payloadJson) { info ->
+                            mainHandler.post { result.success(info) }
+                        }
+                    }
+                    "getWearConnectedNodes" -> {
+                        WearDataLayerHelper.getConnectedNodes(this) { nodes ->
+                            mainHandler.post { result.success(nodes) }
+                        }
+                    }
+                    "syncWatchSnapshotToTile" -> {
+                        val heartRate = call.argument<Int>("heartRate")
+                        val spO2 = call.argument<Int>("spO2")
+                        val battery = call.argument<Int>("battery")
+                        val steps = call.argument<Int>("steps")
+                        val isOff = call.argument<Boolean>("isOffWrist")
+                        val svmG = call.argument<Double>("svmG")
+                        val userName = call.argument<String>("userName")
+                        val isPaired = call.argument<Boolean>("isPaired")
+                        val nextDeadlineMs = (call.argument<Number>("nextDeadlineMs"))?.toLong()
+                        val fusionPhase = call.argument<String>("fusionPhase")
+                        val deviceId = call.argument<String>("deviceId")
+                        val pairedUserId = call.argument<String>("pairedUserId")
+
+                        WatchNativeBridgeBus.saveVitalsSnapshot(
+                            context = applicationContext,
+                            heartRate = heartRate,
+                            spO2 = spO2,
+                            battery = battery,
+                            steps = steps,
+                            isOffWrist = isOff,
+                            svmG = svmG,
+                            userName = userName,
+                            isPaired = isPaired,
+                            nextDeadlineMs = nextDeadlineMs,
+                            fusionPhase = fusionPhase,
+                            deviceId = deviceId,
+                            pairedUserId = pairedUserId
+                        )
+                        if (deviceId != null) {
+                            WearDataLayerHelper.syncVitalsDataItem(
+                                context = applicationContext,
+                                deviceId = deviceId,
+                                heartRate = heartRate ?: 76,
+                                spO2 = spO2 ?: 98,
+                                battery = battery ?: 85,
+                                steps = steps ?: 0,
+                                isOffWrist = isOff ?: false,
+                                svmG = svmG ?: 1.0,
+                                fusionPhase = fusionPhase ?: "IDLE_MONITORING"
+                            )
+                        }
+                        try {
+                            TileService.getUpdater(applicationContext).requestUpdate(SafeSoloTileService::class.java)
+                        } catch (_: Exception) {}
+                        result.success(true)
+                    }
+                    "startWatchBackgroundService" -> {
+                        try {
+                            val svcIntent = Intent(this, WatchSensorForegroundService::class.java).apply {
+                                action = WatchSensorForegroundService.ACTION_START
+                            }
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                startForegroundService(svcIntent)
+                            } else {
+                                startService(svcIntent)
+                            }
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.w("MainActivity", "Could not start WatchSensorForegroundService: ${e.message}")
+                            result.success(false)
+                        }
+                    }
+                    "stopWatchBackgroundService" -> {
+                        try {
+                            stopService(Intent(this, WatchSensorForegroundService::class.java))
+                            result.success(true)
+                        } catch (_: Exception) {
+                            result.success(false)
+                        }
+                    }
+                    "startFieldCameraStream" -> {
+                        if (!FieldCameraStreamer.hasCameraPermission(this)) {
+                            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1003)
+                            result.success(mapOf("started" to false, "code" to "PERMISSION_REQUESTED"))
+                        } else {
+                            result.success(FieldCameraStreamer.start(this))
+                        }
+                    }
+                    "stopFieldCameraStream" -> {
+                        FieldCameraStreamer.stop()
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }
 
-        // Event Channel truyền dòng dữ liệu cảm biến thời gian thực
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                     eventSink = events
+                    WatchNativeBridgeBus.attachEventSink(events)
                     startSensorListening()
                 }
 
                 override fun onCancel(arguments: Any?) {
                     stopSensorListening()
+                    WatchNativeBridgeBus.attachEventSink(null)
                     eventSink = null
                 }
             })
+    }
+
+    private fun buildStableHardwareDeviceId(model: String, isWatch: Boolean, isSmR900: Boolean): String {
+        val rawAndroidId = try {
+            Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID) ?: "safesolo"
+        } catch (_: Exception) {
+            "safesolo"
+        }
+        val hash6 = try {
+            val digest = MessageDigest.getInstance("SHA-256").digest(rawAndroidId.toByteArray(Charsets.UTF_8))
+            digest.take(3).joinToString("") { "%02x".format(it) }
+        } catch (_: Exception) {
+            rawAndroidId.takeLast(6).lowercase()
+        }
+        val modelSlug = model.lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        return if (isWatch || isSmR900) {
+            if (isSmR900) "watch_r900_$hash6" else "watch_${modelSlug}_$hash6"
+        } else {
+            "phone_${modelSlug}_$hash6"
+        }
     }
 
     private fun getBatteryLevel(): Int {
@@ -198,14 +376,12 @@ class MainActivity : FlutterActivity() {
     private fun startSensorListening() {
         val sm = sensorManager ?: return
 
-        // Phát mức pin ban đầu
         sendEvent(mapOf(
             "sensorType" to "BATTERY",
             "level" to getBatteryLevel(),
             "timestamp" to System.currentTimeMillis()
         ))
 
-        // Lắng nghe thay đổi mức pin
         batteryReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 intent?.let {
@@ -236,6 +412,7 @@ class MainActivity : FlutterActivity() {
                         val bpm = event.values[0].toInt()
                         Log.i("MainActivity", "HEART_RATE onSensorChanged: bpm=$bpm, accuracy=${event.accuracy}")
                         if (bpm > 0) {
+                            WatchNativeBridgeBus.saveVitalsSnapshot(context = applicationContext, heartRate = bpm)
                             sendEvent(mapOf(
                                 "sensorType" to "HEART_RATE",
                                 "value" to bpm,
@@ -246,6 +423,7 @@ class MainActivity : FlutterActivity() {
                     }
                     Sensor.TYPE_STEP_COUNTER -> {
                         val steps = event.values[0].toInt()
+                        WatchNativeBridgeBus.saveVitalsSnapshot(context = applicationContext, steps = steps)
                         sendEvent(mapOf(
                             "sensorType" to "STEP_COUNTER",
                             "value" to steps,
@@ -260,10 +438,33 @@ class MainActivity : FlutterActivity() {
                             "timestamp" to now
                         ))
                     }
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        val axG = event.values[0] / 9.80665
+                        val ayG = event.values[1] / 9.80665
+                        val azG = event.values[2] / 9.80665
+                        val svmG = sqrt(axG * axG + ayG * ayG + azG * azG)
+                        val safeSvm = if (svmG > 0.001) svmG else 0.001
+                        val tiltDeg = acos((abs(azG) / safeSvm).coerceIn(0.0, 1.0)) * (180.0 / Math.PI)
+                        // Emit immediately on high-G impact spikes (>= 2.2g) or throttle normal stream to ~12Hz
+                        if (svmG >= 2.2 || (now - lastAccelEmitMs >= 80)) {
+                            lastAccelEmitMs = now
+                            sendEvent(mapOf(
+                                "sensorType" to "ACCELEROMETER",
+                                "axG" to axG,
+                                "ayG" to ayG,
+                                "azG" to azG,
+                                "svmG" to svmG,
+                                "tiltAngle" to tiltDeg,
+                                "timestamp" to now
+                            ))
+                        }
+                    }
                     else -> {
-                        // Kiểm tra cảm biến SpO2
                         if (spo2Sensor != null && event.sensor == spo2Sensor) {
                             val spo2Val = event.values[0].toInt()
+                            if (spo2Val > 0) {
+                                WatchNativeBridgeBus.saveVitalsSnapshot(context = applicationContext, spO2 = spo2Val)
+                            }
                             sendEvent(mapOf(
                                 "sensorType" to "SPO2",
                                 "value" to spo2Val,
@@ -272,6 +473,7 @@ class MainActivity : FlutterActivity() {
                             ))
                         } else if (offbodySensor != null && event.sensor == offbodySensor) {
                             isOffWrist = (event.values[0] == 0f)
+                            WatchNativeBridgeBus.saveVitalsSnapshot(context = applicationContext, isOffWrist = isOffWrist)
                             sendEvent(mapOf(
                                 "sensorType" to "OFFBODY",
                                 "isOffWrist" to isOffWrist,
@@ -293,21 +495,17 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // Đăng ký tất cả các cảm biến nhịp tim phần cứng (Batch & Wakeup) với chu kỳ 1s (1Hz)
         val hrList = sm.getSensorList(Sensor.TYPE_HEART_RATE)
         for (s in hrList) {
             val period = if (s.minDelay > 0) s.minDelay else 1000000
             val reg1 = sm.registerListener(sensorEventListener, s, period)
-            Log.i("MainActivity", "Registered HR sensor ${s.name} (delay=$period): success=$reg1")
             if (!reg1) {
-                val reg2 = sm.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_NORMAL)
-                Log.i("MainActivity", "Registered HR sensor ${s.name} (SENSOR_DELAY_NORMAL): success=$reg2")
+                sm.registerListener(sensorEventListener, s, SensorManager.SENSOR_DELAY_NORMAL)
             }
         }
         if (hrList.isEmpty()) {
             heartRateSensor?.let {
-                val r = sm.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
-                Log.i("MainActivity", "Registered default HR sensor ${it.name}: success=$r")
+                sm.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
             }
         }
         stepCounterSensor?.let {
@@ -321,6 +519,9 @@ class MainActivity : FlutterActivity() {
         }
         offbodySensor?.let {
             sm.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        accelerometerSensor?.let {
+            sm.registerListener(sensorEventListener, it, SensorManager.SENSOR_DELAY_UI)
         }
     }
 
@@ -345,6 +546,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        FieldCameraStreamer.stop()
         stopSensorListening()
         super.onDestroy()
     }

@@ -175,7 +175,7 @@ class _BackgroundSafetyRuntime {
   final List<DateTime> _shakePeaks = [];
 
   Future<void> start() async {
-    await _notifications.initialize();
+    await _notifications.initialize(requestPermission: false);
     await _loadConfigFromPrefs();
     _applyConfig(_config);
   }

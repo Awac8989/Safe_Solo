@@ -37,6 +37,7 @@ import '../../services/watch_sync_manager.dart';
 import '../../services/blackbox_service.dart';
 import '../../services/stroke_defense_service.dart';
 import '../../services/offline_sos_service.dart';
+import '../../services/journey_anomaly_service.dart';
 import '../../models/disaster_alert_model.dart';
 import '../../models/circle_orbit_member.dart';
 import '../../models/rescue_incident_model.dart';
@@ -1365,6 +1366,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await _persistBackgroundSafetyConfig();
 
     if (_user != null) {
+      WatchSyncManager.instance.setActiveUserId(_user!.id);
       final nextDeadline = effectiveNextDeadline;
       final diff = nextDeadline.difference(DateTime.now());
       final isOkay = !diff.isNegative;
@@ -2057,6 +2059,13 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       );
       _wasOutsideHome = false;
       _lastOverdueNotificationAt = null;
+      _deadmanOverdueSmsDispatched = false;
+      unawaited(OfflineSosService.instance.syncEmergencyContext(
+        phoneNumbers: current.emergencyContacts.map((e) => e.phone).toList(),
+        victimName: current.name,
+        lat: finalLat,
+        lng: finalLng,
+      ));
       if (mood != null) {
         _mood = mood;
       }
@@ -2207,8 +2216,28 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     await checkIn(type: 'SNOOZE', snoozeMinutes: minutes);
   }
 
+  bool _deadmanOverdueSmsDispatched = false;
+
   Future<void> performDuressCheckIn() async {
-    await checkIn(type: 'DURESS_FAKE', isDuress: true);
+    try {
+      await checkIn(type: 'DURESS_FAKE', isDuress: true);
+    } catch (_) {}
+    // Luôn phát kèm SMS âm thầm qua SmsManager nếu có mạng kém/mất kết nối để không lộ giao diện Tin nhắn
+    final current = _user;
+    if (current != null && current.emergencyContacts.isNotEmpty) {
+      unawaited(OfflineSosService.instance.sendDirectSms(
+        phoneNumber: current.emergencyContacts.first.phone,
+        message: OfflineSosService.instance.formatEmergencySms(
+          victimName: current.name.isNotEmpty ? current.name : 'Tôi',
+          lat: current.lastKnownLocation?.lat ?? 10.7769,
+          lng: current.lastKnownLocation?.lng ?? 106.7009,
+          heartRate: PedometerService.instance.heartRate,
+          spO2: PedometerService.instance.spO2,
+          reason: 'DURESS PIN 9999 - CANH BAO CUONG BUC NGAM',
+        ),
+        fallbackToComposer: false,
+      ));
+    }
   }
 
   Future<void> performEmotionalCheckIn({
@@ -2866,6 +2895,9 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
 
   void _initWatchIntegration() {
     _watchAlertSubscription?.cancel();
+    if (_user != null) {
+      WatchSyncManager.instance.setActiveUserId(_user!.id);
+    }
     WearOsService.instance.initialize();
     _watchAlertSubscription =
         PedometerService.instance.watchAlertStream.listen(_handleWatchAlert);
@@ -2973,6 +3005,30 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       }
     };
 
+    WatchSyncManager.instance.onOfflineEmergencyFallback = (action, payload) async {
+      final currentUser = _user;
+      final phones = (currentUser?.emergencyContacts ?? [])
+          .map((e) => e.phone)
+          .where((p) => p.isNotEmpty)
+          .toList();
+      final lat = currentUser?.lastKnownLocation?.lat ?? 10.7769;
+      final lng = currentUser?.lastKnownLocation?.lng ?? 106.7009;
+      final msg = OfflineSosService.instance.formatEmergencySms(
+        victimName: currentUser?.name ?? 'SafeSolo User',
+        lat: lat,
+        lng: lng,
+        heartRate: payload['heartRate'] as int?,
+        spO2: payload['spO2'] as int?,
+        batteryLevel: payload['battery'] as int?,
+        reason: 'WATCH BT->$action (MAT INTERNET)',
+      );
+      await OfflineSosService.instance.dispatchToContacts(
+        phoneNumbers: phones,
+        message: msg,
+        fallbackToComposer: action != 'DURESS_SOS',
+      );
+    };
+
     // Đồng bộ hủy báo động từ Đồng hồ sang Điện thoại
     WatchSyncManager.instance.onAlertCancelledReceived = () {
       debugPrint('[AppProvider] Watch alert cancelled received');
@@ -2982,6 +3038,20 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         notifyListeners();
         unawaited(_saveToStorage());
       }
+    };
+
+    WatchSyncManager.instance.onJourneyCheckSafeReceived = (_) {
+      JourneyAnomalyService.instance.confirmWellbeing(source: 'WATCH_5');
+    };
+
+    // Đồng bộ xác nhận điều phối cứu hộ từ Web Admin TOC về Điện thoại & Đồng hồ
+    WatchSyncManager.instance.onTocDispatchAckReceived = (payload) {
+      final unit = payload['ambulanceUnit']?.toString() ?? 'Đội cứu hộ SafeSolo / 115';
+      unawaited(_notifications.showAlert(
+        id: 9095,
+        title: '🚑 TRUNG TÂM TOC ĐÃ ĐIỀU PHỐI CỨU HỘ',
+        body: 'Đơn vị $unit đang tiếp cận vị trí của bạn (đã đồng bộ lên Galaxy Watch 5).',
+      ));
     };
   }
 
@@ -3253,11 +3323,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
           victimName: current?.name ?? 'Tôi',
           lat: position.lat,
           lng: position.lng,
+          heartRate: PedometerService.instance.heartRate,
+          spO2: PedometerService.instance.spO2,
+          batteryLevel: PedometerService.instance.battery,
           reason: 'SOS $incidentType',
         );
-        unawaited(OfflineSosService.instance.sendEmergencySms(
-          phoneNumber: phoneToUse, 
+        unawaited(OfflineSosService.instance.dispatchToContacts(
+          phoneNumbers: contacts.map((c) => c.phone).toList(),
           message: msg,
+          fallbackToComposer: true,
         ));
 
         // Create local emergency model so UI works offline
@@ -3459,11 +3533,14 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
             victimName: current.name.isNotEmpty ? current.name : 'Tôi',
             lat: position.lat,
             lng: position.lng,
+            heartRate: PedometerService.instance.heartRate,
+            spO2: PedometerService.instance.spO2,
             reason: 'SILENT SOS DURESS PIN',
           );
-          unawaited(OfflineSosService.instance.sendEmergencySms(
-            phoneNumber: contacts.first.phone, 
+          unawaited(OfflineSosService.instance.sendDirectSms(
+            phoneNumber: contacts.first.phone,
             message: msg,
+            fallbackToComposer: false,
           ));
         }
       } catch (smsError) {
@@ -3519,12 +3596,112 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
     ));
   }
 
+  bool _journeyAnomalyWired = false;
+
+  void _ensureJourneyAnomalyWired() {
+    if (_journeyAnomalyWired) return;
+    _journeyAnomalyWired = true;
+    final detector = JourneyAnomalyService.instance;
+    detector.onTriggerWatchPrompt = ({
+      required String journeyId,
+      required JourneyAnomalyKind kind,
+      required String reason,
+      required double deviationMeters,
+      required int stationarySeconds,
+    }) {
+      WatchSyncManager.instance.sendRouteDeviationCheck(
+        journeyId: journeyId,
+        reason: reason,
+        anomalyType: kind == JourneyAnomalyKind.routeDeviation
+            ? 'ROUTE_DEVIATION'
+            : 'STATIONARY_ALERT',
+        deviationMeters: deviationMeters,
+        stationarySeconds: stationarySeconds,
+      );
+      unawaited(_notifications.showAlert(
+        id: 9994,
+        title: '⌚ Bạn ổn chứ? (Hành trình Đêm)',
+        body: '$reason — Vui lòng xác nhận "Tôi ổn" trên Watch 5 trong 30 giây.',
+      ));
+      notifyListeners();
+    };
+
+    detector.onConfirmedSafe = (journeyId, source) {
+      final uid = _user?.id;
+      if (uid != null) {
+        unawaited(_api
+            .ackJourneyAnomaly(
+              journeyId: journeyId,
+              userId: uid,
+              action: 'CONFIRM_SAFE',
+              reason: 'Confirmed via $source',
+            )
+            .catchError((_) => <String, dynamic>{}));
+      }
+      notifyListeners();
+    };
+
+    detector.onEscalateTimeout = ({
+      required String journeyId,
+      required JourneyAnomalyKind kind,
+      required String reason,
+      required double deviationMeters,
+      required int stationarySeconds,
+    }) async {
+      final current = _user;
+      if (current != null) {
+        _user = current.copyWith(currentStatus: 'ALERT_TRIGGERED');
+        notifyListeners();
+        unawaited(_saveToStorage());
+        unawaited(_api
+            .ackJourneyAnomaly(
+              journeyId: journeyId,
+              userId: current.id,
+              action: 'ESCALATE_SOS',
+              reason: reason,
+            )
+            .catchError((_) => <String, dynamic>{}));
+        final lat = _activeJourney?.currentLat ?? current.lastKnownLocation?.lat ?? 10.7769;
+        final lng = _activeJourney?.currentLng ?? current.lastKnownLocation?.lng ?? 106.7009;
+        if (current.emergencyContacts.isNotEmpty) {
+          unawaited(OfflineSosService.instance.dispatchToContacts(
+            phoneNumbers: current.emergencyContacts.map((e) => e.phone).toList(),
+            message: OfflineSosService.instance.formatEmergencySms(
+              victimName: current.name,
+              lat: lat,
+              lng: lng,
+              heartRate: PedometerService.instance.heartRate,
+              spO2: PedometerService.instance.spO2,
+              reason: 'HANH TRINH DEM ($reason)',
+            ),
+            fallbackToComposer: false,
+          ));
+        }
+      }
+      unawaited(_notifications.showAlert(
+        id: 9995,
+        title: '🚨 BÁO ĐỘNG HÀNH TRÌNH: KHÔNG PHẢN HỒI WATCH 5',
+        body: '$reason — Quá 30s chưa xác nhận an toàn. Đã phát SOS tới người thân & TOC!',
+      ));
+    };
+  }
+
+  void confirmJourneyAnomalySafe() {
+    JourneyAnomalyService.instance.confirmWellbeing(source: 'PHONE_APP');
+    WatchSyncManager.instance.emitJourneyCheckSafe(
+      journeyId: _activeJourney?.id,
+      userId: _user?.id,
+    );
+    notifyListeners();
+  }
+
   Future<LiveJourneyModel?> startLiveJourney({
     required String destination,
     required int durationMinutes,
     double? destinationLat,
     double? destinationLng,
   }) async {
+    _ensureJourneyAnomalyWired();
     _hasEscalatedJourneyOverdue = false;
     final current = _user;
     final now = DateTime.now();
@@ -3571,6 +3748,15 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       );
     }
     await _saveToStorage();
+    if (_activeJourney != null) {
+      JourneyAnomalyService.instance.startMonitoring(
+        journeyId: _activeJourney!.id,
+        startLat: loc?.lat ?? 10.7769,
+        startLng: loc?.lng ?? 106.7009,
+        destLat: destinationLat,
+        destLng: destinationLng,
+      );
+    }
     notifyListeners();
     return _activeJourney;
   }
@@ -3578,6 +3764,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> finishLiveJourney() async {
     final journey = _activeJourney;
     if (journey == null) return;
+    JourneyAnomalyService.instance.stopMonitoring();
 
     final current = _user;
     try {
@@ -3630,6 +3817,7 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<void> cancelLiveJourney() async {
     final journey = _activeJourney;
     if (journey == null) return;
+    JourneyAnomalyService.instance.stopMonitoring();
 
     final current = _user;
     try {
@@ -3674,6 +3862,8 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
         status: isOverdue ? 'OVERDUE_ALARM' : 'IN_TRANSIT',
       );
     }
+    _ensureJourneyAnomalyWired();
+    JourneyAnomalyService.instance.ingestPosition(lat: lat, lng: lng);
     notifyListeners();
   }
 
@@ -4108,6 +4298,24 @@ class AppProvider with ChangeNotifier, WidgetsBindingObserver {
       await _notifications.showOverdueCheckIn(
         isVietnamese: _language == AppLanguage.vi,
       );
+      if (!_deadmanOverdueSmsDispatched &&
+          now.difference(deadline).inMinutes >= 15 &&
+          user.emergencyContacts.isNotEmpty) {
+        _deadmanOverdueSmsDispatched = true;
+        final msg = OfflineSosService.instance.formatEmergencySms(
+          victimName: user.name.isNotEmpty ? user.name : 'SafeSolo User',
+          lat: user.lastKnownLocation?.lat ?? 10.7769,
+          lng: user.lastKnownLocation?.lng ?? 106.7009,
+          heartRate: PedometerService.instance.heartRate,
+          spO2: PedometerService.instance.spO2,
+          reason: 'DEAD-MAN QUA HAN DIEM DANH >15 PHUT',
+        );
+        unawaited(OfflineSosService.instance.dispatchToContacts(
+          phoneNumbers: user.emergencyContacts.map((e) => e.phone).toList(),
+          message: msg,
+          fallbackToComposer: false,
+        ));
+      }
     }
   }
 

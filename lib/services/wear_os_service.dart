@@ -5,6 +5,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 
 import 'ai_signal_processor.dart';
 import 'api_service.dart';
+import 'fall_fusion_engine.dart';
 import 'pedometer_service.dart';
 import 'watch_hardware_sensor_service.dart';
 import 'watch_sync_manager.dart';
@@ -198,6 +199,11 @@ class WearOsService extends ChangeNotifier {
   void setOffWrist(bool off) {
     _isOffWrist = off;
     _pedometer.setOffWrist(off);
+    FallFusionEngine.instance.updateVitals(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      isOffWrist: off,
+    );
     if (off) {
       // Khi tháo đồng hồ thì tạm ngưng báo động té ngã giả
       stopMotionMonitoring();
@@ -207,7 +213,7 @@ class WearOsService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Xử lý dữ liệu gia tốc kế thời gian thực
+  /// Xử lý dữ liệu gia tốc kế thời gian thực qua Bộ lọc Fusion 3 Pha (IMU >= 2.5G + Bất động 4s + Off-Body + PPG)
   void _onAccelerometerData(AccelerometerEvent event) {
     if (_isOffWrist || !_isFallMonitoringActive) return;
 
@@ -216,6 +222,20 @@ class WearOsService extends ChangeNotifier {
     final ayG = event.y / 9.80665;
     final azG = event.z / 9.80665;
 
+    FallFusionEngine.instance.updateVitals(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      isOffWrist: _isOffWrist,
+    );
+    FallFusionEngine.instance.ingestAccelerometer(
+      axG: axG,
+      ayG: ayG,
+      azG: azG,
+    );
+
+    _currentSvmG = FallFusionEngine.instance.currentSvmG;
+    _currentTiltAngle = FallFusionEngine.instance.impactTiltAngle;
+
     // 1. Kiểm tra va chạm tai nạn giao thông xung lực mạnh (Vehicular Crash >= 4.5g)
     final crashResult = _ai.evaluateVehicularCrash(
       ax: axG,
@@ -223,7 +243,7 @@ class WearOsService extends ChangeNotifier {
       az: azG,
     );
 
-    if (crashResult.isSevereCrash && !_isCountdownActive) {
+    if (crashResult.isSevereCrash && !_isCountdownActive && !_isOffWrist) {
       _triggerAccidentCrashAlert(
         svm: crashResult.svmG,
         tilt: crashResult.tiltAngleDegrees,
@@ -233,23 +253,24 @@ class WearOsService extends ChangeNotifier {
       return;
     }
 
-    // 2. Kiểm tra ngã thông thường
-    final result = _ai.evaluateKinematicFall(
-      ax: axG,
-      ay: ayG,
-      az: azG,
-      thresholdG: _fallSensitivityG,
-    );
-
-    _currentSvmG = double.parse(result.svmG.toStringAsFixed(2));
-    _currentTiltAngle = double.parse(result.tiltAngleDegrees.toStringAsFixed(1));
-
-    // Nếu phát hiện va đập kèm tư thế nghiêng bất động (Hard Fall)
-    if (result.isFallDetected && !_isCountdownActive) {
-      _triggerFallAlert(
-        svm: _currentSvmG,
-        tilt: _currentTiltAngle,
-        isSimulated: false,
+    // 2. Chỉ kích hoạt đếm ngược rung chờ hủy 15s khi Bộ lọc Fusion 3 pha tiến vào Pha 3 (sau bất động + on-wrist)
+    if (FallFusionEngine.instance.phase == FallFusionPhase.ppgAndCountdown &&
+        !_isCountdownActive) {
+      _lastFallDetectedAt = DateTime.now();
+      _heartRate = FallFusionEngine.instance.heartRate;
+      _syncToPedometer();
+      _startEmergencyCountdown(
+        title: 'FUSION 3 PHA: PHÁT HIỆN TÉ NGÃ (${FallFusionEngine.instance.peakSvmG}G)',
+        message:
+            'Đã xác nhận va chạm IMU >= 2.5G, bất động & đang đeo tay. Rung 15 giây chờ hủy (${FallFusionEngine.instance.ppgAnomalyReason}).',
+        signalType: 'WATCH_FALL_DETECTED',
+        countdownSeconds: FallFusionEngine.defaultCountdownSeconds,
+        extraPayload: {
+          'svm': FallFusionEngine.instance.peakSvmG,
+          'tilt': FallFusionEngine.instance.impactTiltAngle,
+          'isSimulated': false,
+          'fusion': FallFusionEngine.instance.toFusionPayload(),
+        },
       );
     }
   }
@@ -480,16 +501,17 @@ class WearOsService extends ChangeNotifier {
     }
   }
 
-  /// Bắt đầu chu kỳ đếm ngược 30 giây kèm rung phản hồi xúc giác
+  /// Bắt đầu chu kỳ đếm ngược kèm rung phản hồi xúc giác
   void _startEmergencyCountdown({
     required String title,
     required String message,
     required String signalType,
+    int countdownSeconds = 30,
     Map<String, dynamic>? extraPayload,
   }) {
     _countdownTimer?.cancel();
     _isCountdownActive = true;
-    _countdownSeconds = 30;
+    _countdownSeconds = countdownSeconds;
     _emergencyTitle = title;
     _emergencyMessage = message;
     _emergencySignalType = signalType;
@@ -532,6 +554,10 @@ class WearOsService extends ChangeNotifier {
     _emergencyTitle = null;
     _emergencyMessage = null;
     _emergencySignalType = null;
+    if (FallFusionEngine.instance.phase == FallFusionPhase.ppgAndCountdown ||
+        FallFusionEngine.instance.phase == FallFusionPhase.stillnessOffBodyCheck) {
+      FallFusionEngine.instance.cancelCurrentAlert();
+    }
 
     // Khôi phục chỉ số về bình thường
     _spO2 = 98;
@@ -787,7 +813,7 @@ class WearOsService extends ChangeNotifier {
       battery: _battery,
       isOffWrist: _isOffWrist,
     );
-    if (broadcast) {
+    if (broadcast && (WatchSyncManager.instance.isRunningOnWatch || WatchSyncManager.instance.isPaired)) {
       WatchSyncManager.instance.emitVitalsTelemetry(
         heartRate: _heartRate,
         spO2: _spO2,
@@ -809,15 +835,17 @@ class WearOsService extends ChangeNotifier {
       battery: _battery,
       isOffWrist: _isOffWrist,
     );
-    WatchSyncManager.instance.emitVitalsTelemetry(
-      heartRate: _heartRate,
-      spO2: _spO2,
-      steps: _steps,
-      battery: _battery,
-      isOffWrist: _isOffWrist,
-      svmG: _currentSvmG,
-      tiltAngle: _currentTiltAngle,
-    );
+    if (WatchSyncManager.instance.isRunningOnWatch || WatchSyncManager.instance.isPaired) {
+      WatchSyncManager.instance.emitVitalsTelemetry(
+        heartRate: _heartRate,
+        spO2: _spO2,
+        steps: _steps,
+        battery: _battery,
+        isOffWrist: _isOffWrist,
+        svmG: _currentSvmG,
+        tiltAngle: _currentTiltAngle,
+      );
+    }
   }
 
   /// Gửi tín hiệu trực tiếp từ đồng hồ lên SafeSolo Backend API

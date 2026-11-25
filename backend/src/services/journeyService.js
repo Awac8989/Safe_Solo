@@ -4,6 +4,46 @@ const { AppError, ensure } = require('../lib/errors');
 const { getIo } = require('../sockets/socketServer');
 const { toIso } = require('../lib/mongoCore');
 
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Computes perpendicular cross-track distance (meters) from current point (lat, lng)
+ * to expected route segment (startLat, startLng) -> (destLat, destLng).
+ */
+function crossTrackDistanceMeters(lat, lng, startLat, startLng, destLat, destLng) {
+  const segLen = haversineMeters(startLat, startLng, destLat, destLng);
+  if (segLen < 30) {
+    return haversineMeters(lat, lng, destLat, destLng);
+  }
+  const midLatRad = (((startLat + destLat) / 2) * Math.PI) / 180;
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos(midLatRad);
+
+  const ax = 0;
+  const ay = 0;
+  const bx = (destLng - startLng) * mPerDegLng;
+  const by = (destLat - startLat) * mPerDegLat;
+  const px = (lng - startLng) * mPerDegLng;
+  const py = (lat - startLat) * mPerDegLat;
+
+  const ab2 = bx * bx + by * by;
+  if (ab2 <= 1e-6) return Math.hypot(px, py);
+  const t = Math.max(0, Math.min(1, ((px - ax) * bx + (py - ay) * by) / ab2));
+  const projX = ax + t * bx;
+  const projY = ay + t * by;
+  return Math.hypot(px - projX, py - projY);
+}
+
 class JourneyService {
   async startJourney(userId, payload) {
     ensure(payload.durationMinutes && payload.durationMinutes > 0, 'Duration in minutes is required', 400);
@@ -92,6 +132,85 @@ class JourneyService {
     journey.lastPingAt = now;
     if (payload.batteryLevel != null) {
       journey.batteryLevel = Number(payload.batteryLevel);
+    }
+
+    // Check Route Deviation (> 300m) & Abnormal Stationary (> 180s outside destination safe zone)
+    let detectedAnomaly = null;
+    if (journey.currentLat != null && journey.currentLng != null && journey.waypoints.length >= 1) {
+      const origin = journey.waypoints[0];
+      const hasDest = journey.destinationLat != null && journey.destinationLng != null;
+      const distToDest = hasDest
+        ? haversineMeters(journey.currentLat, journey.currentLng, journey.destinationLat, journey.destinationLng)
+        : 99999;
+
+      if (hasDest) {
+        const corridorDist = crossTrackDistanceMeters(
+          journey.currentLat,
+          journey.currentLng,
+          origin.lat,
+          origin.lng,
+          journey.destinationLat,
+          journey.destinationLng,
+        );
+        if (corridorDist > 300) {
+          detectedAnomaly = {
+            anomalyType: 'ROUTE_DEVIATION',
+            deviationMeters: Math.round(corridorDist),
+            reason: `Lệch khỏi lộ trình dự kiến ${Math.round(corridorDist)}m (> 300m)`,
+          };
+        }
+      }
+
+      if (!detectedAnomaly && distToDest > 120) {
+        // Scan backward to find how long user remained within 20m radius
+        let oldestStaticTs = now.getTime();
+        for (let i = journey.waypoints.length - 1; i >= 0; i--) {
+          const wp = journey.waypoints[i];
+          const d = haversineMeters(journey.currentLat, journey.currentLng, wp.lat, wp.lng);
+          if (d <= 20) {
+            oldestStaticTs = new Date(wp.timestamp).getTime();
+          } else {
+            break;
+          }
+        }
+        const stationarySeconds = Math.floor((now.getTime() - oldestStaticTs) / 1000);
+        if (stationarySeconds >= 180) {
+          detectedAnomaly = {
+            anomalyType: 'STATIONARY_ALERT',
+            stationarySeconds,
+            reason: `Đứng im bất thường ngoài vùng an toàn ${Math.round(stationarySeconds / 60)} phút (> 3 phút)`,
+          };
+        }
+      }
+    }
+
+    if (detectedAnomaly && !journey.deviationAlertTriggered) {
+      journey.deviationAlertTriggered = true;
+      journey.lastAnomalyDetectedAt = now;
+      journey.anomalyReason = detectedAnomaly.reason;
+
+      try {
+        const watchRoutes = require('../routes/watchRoutes');
+        if (typeof watchRoutes.enqueueCommandForUser === 'function') {
+          await watchRoutes.enqueueCommandForUser(userId, 'ROUTE_DEVIATION_CHECK', {
+            journeyId: journey._id,
+            ...detectedAnomaly,
+            prompt: 'Bạn ổn chứ?',
+            responseTimeoutSeconds: 30,
+          });
+        }
+      } catch (_) {}
+
+      try {
+        const io = getIo();
+        io.emit('journey:watch_check', {
+          journeyId: journey._id,
+          userId,
+          ...detectedAnomaly,
+          prompt: 'Bạn ổn chứ?',
+          responseTimeoutSeconds: 30,
+        });
+      } catch (_) {}
     }
 
     // Check if overdue
@@ -337,27 +456,142 @@ class JourneyService {
   }
 
   /**
-   * Hộ tống Ảo (Virtual Ghost Companion) Giám sát Lệch Lộ trình & Đứng im Bất thường
+   * Hộ tống Ảo (Virtual Ghost Companion) Giám sát Lệch Lộ trình (>300m) & Đứng im Bất thường (>3 phút)
    */
-  async checkGhostCompanionAnomaly(journeyId, currentLat, currentLng) {
+  async checkGhostCompanionAnomaly(journeyId, currentLat, currentLng, opts = {}) {
     const journey = await LiveJourney.findById(journeyId);
-    if (!journey) throw new Error('Không tìm thấy hành trình');
-    // Giả định lệch lộ trình nếu tọa độ lệch hơn 150m
-    const isDeviated = true;
-    journey.deviationAlertTriggered = isDeviated;
-    journey.lastAnomalyDetectedAt = new Date();
-    journey.anomalyReason = 'Phát hiện lệch khỏi lộ trình an toàn > 180m vào hẻm vắng vẻ ban đêm';
+    ensure(journey, 'Không tìm thấy hành trình', 404);
+
+    const origin = (journey.waypoints && journey.waypoints[0]) || { lat: currentLat, lng: currentLng };
+    const hasDest = journey.destinationLat != null && journey.destinationLng != null;
+    const deviationMeters = hasDest
+      ? Math.round(crossTrackDistanceMeters(currentLat, currentLng, origin.lat, origin.lng, journey.destinationLat, journey.destinationLng))
+      : Math.round(haversineMeters(origin.lat, origin.lng, currentLat, currentLng));
+
+    const stationarySeconds = Number(opts.stationarySeconds || 0);
+    const isRouteDeviated = deviationMeters > 300;
+    const isStationary = stationarySeconds >= 180;
+    const isDeviated = isRouteDeviated || isStationary || Boolean(opts.forceTest);
+
+    const reason = isRouteDeviated
+      ? `Phát hiện lệch khỏi lộ trình dự kiến ${deviationMeters}m (> 300m)`
+      : isStationary
+        ? `Phát hiện đứng im bất thường ngoài vùng an toàn ${Math.round(stationarySeconds / 60)} phút`
+        : isDeviated
+          ? 'Kiểm tra an toàn hành trình chủ động (Test Watch Check)'
+          : 'Đang di chuyển đúng hành lang an toàn';
+
     journey.currentLat = currentLat;
     journey.currentLng = currentLng;
+    if (isDeviated) {
+      journey.deviationAlertTriggered = true;
+      journey.lastAnomalyDetectedAt = new Date();
+      journey.anomalyReason = reason;
+      try {
+        const watchRoutes = require('../routes/watchRoutes');
+        if (typeof watchRoutes.enqueueCommandForUser === 'function') {
+          await watchRoutes.enqueueCommandForUser(journey.userId, 'ROUTE_DEVIATION_CHECK', {
+            journeyId: journey._id,
+            anomalyType: isStationary ? 'STATIONARY_ALERT' : 'ROUTE_DEVIATION',
+            deviationMeters,
+            stationarySeconds,
+            reason,
+            prompt: 'Bạn ổn chứ?',
+            responseTimeoutSeconds: 30,
+          });
+        }
+      } catch (_) {}
+    }
     await journey.save();
+
     return {
       success: true,
       journeyId: journey._id,
       ghostCompanionActive: journey.ghostCompanionActive,
       deviationAlertTriggered: journey.deviationAlertTriggered,
-      anomalyReason: journey.anomalyReason,
-      actionSuggested: 'Ứng dụng đã rung cảnh báo hỏi thăm an toàn. Nếu không phản hồi trong 30 giây, còi hú Silent Siren sẽ tự động gửi vị trí tới Người bảo trợ.',
+      deviationMeters,
+      stationarySeconds,
+      anomalyReason: reason,
+      watchPromptSent: isDeviated,
+      responseTimeoutSeconds: 30,
       detectedAt: journey.lastAnomalyDetectedAt,
+    };
+  }
+
+  /**
+   * Xác nhận từ Galaxy Watch 5 ("Tôi ổn") hoặc Leo thang SOS sau 30s không phản hồi
+   */
+  async handleAnomalyAck(journeyId, userId, action = 'CONFIRM_SAFE', reason = '') {
+    const journey = await LiveJourney.findById(journeyId);
+    ensure(journey, 'Không tìm thấy hành trình', 404);
+    const io = getIo();
+
+    if (action === 'CONFIRM_SAFE') {
+      journey.deviationAlertTriggered = false;
+      journey.anomalyReason = '';
+      journey.lastPingAt = new Date();
+      await journey.save();
+      if (io) {
+        io.emit('journey:anomaly_resolved', {
+          journeyId: journey._id,
+          userId: journey.userId,
+          status: 'CONFIRMED_SAFE',
+        });
+      }
+      return {
+        journeyId: journey._id,
+        action: 'CONFIRM_SAFE',
+        deviationAlertTriggered: false,
+        message: 'Đã nhận xác nhận an toàn từ Watch 5 / Điện thoại.',
+      };
+    }
+
+    // ESCALATE_SOS (Watch 5 không trả lời sau 30 giây)
+    journey.status = 'OVERDUE_ALARM';
+    journey.deviationAlertTriggered = true;
+    journey.anomalyReason = reason || journey.anomalyReason || 'Lệch tuyến / Đứng im > 3p không phản hồi Watch 5 sau 30s';
+    await journey.save();
+
+    const userDoc = await User.findById(journey.userId || userId);
+    if (userDoc) {
+      try {
+        const { triggerSosForUser } = require('./sosService');
+        await triggerSosForUser(io, userDoc);
+      } catch (_) {}
+      try {
+        const { createAlertEvent } = require('./alertEventService');
+        await createAlertEvent({
+          userId: userDoc._id,
+          level: 'CRITICAL',
+          status: 'EMERGENCY_TRIGGERED',
+          source: 'SYSTEM',
+          title: 'Cảnh báo Hành trình Đêm: Không phản hồi Watch 5 sau 30s',
+          message: journey.anomalyReason,
+          metadata: {
+            journeyId: journey._id,
+            lat: journey.currentLat,
+            lng: journey.currentLng,
+            shareToken: journey.shareToken,
+          },
+        });
+      } catch (_) {}
+    }
+
+    if (io) {
+      io.emit('journey:anomaly_escalated', {
+        journeyId: journey._id,
+        userId: journey.userId,
+        reason: journey.anomalyReason,
+        lat: journey.currentLat,
+        lng: journey.currentLng,
+      });
+    }
+
+    return {
+      journeyId: journey._id,
+      action: 'ESCALATE_SOS',
+      status: journey.status,
+      reason: journey.anomalyReason,
     };
   }
 

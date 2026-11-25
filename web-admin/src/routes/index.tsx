@@ -38,6 +38,8 @@ import {
   ChevronRight,
   Shield,
   FileCheck,
+  Vibrate,
+  Watch,
 } from "lucide-react";
 import { Tag } from "@/components/Badge";
 import { IncidentMap } from "@/components/IncidentMap";
@@ -48,10 +50,11 @@ import { IncidentDossierModal } from "@/components/IncidentDossierModal";
 import { IncidentPlaybackModal } from "@/components/IncidentPlaybackModal";
 import { AiIncidentCopilotDrawer } from "@/components/AiIncidentCopilotDrawer";
 import { News2ClinicalTriageModal } from "@/components/News2ClinicalTriageModal";
-import { fetchAdminOverview, resolveIncident, submitHitlAction, runClinicalSop } from "@/lib/api";
+import { fetchAdminOverview, resolveIncident, submitHitlAction, runClinicalSop, sendWatchCommand, getWatchStreamUrl } from "@/lib/api";
 import type { HitlActionPayload } from "@/lib/api";
 import { exportWorkbook } from "@/lib/excel";
 import { audioAlarm } from "@/lib/audioAlarm";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -80,6 +83,8 @@ function formatIncidentType(type: "SOS" | "DURESS" | "MEDICAL") {
 
 function DispatchCenter() {
   const queryClient = useQueryClient();
+  const { adminUser } = useAdminAuth();
+  const operatorName = adminUser?.name || "Điều phối viên TOC";
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "clinical" | "heroes">("overview");
@@ -154,6 +159,37 @@ function DispatchCenter() {
     },
   });
 
+  const [watchNotice, setWatchNotice] = useState<string | null>(null);
+  const watchRemoteMutation = useMutation({
+    mutationFn: ({
+      userId,
+      action,
+      incidentId,
+    }: {
+      userId?: string | null;
+      action: "FIND_WATCH_PING" | "INSTANT_MEASURE_REQ" | "TOC_DISPATCH_ACK";
+      incidentId: string;
+    }) =>
+      sendWatchCommand({
+        userId,
+        action,
+        payload: { incidentId },
+        issuedBy: operatorName,
+      }),
+    onSuccess: (res, vars) => {
+      setWatchNotice(`Đã gửi ${vars.action} -> ${res.data.deviceId}`);
+      setTimeout(() => setWatchNotice(null), 4000);
+    },
+  });
+
+  useEffect(() => {
+    const es = new EventSource(getWatchStreamUrl());
+    es.addEventListener("watch", () => {
+      void queryClient.invalidateQueries({ queryKey: ["admin-overview"] });
+    });
+    return () => es.close();
+  }, [queryClient]);
+
   // Countdown tick
   useEffect(() => {
     if (!isCountdownActive || !selected) return;
@@ -215,7 +251,7 @@ function DispatchCenter() {
             incidentId: selected.id,
             payload: {
               action: "INSTANT_DISPATCH",
-              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              supervisorName: operatorName,
               tier: 2,
             },
           });
@@ -228,7 +264,7 @@ function DispatchCenter() {
             incidentId: selected.id,
             payload: {
               action: paused ? "RESUME_COUNTDOWN" : "PAUSE_COUNTDOWN",
-              supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+              supervisorName: operatorName,
               tier: 2,
             },
           });
@@ -357,7 +393,7 @@ function DispatchCenter() {
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             <span>Trực ban TOC</span>
           </div>
-          <span className="text-slate-400 font-medium">Trưởng ca: Đoàn Minh Quân</span>
+          <span className="text-slate-400 font-medium">Trưởng ca: {operatorName}</span>
           <span className="text-slate-700">|</span>
           <span className="font-mono text-slate-400 text-[11px]">Độ trễ: 12ms</span>
         </div>
@@ -633,27 +669,31 @@ function DispatchCenter() {
                       </div>
                     </div>
 
-                    {/* Thẻ Vi Địa Chỉ Phòng Trọ & Lệnh Điều 23 BLHS */}
+                    {/* Thẻ Vi Địa Chỉ & Lệnh Can Thiệp Điều 23 BLHS */}
                     <div className="rounded-xl border border-sky-500/20 bg-sky-950/15 p-3 space-y-2 text-xs">
                       <div className="flex items-center justify-between font-bold text-sky-300">
                         <span className="flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-sky-400" />
-                          VI ĐỊA CHỈ & LỆNH CAN THIỆP SINH MẠNG
+                          ĐỊA CHỈ HIỆN TRƯỜNG & LỆNH CAN THIỆP
                         </span>
                         <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-sky-300">
                           ĐIỀU 23 BLHS
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-300">
-                        Vị trí phòng: <strong>Lầu 3, Phòng 302 (Khu tập thể 420 cũ)</strong> · Mã cửa từ: <strong className="font-mono text-sky-400">9911#</strong>
+                        {selected.microAddress ? (
+                          <>Chi tiết: <strong>{selected.microAddress}</strong></>
+                        ) : (
+                          <>Vị trí GPS: <strong>{selected.address}</strong></>
+                        )}
                       </p>
                       <p className="text-[10px] text-slate-400 leading-relaxed">
-                        Căn cứ Điều 23 BLHS 2015 & Điều 87 Luật KCB 2023: Cấp quyền Hiệp sĩ phá khóa phòng khẩn cấp để tiến hành hồi sức tim phổi CPR trong 4 phút vàng.
+                        Căn cứ Điều 23 BLHS 2015 & Điều 87 Luật KCB 2023: Cấp quyền Hiệp sĩ tiếp cận khẩn cấp để tiến hành hồi sức tim phổi CPR trong 4 phút vàng.
                       </p>
                     </div>
 
-                    {/* Thẻ AI Triage Recommendation */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-1.5 text-xs">
+                    {/* Thẻ AI Triage Recommendation + Công cụ Tác chiến nhanh */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2 text-xs">
                       <div className="flex items-center gap-1.5 font-bold text-amber-300">
                         <Sparkles className="h-3.5 w-3.5 text-amber-400" />
                         <span>Đề xuất phân loại AI Triage</span>
@@ -663,6 +703,24 @@ function DispatchCenter() {
                       </p>
                       <div className="text-[10px] text-emerald-400 font-semibold">
                         Khuyến nghị: {selected.hitl?.recommendedAction || "Phái cử 2 Hiệp sĩ Vòng 1 và thông báo sẵn sàng cho kíp xe 115 lân cận."}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowNews2Modal(true)}
+                          className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Stethoscope className="h-3.5 w-3.5" />
+                          <span>Phân loại NEWS2</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowAiCopilotDrawer(true)}
+                          className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <Brain className="h-3.5 w-3.5" />
+                          <span>Trợ lý AI Copilot</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -680,7 +738,68 @@ function DispatchCenter() {
                       battery={selected.vitals?.battery ?? 78}
                       device={selected.vitals?.device ?? "Samsung Galaxy Watch 5 (WearOS)"}
                       isAlert={Boolean(selected.vitals?.spo2 && selected.vitals.spo2 < 92)}
+                      svmG={selected.vitals?.svmG}
+                      isOffWrist={selected.vitals?.isOffWrist}
+                      gForceWaveform={selected.vitals?.gForceWaveform}
+                      ppgWaveform={selected.vitals?.ppgWaveform}
+                      fusion={selected.vitals?.fusion}
                     />
+
+                    {/* Điều khiển hai chiều Galaxy Watch 5 trực tiếp từ Dispatch Drawer */}
+                    <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-2.5 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-sky-300">
+                        <span className="flex items-center gap-1.5">
+                          <Watch className="h-3.5 w-3.5" /> ĐIỀU KHIỂN GALAXY WATCH 5 HAI CHIỀU
+                        </span>
+                        {watchNotice && (
+                          <span className="font-mono text-[10px] text-emerald-400">{watchNotice}</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            watchRemoteMutation.mutate({
+                              userId: selected.userId,
+                              action: "INSTANT_MEASURE_REQ",
+                              incidentId: selected.id,
+                            })
+                          }
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-sky-500/40 bg-sky-500/15 hover:bg-sky-500/25 py-1.5 px-2 font-semibold text-sky-300 transition cursor-pointer"
+                        >
+                          <HeartPulse className="h-3.5 w-3.5 shrink-0" />
+                          <span>Đo PPG Live</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            watchRemoteMutation.mutate({
+                              userId: selected.userId,
+                              action: "FIND_WATCH_PING",
+                              incidentId: selected.id,
+                            })
+                          }
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 py-1.5 px-2 font-semibold text-amber-300 transition cursor-pointer"
+                        >
+                          <Vibrate className="h-3.5 w-3.5 shrink-0" />
+                          <span>Rung Watch 5</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            watchRemoteMutation.mutate({
+                              userId: selected.userId,
+                              action: "TOC_DISPATCH_ACK",
+                              incidentId: selected.id,
+                            })
+                          }
+                          className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 py-1.5 px-2 font-semibold text-emerald-300 transition cursor-pointer"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                          <span>Báo Cứu Hộ</span>
+                        </button>
+                      </div>
+                    </div>
 
                     {/* Tiến trình cứu hộ 4 bước */}
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
@@ -704,6 +823,34 @@ function DispatchCenter() {
                           4. Giao 115
                         </div>
                       </div>
+                    </div>
+
+                    {/* Công cụ Y Khoa & Điều xe 115 (Tier 3 Gate) */}
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setShowNews2Modal(true)}
+                        className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-2 text-rose-300 hover:bg-rose-500/20 font-semibold text-center flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Stethoscope className="h-3.5 w-3.5 shrink-0" />
+                        <span>NEWS2</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAiCopilotDrawer(true)}
+                        className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-2 text-sky-300 hover:bg-sky-500/20 font-semibold text-center flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Brain className="h-3.5 w-3.5 shrink-0" />
+                        <span>AI SOP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAmbulanceModal(true)}
+                        className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-amber-300 hover:bg-amber-500/20 font-semibold text-center flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Ambulance className="h-3.5 w-3.5 shrink-0" />
+                        <span>Điều 115</span>
+                      </button>
                     </div>
 
                     {/* Nút Kích hoạt Sơ cứu & SBAR nếu chưa chạy */}
@@ -788,28 +935,32 @@ function DispatchCenter() {
                         <span className="text-[10px] text-slate-400 font-mono">ĐÃ KYC PHTLS</span>
                       </div>
                       <div className="space-y-2">
-                        {(selected.nearbyHeroes || [
-                          { name: "Trần Cứu Sinh", distance: "450m", phone: "0977112233", trustScore: 98, eta: "2 phút" },
-                          { name: "Lê Minh Tuấn", distance: "820m", phone: "0988223344", trustScore: 94, eta: "4 phút" },
-                        ]).map((hero, idx) => (
-                          <div key={idx} className="flex items-center justify-between rounded-lg bg-slate-900/80 border border-slate-800 p-2.5 text-xs">
-                            <div>
-                              <div className="font-bold text-slate-200">{hero.name}</div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">
-                                📞 {hero.phone} · Cách: <strong className="text-slate-200">{hero.distance}</strong>
+                        {selected.nearbyHeroes && selected.nearbyHeroes.length > 0 ? (
+                          selected.nearbyHeroes.map((hero, idx) => (
+                            <div key={idx} className="flex items-center justify-between rounded-lg bg-slate-900/80 border border-slate-800 p-2.5 text-xs">
+                              <div>
+                                <div className="font-bold text-slate-200">{hero.name}</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">
+                                  📞 {hero.phone} · Cách: <strong className="text-slate-200">{hero.distance}</strong>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-emerald-400">ETA: {hero.eta}</div>
+                                <div className="text-[10px] text-amber-400 font-mono">⭐ {hero.trustScore} điểm</div>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-xs font-bold text-emerald-400">ETA: {hero.eta}</div>
-                              <div className="text-[10px] text-amber-400 font-mono">⭐ {hero.trustScore} điểm</div>
-                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-lg bg-slate-900/80 border border-slate-800 p-3 text-center text-xs text-slate-400">
+                            Đang quét Radar tìm Hiệp sĩ KYC khả dụng trong bán kính 4.5 km...
                           </div>
-                        ))}
+                        )}
                       </div>
                     </div>
 
                     {/* Bàn đàm thoại 1-chạm */}
                     <DispatchCommsConsole
+                      incidentId={selected.id}
                       victimName={selected.name}
                       victimPhone={selected.phoneNumber}
                       guardianName={selected.emergencyContactName}
@@ -849,7 +1000,7 @@ function DispatchCenter() {
                           incidentId: selected.id,
                           payload: {
                             action: "INSTANT_DISPATCH",
-                            supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+                            supervisorName: operatorName,
                             tier: 2,
                           },
                         })
@@ -1040,7 +1191,7 @@ function DispatchCenter() {
                     payload: {
                       action: "CANCEL_FALSE_ALARM",
                       reason: falseAlarmReason,
-                      supervisorName: "Đoàn Minh Quân (Trưởng ca)",
+                      supervisorName: operatorName,
                       tier: 1,
                     },
                   });
@@ -1054,24 +1205,99 @@ function DispatchCenter() {
         </div>
       )}
 
+      {/* Modal Điều Phối Xe Cấp Cứu 115 (Tier 3 Strict Gate) */}
+      {showAmbulanceModal && selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-slate-900 p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-amber-400 font-bold text-base">
+              <Ambulance className="h-5 w-5" />
+              <span>Lệnh Điều Xe Cấp Cứu 115 (Tier 3 Gate)</span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Xác nhận xuất xe cứu thương tới hiện trường nạn nhân <strong>{selected.name}</strong> tại{" "}
+              <span className="text-sky-300">{selected.address}</span> (BV gần nhất: {selected.nearestHospital?.name || "BV Chợ Rẫy"}).
+            </p>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                Mã chữ ký điều phối viên trưởng ca
+              </label>
+              <input
+                type="text"
+                value={supervisorCode}
+                onChange={(e) => setSupervisorCode(e.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-white font-mono outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAmbulanceModal(false)}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowAmbulanceModal(false);
+                  await hitlMutation.mutateAsync({
+                    incidentId: selected.id,
+                    payload: {
+                      action: "TIER3_AMBULANCE_DISPATCH",
+                      supervisorName: operatorName,
+                      supervisorId: supervisorCode,
+                      reason: `Xuất xe 115 tới ${selected.nearestHospital?.name || "BV Tuyến đầu"}`,
+                      tier: 3,
+                    },
+                  });
+                }}
+                className="px-4 py-1.5 rounded-lg bg-amber-600 text-xs font-bold text-white hover:bg-amber-500 shadow"
+              >
+                Ký & Điều Xe 115 Ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Dossier */}
       {showDossierModal && selected && (
-        <IncidentDossierModal incident={selected} onClose={() => setShowDossierModal(false)} />
+        <IncidentDossierModal incidentId={String(selected.id)} onClose={() => setShowDossierModal(false)} />
       )}
 
       {/* Modal Playback */}
       {showPlaybackModal && selected && (
-        <IncidentPlaybackModal incident={selected} onClose={() => setShowPlaybackModal(false)} />
+        <IncidentPlaybackModal incidentId={String(selected.id)} onClose={() => setShowPlaybackModal(false)} />
       )}
 
       {/* AI Copilot Drawer */}
       {showAiCopilotDrawer && selected && (
-        <AiIncidentCopilotDrawer incident={selected} onClose={() => setShowAiCopilotDrawer(false)} />
+        <AiIncidentCopilotDrawer incidentId={String(selected.id)} onClose={() => setShowAiCopilotDrawer(false)} />
       )}
 
       {/* NEWS2 Modal */}
       {showNews2Modal && selected && (
-        <News2ClinicalTriageModal incident={selected} onClose={() => setShowNews2Modal(false)} />
+        <News2ClinicalTriageModal
+          isOpen={showNews2Modal}
+          onClose={() => setShowNews2Modal(false)}
+          incidentName={selected.name}
+          incidentId={String(selected.id)}
+          initialHeartRate={selected.vitals?.heartRate}
+          initialSpo2={selected.vitals?.spo2}
+          onApplyTriageToDispatch={(score, riskLevel, actionPlan) => {
+            setShowNews2Modal(false);
+            hitlMutation.mutate({
+              incidentId: String(selected.id),
+              payload: {
+                action: "NEWS2_TRIAGE_APPLIED",
+                reason: `NEWS2=${score} (${riskLevel}): ${actionPlan}`,
+                supervisorName: operatorName,
+                supervisorId: adminUser?.badgeNumber || supervisorCode,
+                tier: score >= 7 ? 3 : 2,
+              },
+            });
+          }}
+        />
       )}
     </div>
   );

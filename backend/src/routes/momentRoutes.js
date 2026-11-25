@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const momentController = require('../controllers/momentController');
-const { apiKeyAuth } = require('../middleware/apiKeyAuth');
+const apiKeyAuth = require('../middleware/apiKeyAuth');
 
 const fs = require('fs');
 const uploadDir = path.join(__dirname, '../../uploads');

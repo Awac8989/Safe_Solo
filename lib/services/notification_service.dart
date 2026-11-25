@@ -37,7 +37,7 @@ class NotificationService {
         importance: Importance.low,
       );
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool requestPermission = true}) async {
     if (_initialized) {
       return;
     }
@@ -56,7 +56,9 @@ class NotificationService {
       await androidImplementation?.createNotificationChannel(_alertsChannel);
       await androidImplementation?.createNotificationChannel(_remindersChannel);
       await androidImplementation?.createNotificationChannel(_backgroundSafetyChannel);
-      await androidImplementation?.requestNotificationsPermission();
+      if (requestPermission) {
+        await androidImplementation?.requestNotificationsPermission();
+      }
     } catch (_) {
       if (kDebugMode) {
         debugPrint(

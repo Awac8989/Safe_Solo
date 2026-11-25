@@ -1,8 +1,12 @@
 const http = require('http');
 
 function request(options, body) {
+  const mergedHeaders = {
+    'x-api-key': 'android-app-key-abc',
+    ...(options.headers || {}),
+  };
   return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
+    const req = http.request({ ...options, headers: mergedHeaders }, (res) => {
       let data = '';
       res.on('data', (chunk) => (data += chunk));
       res.on('end', () => {
@@ -118,8 +122,19 @@ async function runTests() {
   );
   console.log('[6] Login with new password:', loginNewRes.status, loginNewRes.body?.success);
 
-  // Reset back to default 123456 for demo consistency
-  await request(
+  // Reset back to default 123456 using a fresh forgot-password OTP for demo consistency
+  const restoreForgotRes = await request(
+    {
+      hostname: 'localhost',
+      port: 4000,
+      path: '/api/auth/forgot-password',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    },
+    { identifier: '0913843958' }
+  );
+  const restoreCode = restoreForgotRes.body?.data?.resetCodePreview || resetCode;
+  const restoreRes = await request(
     {
       hostname: 'localhost',
       port: 4000,
@@ -129,10 +144,15 @@ async function runTests() {
     },
     {
       identifier: '0913843958',
-      resetCode: '123456',
+      resetCode: restoreCode,
       newPassword: '123456',
     }
   );
+  if (loginRes.status !== 200 || loginNewRes.status !== 200 || restoreRes.status !== 200) {
+    throw new Error(
+      `Auth test assertion failed: login=${loginRes.status}, loginNew=${loginNewRes.status}, restore=${restoreRes.status}`
+    );
+  }
 
   // 7. Get active sessions
   const sessionsRes = await request({

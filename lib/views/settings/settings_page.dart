@@ -8,6 +8,7 @@ import '../../core/app_theme.dart';
 import '../../core/constants.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/app_shell.dart';
+import '../../services/offline_sos_service.dart';
 import '../health/health_history_page.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -305,6 +306,14 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const _SectionDivider(),
               _ActionRow(
+                icon: Icons.science_rounded,
+                title: strings.text('Hộp Cát Trình Diễn Hội Đồng (Demo Sandbox)', 'Defense Demo Sandbox'),
+                subtitle: strings.text('Kịch bản Ông Tư, Tai nạn xe, Bơm mẫu AFib & Viễn thám HUD', 'Uncle Tu, Crash & Live telemetry'),
+                valueText: strings.text('Mở Demo', 'Open'),
+                onTap: () => Navigator.pushNamed(context, '/demo-sandbox'),
+              ),
+              const _SectionDivider(),
+              _ActionRow(
                 icon: Icons.medical_services_outlined,
                 title: strings.text('Cẩm nang sơ cứu khẩn cấp', 'Emergency first aid guide'),
                 subtitle: strings.text('Ép tim CPR Metronome, đột quỵ FAST, Heimlich', 'CPR Metronome, stroke FAST, Heimlich choking'),
@@ -448,6 +457,50 @@ class _SettingsPageState extends State<SettingsPage> {
                           strings.text(
                             'SafeSolo đã được cấp quyền chạy ngầm không giới hạn 24/7.',
                             'SafeSolo is already granted unrestricted 24/7 background execution.',
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const _SectionDivider(),
+              _ActionRow(
+                icon: Icons.sms_failed_outlined,
+                title: strings.text('SMS khẩn cấp tự động (SEND_SMS)', 'Auto Emergency SMS (SEND_SMS)'),
+                subtitle: strings.text(
+                  'Tự gửi tin nhắn offline qua SmsManager khi Duress PIN 9999, Dead-Man quá hạn hoặc ngất xỉu',
+                  'Sends SMS via SmsManager without tapping UI on Duress PIN, Dead-Man expiry or unconscious fall',
+                ),
+                valueText: strings.text('Kiểm tra / Cấp quyền', 'Check / Grant'),
+                onTap: () async {
+                  final hasPerm = await OfflineSosService.instance.hasDirectSmsPermission();
+                  if (!hasPerm) {
+                    final granted = await OfflineSosService.instance.requestDirectSmsPermission();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            granted
+                                ? strings.text(
+                                    'Đã cấp quyền SEND_SMS! SafeSolo có thể tự gửi SMS khi ngoại tuyến/Duress.',
+                                    'SEND_SMS permission granted! Auto emergency SMS is ready.',
+                                  )
+                                : strings.text(
+                                    'Hãy chọn Cho phép quyền SMS trong hộp thoại hệ thống để bật gửi tự động.',
+                                    'Please grant SMS permission in system dialog to enable automatic offline SOS.',
+                                  ),
+                          ),
+                        ),
+                      );
+                    }
+                  } else if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          strings.text(
+                            'Quyền SEND_SMS đã sẵn sàng — chế độ tự gửi không cần chạm đang hoạt động.',
+                            'SEND_SMS permission is active — zero-touch emergency SMS is ready.',
                           ),
                         ),
                       ),

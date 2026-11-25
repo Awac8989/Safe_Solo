@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const ARTIFACT_DIR = 'C:\\Users\\Admin\\.gemini\\antigravity-ide\\brain\\0423c0d0-428c-4645-b12c-d1ad8775a9b8';
+const ARTIFACT_DIR = 'C:\\Users\\Admin\\.gemini\\antigravity\\brain\\80e30af8-dd29-4f5e-bb89-8a1197db0216';
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const TEMP_USER_DATA = path.join(os.tmpdir(), 'chrome_testcases_profile_' + Date.now());
 
@@ -104,16 +104,15 @@ async function main() {
     await sleep(2000);
     await captureScreen(cdp, 'TC_WEB_01_Admin_Login.png', 'Cổng Đăng Nhập Phân Quyền');
 
-    // Cấu hình auth Super Admin
-    const sessionUser = {
-      id: "admin_01",
-      name: "Đoàn Minh Quân (Chỉ Huy Trưởng)",
-      email: "admin@safesolo.vn",
-      role: "superadmin",
-      roleTitle: "Tổng Chỉ Huy Hệ Thống (Super Admin)",
-      badgeNumber: "TOC-ADMIN-01",
-      shiftStartTime: "08:00"
-    };
+    // Đăng nhập auth Super Admin bằng JWT thật từ Backend
+    const loginRes = await fetch('http://127.0.0.1:4000/api/admin/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': 'default-public-api-key-123' },
+      body: JSON.stringify({ email: 'admin@safesolo.vn', password: 'admin123' }),
+    });
+    const loginJson = await loginRes.json();
+    if (!loginRes.ok || !loginJson?.data?.token) throw new Error('Admin login failed');
+    const sessionUser = { ...loginJson.data.user, token: loginJson.data.token };
     await cdp.send('Runtime.evaluate', {
       expression: `localStorage.setItem('safesolo_admin_session_v1', ${JSON.stringify(JSON.stringify(sessionUser))});`
     });

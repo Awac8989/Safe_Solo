@@ -110,9 +110,9 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
-          content: Text('Không thể kết nối với đồng hồ. Vui lòng kiểm tra lại thiết bị.'),
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          content: Text(_sync.lastPairingError ?? 'Không thể kết nối với đồng hồ. Vui lòng kiểm tra lại thiết bị.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -148,9 +148,9 @@ class _AddSmartwatchSheetState extends State<AddSmartwatchSheet>
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Color(0xFFEF4444),
-          content: Text('Mã ghép nối không chính xác hoặc đã hết hạn.'),
+        SnackBar(
+          backgroundColor: const Color(0xFFEF4444),
+          content: Text(_sync.lastPairingError ?? 'Mã ghép nối không chính xác hoặc đã hết hạn.'),
         ),
       );
     }

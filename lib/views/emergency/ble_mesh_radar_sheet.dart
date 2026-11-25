@@ -235,14 +235,19 @@ class _BleMeshRadarSheetState extends State<BleMeshRadarSheet>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'LỘ TRÌNH CHUYỂN TIẾP ĐA CHẶNG (STORE & FORWARD):',
-                            style: TextStyle(
-                              color: Color(0xFF94A3B8),
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                          const Expanded(
+                            child: Text(
+                              'LỘ TRÌNH CHUYỂN TIẾP ĐA CHẶNG (STORE & FORWARD):',
+                              style: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             activePacket?.formattedStatusVi ?? 'Chưa phát gói tin',
                             style: TextStyle(

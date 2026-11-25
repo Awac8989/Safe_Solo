@@ -119,6 +119,8 @@ class LockscreenMedicalCardPage extends StatelessWidget {
       backgroundColor: const Color(0xFF0F172A), // Clinical Dark Navy Slate
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E293B),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         title: Row(
           children: [
@@ -165,8 +167,10 @@ class LockscreenMedicalCardPage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
           // KHỐI 1: HERO CARD - THÔNG TIN ĐỊNH DANH & NHÓM MÁU
           Container(
@@ -652,6 +656,7 @@ class LockscreenMedicalCardPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

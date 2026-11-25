@@ -36,8 +36,10 @@ import {
   fetchSafePointsNearby,
   requestSafePointUnlock,
   confirmSafePointUnlock,
+  testSafePointIot,
   type SafePointAssetItem,
 } from "@/lib/api";
+import { useAdminAuth } from "@/context/AdminAuthContext";
 
 export const Route = createFileRoute("/safepoints")({
   head: () => ({ meta: [{ title: "Mạng lưới Cứu hộ SafePoint & OpenAED - SafeSolo Admin" }] }),
@@ -45,6 +47,7 @@ export const Route = createFileRoute("/safepoints")({
 });
 
 function SafePointsManagementPage() {
+  const { adminUser } = useAdminAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -117,12 +120,25 @@ function SafePointsManagementPage() {
     setTimeout(() => setCopiedOtp(false), 2000);
   };
 
-  const handleTestSiren = (stationName: string) => {
-    setFeedbackNotice(`Đã gửi xung kiểm tra còi báo động chống trộm tới trạm [${stationName}]. Âm lượng còi: 110dB OK.`);
+  const iotTestMutation = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "PING_SENSOR" | "TEST_SIREN" }) =>
+      testSafePointIot(id, { action, actorName: adminUser?.name || "Điều phối viên TOC" }),
+    onSuccess: (res) => {
+      setFeedbackNotice(res.data.message);
+      void queryClient.invalidateQueries({ queryKey: ["safepoints-nearby"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+    },
+    onError: (err: any) => {
+      setFeedbackNotice(`Lỗi kiểm tra thiết bị IoT: ${err.message}`);
+    },
+  });
+
+  const handleTestSiren = (stationId: string) => {
+    iotTestMutation.mutate({ id: stationId, action: "TEST_SIREN" });
   };
 
-  const handlePingSensor = (stationName: string) => {
-    setFeedbackNotice(`Cảm biến cửa tủ trạm [${stationName}] phản hồi trực tiếp: Độ trễ 18ms, tình trạng: Khóa cơ điện an toàn.`);
+  const handlePingSensor = (stationId: string) => {
+    iotTestMutation.mutate({ id: stationId, action: "PING_SENSOR" });
   };
 
   const stations = safePointsData?.data || [];
@@ -395,15 +411,17 @@ function SafePointsManagementPage() {
                 <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <button
-                      onClick={() => handlePingSensor(station.name)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                      onClick={() => handlePingSensor(station._id)}
+                      disabled={iotTestMutation.isPending}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
                       title="Kiểm tra cảm biến cửa"
                     >
                       <Activity className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => handleTestSiren(station.name)}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-rose-500"
+                      onClick={() => handleTestSiren(station._id)}
+                      disabled={iotTestMutation.isPending}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-rose-500 disabled:opacity-50"
                       title="Test còi báo động chống trộm"
                     >
                       <Volume2 className="h-3.5 w-3.5" />

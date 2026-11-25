@@ -66,7 +66,7 @@ async getCertificate(req, res, next) {
     try {
       const { id, donorId } = req.params;
       const cert = await bloodRelayService.getDonorCertificate(id, donorId);
-      res.status(200).json({ success: true, data: cert });
+      res.status(200).json({ ...cert, success: true, data: cert });
     } catch (error) {
       next(error);
     }

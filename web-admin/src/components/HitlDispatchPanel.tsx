@@ -221,7 +221,7 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           </div>
         </div>
 
-        {/* Real-time Dynamic ECG & WearOS Telemetry */}
+        {/* Real-time Dynamic ECG, G-Force 3-Phase Fusion & WearOS Telemetry */}
         <LiveVitalsTelemetry
           heartRate={incident.vitals?.heartRate ?? 124}
           spo2={incident.vitals?.spo2 ?? 91}
@@ -230,6 +230,11 @@ export function HitlDispatchPanel({ incident, onAction, isPending }: HitlDispatc
           battery={incident.vitals?.battery ?? 78}
           device={incident.vitals?.device ?? "Samsung Galaxy Watch 5 (WearOS)"}
           isAlert={Boolean(incident.vitals?.spo2 && incident.vitals.spo2 < 92)}
+          svmG={(incident.vitals as any)?.svmG}
+          isOffWrist={(incident.vitals as any)?.isOffWrist}
+          gForceWaveform={(incident.vitals as any)?.gForceWaveform}
+          ppgWaveform={(incident.vitals as any)?.ppgWaveform}
+          fusion={(incident.vitals as any)?.fusion}
         />
       </div>
 

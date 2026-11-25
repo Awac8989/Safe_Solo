@@ -579,8 +579,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         'Emergency contact: ${guardians.first.name}',
                       ),
                       style: AppTextStyles.bodyStrong,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     guardians.first.phone,
                     style: AppTextStyles.caption.copyWith(
@@ -830,8 +833,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(guardian.name, style: AppTextStyles.bodyStrong),
-                              Text(guardian.relation, style: AppTextStyles.caption),
+                              Text(guardian.name, style: AppTextStyles.bodyStrong, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(guardian.relation, style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
                         ),
@@ -1024,152 +1027,173 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        strings.text('Điểm danh & Trạng thái', 'Check-in & Status'),
-                        style: AppTextStyles.h3.copyWith(fontSize: 18),
-                        overflow: TextOverflow.ellipsis,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          strings.text('Điểm danh & Trạng thái', 'Check-in & Status'),
+                          style: AppTextStyles.h3.copyWith(fontSize: 18),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Secret Duress gesture button (Long press 3s triggers Duress SOS silently)
-                    Tooltip(
-                      message: strings.text('Bảo mật', 'Security'),
-                      child: GestureDetector(
-                        onLongPress: () {
-                          Navigator.pop(dialogContext, {'action': 'DURESS'});
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: AppColors.cardSoft,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.verified_user_outlined,
-                            size: 18,
-                            color: AppColors.textMuted,
+                      const SizedBox(width: 8),
+                      // Secret Duress gesture button (Long press 3s triggers Duress SOS silently)
+                      Tooltip(
+                        message: strings.text('Bảo mật', 'Security'),
+                        child: GestureDetector(
+                          onLongPress: () {
+                            Navigator.pop(dialogContext, {'action': 'DURESS'});
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: AppColors.cardSoft,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.verified_user_outlined,
+                              size: 18,
+                              color: AppColors.textMuted,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  strings.text(
-                    'Chọn tâm trạng hoặc thói quen để hoàn tất điểm danh:',
-                    'Select your mood or routine to complete check-in:',
+                    ],
                   ),
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 6),
+                  Text(
+                    strings.text(
+                      'Chọn tâm trạng hoặc thói quen để hoàn tất điểm danh:',
+                      'Select your mood or routine to complete check-in:',
+                    ),
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                // Mood options
-                Row(
-                  children: [
-                    Expanded(
-                      child: _MoodOption(
-                        emoji: '😊',
-                        label: strings.text('Vui vẻ', 'Happy'),
-                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.happy}),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _MoodOption(
-                        emoji: '😐',
-                        label: strings.text('Bình an', 'Calm'),
-                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.calm}),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _MoodOption(
-                        emoji: '😴',
-                        label: strings.text('Hơi mệt', 'Tired'),
-                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.tired}),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _MoodOption(
-                        emoji: '🤒',
-                        label: strings.text('Cần lưu ý', 'Sick'),
-                        onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.sick}),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                // Routine Quick Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+                  const SizedBox(height: 14),
+                  // Mood options
+                  Row(
                     children: [
-                      ActionChip(
-                        avatar: const Text('💊', style: TextStyle(fontSize: 14)),
-                        label: Text(strings.text('Đã uống thuốc', 'Took medicine')),
-                        onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MEDICATION'}),
+                      Expanded(
+                        child: _MoodOption(
+                          emoji: '😊',
+                          label: strings.text('Vui vẻ', 'Happy'),
+                          onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.happy}),
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      ActionChip(
-                        avatar: const Text('🚶', style: TextStyle(fontSize: 14)),
-                        label: Text(strings.text('Đi bộ sáng', 'Morning walk')),
-                        onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MORNING_WALK'}),
+                      Expanded(
+                        child: _MoodOption(
+                          emoji: '😐',
+                          label: strings.text('Bình an', 'Calm'),
+                          onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.calm}),
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      ActionChip(
-                        avatar: const Text('⏰', style: TextStyle(fontSize: 14)),
-                        label: Text(strings.text('Hoãn 30p', 'Snooze 30m')),
-                        onPressed: () => Navigator.pop(dialogContext, {'action': 'SNOOZE', 'minutes': 30}),
+                      Expanded(
+                        child: _MoodOption(
+                          emoji: '😴',
+                          label: strings.text('Hơi mệt', 'Tired'),
+                          onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.tired}),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _MoodOption(
+                          emoji: '🤒',
+                          label: strings.text('Cần lưu ý', 'Sick'),
+                          onTap: () => Navigator.pop(dialogContext, {'action': 'MOOD', 'mood': Mood.sick}),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDC2626),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                  const SizedBox(height: 14),
+                  // Routine Quick Chips
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        ActionChip(
+                          avatar: const Text('💊', style: TextStyle(fontSize: 14)),
+                          label: Text(strings.text('Đã uống thuốc', 'Took medicine')),
+                          onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MEDICATION'}),
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Text('🚶', style: TextStyle(fontSize: 14)),
+                          label: Text(strings.text('Đi bộ sáng', 'Morning walk')),
+                          onPressed: () => Navigator.pop(dialogContext, {'action': 'ROUTINE', 'routine': 'MORNING_WALK'}),
+                        ),
+                        const SizedBox(width: 8),
+                        ActionChip(
+                          avatar: const Text('⏰', style: TextStyle(fontSize: 14)),
+                          label: Text(strings.text('Hoãn 30p', 'Snooze 30m')),
+                          onPressed: () => Navigator.pop(dialogContext, {'action': 'SNOOZE', 'minutes': 30}),
+                        ),
+                      ],
                     ),
-                    icon: const Icon(Icons.emergency_rounded, size: 20),
-                    label: Text(
-                      strings.text('PHÁT SOS KHẨN CẤP (15S ĐẾM NGƯỢC)', 'TRIGGER SOS (15S COUNTDOWN)'),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    onPressed: () => Navigator.pop(dialogContext, {'action': 'TRIGGER_SOS_MODAL'}),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => Navigator.pop(dialogContext, {'action': 'MOMENT'}),
-                      icon: const Icon(Icons.camera_alt_outlined, size: 16),
-                      label: Text(strings.text('Khoảnh khắc', 'Moment')),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      icon: const Icon(Icons.emergency_rounded, size: 20),
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          strings.text('PHÁT SOS KHẨN CẤP (15S ĐẾM NGƯỢC)', 'TRIGGER SOS (15S COUNTDOWN)'),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(dialogContext, {'action': 'TRIGGER_SOS_MODAL'}),
                     ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, null),
-                      child: Text(strings.text('Điểm danh nhanh', 'Quick Check-in')),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => Navigator.pop(dialogContext, {'action': 'MOMENT'}),
+                            icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                            label: Text(strings.text('Khoảnh khắc', 'Moment')),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(dialogContext, null),
+                            child: Text(strings.text('Điểm danh nhanh', 'Quick Check-in')),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -2125,83 +2149,89 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 20,
                 MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        strings.text('Khoảnh khắc gia đình', 'Family Moment'),
-                        style: AppTextStyles.h3.copyWith(fontSize: 18),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(sheetContext),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    strings.text(
-                      'Gửi ảnh hoặc vài chữ để người thân an tâm:',
-                      'Send a quick note or photo to keep family relieved:',
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          strings.text('Khoảnh khắc gia đình', 'Family Moment'),
+                          style: AppTextStyles.h3.copyWith(fontSize: 18),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
                     ),
-                    style: AppTextStyles.caption,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: noteController,
-                    decoration: InputDecoration(
-                      hintText: strings.text(
-                        'Ví dụ: "Con vừa tới nơi làm việc an toàn!"',
-                        'E.g.: "Arrived safely at work!"',
+                    const SizedBox(height: 8),
+                    Text(
+                      strings.text(
+                        'Gửi ảnh hoặc vài chữ để người thân an tâm:',
+                        'Send a quick note or photo to keep family relieved:',
                       ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                      prefixIcon: const Icon(Icons.edit_note_rounded),
+                      style: AppTextStyles.caption,
                     ),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 46,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteController,
+                      decoration: InputDecoration(
+                        hintText: strings.text(
+                          'Ví dụ: "Con vừa tới nơi làm việc an toàn!"',
+                          'E.g.: "Arrived safely at work!"',
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                        prefixIcon: const Icon(Icons.edit_note_rounded),
                       ),
-                      icon: const Icon(Icons.send_rounded, size: 18),
-                      label: Text(
-                        strings.text('Gửi & Hoàn tất điểm danh', 'Send & Complete Check-in'),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      onPressed: () async {
-                        Navigator.pop(sheetContext);
-                        final note = noteController.text.trim();
-                        try {
-                          await provider.performEmotionalCheckIn(
-                            mood: selectedMood,
-                            note: note.isNotEmpty ? note : 'Vẫn bình an!',
-                          );
-                          if (context.mounted) {
-                            TopToast.show(
-                              context,
-                              message: strings.text('Đã gửi khoảnh khắc và điểm danh!', 'Moment sent & check-in confirmed!'),
-                              icon: Icons.favorite_rounded,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.send_rounded, size: 18),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            strings.text('Gửi & Hoàn tất điểm danh', 'Send & Complete Check-in'),
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          final note = noteController.text.trim();
+                          try {
+                            await provider.performEmotionalCheckIn(
+                              mood: selectedMood,
+                              note: note.isNotEmpty ? note : 'Vẫn bình an!',
                             );
+                            if (context.mounted) {
+                              TopToast.show(
+                                context,
+                                message: strings.text('Đã gửi khoảnh khắc và điểm danh!', 'Moment sent & check-in confirmed!'),
+                                icon: Icons.favorite_rounded,
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                            }
                           }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                          }
-                        }
-                      },
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
@@ -2587,12 +2617,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                strings.text('SOS Ngoại tuyến', 'Offline SOS'),
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  strings.text('SOS Ngoại tuyến', 'Offline SOS'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -2663,12 +2699,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                strings.text('Sơ cứu & CPR', 'First Aid & CPR'),
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  strings.text('Sơ cứu & CPR', 'First Aid & CPR'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -2738,12 +2780,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                strings.text('SafeBlood STAT', 'SafeBlood STAT'),
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  strings.text('SafeBlood STAT', 'SafeBlood STAT'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -2809,12 +2857,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                strings.text('Trạm OpenAED', 'OpenAED Station'),
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  strings.text('Trạm OpenAED', 'OpenAED Station'),
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -2905,7 +2959,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         ),
                         child: const Icon(Icons.watch_outlined, color: Color(0xFF0284C7), size: 24),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2920,6 +2974,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -2931,25 +2987,29 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                 color: isDark ? Colors.white.withValues(alpha: 0.6) : AppColors.textSecondary,
                                 fontSize: 11,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(64, 36),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        onPressed: () => AddSmartwatchSheet.show(context),
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: Text(
-                          strings.text('Thêm', 'Add'),
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      const SizedBox(width: 6),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0284C7),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          onPressed: () => AddSmartwatchSheet.show(context),
+                          icon: const Icon(Icons.add_rounded, size: 16),
+                          label: Text(
+                            strings.text('Thêm', 'Add'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
                         ),
                       ),
                     ],
@@ -3093,33 +3153,41 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildGlanceMetric(
-                          icon: Icons.favorite_rounded,
-                          color: const Color(0xFFF43F5E),
-                          value: '${wearOs.heartRate}',
-                          unit: 'BPM',
-                          isDark: isDark,
+                        Expanded(
+                          child: _buildGlanceMetric(
+                            icon: Icons.favorite_rounded,
+                            color: const Color(0xFFF43F5E),
+                            value: '${wearOs.heartRate}',
+                            unit: 'BPM',
+                            isDark: isDark,
+                          ),
                         ),
-                        _buildGlanceMetric(
-                          icon: Icons.bloodtype_rounded,
-                          color: const Color(0xFF06B6D4),
-                          value: '${wearOs.spO2}%',
-                          unit: 'SpO2',
-                          isDark: isDark,
+                        Expanded(
+                          child: _buildGlanceMetric(
+                            icon: Icons.bloodtype_rounded,
+                            color: const Color(0xFF06B6D4),
+                            value: '${wearOs.spO2}%',
+                            unit: 'SpO2',
+                            isDark: isDark,
+                          ),
                         ),
-                        _buildGlanceMetric(
-                          icon: Icons.directions_walk_rounded,
-                          color: const Color(0xFF10B981),
-                          value: '${wearOs.steps}',
-                          unit: strings.text('bước', 'steps'),
-                          isDark: isDark,
+                        Expanded(
+                          child: _buildGlanceMetric(
+                            icon: Icons.directions_walk_rounded,
+                            color: const Color(0xFF10B981),
+                            value: '${wearOs.steps}',
+                            unit: strings.text('bước', 'steps'),
+                            isDark: isDark,
+                          ),
                         ),
-                        _buildGlanceMetric(
-                          icon: Icons.battery_charging_full_rounded,
-                          color: const Color(0xFF0284C7),
-                          value: '${wearOs.battery}%',
-                          unit: 'PIN',
-                          isDark: isDark,
+                        Expanded(
+                          child: _buildGlanceMetric(
+                            icon: Icons.battery_charging_full_rounded,
+                            color: const Color(0xFF0284C7),
+                            value: '${wearOs.battery}%',
+                            unit: 'PIN',
+                            isDark: isDark,
+                          ),
                         ),
                       ],
                     ),
@@ -3168,14 +3236,17 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Text(
-                            '${hrv.assessment.riskPercent}% rủi ro',
-                            style: TextStyle(
-                              color: hrv.assessment.level == HrvRiskLevel.critical
-                                  ? const Color(0xFFEF4444)
-                                  : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.bold,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '${hrv.assessment.riskPercent}% rủi ro',
+                              style: TextStyle(
+                                color: hrv.assessment.level == HrvRiskLevel.critical
+                                    ? const Color(0xFFEF4444)
+                                    : (isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7)),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -3257,12 +3328,16 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                     children: [
                       Row(
                         children: [
-                          Text(
-                            strings.text('Tiện ích Màn hình chính', 'Home Screen Widget'),
-                            style: TextStyle(
-                              color: isDark ? Colors.white : AppColors.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                          Flexible(
+                            child: Text(
+                              strings.text('Tiện ích Màn hình chính', 'Home Screen Widget'),
+                              style: TextStyle(
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -3317,9 +3392,11 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                               children: [
                                 const Icon(Icons.widgets_rounded, color: Color(0xFF10B981)),
                                 const SizedBox(width: 10),
-                                Text(
-                                  strings.text('Cách thêm Widget ra Màn hình chính', 'How to add Widget to Home Screen'),
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                Expanded(
+                                  child: Text(
+                                    strings.text('Cách thêm Widget ra Màn hình chính', 'How to add Widget to Home Screen'),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
                                 ),
                               ],
                             ),
@@ -3380,13 +3457,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        appProvider.user?.name.isNotEmpty == true ? appProvider.user!.name : 'BS. CKII Lê Hoàng Nam',
-                        style: TextStyle(
-                          color: isDark ? Colors.white54 : Colors.white60,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            appProvider.user?.name.isNotEmpty == true ? appProvider.user!.name : 'BS. CKII Lê Hoàng Nam',
+                            style: TextStyle(
+                              color: isDark ? Colors.white54 : Colors.white60,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
                     ],
@@ -3665,10 +3749,15 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              strings.text('Điểm nguy cơ tổng hợp:', 'Threat Composite Score:'),
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            Expanded(
+                              child: Text(
+                                strings.text('Điểm nguy cơ tổng hợp:', 'Threat Composite Score:'),
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               '${(state.threatScore * 100).toStringAsFixed(0)}%',
                               style: TextStyle(
@@ -3773,28 +3862,40 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     required bool isDark,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: color, size: 14),
             const SizedBox(width: 4),
-            Text(
-              value,
-              style: TextStyle(
-                color: isDark ? Colors.white : AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 2),
-        Text(
-          unit,
-          style: TextStyle(
-            color: isDark ? Colors.white.withValues(alpha: 0.5) : AppColors.textSecondary,
-            fontSize: 10,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            unit,
+            maxLines: 1,
+            style: TextStyle(
+              color: isDark ? Colors.white.withValues(alpha: 0.5) : AppColors.textSecondary,
+              fontSize: 10,
+            ),
           ),
         ),
       ],
@@ -4109,27 +4210,28 @@ class _MoodOption extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           color: isDark ? AppDarkColors.cardSoft : AppColors.secondary,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: isDark ? Border.all(color: AppDarkColors.border) : null,
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: const BoxConstraints(minHeight: 56),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 24)),
-              const SizedBox(height: 4),
+              Text(emoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(height: 3),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
+                  maxLines: 1,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w600,
                     color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
                   ),
@@ -4158,7 +4260,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -4166,22 +4268,27 @@ class _StatCard extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 20,
+                size: 18,
                 color: isDark ? AppDarkColors.primaryGlow : AppColors.primary,
               ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  style: AppTextStyles.caption.copyWith(
-                    color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
+              const SizedBox(width: 4),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: AppTextStyles.caption.copyWith(
+                      color: isDark ? AppDarkColors.textSecondary : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -4189,7 +4296,7 @@ class _StatCard extends StatelessWidget {
               value,
               maxLines: 1,
               style: AppTextStyles.h3.copyWith(
-                fontSize: 18,
+                fontSize: 17,
                 color: isDark ? AppDarkColors.textPrimary : AppColors.textPrimary,
               ),
             ),

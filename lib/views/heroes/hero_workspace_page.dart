@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/providers/app_provider.dart';
 import '../../core/widgets/top_toast.dart';
 import '../../services/api_service.dart';
+import '../../services/field_webrtc_service.dart';
 
 /// Trạng thái nhiệm vụ cứu nạn của Hiệp sĩ
 enum HeroMissionStage {
@@ -131,10 +132,7 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
   String _selectedAvpuLevel = 'V'; // 'A', 'V', 'P', 'U'
   bool _isCSpineStabilized = false;
 
-  late final AnimationController _pulseAnim = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
+  late final AnimationController _pulseAnim;
 
   // Danh sách các ca SOS khẩn cấp mô phỏng xung quanh vị trí Hiệp sĩ
   final List<HeroIncidentItem> _incidents = [
@@ -198,11 +196,26 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
   @override
   void initState() {
     super.initState();
+    _pulseAnim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
     // Khởi tạo một ca đang tác chiến mẫu và đồng thời kéo ca thực tế từ backend radar
     _activeMission = _incidents.first;
     _startMissionTimer();
     _fetchNearbyIncidents();
     _loadHeroShieldData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = context.read<AppProvider>().user;
+      if (_activeMission != null) {
+        FieldWebRtcService.instance.joinIncidentRoom(
+          incidentId: _activeMission!.id,
+          heroId: user?.id ?? 'hero_a71',
+          heroName: user?.name ?? 'Hiệp sĩ hiện trường',
+        );
+      }
+    });
   }
 
   Future<void> _loadHeroShieldData() async {
@@ -523,11 +536,12 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
 
   @override
   void dispose() {
-    _pulseAnim.dispose();
+    FieldWebRtcService.instance.leaveRoom();
     _missionTimer?.cancel();
     _cprTimer?.cancel();
     _bystanderCoPilotTimer?.cancel();
     _tourniquetTimer?.cancel();
+    _pulseAnim.dispose();
     super.dispose();
   }
 
@@ -1360,96 +1374,241 @@ class _HeroWorkspacePageState extends State<HeroWorkspacePage> with SingleTicker
         ),
         const SizedBox(height: 14),
 
-        // Bộ đàm Web PTT 2 chiều (Push to Talk) với Nạn nhân & Ban Chỉ Huy TOC
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0F172A),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Expanded(
-                    child: Text(
-                      'BỘ ĐÀM HIỆN TRƯỜNG (PTT DIRECT LINK)',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'LOA NGOÀI ĐỒNG HỒ NẠN NHÂN',
-                    style: TextStyle(color: Colors.white54, fontSize: 9.5, fontFamily: 'monospace'),
-                  ),
-                ],
+        // Kênh Đàm Thoại PTT & Video WebRTC Trực Tiếp (Hiệp sĩ A71 <-> Bác sĩ 115 TOC)
+        AnimatedBuilder(
+          animation: FieldWebRtcService.instance,
+          builder: (context, _) {
+            final rtc = FieldWebRtcService.instance;
+            final appUser = context.read<AppProvider>().user;
+            final isTalk = _isPttTransmitting || rtc.isPttTransmitting;
+            return Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: rtc.isConnected
+                      ? const Color(0xFF10B981).withValues(alpha: 0.45)
+                      : const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                ),
               ),
-              const SizedBox(height: 12),
-
-              // Audio Wave Visualizer
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(16, (i) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                    width: 3.5,
-                    height: _isPttTransmitting ? (10.0 + (i * 7 % 24)) : 4.0,
-                    decoration: BoxDecoration(
-                      color: _isPttTransmitting ? const Color(0xFF10B981) : Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 14),
-
-              // Hold to talk button
-              GestureDetector(
-                onTapDown: (_) => setState(() => _isPttTransmitting = true),
-                onTapUp: (_) {
-                  setState(() => _isPttTransmitting = false);
-                  TopToast.show(context, message: 'Đã phát: "Hiệp sĩ SafeSolo đang đến gần, bạn hãy giữ bình tĩnh!"');
-                },
-                onTapCancel: () => setState(() => _isPttTransmitting = false),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(
-                    gradient: _isPttTransmitting
-                        ? const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)])
-                        : const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF0369A1)]),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_isPttTransmitting ? Colors.red : Colors.blue).withValues(alpha: 0.3),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        _isPttTransmitting ? Icons.mic_rounded : Icons.mic_none_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      Flexible(
+                      const Expanded(
                         child: Text(
-                          _isPttTransmitting ? 'ĐANG PHÁT THANH TRỰC TIẾP (NHẢ ĐỂ DỪNG)' : 'GIỮ ĐỂ NÓI VỚI NẠN NHÂN & TOC',
+                          'WEBRTC & BỘ ĐÀM BÁC SĨ 115',
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: rtc.isConnected ? const Color(0xFF10B981).withValues(alpha: 0.2) : Colors.white10,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          rtc.isConnected ? 'LIVE (${rtc.remotePeerCount} peers)' : 'ĐANG KẾT NỐI...',
+                          style: TextStyle(
+                            color: rtc.isConnected ? const Color(0xFF34D399) : Colors.white54,
+                            fontSize: 9.5,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
+                  if (rtc.latestDoctorInstruction != null && rtc.latestDoctorInstruction!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7F1D1D).withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFF43F5E).withValues(alpha: 0.6)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.medical_services_rounded, color: Color(0xFFFDA4AF), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${rtc.latestDoctorName ?? "Bác sĩ 115"}: ${rtc.latestDoctorInstruction}',
+                              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  if (rtc.isCameraStreaming && rtc.latestLocalFrameBytes != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Stack(
+                        alignment: Alignment.topLeft,
+                        children: [
+                          Image.memory(
+                            rtc.latestLocalFrameBytes!,
+                            height: 130,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                          ),
+                          Container(
+                            margin: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'CAM LIVE -> 115 · ${rtc.framesSentCount}f',
+                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        if (rtc.isCameraStreaming) {
+                          await rtc.stopCameraStream();
+                        } else {
+                          rtc.joinIncidentRoom(
+                            incidentId: mission.id,
+                            heroId: appUser?.id ?? 'hero_a71',
+                            heroName: appUser?.name ?? 'Hiệp sĩ hiện trường',
+                          );
+                          final started = await rtc.startCameraStream();
+                          if (mounted && !started) {
+                            TopToast.show(context, message: 'Hãy cấp quyền Camera để phát luồng video hiện trường về 115.');
+                          }
+                        }
+                      },
+                      icon: Icon(
+                        rtc.isCameraStreaming ? Icons.videocam_off_rounded : Icons.videocam_rounded,
+                        color: rtc.isCameraStreaming ? const Color(0xFFF43F5E) : const Color(0xFF38BDF8),
+                        size: 18,
+                      ),
+                      label: Text(
+                        rtc.isCameraStreaming
+                            ? 'DỪNG PHÁT CAMERA HIỆN TRƯỜNG'
+                            : 'PHÁT CAMERA HIỆN TRƯỜNG -> BÁC SĨ 115',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: rtc.isCameraStreaming ? const Color(0xFFF43F5E) : const Color(0xFF38BDF8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(16, (i) {
+                      return Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                        width: 3.5,
+                        height: (isTalk || rtc.isReceivingAudio) ? (10.0 + (i * 7 % 24)) : 4.0,
+                        decoration: BoxDecoration(
+                          color: isTalk
+                              ? const Color(0xFF10B981)
+                              : rtc.isReceivingAudio
+                                  ? const Color(0xFF38BDF8)
+                                  : Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTapDown: (_) async {
+                      setState(() => _isPttTransmitting = true);
+                      rtc.joinIncidentRoom(
+                        incidentId: mission.id,
+                        heroId: appUser?.id ?? 'hero_a71',
+                        heroName: appUser?.name ?? 'Hiệp sĩ hiện trường',
+                      );
+                      await rtc.startPttTalk(
+                        userId: appUser?.id ?? 'hero_a71',
+                        userName: appUser?.name ?? 'Hiệp sĩ hiện trường',
+                      );
+                    },
+                    onTapUp: (_) async {
+                      setState(() => _isPttTransmitting = false);
+                      await rtc.stopPttTalk(
+                        userId: appUser?.id ?? 'hero_a71',
+                        userName: appUser?.name ?? 'Hiệp sĩ hiện trường',
+                      );
+                      if (mounted) {
+                        TopToast.show(context, message: 'Đã truyền thoại PTT tới Bác sĩ 115 TOC!');
+                      }
+                    },
+                    onTapCancel: () async {
+                      setState(() => _isPttTransmitting = false);
+                      await rtc.stopPttTalk(
+                        userId: appUser?.id ?? 'hero_a71',
+                        userName: appUser?.name ?? 'Hiệp sĩ hiện trường',
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        gradient: isTalk
+                            ? const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)])
+                            : const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF0369A1)]),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isTalk ? Colors.red : Colors.blue).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isTalk ? Icons.mic_rounded : Icons.mic_none_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              isTalk
+                                  ? 'ĐANG PHÁT THOẠI PTT TỚI 115 (NHẢ ĐỂ GỬI)'
+                                  : rtc.isReceivingAudio
+                                      ? '🔊 ĐANG NGHE CHỈ ĐẠO TỪ BÁC SĨ 115...'
+                                      : 'GIỮ ĐỂ NÓI VỚI BÁC SĨ 115 & TOC',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
         const SizedBox(height: 16),
 

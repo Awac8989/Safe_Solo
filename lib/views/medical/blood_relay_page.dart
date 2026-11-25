@@ -766,6 +766,8 @@ class _BloodRelayPageState extends State<BloodRelayPage> {
       backgroundColor: const Color(0xFF0B132B),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1C2541),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         title: const Row(
           children: [
@@ -877,10 +879,13 @@ class _BloodRelayPageState extends State<BloodRelayPage> {
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredRequests.length,
-                        itemBuilder: (ctx, idx) => _buildRequestCard(_filteredRequests[idx]),
+                    : SafeArea(
+                        top: false,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                          itemCount: _filteredRequests.length,
+                          itemBuilder: (ctx, idx) => _buildRequestCard(_filteredRequests[idx]),
+                        ),
                       ),
           ),
         ],
@@ -888,6 +893,8 @@ class _BloodRelayPageState extends State<BloodRelayPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showCreateRequestModal,
         backgroundColor: const Color(0xFFEF4444),
+        foregroundColor: Colors.white,
+        shape: const StadiumBorder(),
         icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white),
         label: const Text(
           'Kêu Gọi Máu STAT',

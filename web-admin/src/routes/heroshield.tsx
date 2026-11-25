@@ -238,10 +238,10 @@ function HeroShieldManagementPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-emerald-400 font-mono">100,000,000đ</span>
-              <span className="text-xs text-muted-foreground">Thuốc PEP 72h & Y tế</span>
+              <span className="text-xs text-muted-foreground">/ ca phơi nhiễm PEP</span>
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              Đã chi trả: <strong className="text-foreground font-mono">{totalClaimsSettledValue.toLocaleString("vi-VN")}đ</strong>
+              Tổng giải ngân toàn mạng: <strong className="text-foreground font-mono">{totalClaimsSettledValue.toLocaleString("vi-VN")}đ</strong>
             </div>
           </div>
 

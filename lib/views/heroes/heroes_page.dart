@@ -1260,18 +1260,17 @@ class _HeroesPageState extends State<HeroesPage> {
             ),
           ),
 
-          // NÚT KHỞI ĐỘNG TÁC CHIẾN HIỆP SĨ (CHỈ XUẤT HIỆN KHI ĐÃ KYC)
-          if (isKycVerified) ...[
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(builder: (_) => const HeroWorkspacePage()),
-                );
-              },
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
+          // NÚT KHỞI ĐỘNG TÁC CHIẾN HIỆP SĨ (BÀN TÁC CHIẾN CỨU HỘ THỰC ĐỊA)
+          const SizedBox(height: 12),
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const HeroWorkspacePage()),
+              );
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
@@ -1327,8 +1326,6 @@ class _HeroesPageState extends State<HeroesPage> {
                 ),
               ),
             ),
-          ],
-
           const SizedBox(height: 18),
           if (rows.isNotEmpty)
             AppCard(

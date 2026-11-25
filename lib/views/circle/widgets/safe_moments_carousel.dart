@@ -324,11 +324,15 @@ class _SafeMomentsCarouselState extends State<SafeMomentsCarousel> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              strings.text('Khoảnh khắc an toàn 24h', '24h Safe Moments'),
-              style: AppTextStyles.title.copyWith(fontSize: 16),
+            Expanded(
+              child: Text(
+                strings.text('Khoảnh khắc an toàn 24h', '24h Safe Moments'),
+                style: AppTextStyles.title.copyWith(fontSize: 16),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Text(
               strings.text('Tự biến mất sau 24h', 'Expires in 24h'),
               style: AppTextStyles.caption.copyWith(color: AppColors.textMuted),

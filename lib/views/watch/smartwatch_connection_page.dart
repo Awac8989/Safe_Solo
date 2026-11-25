@@ -64,6 +64,10 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       case WatchAction.pairRequest:
       case WatchAction.pairConfirmed:
         return 'Ghép nối đồng hồ';
+      case WatchAction.tocDispatchAck:
+        return 'Chỉ huy TOC đang điều phối';
+      case WatchAction.watchCommandAck:
+        return 'Đồng hồ phản hồi lệnh';
       default:
         return 'Đồng bộ dữ liệu';
     }
@@ -84,7 +88,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       case WatchAction.findPhonePing:
         return 'Đồng hồ vừa phát chuông rung tìm điện thoại.';
       case WatchAction.findWatchPing:
-        return 'Điện thoại vừa gửi lệnh rung chuông tìm kiếm đồng hồ.';
+        return 'Nhận lệnh rung chuông kiểm tra phản xạ / tìm đồng hồ.';
       case WatchAction.precisionMeasureResult:
         final hr = payload['heartRate'];
         final sp = payload['spO2'];
@@ -93,6 +97,11 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
         return 'Người dùng đã bấm xác nhận an toàn trên đồng hồ.';
       case WatchAction.pairConfirmed:
         return 'Đồng hồ và điện thoại đã kết nối và đồng bộ hoàn tất.';
+      case WatchAction.tocDispatchAck:
+        final unit = payload['ambulanceUnit'] ?? 'Đội cứu hộ SafeSolo & 115';
+        return 'Trung tâm TOC xác nhận đã điều phối: $unit.';
+      case WatchAction.watchCommandAck:
+        return payload['note']?.toString() ?? 'Galaxy Watch 5 đã thực thi lệnh điều khiển.';
       default:
         return 'Dữ liệu được cập nhật tự động từ đồng hồ.';
     }
@@ -110,10 +119,24 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
       if (!mounted) return;
       _addTelemetryLog(
         type: _getFriendlyActionName(packet.action),
-        source: packet.sender == WatchSender.watch ? 'Đồng hồ thông minh' : 'Ứng dụng điện thoại',
+        source: packet.sender == WatchSender.watch
+            ? 'Đồng hồ thông minh'
+            : (packet.sender == WatchSender.toc ? 'Trung tâm Điều phối TOC' : 'Ứng dụng điện thoại'),
         detail: _getFriendlyActionDetail(packet.action, packet.payload),
         isSuccess: true,
       );
+
+      if (packet.action == WatchAction.tocDispatchAck) {
+        final unit = packet.payload['ambulanceUnit']?.toString() ?? 'Đội cứu hộ SafeSolo / 115';
+        HapticFeedback.heavyImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            duration: const Duration(seconds: 5),
+            backgroundColor: const Color(0xFF059669),
+            content: Text('🚑 TOC ĐÃ ĐIỀU PHỐI: $unit đang tiếp cận!'),
+          ),
+        );
+      }
 
       // Phản hồi chuông rung khi đồng hồ bấm "Tìm điện thoại"
       if (packet.action == WatchAction.findPhonePing) {
@@ -151,14 +174,6 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           const SnackBar(
             backgroundColor: Color(0xFF059669),
             content: Text('✓ Đã nhận điểm danh an toàn từ đồng hồ!'),
-          ),
-        );
-      } else if (packet.action == WatchAction.findPhonePing) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Color(0xFF0284C7),
-            content: Text('📱 Đồng hồ đang kích hoạt tìm kiếm điện thoại của bạn!'),
-            duration: Duration(seconds: 4),
           ),
         );
       }
@@ -660,7 +675,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                                         backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
                                         content: Text(ok
                                             ? '✓ Ghép nối thành công! Đồng hồ và điện thoại đã đồng bộ.'
-                                            : 'Không thể ghép nối. Vui lòng kiểm tra lại mã số trên đồng hồ.'),
+                                            : (_syncManager.lastPairingError ?? 'Không thể ghép nối. Vui lòng kiểm tra lại mã số trên đồng hồ.')),
                                       ),
                                     );
                                   }
@@ -902,7 +917,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                                 backgroundColor: ok ? const Color(0xFF059669) : Colors.red,
                                 content: Text(ok
                                     ? '✓ Đã kết nối tự động với đồng hồ thành công!'
-                                    : 'Không thể kết nối tự động. Hãy thử nhập mã 6 số.'),
+                                    : (_syncManager.lastPairingError ?? 'Không thể kết nối tự động. Hãy thử nhập mã 6 số.')),
                               ),
                             );
                           }
@@ -994,9 +1009,11 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
           final isConnected = _syncManager.isPaired;
           final isOffWrist = _wearOs.isOffWrist;
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
+          return SafeArea(
+            top: false,
+            child: TabBarView(
+              controller: _tabController,
+              children: [
               // ===============================================================
               // TAB 1: TỔNG QUAN THIẾT BỊ & CHỈ SỐ SỨC KHỎE
               // ===============================================================
@@ -1166,6 +1183,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                 ),
               ),
             ],
+          ),
           );
         },
       ),
@@ -1506,7 +1524,9 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Samsung Galaxy Watch 5 · Kết nối an toàn',
+                      isConnected
+                          ? 'Samsung Galaxy Watch 5 · Kết nối an toàn'
+                          : 'Samsung Galaxy Watch 5 · Chờ ghép nối Bluetooth/WearOS',
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                     ),
                     const SizedBox(height: 8),
@@ -1557,7 +1577,7 @@ class _SmartwatchConnectionPageState extends State<SmartwatchConnectionPage>
                   icon: Icons.wifi_rounded,
                   iconColor: const Color(0xFF38BDF8),
                   label: 'Sóng kết nối',
-                  value: _rssiText,
+                  value: isConnected ? _rssiText : 'Chờ kết nối',
                 ),
               ),
               Expanded(

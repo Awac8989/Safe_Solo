@@ -226,19 +226,81 @@ Future<void> capture(
       }
     }
   });
+
+  // Dispose widget tree & settle cleanly
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 50));
+  p.dispose();
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    Directory('docs/screenshots').createSync(recursive: true);
+    await loadAllFonts();
+  });
+
+  setUp(() {
+    final prevOnError = FlutterError.onError;
     FlutterError.onError = (details) {
       final msg = details.toString();
-      if (msg.contains('overflowed') || msg.contains('setState() or markNeedsBuild()') || msg.contains('MissingPluginException') || msg.contains('WearOsService') || msg.contains('HTTP requests will return status code 400')) {
+      if (msg.contains('overflowed') ||
+          msg.contains('setState() or markNeedsBuild()') ||
+          msg.contains('MissingPluginException') ||
+          msg.contains('WearOsService') ||
+          msg.contains('HTTP requests will return status code 400')) {
         return;
       }
-      FlutterError.presentError(details);
+      prevOnError?.call(details);
     };
+    addTearDown(() => FlutterError.onError = prevOnError);
+
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    for (final ch in <String>[
+      'home_widget',
+      'flutter.baseflow.com/permissions/methods',
+      'dev.fluttercommunity.plus/connectivity',
+      'xyz.luan/audioplayers.global',
+      'xyz.luan/audioplayers',
+      'flutter/platform_views',
+      'plugins.flutter.io/google_maps_0',
+      'plugins.flutter.io/google_maps_1',
+      'plugins.flutter.io/google_maps_2',
+      'plugins.flutter.io/google_maps_3',
+    ]) {
+      messenger.setMockMethodCallHandler(MethodChannel(ch), (call) async {
+        if (ch == 'flutter/platform_views' && call.method == 'create') return 0;
+        if (ch == 'xyz.luan/audioplayers' && call.method == 'create') {
+          final playerId = (call.arguments as Map?)?['playerId']?.toString();
+          if (playerId != null && playerId.isNotEmpty) {
+            messenger.setMockStreamHandler(
+              EventChannel('xyz.luan/audioplayers/events/$playerId'),
+              MockStreamHandler.inline(onListen: (_, __) {}, onCancel: (_) {}),
+            );
+          }
+          return null;
+        }
+        if (ch.startsWith('plugins.flutter.io/google_maps_')) {
+          if (call.method == 'map#waitForMap') return null;
+          if (call.method == 'map#update') return null;
+          return <String, dynamic>{};
+        }
+        if (call.method == 'checkPermissionStatus') return 1;
+        if (call.method == 'check') return <String>['wifi'];
+        return null;
+      });
+    }
+    for (final ev in <String>[
+      'home_widget/updates',
+      'dev.fluttercommunity.plus/connectivity_status',
+      'xyz.luan/audioplayers.global/events',
+    ]) {
+      messenger.setMockStreamHandler(
+        EventChannel(ev),
+        MockStreamHandler.inline(onListen: (_, __) {}, onCancel: (_) {}),
+      );
+    }
 
     SharedPreferences.setMockInitialValues({
       'safesolo_state_v3': jsonEncode({
@@ -248,9 +310,6 @@ void main() {
         'badges': <String>['first_checkin', 'shield_master', 'hero_bronze'],
       }),
     });
-    Directory('docs/screenshots').createSync(recursive: true);
-
-    await loadAllFonts();
   });
 
   group('Capture All SafeSolo Screens With Real Fonts', () {

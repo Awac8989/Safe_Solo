@@ -18,10 +18,30 @@ class SafeTagController {
       const scanMetadata = {
         ip: req.ip,
         userAgent: req.get('user-agent'),
-        location: req.body.location || null,
+        location: (req.body && req.body.location) || null,
       };
       const result = await safeTagService.resolvePublicICEData(code, scanMetadata);
-      res.json({ success: true, data: result });
+      const info = result.emergencyInfo || {};
+      const allergies = Array.isArray(info.allergies) ? info.allergies.join(', ') : (info.allergies || 'None');
+      const conditions = Array.isArray(info.criticalConditions)
+        ? info.criticalConditions.join(', ')
+        : (info.criticalConditions || 'None');
+      res.json({
+        success: true,
+        data: {
+          ...result,
+          tagUid: result.tagCode,
+          fullName: info.fullName || 'Nạn nhân SafeSolo',
+          bloodType: info.bloodType || 'Unknown',
+          allergiesSummary: allergies,
+          emergencyContacts: info.emergencyContacts || [],
+          dnrOrder: Boolean(info.dnrOrder),
+          organDonor: Boolean(info.organDonor),
+          chronicDiseasesMasked: conditions,
+          tagStatus: result.status,
+          complianceNote: result.guidanceNote,
+        },
+      });
     } catch (err) {
       next(err);
     }

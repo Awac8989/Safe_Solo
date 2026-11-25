@@ -224,18 +224,23 @@ void main() {
     }
   });
 
-  group('Check Mobile Screens - Samsung Galaxy A53 5G (412x915)', () {
+  group('Check Mobile Screens - Samsung Galaxy A53 5G (384x854 - Native)', () {
     final keyScreensA53 = <String, Widget Function()>{
       'A53_05_HomePage': () => const HomePage(),
+      'A53_06_CirclePage': () => const CirclePage(),
+      'A53_07_ActiveJourneyPage': () => const ActiveJourneyPage(),
       'A53_10_MedicalPage': () => const MedicalPage(),
       'A53_13_SosMapPage': () => const SosMapPage(),
+      'A53_21_VaultPage': () => const VaultPage(),
+      'A53_24_AchievementsPage': () => const AchievementsPage(),
+      'A53_25_SettingsPage': () => const SettingsPage(),
       'A53_28_BloodRelayPage': () => const BloodRelayPage(),
       'A53_29_SafePointsMapPage': () => const SafePointsMapPage(),
     };
 
     for (final entry in keyScreensA53.entries) {
       testWidgets('Check ${entry.key} on Galaxy A53 5G viewport', (tester) async {
-        await runOverflowCheck(tester, entry.value(), entry.key, size: const Size(412, 915));
+        await runOverflowCheck(tester, entry.value(), entry.key, size: const Size(384, 854));
         if (entry.key.contains('BloodRelay') || entry.key.contains('SafePointsMap')) {
           await tester.pump(const Duration(seconds: 3));
         }
@@ -302,5 +307,6 @@ void main() {
       });
     }
     print('=' * 70 + '\n');
+    expect(overflowReport, isEmpty, reason: 'Phát hiện lỗi tràn pixel trên giao diện: $overflowReport');
   });
 }

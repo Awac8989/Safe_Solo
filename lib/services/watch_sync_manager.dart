@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants.dart';
 import '../models/watch_protocol.dart';
+import 'fall_fusion_engine.dart';
 import 'pedometer_service.dart';
 import 'wear_os_service.dart';
 
@@ -32,6 +33,10 @@ class WatchSyncManager extends ChangeNotifier {
   static const String _storageUserIdKey = 'safesolo_watch_user_id';
 
   final _client = http.Client();
+  static const Map<String, String> _watchApiHeaders = {
+    'Content-Type': 'application/json',
+    'x-api-key': 'android-app-key-abc',
+  };
   final StreamController<WatchPacket> _packetController =
       StreamController<WatchPacket>.broadcast();
 
@@ -63,10 +68,22 @@ class WatchSyncManager extends ChangeNotifier {
   bool _isSyncing = false;
   bool _isCheckingStatus = false;
   String? _pairedUserId;
+  String? _lastPairingError;
+  String? get lastPairingError => _lastPairingError;
+
+  static bool isPlaceholderUserId(String? userId) {
+    final clean = userId?.trim() ?? '';
+    return clean.isEmpty ||
+        clean == 'anonymous' ||
+        clean == 'user_default' ||
+        clean == 'sandbox_user';
+  }
 
   // Lịch sử gói tin truyền thông
   WatchPacket? _lastPacket;
   final List<WatchPacket> _recentPackets = [];
+  final Set<String> _processedMessageIds = <String>{};
+  final List<String> _processedMessageOrder = <String>[];
   Timer? _cloudPollTimer;
 
   // Hồ sơ y tế thực tế đồng bộ hai chiều (Real Medical Profile)
@@ -127,20 +144,115 @@ class WatchSyncManager extends ChangeNotifier {
     _isRunningOnWatch = val;
   }
 
+  /// Định danh phần cứng duy nhất cho Galaxy Watch (SM-R900 / Wear OS) để ghép 1-1
+  void configureHardwareIdentity({
+    required String deviceId,
+    required String deviceModel,
+    required bool isWatch,
+  }) {
+    _isRunningOnWatch = isWatch;
+    if (deviceId.isNotEmpty) {
+      _deviceId = deviceId;
+    }
+    if (deviceModel.isNotEmpty) {
+      _deviceModel = deviceModel;
+    }
+    _savePersistedState();
+    notifyListeners();
+  }
+
+  /// Gắn userId nạn nhân thực tế vào đồng hồ để đồng bộ với TOC Web Admin
+  void setActiveUserId(String? userId) {
+    if (isPlaceholderUserId(userId)) return;
+    if (_pairedUserId != userId) {
+      // Nếu điện thoại vừa đổi sang tài khoản khác với chủ đồng hồ trước đó -> hủy trạng thái ghép cũ
+      if (!_isRunningOnWatch && _isPaired && !isPlaceholderUserId(_pairedUserId)) {
+        _isPaired = false;
+        _connectionType = WatchConnectionType.disconnected;
+        WearOsService.instance.setPaired(false);
+        PedometerService.instance.setPaired(false);
+      }
+      _pairedUserId = userId;
+      _savePersistedState();
+      notifyListeners();
+    }
+  }
+
   // Các sự kiện đồng bộ tương tác thực tế 2 chiều (Bidirectional Event Callbacks)
   Future<void> Function(String mood)? onWatchCheckinReceived;
   void Function(String action, Map<String, dynamic> payload)? onWatchEmergencyReceived;
+  Future<void> Function(String action, Map<String, dynamic> payload)? onOfflineEmergencyFallback;
+
+  @visibleForTesting
+  Future<bool> Function(WatchPacket packet)? cloudRelayOverrideForTest;
   void Function()? onAlertCancelledReceived;
   void Function(int remainingSeconds, String deadline)? onTimerSyncReceived;
   void Function()? onFindWatchPingReceived;
   void Function()? onFindPhonePingReceived;
   void Function()? onInstantMeasureReqReceived;
   void Function(int heartRate, int spO2)? onPrecisionMeasureResultReceived;
+  void Function(Map<String, dynamic> payload)? onTocDispatchAckReceived;
+  void Function(Map<String, dynamic> payload)? onRouteDeviationCheckReceived;
+  void Function(Map<String, dynamic> payload)? onJourneyCheckSafeReceived;
+
+  // Wear OS Data Layer & Tile native delegates (registered by WatchHardwareSensorService)
+  Future<Map<String, dynamic>> Function(String path, String payloadJson)? _wearDataLayerSender;
+  Future<List<Map<String, dynamic>>> Function()? _wearNodeFinder;
+  Future<void> Function({
+    String? deviceId,
+    String? pairedUserId,
+    String? userName,
+    bool? isPaired,
+    DateTime? nextDeadline,
+  })? _wearTileSync;
+
+  bool _isWearDataLayerConnected = false;
+  int _wearNodeCount = 0;
+  List<String> _wearNodeNames = const [];
+  bool _fusionWired = false;
+
+  bool get isWearDataLayerConnected => _isWearDataLayerConnected;
+  int get wearNodeCount => _wearNodeCount;
+  List<String> get wearNodeNames => List.unmodifiable(_wearNodeNames);
+
+  void registerWearBridgeHandlers({
+    Future<Map<String, dynamic>> Function(String path, String payloadJson)? sender,
+    Future<List<Map<String, dynamic>>> Function()? nodeFinder,
+    Future<void> Function({
+      String? deviceId,
+      String? pairedUserId,
+      String? userName,
+      bool? isPaired,
+      DateTime? nextDeadline,
+    })? tileSync,
+  }) {
+    _wearDataLayerSender = sender;
+    _wearNodeFinder = nodeFinder;
+    _wearTileSync = tileSync;
+  }
+
+  Future<void> refreshWearConnectedNodes() async {
+    final finder = _wearNodeFinder;
+    if (finder == null) return;
+    try {
+      final nodes = await finder();
+      _wearNodeCount = nodes.length;
+      _wearNodeNames = nodes
+          .map((n) => n['displayName']?.toString() ?? n['id']?.toString() ?? 'WearNode')
+          .toList();
+      _isWearDataLayerConnected = nodes.isNotEmpty;
+      if (_isWearDataLayerConnected && _connectionType == WatchConnectionType.disconnected) {
+        _connectionType = WatchConnectionType.localBle;
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
 
   StreamSubscription<WatchPacket>? _packetSub;
 
   void initialize() {
     _packetSub ??= _packetController.stream.listen(_handleIncomingPacket);
+    _ensureFusionWired();
     loadPersistedState().then((_) {
       if (!kIsTesting) {
         _startPeriodicHealthCheck();
@@ -148,6 +260,53 @@ class WatchSyncManager extends ChangeNotifier {
         fetchMedicalProfileFromBackend();
       }
     });
+  }
+
+  void _ensureFusionWired() {
+    if (_fusionWired) return;
+    _fusionWired = true;
+    final fusion = FallFusionEngine.instance;
+    fusion.onPhase3CountdownStarted = (sec, peakSvmG, ppgNote) {
+      HapticFeedback.heavyImpact();
+      emitVitalsTelemetry(
+        heartRate: fusion.heartRate,
+        spO2: fusion.spO2,
+        steps: PedometerService.instance.steps,
+        battery: WearOsService.instance.battery,
+        isOffWrist: fusion.isOffWrist,
+        svmG: peakSvmG,
+        tiltAngle: fusion.impactTiltAngle,
+      );
+    };
+    fusion.onFalseAlarmBlocked = (phase, reason) {
+      debugPrint('[WatchSyncManager] 3-Phase Fusion BLOCKED false alarm: $reason');
+      emitVitalsTelemetry(
+        heartRate: fusion.heartRate,
+        spO2: fusion.spO2,
+        steps: PedometerService.instance.steps,
+        battery: WearOsService.instance.battery,
+        isOffWrist: fusion.isOffWrist,
+        svmG: fusion.currentSvmG,
+        tiltAngle: fusion.impactTiltAngle,
+      );
+    };
+    fusion.onConfirmedFall = (event) {
+      debugPrint('[WatchSyncManager] 3-Phase Fusion CONFIRMED FALL: ${event.peakSvmG}G conf=${event.fusionConfidence}');
+      WearOsService.instance.updateMetrics(
+        heartRate: event.heartRateAtImpact,
+        spO2: event.spO2AtImpact,
+        isOffWrist: event.isOffWrist,
+        broadcast: false,
+      );
+      emitFallAlert(
+        svm: event.peakSvmG,
+        tilt: event.tiltAngleDegrees,
+        isSimulated: false,
+        gForceWaveform: event.gForceWaveform,
+        ppgWaveform: event.ppgWaveform,
+        fusionMetadata: fusion.toFusionPayload(),
+      );
+    };
   }
 
   /// Khôi phục trạng thái ghép nối từ SharedPreferences
@@ -278,7 +437,9 @@ class WatchSyncManager extends ChangeNotifier {
     if (kIsTesting) return;
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/medical-profile/$_deviceId');
-      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
+      final res = await _client
+          .get(uri, headers: _watchApiHeaders)
+          .timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final med = data['medical'] as Map<String, dynamic>?;
@@ -330,7 +491,7 @@ class WatchSyncManager extends ChangeNotifier {
         final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/medical-profile/$_deviceId');
         await _client.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: _watchApiHeaders,
           body: jsonEncode({'medical': payload}),
         ).timeout(const Duration(seconds: 3));
       } catch (_) {}
@@ -342,7 +503,9 @@ class WatchSyncManager extends ChangeNotifier {
     final start = DateTime.now().millisecondsSinceEpoch;
     try {
       final url = targetUrl ?? '${AppConstants.backendBaseUrl}/health';
-      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 3));
+      final res = await _client
+          .get(Uri.parse(url), headers: _watchApiHeaders)
+          .timeout(const Duration(seconds: 3));
       final end = DateTime.now().millisecondsSinceEpoch;
       _latencyMs = (end - start).clamp(5, 999);
       notifyListeners();
@@ -365,29 +528,30 @@ class WatchSyncManager extends ChangeNotifier {
 
   Future<void> _fetchLatestVitals() async {
     if (kIsTesting) return;
+    // Chặn lỗi ghép ngầm: Điện thoại chưa ghép nối 1-1 thì không tự ý poll & nhận nhầm đồng hồ khác
+    if (!_isRunningOnWatch && !_isPaired) return;
+    if (_isRunningOnWatch) {
+      await checkWatchPairingStatus();
+    }
     final start = DateTime.now().millisecondsSinceEpoch;
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/vitals/$_deviceId');
-      final res = await _client.get(uri).timeout(const Duration(seconds: 3));
+      final res = await _client
+          .get(uri, headers: _watchApiHeaders)
+          .timeout(const Duration(seconds: 3));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final end = DateTime.now().millisecondsSinceEpoch;
         _latencyMs = (end - start).clamp(12, 450);
 
         final vitals = data['vitals'] as Map<String, dynamic>?;
-        if (vitals != null) {
+        final serverPaired = data['paired'] == true;
+        if (vitals != null && (serverPaired || _isRunningOnWatch)) {
           final heartRate = vitals['heartRate'] as int?;
           final spO2 = vitals['spO2'] as int?;
           final steps = vitals['steps'] as int?;
           final battery = vitals['battery'] as int?;
           final isOffWrist = vitals['isOffWrist'] as bool?;
-
-          if (!_isPaired) {
-            _isPaired = true;
-            WearOsService.instance.setPaired(true);
-            PedometerService.instance.setPaired(true);
-            _savePersistedState();
-          }
 
           WearOsService.instance.updateMetrics(
             heartRate: heartRate,
@@ -395,6 +559,7 @@ class WatchSyncManager extends ChangeNotifier {
             steps: steps,
             battery: battery,
             isOffWrist: isOffWrist,
+            broadcast: false,
           );
           PedometerService.instance.updateFromWatchSimulator(
             steps: steps ?? PedometerService.instance.steps,
@@ -403,7 +568,9 @@ class WatchSyncManager extends ChangeNotifier {
             battery: battery ?? PedometerService.instance.battery,
             isOffWrist: isOffWrist ?? false,
           );
-          _connectionType = WatchConnectionType.cloudRelay;
+          if (_isPaired) {
+            _connectionType = WatchConnectionType.cloudRelay;
+          }
         }
         notifyListeners();
       }
@@ -411,7 +578,9 @@ class WatchSyncManager extends ChangeNotifier {
       // 2. Lấy các lệnh chờ điều phối hai chiều từ Backend (Command Queue Polling)
       final target = _isRunningOnWatch ? 'watch' : 'phone';
       final cmdUri = Uri.parse('${AppConstants.backendBaseUrl}/watch/commands/$_deviceId?target=$target');
-      final cmdRes = await _client.get(cmdUri).timeout(const Duration(seconds: 2));
+      final cmdRes = await _client
+          .get(cmdUri, headers: _watchApiHeaders)
+          .timeout(const Duration(seconds: 2));
       if (cmdRes.statusCode == 200) {
         final cmdData = jsonDecode(cmdRes.body) as Map<String, dynamic>;
         final commands = cmdData['commands'] as List<dynamic>? ?? [];
@@ -457,7 +626,7 @@ class WatchSyncManager extends ChangeNotifier {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/request-code');
       final res = await _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _watchApiHeaders,
         body: jsonEncode({
           'deviceId': _deviceId,
           'deviceModel': _deviceModel,
@@ -482,9 +651,10 @@ class WatchSyncManager extends ChangeNotifier {
     return _pairingCode;
   }
 
-  /// 2. ĐIỆN THOẠI XÁC NHẬN MÃ GHÉP NỐI TỪ ĐỒNG HỒ
+  /// 2. ĐIỆN THOẠI XÁC NHẬN MÃ GHÉP NỐI TỪ ĐỒNG HỒ (RÀNG BUỘC 1-1)
   Future<bool> verifyPairingCode(String code, {required String userId}) async {
     _isSyncing = true;
+    _lastPairingError = null;
     notifyListeners();
 
     if (kIsTesting) {
@@ -510,7 +680,7 @@ class WatchSyncManager extends ChangeNotifier {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/verify-code');
       final res = await _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _watchApiHeaders,
         body: jsonEncode({
           'code': cleanCode,
           'userId': userId,
@@ -542,6 +712,18 @@ class WatchSyncManager extends ChangeNotifier {
         _fetchLatestVitals();
         return true;
       }
+
+      if (res.statusCode == 409 || res.statusCode == 403 || res.statusCode == 400) {
+        try {
+          final errData = jsonDecode(res.body) as Map<String, dynamic>;
+          _lastPairingError = errData['message'] as String? ?? 'Đồng hồ đã được ghép nối 1-1 với tài khoản khác.';
+        } catch (_) {
+          _lastPairingError = 'Không thể ghép nối với mã đã nhập.';
+        }
+        _isSyncing = false;
+        notifyListeners();
+        return false;
+      }
     } catch (_) {
       // Nếu không có mạng Backend hoặc test cục bộ:
       _isPaired = true;
@@ -571,9 +753,40 @@ class WatchSyncManager extends ChangeNotifier {
     return false;
   }
 
-  /// 2b. GHÉP NỐI NHANH 1-CHẠM (QUICK PAIR)
+  /// Tự động tìm deviceId đồng hồ thật đang phát OTP / online để ghép nối chính xác 1-1
+  Future<String?> _discoverAvailableWatchDeviceId() async {
+    try {
+      final discoverUri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/discover');
+      final dRes = await _client.get(discoverUri, headers: _watchApiHeaders).timeout(const Duration(seconds: 2));
+      if (dRes.statusCode == 200) {
+        final dJson = jsonDecode(dRes.body) as Map<String, dynamic>;
+        final devs = dJson['devices'] as List<dynamic>? ?? [];
+        final free = devs.cast<Map>().where((d) => d['alreadyPaired'] != true).toList();
+        if (free.isNotEmpty) {
+          return free.first['deviceId']?.toString();
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final listUri = Uri.parse('${AppConstants.backendBaseUrl}/watch/devices');
+      final lRes = await _client.get(listUri, headers: _watchApiHeaders).timeout(const Duration(seconds: 2));
+      if (lRes.statusCode == 200) {
+        final lJson = jsonDecode(lRes.body) as Map<String, dynamic>;
+        final devs = (lJson['data']?['devices'] as List<dynamic>? ?? []);
+        final freeOrMatched = devs.cast<Map>().where((d) => d['paired'] != true || d['userId'] == _pairedUserId).toList();
+        if (freeOrMatched.isNotEmpty) {
+          return freeOrMatched.first['deviceId']?.toString();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// 2b. GHÉP NỐI NHANH 1-CHẠM (QUICK PAIR 1-1)
   Future<bool> quickPairDevice({String? userId, String? deviceId}) async {
     _isSyncing = true;
+    _lastPairingError = null;
     notifyListeners();
 
     if (deviceId != null) _deviceId = deviceId;
@@ -597,11 +810,18 @@ class WatchSyncManager extends ChangeNotifier {
       return true;
     }
 
+    if (deviceId == null || deviceId.isEmpty) {
+      final discovered = await _discoverAvailableWatchDeviceId();
+      if (discovered != null && discovered.isNotEmpty) {
+        _deviceId = discovered;
+      }
+    }
+
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/auto-pair');
       final res = await _client.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: _watchApiHeaders,
         body: jsonEncode({
           'deviceId': _deviceId,
           'deviceModel': _deviceModel,
@@ -613,6 +833,17 @@ class WatchSyncManager extends ChangeNotifier {
         _isPaired = true;
         _connectionType = WatchConnectionType.cloudRelay;
         _latencyMs = 24;
+      } else if (res.statusCode == 409 || res.statusCode == 403) {
+        try {
+          final errData = jsonDecode(res.body) as Map<String, dynamic>;
+          _lastPairingError = errData['message'] as String? ?? 'Đồng hồ đã được ghép nối 1-1 với tài khoản khác.';
+        } catch (_) {
+          _lastPairingError = 'Đồng hồ đã thuộc tài khoản khác.';
+        }
+        _isPaired = false;
+        _isSyncing = false;
+        notifyListeners();
+        return false;
       } else {
         _isPaired = true;
         _connectionType = WatchConnectionType.inMemory;
@@ -640,8 +871,9 @@ class WatchSyncManager extends ChangeNotifier {
     return true;
   }
 
-  /// 2c. HỦY GHÉP NỐI THIẾT BỊ
+  /// 2c. HỦY GHÉP NỐI THIẾT BỊ (CHÍNH CHỦ)
   Future<void> unpairDevice() async {
+    final prevOwnerId = _pairedUserId;
     _isPaired = false;
     _connectionType = WatchConnectionType.disconnected;
     stopPeriodicChecks();
@@ -654,8 +886,11 @@ class WatchSyncManager extends ChangeNotifier {
         final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/unpair');
         await _client.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'deviceId': _deviceId}),
+          headers: _watchApiHeaders,
+          body: jsonEncode({
+            'deviceId': _deviceId,
+            if (!isPlaceholderUserId(prevOwnerId)) 'userId': prevOwnerId,
+          }),
         ).timeout(const Duration(seconds: 2));
       } catch (_) {}
     }
@@ -670,22 +905,35 @@ class WatchSyncManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 2d. ĐỒNG HỒ KIỂM TRA TRẠNG THÁI GHÉP NỐI TỪ BACKEND
+  /// 2d. ĐỒNG HỒ KIỂM TRA TRẠNG THÁI GHÉP NỐI TỪ BACKEND (TỰ ĐỒNG BỘ CHỦ SỞ HỮU 1-1)
   Future<bool> checkWatchPairingStatus() async {
     if (kIsTesting) return _isPaired;
     if (_isCheckingStatus) return _isPaired;
     _isCheckingStatus = true;
     try {
       final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/pair/status/$_deviceId');
-      final res = await _client.get(uri).timeout(const Duration(seconds: 2));
+      final res = await _client
+          .get(uri, headers: _watchApiHeaders)
+          .timeout(const Duration(seconds: 2));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final paired = data['paired'] as bool? ?? false;
+        final serverUserId = data['userId']?.toString();
+        bool changed = false;
+        if (!isPlaceholderUserId(serverUserId) && _pairedUserId != serverUserId) {
+          _pairedUserId = serverUserId;
+          changed = true;
+          fetchMedicalProfileFromBackend();
+        }
         if (_isPaired != paired) {
           _isPaired = paired;
           _connectionType = paired ? WatchConnectionType.cloudRelay : WatchConnectionType.disconnected;
           WearOsService.instance.setPaired(paired);
           PedometerService.instance.setPaired(paired);
+          changed = true;
+        }
+        if (changed) {
+          _savePersistedState();
           notifyListeners();
         }
         return _isPaired;
@@ -697,22 +945,55 @@ class WatchSyncManager extends ChangeNotifier {
     return _isPaired;
   }
 
-  /// 3. GỬI GÓI TIN SSWP ĐI
+  /// 3. GỬI GÓI TIN SSWP ĐI (Ưu tiên Wear OS Data Layer Bluetooth < 100ms, song song Cloud Relay)
   Future<void> sendPacket(WatchPacket packet) async {
-    _lastPacket = packet;
-    _addPacketToHistory(packet);
+    final enrichedPayload = <String, dynamic>{
+      ...packet.payload,
+      if (!packet.payload.containsKey('deviceId')) 'deviceId': _deviceId,
+      if (_pairedUserId != null && !packet.payload.containsKey('userId')) 'userId': _pairedUserId,
+    };
+    final outgoing = WatchPacket(
+      protocol: packet.protocol,
+      messageId: packet.messageId,
+      timestamp: packet.timestamp,
+      sender: packet.sender,
+      type: packet.type,
+      action: packet.action,
+      payload: enrichedPayload,
+    );
+    _lastPacket = outgoing;
+    _addPacketToHistory(outgoing);
 
     // Phát nội bộ trước để UI phản hồi ngay (0ms latency)
-    _packetController.add(packet);
+    _packetController.add(outgoing);
 
-    // Đồng bộ lên Cloud Relay nếu có kết nối
+    final serialized = jsonEncode(outgoing.toJson());
+
+    // Tầng ưu tiên 1 (< 100ms): Wear OS Data Layer (MessageClient) trực tiếp qua Bluetooth
+    if (!kIsTesting && _wearDataLayerSender != null) {
+      try {
+        final btRes = await _wearDataLayerSender!('/safesolo/packet', serialized);
+        if (btRes['sent'] == true) {
+          _isWearDataLayerConnected = true;
+          _connectionType = WatchConnectionType.localBle;
+          final latVal = btRes['latencyMs'];
+          if (latVal is int && latVal >= 0) {
+            _latencyMs = latVal;
+          }
+        }
+      } catch (e) {
+        debugPrint('[WatchSyncManager] Wear Data Layer BT send error: $e');
+      }
+    }
+
+    // Tầng 2: Đồng bộ lên Cloud Relay (nếu Watch đang mất Wi-Fi ngoài đường, Phone đã nhận qua BT sẽ tự relay bước dưới)
     if (!kIsTesting) {
       try {
         final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/packet');
         await _client.post(
           uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(packet.toJson()),
+          headers: _watchApiHeaders,
+          body: serialized,
         ).timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[WatchSyncManager] Error sending packet to backend: $e');
@@ -720,6 +1001,77 @@ class WatchSyncManager extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  /// Tiếp nhận gói tin trực tiếp từ Android Wear OS Data Layer / Watch Tile
+  Future<void> handleNativeWearBridgeEvent(Map<String, dynamic> event) async {
+    final sensorType = event['sensorType'] as String?;
+    if (sensorType == 'WEAR_TILE_ACTION' || sensorType == 'WEAR_LAUNCH_ACTION') {
+      final action = event['action'] as String? ?? '';
+      if (action == WatchAction.deadmanCheckin) {
+        emitDeadmanCheckin(mood: 'Wear OS Tile 1-chạm', userId: _pairedUserId);
+      } else if (action == WatchAction.hardwareSos) {
+        emitHardwareSos(userId: _pairedUserId);
+      }
+      return;
+    }
+
+    final payloadJson = event['payloadJson'] as String?;
+    if (payloadJson == null || payloadJson.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(payloadJson);
+      if (decoded is! Map) return;
+      final packet = WatchPacket.fromJson(Map<String, dynamic>.from(decoded));
+
+      _isWearDataLayerConnected = true;
+      _connectionType = WatchConnectionType.localBle;
+      final rawTs = event['timestamp'] as int?;
+      if (rawTs != null) {
+        _latencyMs = (DateTime.now().millisecondsSinceEpoch - rawTs).clamp(1, 200);
+      }
+
+      // 1. Đẩy vào luồng xử lý sự kiện Watch <-> Phone ngay lập tức (< 100ms BT)
+      _broadcastInternal(packet);
+      _handleIncomingPacket(packet);
+
+      // 2. Nếu đây là Điện thoại nhận gói tin từ Watch qua Bluetooth ngoài đường:
+      //    Tự động chuyển tiếp (relay) lên Backend; nếu mất mạng hoàn toàn & là SOS -> kích hoạt SMS fallback!
+      if (!_isRunningOnWatch && packet.sender == WatchSender.watch && (!kIsTesting || cloudRelayOverrideForTest != null)) {
+        bool relayOk = false;
+        try {
+          if (cloudRelayOverrideForTest != null) {
+            relayOk = await cloudRelayOverrideForTest!(packet);
+          } else {
+            final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/packet');
+            final resp = await _client.post(
+              uri,
+              headers: _watchApiHeaders,
+              body: jsonEncode(packet.toJson()),
+            ).timeout(const Duration(seconds: 3));
+            relayOk = resp.statusCode >= 200 && resp.statusCode < 300;
+          }
+        } catch (e) {
+          debugPrint('[WatchSyncManager] BT->Cloud relay offline ($e)');
+        }
+
+        const emergencyActions = {
+          WatchAction.fallDetected,
+          WatchAction.accidentCrash,
+          WatchAction.freeFallImpact,
+          WatchAction.hardwareSos,
+          WatchAction.duressSos,
+          WatchAction.cardiacDistress,
+          WatchAction.hypoxiaRisk,
+        };
+        if (!relayOk && emergencyActions.contains(packet.action)) {
+          debugPrint('[WatchSyncManager] Offline BT SOS -> invoking Phone SmsManager fallback!');
+          await onOfflineEmergencyFallback?.call(packet.action, packet.payload);
+        }
+      }
+    } catch (e) {
+      debugPrint('[WatchSyncManager] handleNativeWearBridgeEvent parse error: $e');
+    }
   }
 
   void _addPacketToHistory(WatchPacket packet) {
@@ -736,6 +1088,19 @@ class WatchSyncManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _markMessageProcessed(String messageId) {
+    if (messageId.isEmpty) return true;
+    if (!_processedMessageIds.add(messageId)) {
+      return false;
+    }
+    _processedMessageOrder.add(messageId);
+    if (_processedMessageOrder.length > 150) {
+      final oldest = _processedMessageOrder.removeAt(0);
+      _processedMessageIds.remove(oldest);
+    }
+    return true;
+  }
+
   /// 4. XỬ LÝ GÓI TIN ĐẾN (INCOMING PACKET HANDLER)
   void _handleIncomingPacket(WatchPacket packet) {
     // Chỉ xử lý gói tin từ thiết bị đối tác
@@ -744,6 +1109,9 @@ class WatchSyncManager extends ChangeNotifier {
     }
     if (!_isRunningOnWatch && packet.sender == WatchSender.phone) {
       return; // Bỏ qua gói tin do chính điện thoại vừa phát ra
+    }
+    if (!_markMessageProcessed(packet.messageId)) {
+      return; // Bỏ qua gói tin trùng lặp (đã xử lý qua kênh nội bộ/poll khác)
     }
 
     final wearOs = WearOsService.instance;
@@ -756,6 +1124,13 @@ class WatchSyncManager extends ChangeNotifier {
           Future.delayed(Duration(milliseconds: i * 400), () => HapticFeedback.heavyImpact());
         }
         onFindWatchPingReceived?.call();
+        if (packet.sender == WatchSender.toc) {
+          emitCommandAck(
+            ackAction: WatchAction.findWatchPing,
+            status: 'VIBRATING_ON_WATCH',
+            note: 'Galaxy Watch 5 đã rung chuông kiểm tra phản xạ từ lệnh TOC',
+          );
+        }
         debugPrint('[WatchSyncManager] Received FIND_WATCH_PING: triggering haptic vibration on watch!');
         break;
 
@@ -777,7 +1152,36 @@ class WatchSyncManager extends ChangeNotifier {
         } else {
           wearOs.startPrecisionMeasurement(force: true);
         }
+        if (packet.sender == WatchSender.toc) {
+          emitCommandAck(
+            ackAction: WatchAction.instantMeasureReq,
+            status: 'MEASURING_BIOACTIVE_PPG',
+            note: 'Galaxy Watch 5 đã nhận lệnh TOC và bắt đầu đo nhịp tim/SpO2',
+          );
+        }
         debugPrint('[WatchSyncManager] Received INSTANT_MEASURE_REQ: BioActive PPG measurement triggered!');
+        break;
+
+      // Nhận xác nhận điều phối cứu hộ từ Trung tâm Chỉ huy TOC lên Đồng hồ
+      case WatchAction.tocDispatchAck:
+        HapticFeedback.heavyImpact();
+        for (int i = 1; i <= 3; i++) {
+          Future.delayed(Duration(milliseconds: i * 350), () => HapticFeedback.heavyImpact());
+        }
+        onTocDispatchAckReceived?.call(packet.payload);
+        if (packet.sender == WatchSender.toc) {
+          emitCommandAck(
+            ackAction: WatchAction.tocDispatchAck,
+            status: 'DISPLAYED_ON_WATCH',
+            note: 'Đã hiển thị thông báo cứu hộ TOC trên màn hình đồng hồ',
+          );
+        }
+        debugPrint('[WatchSyncManager] Received TOC_DISPATCH_ACK: ${packet.payload}');
+        break;
+
+      // Xác nhận đồng hồ đã thực thi lệnh
+      case WatchAction.watchCommandAck:
+        debugPrint('[WatchSyncManager] Watch ACK received: ${packet.payload}');
         break;
 
       // Nhận kết quả đo chuẩn xác từ đồng hồ
@@ -898,6 +1302,19 @@ class WatchSyncManager extends ChangeNotifier {
         wearOs.cancelEmergency();
         onAlertCancelledReceived?.call();
         break;
+
+      // Nhận lệnh hỏi thăm khi lệch tuyến > 300m hoặc đứng im > 3 phút (Phone/Backend -> Watch 5)
+      case WatchAction.routeDeviationCheck:
+        HapticFeedback.heavyImpact();
+        onRouteDeviationCheckReceived?.call(packet.payload);
+        debugPrint('[WatchSyncManager] Received ROUTE_DEVIATION_CHECK: ${packet.payload['reason']}');
+        break;
+
+      // Nhận xác nhận "Tôi ổn" từ Watch 5 -> Phone dừng đếm ngược 30s Lệch tuyến
+      case WatchAction.journeyCheckSafe:
+        onJourneyCheckSafeReceived?.call(packet.payload);
+        debugPrint('[WatchSyncManager] Received JOURNEY_CHECK_SAFE from Watch 5!');
+        break;
     }
   }
 
@@ -905,7 +1322,7 @@ class WatchSyncManager extends ChangeNotifier {
   // CÁC HÀM TIỆN ÍCH DÀNH CHO CẢ WATCH & PHONE
   // ===========================================================================
 
-  /// Watch phát gói tin sinh tồn (Telemetry)
+  /// Watch phát gói tin sinh tồn (Telemetry) kèm sóng IMU / PPG 3 pha
   void emitVitalsTelemetry({
     required int heartRate,
     required int spO2,
@@ -914,33 +1331,56 @@ class WatchSyncManager extends ChangeNotifier {
     required bool isOffWrist,
     double? svmG,
     double? tiltAngle,
+    List<double>? gForceWaveform,
+    List<double>? ppgWaveform,
+    Map<String, dynamic>? fusionMetadata,
   }) {
-    // 1. Post trực tiếp lên /api/watch/vitals để Backend relay lưu cache tức thì
-    try {
-      final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/vitals');
-      _client.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'deviceId': _deviceId,
-          'heartRate': heartRate,
-          'spO2': spO2,
-          'steps': steps,
-          'battery': battery,
-          'isOffWrist': isOffWrist,
-          if (svmG != null) 'svmG': svmG,
-          if (tiltAngle != null) 'tiltAngle': tiltAngle,
-        }),
-      ).timeout(const Duration(seconds: 2)).catchError((_) => http.Response('', 500));
-    } catch (_) {}
+    if (!kIsTesting && !_isRunningOnWatch && (!_isPaired || isPlaceholderUserId(_pairedUserId))) {
+      return; // Chặn điện thoại chưa ghép 1-1 phát nhầm telemetry Watch
+    }
+    final fusion = FallFusionEngine.instance;
+    final effectiveGForce = gForceWaveform ?? fusion.gForceWaveform;
+    final effectivePpg = ppgWaveform ?? fusion.ppgWaveform;
+    final effectiveFusion = fusionMetadata ?? fusion.toFusionPayload();
 
-    // 2. Đồng thời phát gói tin SSWP
+    if (!kIsTesting) {
+      _wearTileSync?.call(
+        deviceId: _deviceId,
+        pairedUserId: _pairedUserId,
+        userName: _medicalFullName,
+        isPaired: _isPaired,
+      );
+      try {
+        final uri = Uri.parse('${AppConstants.backendBaseUrl}/watch/vitals');
+        _client.post(
+          uri,
+          headers: _watchApiHeaders,
+          body: jsonEncode({
+            'deviceId': _deviceId,
+            if (_pairedUserId != null) 'userId': _pairedUserId,
+            'heartRate': heartRate,
+            'spO2': spO2,
+            'steps': steps,
+            'battery': battery,
+            'isOffWrist': isOffWrist,
+            if (svmG != null) 'svmG': svmG,
+            if (tiltAngle != null) 'tiltAngle': tiltAngle,
+            'gForceWaveform': effectiveGForce,
+            'ppgWaveform': effectivePpg,
+            'fusion': effectiveFusion,
+          }),
+        ).timeout(const Duration(seconds: 2)).catchError((_) => http.Response('', 500));
+      } catch (_) {}
+    }
+
+    // Đồng thời phát gói tin SSWP (qua Wear Data Layer BT + Cloud)
     sendPacket(WatchPacket.create(
       sender: WatchSender.watch,
       type: WatchPacketType.telemetry,
       action: WatchAction.vitalsUpdate,
       payload: {
         'deviceId': _deviceId,
+        if (_pairedUserId != null) 'userId': _pairedUserId,
         'heartRate': heartRate,
         'spO2': spO2,
         'steps': steps,
@@ -948,16 +1388,23 @@ class WatchSyncManager extends ChangeNotifier {
         'isOffWrist': isOffWrist,
         if (svmG != null) 'svmG': svmG,
         if (tiltAngle != null) 'tiltAngle': tiltAngle,
+        'gForceWaveform': effectiveGForce,
+        'ppgWaveform': effectivePpg,
+        'fusion': effectiveFusion,
       },
     ));
   }
 
-  /// Watch phát sự kiện Té ngã
+  /// Watch phát sự kiện Té ngã (đính kèm bằng chứng Fusion 3 pha & sóng G-Force/PPG)
   void emitFallAlert({
     required double svm,
     required double tilt,
     bool isSimulated = false,
+    List<double>? gForceWaveform,
+    List<double>? ppgWaveform,
+    Map<String, dynamic>? fusionMetadata,
   }) {
+    final fusion = FallFusionEngine.instance;
     sendPacket(WatchPacket.create(
       sender: WatchSender.watch,
       type: WatchPacketType.emergency,
@@ -967,6 +1414,9 @@ class WatchSyncManager extends ChangeNotifier {
         'svmG': svm,
         'tiltAngle': tilt,
         'isSimulated': isSimulated,
+        'gForceWaveform': gForceWaveform ?? fusion.gForceWaveform,
+        'ppgWaveform': ppgWaveform ?? fusion.ppgWaveform,
+        'fusion': fusionMetadata ?? fusion.toFusionPayload(),
         'alert': 'Phát hiện va đập $svm g và góc nghiêng $tilt° từ Samsung Galaxy Watch 5',
       },
     ));
@@ -1109,6 +1559,48 @@ class WatchSyncManager extends ChangeNotifier {
     ));
   }
 
+  /// Phone đẩy ping rung xuống Watch 5 hỏi "Bạn ổn chứ?" khi Lệch tuyến >300m / Đứng im >3p
+  void sendRouteDeviationCheck({
+    required String journeyId,
+    required String reason,
+    String anomalyType = 'ROUTE_DEVIATION',
+    double? deviationMeters,
+    int? stationarySeconds,
+  }) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.phone,
+      type: WatchPacketType.command,
+      action: WatchAction.routeDeviationCheck,
+      payload: {
+        'deviceId': _deviceId,
+        'journeyId': journeyId,
+        'anomalyType': anomalyType,
+        'reason': reason,
+        'prompt': 'Bạn ổn chứ?',
+        if (deviationMeters != null) 'deviationMeters': deviationMeters.round(),
+        if (stationarySeconds != null) 'stationarySeconds': stationarySeconds,
+        'responseTimeoutSeconds': 30,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
+  /// Watch 5 xác nhận "Tôi ổn" trả lời ping Lệch tuyến / Đứng im
+  void emitJourneyCheckSafe({String? journeyId, String? userId}) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.ack,
+      action: WatchAction.journeyCheckSafe,
+      payload: {
+        'deviceId': _deviceId,
+        if (userId != null) 'userId': userId,
+        if (journeyId != null) 'journeyId': journeyId,
+        'status': 'SAFE_CONFIRMED',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    ));
+  }
+
   /// Phone gửi lệnh tìm đồng hồ (Rung)
   void sendFindWatchPing() {
     HapticFeedback.heavyImpact();
@@ -1191,6 +1683,31 @@ class WatchSyncManager extends ChangeNotifier {
       type: WatchPacketType.command,
       action: WatchAction.alertCancelled,
       payload: {'deviceId': _deviceId, 'by': 'user_confirm'},
+    ));
+  }
+
+  /// Đồng hồ gửi xác nhận (ACK) đã nhận & thực thi lệnh từ TOC / Phone
+  void emitCommandAck({
+    required String ackAction,
+    String status = 'EXECUTED',
+    String? note,
+  }) {
+    sendPacket(WatchPacket.create(
+      sender: WatchSender.watch,
+      type: WatchPacketType.ack,
+      action: WatchAction.watchCommandAck,
+      payload: {
+        'deviceId': _deviceId,
+        if (_pairedUserId != null) 'userId': _pairedUserId,
+        'ackAction': ackAction,
+        'status': status,
+        if (note != null) 'note': note,
+        'heartRate': WearOsService.instance.heartRate,
+        'spO2': WearOsService.instance.spO2,
+        'battery': WearOsService.instance.battery,
+        'isOffWrist': WearOsService.instance.isOffWrist,
+        'acknowledgedAt': DateTime.now().toIso8601String(),
+      },
     ));
   }
 

@@ -42,7 +42,7 @@ async function runE2ETests() {
   await AlertEvent.deleteMany({ userId: testUserId });
   await CheckInHistory.deleteMany({ userId: testUserId });
   await DeviceSignal.deleteMany({ userId: testUserId });
-  await RescueIncident.deleteMany({ userId: testUserId });
+  await RescueIncident.deleteMany({ $or: [{ victimId: testUserId }, { userId: testUserId }] });
 
   console.log('--- GIAI ĐOẠN 1: KHỞI TẠO NGƯỜI DÙNG & HỒ SƠ AN TOÀN ---');
   const user = await User.create({
@@ -177,7 +177,7 @@ async function runE2ETests() {
     await AlertEvent.deleteMany({ userId: testUserId });
     await CheckInHistory.deleteMany({ userId: testUserId });
     await DeviceSignal.deleteMany({ userId: testUserId });
-    await RescueIncident.deleteMany({ userId: testUserId });
+    await RescueIncident.deleteMany({ $or: [{ victimId: testUserId }, { userId: testUserId }] });
     console.log('✓ Dọn dẹp dữ liệu kiểm thử E2E hoàn tất.');
   }
 

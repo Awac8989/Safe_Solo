@@ -913,6 +913,32 @@ class ApiService {
     return LiveJourneyModel.fromJson(body['data'] as Map<String, dynamic>);
   }
 
+  Future<Map<String, dynamic>> ackJourneyAnomaly({
+    required String journeyId,
+    required String userId,
+    required String action,
+    String reason = '',
+  }) async {
+    final uri = Uri.parse('${AppConstants.backendBaseUrl}/journeys/$journeyId/anomaly-ack');
+    final response = await _safeRequest(
+      _client.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'android-app-key-abc',
+          'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'action': action,
+          'reason': reason,
+        }),
+      ),
+    );
+    _throwIfFailed(response);
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<LiveJourneyModel> finishJourney({
     required String journeyId,
     required String userId,

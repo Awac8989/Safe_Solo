@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'wear_os_service.dart';
-import 'watch_sync_manager.dart';
+import 'fall_fusion_engine.dart';
 import 'pedometer_service.dart';
+import 'watch_sync_manager.dart';
+import 'wear_os_service.dart';
 
 /// Trạng thái hoạt động của cảm biến BioActive
 enum BioActiveSensorState {
@@ -18,12 +19,13 @@ enum BioActiveSensorState {
 
 /// ============================================================================
 /// SAFESOLO - DỊCH VỤ CẢM BIẾN PHẦN CỨNG GALAXY WATCH 5 (SM-R900)
-/// Đọc trực tiếp từ Android SensorManager trên đồng hồ thật Wear OS:
+/// Đọc trực tiếp từ Android SensorManager & Wear Data Layer:
 /// 1. Nhịp tim quang học BioActive PPG (Type 21) kèm lọc nhiễu EMA chuẩn xác
 /// 2. Đếm bước chân phần cứng (Type 19 Step Counter & Type 18 Step Detector)
 /// 3. Nồng độ oxy hòa tan trong máu SpO2 (Type 65545 / 38 / Samsung Vendor)
 /// 4. Cảm biến nhận diện tháo đồng hồ (Type 34 Off-body Detect)
-/// 5. Mức pin phần cứng thật (BatteryManager)
+/// 5. Gia tốc kế 3 trục thật (Type 1 Accelerometer) -> Bộ lọc Fusion 3 pha
+/// 6. Cầu nối Wear OS Data Layer (MessageClient / DataClient Bluetooth) + Tile Sync
 /// ============================================================================
 class WatchHardwareSensorService extends ChangeNotifier {
   WatchHardwareSensorService._();
@@ -60,6 +62,7 @@ class WatchHardwareSensorService extends ChangeNotifier {
   int _batteryLevel = 100;
   bool _isOffWrist = false;
   DateTime? _lastReadingTime;
+  bool _backgroundSensorServiceStarted = false;
 
   // Getters
   bool get isHardwareAvailable => _isHardwareAvailable;
@@ -79,8 +82,9 @@ class WatchHardwareSensorService extends ChangeNotifier {
   int get batteryLevel => _batteryLevel;
   bool get isOffWrist => _isOffWrist;
   DateTime? get lastReadingTime => _lastReadingTime;
+  bool get backgroundSensorServiceStarted => _backgroundSensorServiceStarted;
 
-  /// Bật và kết nối với các cảm biến phần cứng của đồng hồ SM-R900
+  /// Bật và kết nối với các cảm biến phần cứng của đồng hồ SM-R900 + Cầu nối Wear Data Layer trên Phone
   Future<void> initialize() async {
     if (WatchSyncManager.kIsTesting || kIsWeb || !Platform.isAndroid) {
       _sensorState = BioActiveSensorState.unavailable;
@@ -97,6 +101,7 @@ class WatchHardwareSensorService extends ChangeNotifier {
         final manufacturer = (info['manufacturer'] as String? ?? '').toUpperCase();
         final isWatch = info['isWatch'] as bool? ?? false;
         final isSmR900Flag = info['isSmR900'] == true;
+        final hwDeviceId = info['hardwareDeviceId'] as String?;
         final smR900Match = model.contains('SM-R900') ||
             model.contains('WATCH5') ||
             isSmR900Flag;
@@ -109,11 +114,35 @@ class WatchHardwareSensorService extends ChangeNotifier {
         _deviceManufacturer = info['manufacturer'] as String? ?? 'Samsung';
         _isHardwareAvailable = true;
 
-        debugPrint('[WatchHardwareSensorService] Khởi tạo thiết bị: $_deviceModel (SM-R900=$smR900Match)');
+        if (isWatch || smR900Match) {
+          WatchSyncManager.instance.configureHardwareIdentity(
+            deviceId: (hwDeviceId != null && hwDeviceId.isNotEmpty) ? hwDeviceId : 'watch_galaxy_5',
+            deviceModel: _deviceModel,
+            isWatch: true,
+          );
+          await startWatchBackgroundService();
+        }
+
+        debugPrint('[WatchHardwareSensorService] Khởi tạo thiết bị: $_deviceModel (SM-R900=$smR900Match, hwId=$hwDeviceId)');
       }
 
-      // 2. Yêu cầu cấp quyền cảm biến nếu cần
-      await _methodChannel.invokeMethod('requestSensorPermissions');
+      WatchSyncManager.instance.registerWearBridgeHandlers(
+        sender: (path, payloadJson) => sendWearDataLayerMessage(path: path, payloadJson: payloadJson),
+        nodeFinder: getWearConnectedNodes,
+        tileSync: ({deviceId, pairedUserId, userName, isPaired, nextDeadline}) =>
+            syncSnapshotToWatchTile(
+              deviceId: deviceId,
+              pairedUserId: pairedUserId,
+              userName: userName,
+              isPaired: isPaired,
+              nextDeadline: nextDeadline,
+            ),
+      );
+
+      // 2. Yêu cầu cấp quyền cảm biến nếu cần (đồng hồ)
+      if (_isSamsungWatch5 || _isSmR900) {
+        await _methodChannel.invokeMethod('requestSensorPermissions');
+      }
 
       // 3. Đọc mức pin hiện tại
       final bat = await _methodChannel.invokeMethod<int>('getBatteryLevel');
@@ -121,13 +150,91 @@ class WatchHardwareSensorService extends ChangeNotifier {
         _batteryLevel = bat;
       }
 
-      // 4. Bắt đầu lắng nghe dòng dữ liệu thời gian thực từ EventChannel
+      // 4. Bắt đầu lắng nghe dòng dữ liệu thời gian thực từ EventChannel (gồm cả Wear Data Layer Bluetooth)
       _startSensorStream();
+      // Kiểm tra các Wear Node Bluetooth đã ghép sẵn
+      await WatchSyncManager.instance.refreshWearConnectedNodes();
     } catch (e) {
       debugPrint('[WatchHardwareSensorService] Thiết bị không hỗ trợ Native SensorChannel: $e');
       _isHardwareAvailable = false;
       _sensorState = BioActiveSensorState.unavailable;
     }
+  }
+
+  /// Khởi động WatchSensorForegroundService chạy độc lập khi Watch tắt màn hình
+  Future<bool> startWatchBackgroundService() async {
+    if (WatchSyncManager.kIsTesting || kIsWeb || !Platform.isAndroid) return false;
+    try {
+      final ok = await _methodChannel.invokeMethod<bool>('startWatchBackgroundService') ?? false;
+      _backgroundSensorServiceStarted = ok;
+      notifyListeners();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Gửi gói tin SSWP qua cầu nối Wear OS Data Layer (MessageClient Bluetooth < 100ms)
+  Future<Map<String, dynamic>> sendWearDataLayerMessage({
+    String path = '/safesolo/packet',
+    required String payloadJson,
+  }) async {
+    if (WatchSyncManager.kIsTesting || kIsWeb || !Platform.isAndroid) {
+      return const {'sent': false, 'nodeCount': 0};
+    }
+    try {
+      final raw = await _methodChannel.invokeMethod<Map<dynamic, dynamic>>(
+        'sendWearMessage',
+        {'path': path, 'payloadJson': payloadJson},
+      );
+      if (raw != null) {
+        return Map<String, dynamic>.from(raw);
+      }
+    } catch (e) {
+      debugPrint('[WatchHardwareSensorService] sendWearMessage error: $e');
+    }
+    return const {'sent': false, 'nodeCount': 0};
+  }
+
+  /// Liệt kê các thiết bị Wear OS đang kết nối Bluetooth trực tiếp
+  Future<List<Map<String, dynamic>>> getWearConnectedNodes() async {
+    if (WatchSyncManager.kIsTesting || kIsWeb || !Platform.isAndroid) {
+      return const [];
+    }
+    try {
+      final raw = await _methodChannel.invokeMethod<List<dynamic>>('getWearConnectedNodes');
+      if (raw != null) {
+        return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// Đồng bộ dữ liệu mới nhất sang Wear OS Tile & DataClient
+  Future<void> syncSnapshotToWatchTile({
+    String? deviceId,
+    String? pairedUserId,
+    String? userName,
+    bool? isPaired,
+    DateTime? nextDeadline,
+  }) async {
+    if (WatchSyncManager.kIsTesting || kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _methodChannel.invokeMethod('syncWatchSnapshotToTile', {
+        if (_heartRate != null) 'heartRate': _heartRate,
+        if (_spO2 != null) 'spO2': _spO2,
+        'battery': _batteryLevel,
+        'steps': _steps,
+        'isOffWrist': _isOffWrist,
+        'svmG': FallFusionEngine.instance.currentSvmG,
+        'fusionPhase': FallFusionEngine.instance.phaseApiCode,
+        if (deviceId != null) 'deviceId': deviceId,
+        if (pairedUserId != null) 'pairedUserId': pairedUserId,
+        if (userName != null) 'userName': userName,
+        if (isPaired != null) 'isPaired': isPaired,
+        if (nextDeadline != null) 'nextDeadlineMs': nextDeadline.millisecondsSinceEpoch,
+      });
+    } catch (_) {}
   }
 
   void _startSensorStream() {
@@ -187,6 +294,20 @@ class WatchHardwareSensorService extends ChangeNotifier {
         _processOffBody(map['isOffWrist'] as bool? ?? false);
         break;
 
+      case 'ACCELEROMETER':
+        final axG = (map['axG'] as num?)?.toDouble() ?? 0.0;
+        final ayG = (map['ayG'] as num?)?.toDouble() ?? 0.0;
+        final azG = (map['azG'] as num?)?.toDouble() ?? 1.0;
+        // Chỉ chạy IMU Watch Sensor Fusion trên đồng hồ (hoặc khi bật giám sát Watch)
+        if (_isSamsungWatch5 || _isSmR900 || WatchSyncManager.instance.isRunningOnWatch) {
+          FallFusionEngine.instance.ingestAccelerometer(
+            axG: axG,
+            ayG: ayG,
+            azG: azG,
+          );
+        }
+        break;
+
       case 'BATTERY':
         final bat = map['level'] as int? ?? _batteryLevel;
         if (bat > 0 && bat <= 100) {
@@ -194,6 +315,12 @@ class WatchHardwareSensorService extends ChangeNotifier {
           _syncToSubsystems();
           notifyListeners();
         }
+        break;
+
+      case 'WEAR_MESSAGE':
+      case 'WEAR_TILE_ACTION':
+      case 'WEAR_LAUNCH_ACTION':
+        WatchSyncManager.instance.handleNativeWearBridgeEvent(map);
         break;
     }
   }
@@ -204,6 +331,7 @@ class WatchHardwareSensorService extends ChangeNotifier {
       _heartRate = null;
       _rawHeartRate = 0;
       _sensorState = BioActiveSensorState.offWrist;
+      FallFusionEngine.instance.updateVitals(heartRate: 0, spO2: _spO2, isOffWrist: true);
       notifyListeners();
       return;
     }
@@ -211,27 +339,29 @@ class WatchHardwareSensorService extends ChangeNotifier {
     _rawHeartRate = rawBpm;
     _heartRateAccuracy = accuracy;
 
-    // Bỏ qua giá trị 0 hoặc dị thường sinh lý (< 35 bpm hoặc > 220 bpm)
     if (rawBpm < 35 || rawBpm > 220) {
       _sensorState = BioActiveSensorState.measuring;
       notifyListeners();
       return;
     }
 
-    // Nếu độ chính xác bằng 0 (unreliable), cảm biến đang điều chỉnh quang phổ
     if (accuracy == 0) {
       _sensorState = BioActiveSensorState.measuring;
     } else {
       _sensorState = BioActiveSensorState.calibrated;
     }
 
-    // Bộ lọc mượt EMA (Exponential Moving Average) với alpha = 0.35
     if (_emaHeartRate == null) {
       _emaHeartRate = rawBpm.toDouble();
     } else {
       _emaHeartRate = (0.35 * rawBpm) + (0.65 * _emaHeartRate!);
     }
     _heartRate = _emaHeartRate!.round();
+    FallFusionEngine.instance.updateVitals(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      isOffWrist: _isOffWrist,
+    );
     _syncToSubsystems();
     notifyListeners();
   }
@@ -251,7 +381,6 @@ class WatchHardwareSensorService extends ChangeNotifier {
     }
   }
 
-  /// Nhận tín hiệu xung bước chân tức thời (+1 bước)
   void _processStepDetector() {
     _steps++;
     _syncToSubsystems();
@@ -263,11 +392,11 @@ class WatchHardwareSensorService extends ChangeNotifier {
     if (_isOffWrist) {
       _spO2 = null;
       _sensorState = BioActiveSensorState.offWrist;
+      FallFusionEngine.instance.updateVitals(heartRate: _heartRate, spO2: 0, isOffWrist: true);
       notifyListeners();
       return;
     }
 
-    // Nồng độ SpO2 sinh lý chỉ nằm trong khoảng 70% - 100%
     if (rawSpo2 < 70 || rawSpo2 > 100) return;
 
     _spO2Buffer.add(rawSpo2);
@@ -275,12 +404,16 @@ class WatchHardwareSensorService extends ChangeNotifier {
       _spO2Buffer.removeAt(0);
     }
 
-    // Lấy giá trị trung vị (Median) của 5 mẫu gần nhất để loại bỏ nhiễu ánh sáng
     final sorted = List<int>.from(_spO2Buffer)..sort();
     final median = sorted[sorted.length ~/ 2];
 
     _spO2 = median;
     _sensorState = BioActiveSensorState.calibrated;
+    FallFusionEngine.instance.updateVitals(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      isOffWrist: _isOffWrist,
+    );
     _syncToSubsystems();
     notifyListeners();
   }
@@ -295,11 +428,15 @@ class WatchHardwareSensorService extends ChangeNotifier {
     } else {
       _sensorState = BioActiveSensorState.measuring;
     }
+    FallFusionEngine.instance.updateVitals(
+      heartRate: _heartRate,
+      spO2: _spO2,
+      isOffWrist: off,
+    );
     _syncToSubsystems();
     notifyListeners();
   }
 
-  /// Đồng bộ các chỉ số sinh tồn chuẩn sang WearOsService, PedometerService & WatchSyncManager
   void _syncToSubsystems() {
     WearOsService.instance.updateMetrics(
       heartRate: _heartRate,
@@ -317,9 +454,14 @@ class WatchHardwareSensorService extends ChangeNotifier {
       battery: _batteryLevel,
       isOffWrist: _isOffWrist,
     );
+
+    unawaited(syncSnapshotToWatchTile(
+      deviceId: WatchSyncManager.instance.deviceId,
+      pairedUserId: WatchSyncManager.instance.pairedUserId,
+      isPaired: WatchSyncManager.instance.isPaired,
+    ));
   }
 
-  /// Phương thức đặt giá trị thử nghiệm (Unit testing)
   @visibleForTesting
   void testSetVitals({
     int? heartRate,

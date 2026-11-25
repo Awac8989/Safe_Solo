@@ -123,7 +123,22 @@ class OfflineSyncEngine {
         processed++;
         syncProgress.value = processed / total;
       } catch (e) {
+        final msg = e.toString().toLowerCase();
+        final isPermanentClientError =
+            msg.contains('user not found') ||
+            msg.contains('not found') ||
+            msg.contains('400') ||
+            msg.contains('401') ||
+            msg.contains('403') ||
+            msg.contains('404');
         debugPrint('Failed to sync req ${req.id}: $e');
+        if (isPermanentClientError) {
+          _queue.removeWhere((item) => item.id == req.id);
+          await _saveQueue();
+          processed++;
+          syncProgress.value = processed / total;
+          continue;
+        }
         isOfflineMode.value = true; // Still offline
         break; // Stop flushing if a network error occurs
       }

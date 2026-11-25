@@ -17,15 +17,6 @@ const { apiRouter } = require('./src/routes');
 const apiKeyAuth = require('./src/middleware/apiKeyAuth');
 
 const emergencyRoutes = require('./src/routes/emergencyRoutes');
-const authRoutes = require('./src/routes/authRoutes');
-const medicalRoutes = require('./src/routes/medicalRoutes');
-const guardianRoutes = require('./src/routes/guardianRoutes');
-const locationRoutes = require('./src/routes/locationRoutes');
-const radarRoutes = require('./src/routes/radarRoutes');
-const chatRoutes = require('./src/routes/chatRoutes');
-const feedRoutes = require('./src/routes/feedRoutes');
-const communityRoutes = require('./src/routes/communityRoutes');
-const kycRoutes = require('./src/routes/kycRoutes');
 const adminPortalRoutes = require('./src/routes/adminPortalRoutes');
 
 const app = express();
@@ -35,7 +26,7 @@ const port = process.env.PORT || 4000;
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 300 : 5000,
   skip: (req) =>
     req.path.startsWith('/api/watch') ||
     req.path.startsWith('/watch') ||
@@ -47,7 +38,9 @@ const limiter = rateLimit({
   },
 });
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({
   origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -77,21 +70,12 @@ app.get('/api/health', (_req, res) => {
 app.use('/api', apiKeyAuth);
 app.use('/api/v1', apiKeyAuth);
 
-// Unified API router: includes Flutter legacy endpoints such as /api/users/register.
+// Unified API router: includes all domain routes (/auth, /medical, /moments, /watch, /safetags, etc.)
 app.use('/api', apiRouter);
 app.use('/api/v1', apiRouter);
 
-// Keep direct mounts for existing clients using these exact paths.
-app.use('/api/auth', authRoutes);
-app.use('/api/medical', medicalRoutes);
-app.use('/api/guardians', guardianRoutes);
-app.use('/api/location', locationRoutes);
-app.use('/api/radar', radarRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/feed', feedRoutes);
-app.use('/api/community', communityRoutes);
+// Backward-compatible singular alias & Web Admin TOC routes (avoid duplicate router mounts)
 app.use('/api/emergency', emergencyRoutes);
-app.use('/api/kyc', kycRoutes);
 app.use('/api/admin', adminPortalRoutes);
 
 app.use(notFoundHandler);

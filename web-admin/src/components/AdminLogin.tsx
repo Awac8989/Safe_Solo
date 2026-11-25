@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Shield,
 } from "lucide-react";
+import { loginAdminPortal } from "@/lib/api";
 
 export interface AdminUser {
   id: string;
@@ -22,6 +23,7 @@ export interface AdminUser {
   badgeNumber: string;
   avatar?: string;
   shiftStartTime: string;
+  token?: string;
 }
 
 const DEMO_PRESETS: {
@@ -97,47 +99,23 @@ export function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
     setError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setIsLoading(true);
 
-    setTimeout(() => {
-      // Tìm xem có khớp với preset nào không hoặc cho phép tài khoản hợp lệ
-      const matched = DEMO_PRESETS.find(
-        (p) => p.user.email.toLowerCase() === email.trim().toLowerCase()
-      );
-
-      if (matched) {
-        if (password === matched.pass) {
-          onLoginSuccess(matched.user);
-          setIsLoading(false);
-          return;
-        } else {
-          setError("Mật khẩu ca trực không chính xác. Vui lòng thử lại!");
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Nếu nhập tài khoản hợp lệ định dạng email
-      if (email.includes("@") && password.length >= 6) {
-        const customUser: AdminUser = {
-          id: `custom_${Date.now()}`,
-          name: email.split("@")[0].toUpperCase(),
-          email: email.trim(),
-          role: "dispatcher",
-          roleTitle: "Điều Phối Viên Hiện Trường",
-          badgeNumber: `TOC-${Math.floor(1000 + Math.random() * 9000)}`,
-          shiftStartTime: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
-        };
-        onLoginSuccess(customUser);
-        setIsLoading(false);
-      } else {
-        setError("Email hoặc mật khẩu không hợp lệ (Mật khẩu tối thiểu 6 ký tự).");
-        setIsLoading(false);
-      }
-    }, 450);
+    try {
+      const res = await loginAdminPortal(email.trim(), password);
+      onLoginSuccess({
+        ...res.data.user,
+        token: res.data.token,
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Đăng nhập ca trực thất bại. Vui lòng kiểm tra thông tin!";
+      setError(msg);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -212,7 +190,7 @@ export function AdminLogin({ onLoginSuccess }: AdminLoginProps) {
                           <span className="text-xs font-bold text-white truncate">
                             {preset.user.name}
                           </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-slate-300 border border-white/5">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-slate-300 border border-white/5 shrink-0 whitespace-nowrap">
                             {preset.user.badgeNumber}
                           </span>
                         </div>

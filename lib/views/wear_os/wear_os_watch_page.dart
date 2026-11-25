@@ -119,6 +119,11 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
   Timer? _toastTimer;
   bool _isBeingFound = false;
   Timer? _findTimer;
+  bool _isJourneyCheckActive = false;
+  String _journeyCheckReason = '';
+  String? _journeyCheckId;
+  int _journeyCheckSeconds = 30;
+  Timer? _journeyCheckTimer;
 
   final List<Map<String, dynamic>> _moods = [
     {'emoji': '😄', 'label': 'Tuyệt vời', 'color': const Color(0xFF00C853)},
@@ -172,16 +177,72 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
       });
     };
 
-    // Nhận lệnh rung tìm đồng hồ từ điện thoại
+    // Nhận lệnh rung tìm đồng hồ từ điện thoại / Web Admin TOC
     WatchSyncManager.instance.onFindWatchPingReceived = () {
       if (!mounted) return;
-      setState(() => _isBeingFound = true);
+      setState(() {
+        _isBeingFound = true;
+        _toastMessage = 'KIỂM TRA PHẢN XẠ TỪ TOC / PHONE';
+        _showCheckinSuccessToast = true;
+      });
       for (int i = 0; i < 6; i++) {
         Future.delayed(Duration(milliseconds: i * 400), () => HapticFeedback.heavyImpact());
       }
       _findTimer?.cancel();
       _findTimer = Timer(const Duration(seconds: 8), () {
-        if (mounted) setState(() => _isBeingFound = false);
+        if (mounted) {
+          setState(() {
+            _isBeingFound = false;
+            _showCheckinSuccessToast = false;
+          });
+        }
+      });
+    };
+
+    // Nhận xác nhận điều phối cứu hộ từ Web Admin TOC
+    WatchSyncManager.instance.onTocDispatchAckReceived = (payload) {
+      if (!mounted) return;
+      final unit = payload['ambulanceUnit']?.toString() ?? 'Hiệp sĩ / Xe 115';
+      setState(() {
+        _toastMessage = 'CỨU HỘ ĐANG TỚI: $unit';
+        _showCheckinSuccessToast = true;
+      });
+      for (int i = 0; i < 3; i++) {
+        Future.delayed(Duration(milliseconds: i * 350), () => HapticFeedback.heavyImpact());
+      }
+      _toastTimer?.cancel();
+      _toastTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted) setState(() => _showCheckinSuccessToast = false);
+      });
+    };
+
+    // Nhận ping hỏi thăm Lệch tuyến >300m / Đứng im >3p ("Bạn ổn chứ?")
+    WatchSyncManager.instance.onRouteDeviationCheckReceived = (payload) {
+      if (!mounted) return;
+      _journeyCheckTimer?.cancel();
+      final timeoutSec = (payload['responseTimeoutSeconds'] as int?) ?? 30;
+      setState(() {
+        _isJourneyCheckActive = true;
+        _journeyCheckId = payload['journeyId']?.toString();
+        _journeyCheckReason = payload['reason']?.toString() ?? 'Lệch tuyến hoặc đứng im > 3 phút';
+        _journeyCheckSeconds = timeoutSec;
+      });
+      for (int i = 0; i < 5; i++) {
+        Future.delayed(Duration(milliseconds: i * 350), () => HapticFeedback.heavyImpact());
+      }
+      _journeyCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted || !_isJourneyCheckActive) {
+          timer.cancel();
+          return;
+        }
+        if (_journeyCheckSeconds > 1) {
+          setState(() => _journeyCheckSeconds--);
+          HapticFeedback.mediumImpact();
+        } else {
+          timer.cancel();
+          setState(() => _isJourneyCheckActive = false);
+          WearOsService.instance.triggerHardwareSos();
+        }
       });
     };
 
@@ -410,6 +471,7 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
     _checkinTimer2?.cancel();
     _toastTimer?.cancel();
     _findTimer?.cancel();
+    _journeyCheckTimer?.cancel();
     super.dispose();
   }
 
@@ -726,6 +788,94 @@ class _WearOsWatchPageState extends State<WearOsWatchPage> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+
+              // Modal Hỏi thăm Lệch tuyến >300m / Đứng im >3p trên mặt Watch 5 ("Bạn ổn chứ?")
+              if (_isJourneyCheckActive)
+                Positioned.fill(
+                  child: ClipOval(
+                    child: Container(
+                      color: const Color(0xF51A1204),
+                      padding: EdgeInsets.all(size <= 200 ? 14.0 : 20.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '⌚ BẠN ỔN CHỨ? (${_journeyCheckSeconds}s)',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.amberAccent,
+                              fontSize: size <= 200 ? 11.0 : 13.0,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _journeyCheckReason,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: size <= 200 ? 8.5 : 10.0,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: () {
+                              _journeyCheckTimer?.cancel();
+                              WatchSyncManager.instance.emitJourneyCheckSafe(
+                                journeyId: _journeyCheckId,
+                              );
+                              setState(() {
+                                _isJourneyCheckActive = false;
+                                _toastMessage = 'ĐÃ XÁC NHẬN AN TOÀN';
+                                _showCheckinSuccessToast = true;
+                              });
+                              HapticFeedback.lightImpact();
+                              _toastTimer?.cancel();
+                              _toastTimer = Timer(const Duration(seconds: 3), () {
+                                if (mounted) setState(() => _showCheckinSuccessToast = false);
+                              });
+                            },
+                            child: Container(
+                              width: size * 0.65,
+                              padding: const EdgeInsets.symmetric(vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF059669),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Text(
+                                '✓ TÔI ỔN',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: size <= 200 ? 10.0 : 11.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: () {
+                              _journeyCheckTimer?.cancel();
+                              setState(() => _isJourneyCheckActive = false);
+                              WearOsService.instance.triggerHardwareSos();
+                            },
+                            child: Text(
+                              '🚨 CỨU HỘ NGAY',
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: size <= 200 ? 9.0 : 10.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

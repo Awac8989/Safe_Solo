@@ -23,4 +23,10 @@ echo   DANH SÁCH TOÀN BỘ THIẾT BỊ SAFESOLO ĐANG HOẠT ĐỘNG
 echo ==============================================================================
 %ADB% devices -l
 echo.
+echo [*] Đang thiết lập ADB Reverse Port 4000 (Backend SafeSolo) cho mọi thiết bị...
+for /f "tokens=1" %%d in ('%ADB% devices ^| findstr /r /c:"[0-9a-zA-Z.:].*device$"') do (
+    echo   -^> Reverse tcp:4000 cho %%d
+    %ADB% -s %%d reverse tcp:4000 tcp:4000
+)
+echo.
 pause

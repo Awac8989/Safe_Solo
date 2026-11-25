@@ -10,6 +10,7 @@ import 'views/achievements/achievements_page.dart';
 import 'views/auth/auth_page.dart';
 import 'views/auth/profile_setup_page.dart';
 import 'views/medical/medical_page.dart';
+import 'views/messenger/messenger_page.dart';
 import 'views/network/network_page.dart';
 import 'views/onboarding/onboarding_page.dart';
 import 'views/permissions/permissions_page.dart';
@@ -70,6 +71,9 @@ Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('FLUTTER GLOBAL ERROR: ${details.exceptionAsString()}');
+    debugPrint('FLUTTER OVERFLOW SUMMARY: ${details.summary}');
+    debugPrint('FLUTTER OVERFLOW CONTEXT: ${details.context}');
+    debugPrint('FLUTTER STACK: ${details.stack}');
   };
   ErrorWidget.builder = (details) {
     debugPrint('FLUTTER BUILD ERROR: ${details.exceptionAsString()}');
@@ -123,6 +127,7 @@ class SafeSoloApp extends StatelessWidget {
               '/onboarding': (_) => const OnboardingPage(),
               '/permissions': (_) => const PermissionsPage(),
               '/medical': (_) => const MedicalPage(),
+              '/messenger': (_) => const MessengerPage(),
               '/network': (_) => const NetworkPage(),
               '/security': (_) => const SecurityPage(),
               '/stealth': (_) => const StealthPage(),

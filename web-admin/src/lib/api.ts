@@ -1,23 +1,78 @@
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000/api";
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, "");
+export const ADMIN_SESSION_STORAGE_KEY = "safesolo_admin_session_v1";
+
+export function getStoredAdminToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { token?: string };
+    return typeof parsed?.token === "string" && parsed.token.trim().length > 0 ? parsed.token.trim() : null;
+  } catch {
+    return null;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredAdminToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
       "x-api-key": "default-public-api-key-123",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
     ...init,
   });
 
   const data = await response.json().catch(() => null);
+  if (response.status === 401 && !path.startsWith("/admin/auth/login") && typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+      window.dispatchEvent(new CustomEvent("safesolo:admin-unauthorized", { detail: data }));
+    } catch {}
+  }
   if (!response.ok) {
     throw new Error(data?.error || data?.message || `Request failed: ${response.status}`);
   }
 
   return data as T;
 }
+
+export type AdminLoginUserPayload = {
+  id: string;
+  name: string;
+  email: string;
+  role: "superadmin" | "dispatcher" | "moderator";
+  roleTitle: string;
+  badgeNumber: string;
+  shiftStartTime: string;
+  token?: string;
+};
+
+export const loginAdminPortal = async (email: string, password: string) => {
+  return request<{
+    success: true;
+    data: {
+      token: string;
+      expiresInSeconds: number;
+      user: AdminLoginUserPayload;
+    };
+  }>("/admin/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+};
+
+export const fetchAdminSession = async () => {
+  return request<{
+    success: true;
+    data: {
+      user: AdminLoginUserPayload;
+    };
+  }>("/admin/auth/me");
+};
 
 export type AdminOverviewResponse = {
   success: true;
@@ -32,6 +87,7 @@ export type AdminOverviewResponse = {
     };
     incidents: Array<{
       id: string;
+      userId?: string | null;
       type: "SOS" | "DURESS" | "MEDICAL";
       severity: number;
       status: string;
@@ -39,7 +95,9 @@ export type AdminOverviewResponse = {
       age: number | null;
       blood: string;
       allergies: string;
+      chronicConditions?: string;
       address: string;
+      microAddress?: string | null;
       district: string;
       city: string;
       x: number;
@@ -63,6 +121,22 @@ export type AdminOverviewResponse = {
         syncTime?: string;
         hrvRmssd?: number;
         strokeRisk?: string;
+        isOffWrist?: boolean;
+        svmG?: number;
+        steps?: number;
+        fallDetected?: boolean;
+        gForceWaveform?: number[];
+        ppgWaveform?: number[];
+        fusion?: {
+          phase?: string;
+          peakSvmG?: number;
+          stillnessRatio?: number;
+          isOffWrist?: boolean;
+          ppgAnomalyReason?: string;
+          confidence?: number;
+          falseAlarmsBlockedCount?: number;
+          rejectedReason?: string;
+        } | null;
       } | null;
       hitl?: HitlTriage;
       clinicalActions?: ClinicalAction[];
@@ -150,7 +224,8 @@ export type AuditLog = {
   actor: string;
   action: string;
   target: string;
-  tone: "info" | "sos" | "warning";
+  tone: "info" | "sos" | "warning" | "success";
+  metadata?: Record<string, any>;
   hash: string;
   category: string;
 };
@@ -181,6 +256,7 @@ export type KycApplicant = {
   issuingAuthority?: string;
   workingUnit?: string;
   yearsOfExperience?: number;
+  credentialImageUrl?: string | null;
   certificateImageUrl?: string | null;
   certificateNumber?: string | null;
   issuingOrganization?: string;
@@ -479,6 +555,8 @@ export type HeroRadarItem = {
   equipment: string[];
   skills: string[];
   lastSeenAt: string;
+  isDispatched?: boolean;
+  isArrived?: boolean;
 };
 
 export type SafeHavenItem = {
@@ -639,6 +717,7 @@ export const createHazard = async (payload: Partial<HazardItem>) => {
 
 export type MultiVictimVitalsItem = {
   incidentId: string;
+  userId?: string | null;
   victimName: string;
   victimPhone: string;
   age: number;
@@ -655,8 +734,13 @@ export type MultiVictimVitalsItem = {
     hrvRmssd: number;
     strokeRisk: string;
     fallDetected: boolean;
+    isOffWrist?: boolean;
+    svmG?: number;
+    steps?: number;
     battery: number;
     device: string;
+    watchPaired?: boolean;
+    watchDeviceId?: string | null;
     status: string;
     syncTime: string;
   };
@@ -699,9 +783,105 @@ export const instantDispatchVictim = async (
       dispatchId: string;
       dispatchedAt: string;
       telegramStatus: string;
+      watchNotification?: string;
       sbarSummary: string;
     };
   }>(`/admin/vitals/${incidentId}/instant-dispatch`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+// Galaxy Watch 5 <-> Web Admin Bi-directional Bridge APIs
+export type WatchDeviceSnapshot = {
+  deviceId: string;
+  deviceModel: string;
+  paired: boolean;
+  pairedAt: string | null;
+  userId: string | null;
+  userName: string;
+  userPhone: string | null;
+  userStatus: string | null;
+  pendingWatchCommands: number;
+  vitals: {
+    heartRate: number;
+    spO2: number;
+    battery: number;
+    steps: number;
+    isOffWrist: boolean;
+    svmG: number;
+    tiltAngle: number;
+    updatedAt: number;
+  } | null;
+};
+
+export type WatchEventEntry = {
+  id: string;
+  timestamp: string;
+  type: string;
+  sender: string;
+  deviceId: string;
+  userId?: string | null;
+  note?: string;
+  payload?: Record<string, unknown>;
+};
+
+export type WatchDevicesResponse = {
+  devices: WatchDeviceSnapshot[];
+  recentEvents: WatchEventEntry[];
+  sseClientCount: number;
+};
+
+export const getWatchStreamUrl = () =>
+  `${API_BASE_URL}/watch/stream?api_key=default-public-api-key-123`;
+
+export const fetchWatchDevices = async () => {
+  return request<{ success: true; data: WatchDevicesResponse }>("/watch/devices");
+};
+
+export const quickPairWatchToUser = async (payload: {
+  deviceId?: string;
+  deviceModel?: string;
+  userId: string;
+  forceReassign?: boolean;
+}) => {
+  return request<{
+    success: true;
+    paired: boolean;
+    deviceId: string;
+    deviceModel: string;
+    userId: string;
+  }>("/watch/pair/auto-pair", {
+    method: "POST",
+    body: JSON.stringify({ forceReassign: true, ...payload }),
+  });
+};
+
+export const sendWatchCommand = async (payload: {
+  deviceId?: string;
+  userId?: string | null;
+  action:
+    | "FIND_WATCH_PING"
+    | "INSTANT_MEASURE_REQ"
+    | "TOC_DISPATCH_ACK"
+    | "TIMER_SYNC"
+    | "ALERT_CANCELLED";
+  payload?: Record<string, unknown>;
+  issuedBy?: string;
+}) => {
+  return request<{
+    success: true;
+    data: {
+      deviceId: string;
+      userId: string | null;
+      pendingWatchQueueSize: number;
+      packet: {
+        messageId: string;
+        action: string;
+        timestamp: string;
+      };
+    };
+  }>("/watch/command", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -1250,7 +1430,9 @@ export type BloodRelayItem = {
     coordinates: [number, number]; // [lng, lat]
   };
   clinicalJustification: string;
-  status: "PENDING_DONORS" | "DONORS_COMMITTED" | "IN_TRANSIT" | "DELIVERED_AND_FULFILLED" | "CANCELLED";
+  requestedBloodType?: string;
+  hospitalName?: string;
+  status: "PENDING_DONORS" | "SEARCHING" | "DONORS_COMMITTED" | "IN_TRANSIT" | "DELIVERED_AND_FULFILLED" | "CANCELLED";
   matchedDonors: Array<{
     donorId: string;
     donorName?: string;
@@ -3456,6 +3638,30 @@ export const locateUrologyCenterApi = async (payload: { lat: number; lng: number
     etaMinutes: number;
     urologyTraumaGuidance: string;
   }>("/hospitals/urology-center/locate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const testSafePointIot = async (
+  id: string,
+  payload: { action: "PING_SENSOR" | "TEST_SIREN"; actorName?: string },
+) => {
+  return request<{
+    success: true;
+    data: {
+      stationId: string;
+      serialNumber: string;
+      stationName: string;
+      action: string;
+      doorState: string;
+      batteryPercent: number;
+      latencyMs: number;
+      sirenDb: number;
+      lastPingAt: string;
+      message: string;
+    };
+  }>(`/safepoints/${id}/test-iot`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

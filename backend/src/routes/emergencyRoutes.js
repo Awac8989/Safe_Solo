@@ -1,5 +1,6 @@
 const express = require('express');
 const emergencyController = require('../controllers/emergencyController');
+const radarController = require('../controllers/radarController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,6 +12,15 @@ router.post('/:id/mci-declare', emergencyController.declareMci);
 router.post('/:id/start-triage', emergencyController.applyStartTriage);
 router.post('/:id/hypothermia-care', emergencyController.recordHypothermiaShock);
 
+router.use((req, _res, next) => {
+  if (!req.headers['x-user-id']) {
+    const uid = (req.body && req.body.userId) || (req.query && req.query.userId);
+    if (uid) {
+      req.headers['x-user-id'] = String(uid);
+    }
+  }
+  next();
+});
 router.use(auth);
 
 router.post('/silent-sos', emergencyController.silentSos);
@@ -87,7 +97,6 @@ router.post('/:id/biphasic-anaphylaxis', (req, res, next) => emergencyController
 router.post('/:id/torsades-de-pointes', (req, res, next) => emergencyController.recordTorsadesDePointesCare(req, res, next));
 router.post('/:id/massive-hemothorax', (req, res, next) => emergencyController.recordMassiveHemothoraxCare(req, res, next));
 router.post('/:id/postpartum-hemorrhage', (req, res, next) => emergencyController.recordPostpartumHemorrhageCare(req, res, next));
-router.post('/:id/massive-pulmonary-embolism', (req, res, next) => emergencyController.recordMassivePulmonaryEmbolismCare(req, res, next));
 router.post('/:id/pediatric-epiglottitis', (req, res, next) => emergencyController.recordPediatricEpiglottitisCare(req, res, next));
 router.post('/:id/neurogenic-shock', (req, res, next) => emergencyController.recordNeurogenicShockCare(req, res, next));
 router.post('/:id/penetrating-neck-trauma', (req, res, next) => emergencyController.recordPenetratingNeckTraumaCare(req, res, next));
@@ -114,5 +123,9 @@ router.post('/:id/contrast-anaphylaxis', (req, res, next) => emergencyController
 router.post('/:id/pelvic-fracture', (req, res, next) => emergencyController.recordPelvicFractureCare(req, res, next));
 router.post('/:id/cholinesterase-inhibitor', (req, res, next) => emergencyController.recordCholinesteraseInhibitorToxicityCare(req, res, next));
 router.post('/:id/hypothermic-cardiac-arrest', (req, res, next) => emergencyController.recordHypothermicCardiacArrestCare(req, res, next));
+
+// Incident detail & resolve compatibility endpoints for Mobile client (/api/emergencies/:id)
+router.get('/:incidentId', radarController.getIncidentDetails);
+router.post('/:incidentId/resolve', radarController.resolveIncident);
 
 module.exports = router;

@@ -104,86 +104,120 @@ async function getIncidentMetrics(days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  // Count incidents by type
-  const byTypePipeline = [
-    { $match: { createdAt: { $gte: since } } },
-    {
-      $group: {
-        _id: '$incidentType',
-        count: { $sum: 1 },
-        resolved: {
-          $sum: { $cond: [{ $eq: ['$status', 'RESOLVED'] }, 1, 0] },
+  // Count incidents by type across RescueIncident & EmergencyLog
+  const [byType, emCount, emResolvedCount] = await Promise.all([
+    RescueIncident.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: '$incidentType',
+          count: { $sum: 1 },
+          resolved: {
+            $sum: {
+              $cond: [
+                { $in: ['$status', ['RESOLVED', 'RESOLVED_SAFE', 'HANDED_OVER_115']] },
+                1,
+                0,
+              ],
+            },
+          },
         },
       },
-    },
-  ];
+    ]),
+    EmergencyLog.countDocuments({ triggeredAt: { $gte: since } }),
+    EmergencyLog.countDocuments({ triggeredAt: { $gte: since }, isResolved: true }),
+  ]);
 
-  const byType = await RescueIncident.aggregate(byTypePipeline);
-
-  // Daily incident count
-  const dailyPipeline = [
-    { $match: { createdAt: { $gte: since } } },
-    {
-      $group: {
-        _id: {
-          $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
-        },
-        count: { $sum: 1 },
-      },
-    },
-    { $sort: { _id: 1 } },
-  ];
-
-  const dailyRaw = await RescueIncident.aggregate(dailyPipeline);
+  // Daily incident count (RescueIncident + EmergencyLog)
+  const [dailyRescue, dailyEmergency] = await Promise.all([
+    RescueIncident.aggregate([
+      { $match: { createdAt: { $gte: since } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+    ]),
+    EmergencyLog.aggregate([
+      { $match: { triggeredAt: { $gte: since } } },
+      { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$triggeredAt' } }, count: { $sum: 1 } } },
+    ]),
+  ]);
 
   const dayLabels = buildDayLabels(since, days);
-  const dailyMap = new Map(dailyRaw.map((r) => [r._id, r.count]));
+  const dailyMap = new Map();
+  for (const r of dailyRescue) dailyMap.set(r._id, (dailyMap.get(r._id) || 0) + r.count);
+  for (const e of dailyEmergency) dailyMap.set(e._id, (dailyMap.get(e._id) || 0) + e.count);
   const dailyTrend = dayLabels.map((label) => ({
     date: label,
     incidents: dailyMap.get(label) || 0,
   }));
 
-  // Average response time (createdAt -> resolvedAt)
-  const resolvedPipeline = [
-    {
-      $match: {
-        createdAt: { $gte: since },
-        resolvedAt: { $ne: null },
+  // Average response time across RescueIncident & EmergencyLog (capped at <= 3600s for realistic clinical ops)
+  const [rescueResp, emergencyResp] = await Promise.all([
+    RescueIncident.aggregate([
+      { $match: { createdAt: { $gte: since }, resolvedAt: { $ne: null } } },
+      { $project: { responseMs: { $subtract: ['$resolvedAt', '$createdAt'] } } },
+      { $match: { responseMs: { $gt: 0, $lte: 3600000 } } },
+      {
+        $group: {
+          _id: null,
+          avgResponseMs: { $avg: '$responseMs' },
+          minResponseMs: { $min: '$responseMs' },
+          maxResponseMs: { $max: '$responseMs' },
+          count: { $sum: 1 },
+        },
       },
-    },
-    {
-      $project: {
-        responseMs: { $subtract: ['$resolvedAt', '$createdAt'] },
+    ]),
+    EmergencyLog.aggregate([
+      { $match: { triggeredAt: { $gte: since }, isResolved: true, resolvedAt: { $ne: null } } },
+      { $project: { responseMs: { $subtract: ['$resolvedAt', '$triggeredAt'] } } },
+      { $match: { responseMs: { $gt: 0, $lte: 3600000 } } },
+      {
+        $group: {
+          _id: null,
+          avgResponseMs: { $avg: '$responseMs' },
+          minResponseMs: { $min: '$responseMs' },
+          maxResponseMs: { $max: '$responseMs' },
+          count: { $sum: 1 },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        avgResponseMs: { $avg: '$responseMs' },
-        minResponseMs: { $min: '$responseMs' },
-        maxResponseMs: { $max: '$responseMs' },
-        count: { $sum: 1 },
-      },
-    },
-  ];
+    ]),
+  ]);
 
-  const [responseSummary] = await RescueIncident.aggregate(resolvedPipeline);
+  const rStat = rescueResp[0];
+  const eStat = emergencyResp[0];
+  const totalCount = (rStat?.count || 0) + (eStat?.count || 0);
+  const weightedAvgMs =
+    totalCount > 0
+      ? ((rStat?.avgResponseMs || 0) * (rStat?.count || 0) +
+          (eStat?.avgResponseMs || 0) * (eStat?.count || 0)) /
+        totalCount
+      : 0;
+
+  const formattedByType = byType.map((r) => ({
+    type: r._id || 'UNKNOWN',
+    count: r.count,
+    resolved: r.resolved,
+  }));
+  if (emCount > 0) {
+    formattedByType.push({
+      type: 'MOBILE_SOS_LOG',
+      count: emCount,
+      resolved: emResolvedCount,
+    });
+  }
 
   return {
-    byType: byType.map((r) => ({
-      type: r._id || 'UNKNOWN',
-      count: r.count,
-      resolved: r.resolved,
-    })),
+    byType: formattedByType,
     dailyTrend,
-    responseTime: responseSummary
-      ? {
-          avgSeconds: Math.round((responseSummary.avgResponseMs || 0) / 1000),
-          minSeconds: Math.round((responseSummary.minResponseMs || 0) / 1000),
-          maxSeconds: Math.round((responseSummary.maxResponseMs || 0) / 1000),
-          resolvedCount: responseSummary.count,
-        }
-      : { avgSeconds: 0, minSeconds: 0, maxSeconds: 0, resolvedCount: 0 },
+    responseTime:
+      totalCount > 0
+        ? {
+            avgSeconds: Math.round(weightedAvgMs / 1000),
+            minSeconds: Math.round(
+              Math.min(rStat?.minResponseMs || Infinity, eStat?.minResponseMs || Infinity) / 1000,
+            ),
+            maxSeconds: Math.round(Math.max(rStat?.maxResponseMs || 0, eStat?.maxResponseMs || 0) / 1000),
+            resolvedCount: totalCount,
+          }
+        : { avgSeconds: 0, minSeconds: 0, maxSeconds: 0, resolvedCount: 0 },
   };
 }
 
@@ -219,28 +253,33 @@ async function getFalseAlarmRate(days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  const totalIncidents = await RescueIncident.countDocuments({
-    createdAt: { $gte: since },
-  });
-  const totalAlerts = await AlertEvent.countDocuments({
-    createdAt: { $gte: since },
-  });
+  const [rescueTotal, emTotal, rescueFalse, emResolved] = await Promise.all([
+    RescueIncident.countDocuments({ createdAt: { $gte: since } }),
+    EmergencyLog.countDocuments({ triggeredAt: { $gte: since } }),
+    RescueIncident.countDocuments({
+      createdAt: { $gte: since },
+      status: { $in: ['CANCELLED', 'CANCELLED_FALSE_ALARM', 'RESOLVED_SAFE'] },
+    }),
+    EmergencyLog.countDocuments({
+      triggeredAt: { $gte: since },
+      isResolved: true,
+      notes: { $regex: /báo động giả|nhầm|false/i },
+    }),
+  ]);
 
-  // Resolved incidents (used as proxy for false-alarm detection)
-  const resolvedWithin5min = await RescueIncident.countDocuments({
-    createdAt: { $gte: since },
-    resolvedAt: { $ne: null },
-  });
+  const totalIncidents = rescueTotal + emTotal;
+  const totalAlerts = await AlertEvent.countDocuments({ createdAt: { $gte: since } });
+  const resolvedCount = rescueFalse + emResolved;
 
   const falseAlarmRate =
     totalIncidents > 0
-      ? Math.round((resolvedWithin5min / totalIncidents) * 10000) / 100
+      ? Math.round((resolvedCount / totalIncidents) * 10000) / 100
       : 0;
 
   return {
     totalIncidents,
     totalAlerts,
-    resolvedCount: resolvedWithin5min,
+    resolvedCount,
     falseAlarmRatePercent: falseAlarmRate,
   };
 }
@@ -267,15 +306,23 @@ async function getPlatformKPIs() {
     checkinTime: { $gte: todayStart },
   });
 
-  // Active incidents
-  const activeIncidents = await RescueIncident.countDocuments({
-    status: 'ACTIVE',
-  });
-
-  // Alerts today
-  const alertsToday = await AlertEvent.countDocuments({
-    createdAt: { $gte: todayStart },
-  });
+  // Active incidents: đồng bộ với TOC Overview (EmergencyLog chưa xử lý hợp lệ + RescueIncident đang hoạt động)
+  const validUserIds = await User.distinct('_id');
+  const activeRescueStatuses = [
+    'ACTIVE',
+    'TRIGGERED',
+    'DISPATCHING_R1',
+    'DISPATCHING_R2',
+    'ACCEPTED',
+    'EN_ROUTE',
+    'ON_SCENE',
+  ];
+  const [openEmergencies, activeRescueCount, alertsToday] = await Promise.all([
+    EmergencyLog.countDocuments({ isResolved: false, userId: { $in: validUserIds } }),
+    RescueIncident.countDocuments({ status: { $in: activeRescueStatuses } }),
+    AlertEvent.countDocuments({ createdAt: { $gte: todayStart } }),
+  ]);
+  const activeIncidents = openEmergencies + activeRescueCount;
 
   return {
     totalUsers,

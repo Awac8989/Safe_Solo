@@ -526,11 +526,12 @@ class StrokeDefenseService extends ChangeNotifier {
 
     debugPrint('[StrokeDefense] Dispatching Golden Hour SMS: $smsMessage');
 
-    // 1. Gửi SMS cứu nạn tới số người thân / con gái ông Tư
+    // 1. Gửi SMS cứu nạn tự động (SmsManager) tới số người thân / con gái ông Tư
     try {
-      await OfflineSosService.instance.sendEmergencySms(
+      await OfflineSosService.instance.sendDirectSms(
         phoneNumber: '0913843958',
         message: smsMessage,
+        fallbackToComposer: true,
       );
     } catch (e) {
       debugPrint('[StrokeDefense] SMS failed: $e');

@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const mongoose = require('mongoose');
 const { fullName, sanitizeUser } = require('../lib/utils');
 const { listAlertEvents } = require('./alertEventService');
@@ -14,8 +16,95 @@ const ThankYouNote = require('../models/ThankYouNote');
 const VolunteerResponse = require('../models/VolunteerResponse');
 const HazardReport = require('../models/HazardReport');
 const DisasterAlert = require('../models/DisasterAlert');
+const MedicalProfile = require('../models/MedicalProfile');
+const DeviceSignal = require('../models/DeviceSignal');
 const { mapUserDoc, toIso } = require('../lib/mongoCore');
 const { decryptUserSensitivePayload } = require('../lib/userSensitiveCodec');
+const { decryptMedicalPayload } = require('../lib/medicalProfileCodec');
+
+const UPLOADS_ROOT = path.join(__dirname, '..', '..', 'uploads');
+
+function resolveUploadOrFallback(rawUrl, fallbackFn) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return fallbackFn();
+  }
+  if (rawUrl.startsWith('data:')) {
+    return rawUrl;
+  }
+  const uploadsIdx = rawUrl.indexOf('/uploads/');
+  if (uploadsIdx !== -1) {
+    const relPath = rawUrl.slice(uploadsIdx + '/uploads/'.length).replace(/^\/+/, '');
+    const fullDiskPath = path.join(UPLOADS_ROOT, relPath);
+    if (!fs.existsSync(fullDiskPath)) {
+      return fallbackFn();
+    }
+  }
+  return rawUrl;
+}
+
+function deriveUniqueVitals(seedId, severity = 3, signalSnapshot = null) {
+  let hash = 0;
+  const s = String(seedId || 'default');
+  for (let i = 0; i < s.length; i++) {
+    hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  const isCrit = Number(severity || 3) >= 3;
+  const heartRate = signalSnapshot?.heartRate || (isCrit ? 116 + (hash % 24) : 76 + (hash % 18));
+  const spo2 = signalSnapshot?.spo2 || (isCrit ? 88 + (hash % 5) : 96 + (hash % 3));
+  const hrvRmssd = signalSnapshot?.hrvRmssd || (isCrit ? 14 + (hash % 11) : 34 + (hash % 16));
+  const battery = signalSnapshot?.battery || 62 + (hash % 34);
+  const svmG = signalSnapshot?.svmG !== undefined ? Number(signalSnapshot.svmG) : undefined;
+  const isOffWrist = Boolean(signalSnapshot?.isOffWrist);
+  const fallDetected = Boolean(signalSnapshot?.fallDetected || (svmG !== undefined && svmG >= 2.5));
+  const strokeRisk =
+    spo2 < 92 || heartRate > 125
+      ? 'NGUY CƠ CAO (Rung nhĩ AFib)'
+      : isCrit
+        ? 'THEO DÕI CHẶT (Nhịp nhanh)'
+        : 'BÌNH THƯỜNG';
+
+  const gForceWaveform = Array.isArray(signalSnapshot?.gForceWaveform) && signalSnapshot.gForceWaveform.length > 0
+    ? signalSnapshot.gForceWaveform
+    : [1.0, 1.02, 0.98, 1.01, isCrit ? Number((svmG ?? 3.1).toFixed(2)) : 1.03, 1.01, 0.99, 1.0];
+  const ppgWaveform = Array.isArray(signalSnapshot?.ppgWaveform) && signalSnapshot.ppgWaveform.length > 0
+    ? signalSnapshot.ppgWaveform
+    : [0.16, 0.88, 0.24, 0.42, 0.18, 0.15, 0.92, 0.22];
+  const fusion = signalSnapshot?.fusion || {
+    phase: fallDetected ? 'PPG_AND_COUNTDOWN' : 'IDLE_MONITORING',
+    peakSvmG: svmG ?? 1.0,
+    isOffWrist,
+    stillnessRatio: fallDetected ? 0.92 : 0.0,
+    ppgAnomalyReason: strokeRisk,
+    confidence: fallDetected ? 0.88 : 0.0,
+    falseAlarmsBlockedCount: 0,
+  };
+
+  return {
+    spo2,
+    heartRate,
+    device: signalSnapshot?.device || 'Samsung Galaxy Watch 5 (WearOS)',
+    battery,
+    status: isOffWrist ? 'THÁO ĐỒNG HỒ KHỎI CỔ TAY' : isCrit ? 'CẢNH BÁO NGUY HIỂM' : 'BÌNH THƯỜNG',
+    syncTime: signalSnapshot?.syncTime || 'Thời gian thực',
+    hrvRmssd,
+    strokeRisk,
+    isOffWrist,
+    svmG: svmG ?? 1.0,
+    steps: signalSnapshot?.steps,
+    fallDetected,
+    watchPaired: Boolean(signalSnapshot?.watchPaired),
+    watchDeviceId: signalSnapshot?.watchDeviceId || null,
+    gForceWaveform,
+    ppgWaveform,
+    fusion,
+  };
+}
+
+function parseAgeFromBirthYear(birthYear) {
+  const year = parseInt(String(birthYear || '').trim(), 10);
+  if (!year || year < 1920 || year > new Date().getFullYear()) return null;
+  return new Date().getFullYear() - year;
+}
 
 const hitlIncidentStates = new Map();
 const incidentSopStates = new Map();
@@ -168,6 +257,8 @@ function buildCredentialBadgeCard({ name, category, credentialName, credentialNu
   const safeCredName = xmlEscape(credentialName || 'N/A');
   const safeUnit = xmlEscape(workingUnit || 'N/A');
   const safeAuthority = xmlEscape(issuingAuthority || 'Bộ Y tế');
+  const safeBadgeHeader = xmlEscape(badgeHeader);
+  const safeAuthorityLabel = xmlEscape(authorityLabel);
 
   return svgDataUrl(`
     <svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600">
@@ -180,7 +271,7 @@ function buildCredentialBadgeCard({ name, category, credentialName, credentialNu
       <rect width="960" height="600" rx="32" fill="url(#credGrad)"/>
       <rect x="30" y="30" width="900" height="540" rx="24" fill="#ffffff" fill-opacity="0.9" stroke="${primaryColor}" stroke-width="4"/>
       <rect x="30" y="30" width="900" height="85" rx="20" fill="${primaryColor}"/>
-      <text x="480" y="70" text-anchor="middle" font-size="24" font-family="Arial, sans-serif" font-weight="700" fill="#ffffff" letter-spacing="1">${authorityLabel}</text>
+      <text x="480" y="70" text-anchor="middle" font-size="24" font-family="Arial, sans-serif" font-weight="700" fill="#ffffff" letter-spacing="1">${safeAuthorityLabel}</text>
       <text x="480" y="98" text-anchor="middle" font-size="16" font-family="Arial, sans-serif" fill="#ffffff" opacity="0.9">CHỨNG THƯ XÁC THỰC NGHIỆP VỤ SAFESOLO HERO KYC</text>
 
       <rect x="65" y="150" width="220" height="280" rx="20" fill="${secondaryColor}" stroke="${primaryColor}" stroke-width="2"/>
@@ -189,7 +280,7 @@ function buildCredentialBadgeCard({ name, category, credentialName, credentialNu
       <text x="175" y="255" text-anchor="middle" font-size="28" font-family="Arial, sans-serif" font-weight="700" fill="${primaryColor}">OFFICIAL</text>
       <text x="175" y="410" text-anchor="middle" font-size="13" font-family="Arial, sans-serif" font-weight="700" fill="${primaryColor}">ĐÃ XÁC MINH EKYC</text>
 
-      <text x="320" y="175" font-size="15" font-family="Arial, sans-serif" font-weight="700" fill="${primaryColor}" letter-spacing="1">${badgeHeader}</text>
+      <text x="320" y="175" font-size="15" font-family="Arial, sans-serif" font-weight="700" fill="${primaryColor}" letter-spacing="1">${safeBadgeHeader}</text>
       <text x="320" y="215" font-size="30" font-family="Arial, sans-serif" font-weight="700" fill="#0f172a">${safeName}</text>
 
       <text x="320" y="260" font-size="14" font-family="Arial, sans-serif" fill="#64748b">Số hiệu chứng chỉ / Thẻ ngành:</text>
@@ -358,8 +449,8 @@ function buildHitlTriage(incidentType, severity, vitals, incidentId) {
       state === 'DISPATCHED' || state === 'RESOLVED'
         ? 'COMPLETED'
         : state === 'CANCELLED_FALSE_ALARM'
-        ? 'CANCELLED'
-        : 'PENDING_COUNTDOWN',
+          ? 'CANCELLED'
+          : 'PENDING_COUNTDOWN',
     tier3Status:
       state === 'AMBULANCE_DISPATCHED' || state === 'RESOLVED' ? 'COMPLETED' : 'STRICT_GATE_LOCKED',
   };
@@ -522,49 +613,53 @@ function getDemoHitlIncidents(mongoUsers = []) {
   });
 }
 
-function buildDispatchIncidentFromEmergency(log, mongoUsers = []) {
+function buildDispatchIncidentFromEmergency(log, mongoUsers = [], medMap = new Map(), signalMap = new Map()) {
   const user = log.userId;
+  const rawUserId = String(log.rawUserId || user?._id || '');
+  const med = medMap.get(rawUserId) || null;
+  const sig = signalMap.get(rawUserId) || null;
   const contacts = user?.emergencyContacts || [];
-  const firstContact = contacts[0] || null;
+  const firstContact = contacts[0] || med?.emergencyContact || null;
   const location = log.locationSnapshot || null;
   const [firstName, ...rest] = String(user?.fullName || 'Unknown User').split(' ');
 
-  const vitals = {
-    spo2: 91,
-    heartRate: 124,
-    device: 'Samsung Galaxy Watch 5 (WearOS)',
-    battery: 82,
-    status: 'CẢNH BÁO NGUY HIỂM',
-    syncTime: 'Thời gian thực',
-    hrvRmssd: 18,
-    strokeRisk: 'NGUY CƠ CAO (Rung nhĩ AFib)',
-  };
+  const vitals = deriveUniqueVitals(log._id, 3, sig);
 
   const hitl = buildHitlTriage('SOS', 3, vitals, String(log._id));
   const existing = hitlIncidentStates.get(String(log._id));
+  const resolvedBlood = (med?.bloodType && med.bloodType.trim()) || 'O+';
+  const resolvedAllergies = (med?.allergies && med.allergies.trim()) || user?.medicalNotes || 'Không ghi nhận dị ứng';
+  const resolvedAge = parseAgeFromBirthYear(med?.birthYear) || null;
 
   return {
     id: log._id,
+    userId: rawUserId || null,
     type: 'SOS',
     severity: 3,
     status: existing?.state === 'CANCELLED_FALSE_ALARM' ? 'CANCELLED' : log.isResolved ? 'RESOLVED' : 'ACTIVE',
     name: user?.fullName || 'Unknown User',
     firstName,
     lastName: rest.join(' '),
-    age: null,
-    blood: 'N/A',
-    allergies: user?.medicalNotes || 'No notes',
+    age: resolvedAge,
+    blood: resolvedBlood,
+    allergies: resolvedAllergies,
+    chronicConditions: med?.conditions || '',
     address: location?.approxAddress || (location ? `${location.lat}, ${location.lng}` : '227 Nguyễn Văn Cừ, Phường 4, Quận 5, TP.HCM'),
-    district: location?.approxAddress?.includes('Quận 1') ? 'Quận 1' : 'Quận 5',
-    city: 'TP. Hồ Chí Minh',
+    microAddress: location?.microAddress || user?.microAddress || null,
+    district: location?.approxAddress?.includes('Bình Dương') || location?.approxAddress?.includes('Thủ Dầu Một')
+      ? 'TP. Thủ Dầu Một'
+      : location?.approxAddress?.includes('Quận 1')
+        ? 'Quận 1'
+        : 'Quận 5',
+    city: location?.approxAddress?.includes('Bình Dương') ? 'Bình Dương' : 'TP. Hồ Chí Minh',
     x: location ? 20 + Math.abs((location.lng * 17) % 60) : 50,
     y: location ? 20 + Math.abs((location.lat * 23) % 60) : 50,
     receivedAt: log.triggeredAt,
     channel: log.smsSentStatus ? 'SMS' : 'App',
     phoneNumber: user?.phoneNumber || '',
-    medicalNotes: user?.medicalNotes || '',
-    emergencyContactName: firstContact?.name || '',
-    emergencyContactPhone: firstContact?.phone || '',
+    medicalNotes: user?.medicalNotes || resolvedAllergies,
+    emergencyContactName: firstContact?.name || med?.emergencyPhone || 'Người thân khẩn cấp',
+    emergencyContactPhone: firstContact?.phone || med?.emergencyPhone || '',
     location: location || { lat: 10.762622, lng: 106.682276 },
     vitals: existing?.vitalsAfterRescue || vitals,
     hitl,
@@ -581,36 +676,34 @@ function buildDispatchIncidentFromEmergency(log, mongoUsers = []) {
   };
 }
 
-function buildDispatchIncidentFromRescue(incident, user, mongoUsers = []) {
+function buildDispatchIncidentFromRescue(incident, user, mongoUsers = [], medMap = new Map(), signalMap = new Map()) {
+  const rawUserId = String(incident.victimId || user?._id || '');
+  const med = medMap.get(rawUserId) || null;
+  const sig = signalMap.get(rawUserId) || null;
   const contacts = user?.emergencyContacts || [];
-  const firstContact = contacts[0] || null;
+  const firstContact = contacts[0] || med?.emergencyContact || null;
   const [firstName, ...rest] = String(user?.fullName || 'Unknown User').split(' ');
 
   const severity = Number(incident.severity || 3);
-  const vitals = {
-    spo2: severity >= 3 ? 91 : 98,
-    heartRate: severity >= 3 ? 122 : 78,
-    device: 'Samsung Galaxy Watch 5 (WearOS)',
-    battery: 86,
-    status: severity >= 3 ? 'CẢNH BÁO NGUY HIỂM' : 'BÌNH THƯỜNG',
-    syncTime: 'Thời gian thực',
-    hrvRmssd: severity >= 3 ? 18 : 42,
-    strokeRisk: severity >= 3 ? 'NGUY CƠ CAO (Rung nhĩ AFib)' : 'BÌNH THƯỜNG',
-  };
+  const vitals = deriveUniqueVitals(incident._id, severity, sig);
 
   const incidentType = String(incident.incidentType || 'SOS').toUpperCase();
   const hitl = buildHitlTriage(incidentType, severity, vitals, String(incident._id));
   const existing = hitlIncidentStates.get(String(incident._id));
+  const resolvedBlood = (med?.bloodType && med.bloodType.trim()) || 'O+';
+  const resolvedAllergies = (med?.allergies && med.allergies.trim()) || incident.medicalSnapshot?.allergies || user?.medicalNotes || 'Không ghi nhận dị ứng';
+  const resolvedAge = parseAgeFromBirthYear(med?.birthYear) || null;
 
   return {
     id: incident._id,
+    userId: rawUserId || null,
     type: incidentType,
     severity,
     status: existing?.state === 'CANCELLED_FALSE_ALARM'
       ? 'CANCELLED'
       : (incident.status === 'RESOLVED' || incident.status === 'RESOLVED_SAFE')
-      ? 'RESOLVED'
-      : incident.status,
+        ? 'RESOLVED'
+        : incident.status,
     isBuddyDispatchRequired: Boolean(incident.isBuddyDispatchRequired),
     buddyStatus: incident.buddyStatus || 'NOT_REQUIRED',
     rendezvousPoint: incident.rendezvousPoint || null,
@@ -619,10 +712,12 @@ function buildDispatchIncidentFromRescue(incident, user, mongoUsers = []) {
     name: user?.fullName || 'Unknown User',
     firstName,
     lastName: rest.join(' '),
-    age: null,
-    blood: 'N/A',
-    allergies: user?.medicalNotes || 'No notes',
+    age: resolvedAge,
+    blood: resolvedBlood,
+    allergies: resolvedAllergies,
+    chronicConditions: med?.conditions || '',
     address: incident.approxAddress || `${incident.exactLat}, ${incident.exactLng}`,
+    microAddress: incident.medicalSnapshot?.microAddress || user?.microAddress || null,
     district: 'Live GPS',
     city: 'SafeSolo',
     x: 20 + Math.abs((incident.fuzzedLng * 17) % 60),
@@ -630,9 +725,9 @@ function buildDispatchIncidentFromRescue(incident, user, mongoUsers = []) {
     receivedAt: toIso(incident.createdAt),
     channel: incident.source || 'App',
     phoneNumber: user?.phoneNumber || '',
-    medicalNotes: user?.medicalNotes || '',
-    emergencyContactName: firstContact?.name || '',
-    emergencyContactPhone: firstContact?.phone || '',
+    medicalNotes: user?.medicalNotes || resolvedAllergies,
+    emergencyContactName: firstContact?.name || 'Người thân khẩn cấp',
+    emergencyContactPhone: firstContact?.phone || med?.emergencyPhone || '',
     location: {
       lat: incident.exactLat,
       lng: incident.exactLng,
@@ -650,6 +745,101 @@ function buildDispatchIncidentFromRescue(incident, user, mongoUsers = []) {
     },
     source: 'mongo-rescue',
   };
+}
+
+async function buildMedicalAndSignalMaps(userIds = []) {
+  const uniqueIds = [...new Set(userIds.filter(Boolean).map(String))];
+  const medMap = new Map();
+  const signalMap = new Map();
+  if (!uniqueIds.length) return { medMap, signalMap };
+
+  const [medDocs, recentSignals] = await Promise.all([
+    MedicalProfile.find({ userId: { $in: uniqueIds } }).lean().catch(() => []),
+    DeviceSignal.find({
+      userId: { $in: uniqueIds },
+      signalType: { $in: ['HEART_RATE', 'SPO2', 'WATCH_VITALS', 'WATCH_OFF_WRIST', 'WEARABLE_TELEMETRY_SYNC'] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean()
+      .catch(() => []),
+  ]);
+
+  for (const doc of medDocs) {
+    try {
+      medMap.set(String(doc.userId), decryptMedicalPayload(doc));
+    } catch (_) {
+      medMap.set(String(doc.userId), doc);
+    }
+  }
+
+  for (const s of recentSignals) {
+    const uid = String(s.userId);
+    const cur = signalMap.get(uid) || {};
+    if ((s.signalType === 'HEART_RATE' || s.payload?.heartRate) && !cur.heartRate) {
+      cur.heartRate = Number(s.payload?.heartRate || s.payload?.value || 0) || undefined;
+    }
+    if ((s.signalType === 'SPO2' || s.payload?.spo2 || s.payload?.spO2) && !cur.spo2) {
+      cur.spo2 = Number(s.payload?.spo2 || s.payload?.spO2 || s.payload?.value || 0) || undefined;
+    }
+    if (s.payload?.battery !== undefined && cur.battery === undefined) {
+      cur.battery = Number(s.payload.battery);
+    }
+    if (s.payload?.isOffWrist !== undefined && cur.isOffWrist === undefined) {
+      cur.isOffWrist = Boolean(s.payload.isOffWrist);
+    }
+    if (s.payload?.svmG !== undefined && cur.svmG === undefined) {
+      cur.svmG = Number(s.payload.svmG);
+    }
+    if (s.payload?.steps !== undefined && cur.steps === undefined) {
+      cur.steps = Number(s.payload.steps);
+    }
+    if (s.payload?.deviceId && !cur.watchDeviceId) {
+      cur.watchDeviceId = String(s.payload.deviceId);
+    }
+    if (Array.isArray(s.payload?.gForceWaveform) && !cur.gForceWaveform) {
+      cur.gForceWaveform = s.payload.gForceWaveform;
+    }
+    if (Array.isArray(s.payload?.ppgWaveform) && !cur.ppgWaveform) {
+      cur.ppgWaveform = s.payload.ppgWaveform;
+    }
+    if (s.payload?.fusion && !cur.fusion) {
+      cur.fusion = s.payload.fusion;
+    }
+    signalMap.set(uid, cur);
+  }
+
+  // Merge live real-time Watch 5 telemetry cache from watchRoutes (takes priority for live demo)
+  try {
+    const watchRoutes = require('../routes/watchRoutes');
+    if (typeof watchRoutes.getLatestWatchVitalsByUserId === 'function') {
+      for (const uid of uniqueIds) {
+        const live = watchRoutes.getLatestWatchVitalsByUserId(uid);
+        if (live) {
+          const cur = signalMap.get(uid) || {};
+          signalMap.set(uid, {
+            ...cur,
+            heartRate: live.heartRate ?? cur.heartRate,
+            spo2: live.spO2 ?? cur.spo2,
+            battery: live.battery ?? cur.battery,
+            steps: live.steps ?? cur.steps,
+            isOffWrist: Boolean(live.isOffWrist),
+            svmG: live.svmG ?? cur.svmG ?? 1.0,
+            fallDetected: Number(live.svmG || 1.0) >= 2.5,
+            device: live.device || 'Samsung Galaxy Watch 5 (SM-R900)',
+            watchDeviceId: live.deviceId,
+            watchPaired: Boolean(live.paired),
+            syncTime: 'Watch 5 Live Stream',
+            ...(Array.isArray(live.gForceWaveform) && live.gForceWaveform.length > 0 ? { gForceWaveform: live.gForceWaveform } : {}),
+            ...(Array.isArray(live.ppgWaveform) && live.ppgWaveform.length > 0 ? { ppgWaveform: live.ppgWaveform } : {}),
+            ...(live.fusion ? { fusion: live.fusion } : {}),
+          });
+        }
+      }
+    }
+  } catch (_) { }
+
+  return { medMap, signalMap };
 }
 
 class AdminPortalService {
@@ -670,8 +860,11 @@ class AdminPortalService {
     }
 
     const mongoUsers = await getMongoUsers();
-    const openEmergencies = (await EmergencyLog.find({ isResolved: false }).sort({ createdAt: -1 }))
-      .map(mapEmergencyDoc);
+    const validUserIds = mongoUsers.map((u) => String(u._id));
+    const openEmergencies = (
+      await EmergencyLog.find({ isResolved: false, userId: { $in: validUserIds } }).sort({ createdAt: -1 })
+    ).map(mapEmergencyDoc);
+
     const activeRescueStatuses = [
       'ACTIVE',
       'TRIGGERED',
@@ -682,12 +875,26 @@ class AdminPortalService {
       'ON_SCENE',
     ];
     const rescueIncidents = await RescueIncident.find({ status: { $in: activeRescueStatuses } }).sort({ createdAt: -1 }).lean();
+
+    const involvedUserIds = [
+      ...openEmergencies.map((e) => e.userId),
+      ...rescueIncidents.map((r) => r.victimId),
+    ];
+    const { medMap, signalMap } = await buildMedicalAndSignalMaps(involvedUserIds);
+
     let incidents = openEmergencies
-      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers), mongoUsers))
+      .map((item) =>
+        buildDispatchIncidentFromEmergency(
+          this.attachEmergencyUser(item, mongoUsers),
+          mongoUsers,
+          medMap,
+          signalMap,
+        ),
+      )
       .concat(
         rescueIncidents.map((item) => {
           const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
-          return buildDispatchIncidentFromRescue(item, user, mongoUsers);
+          return buildDispatchIncidentFromRescue(item, user, mongoUsers, medMap, signalMap);
         }),
       )
       .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
@@ -738,14 +945,17 @@ class AdminPortalService {
     const user = mongoUsers.find((item) => item._id === log.userId) || null;
     return {
       ...log,
+      rawUserId: log.userId,
       userId: user
         ? {
-            fullName: user.fullName,
-            phoneNumber: user.phoneNumber,
-            medicalNotes: user.medicalNotes,
-            emergencyContacts: user.emergencyContacts,
-            currentStatus: user.currentStatus,
-          }
+          _id: user._id,
+          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          medicalNotes: user.medicalNotes,
+          emergencyContacts: user.emergencyContacts,
+          currentStatus: user.currentStatus,
+          microAddress: user.microAddress,
+        }
         : null,
     };
   }
@@ -756,28 +966,36 @@ class AdminPortalService {
     }
 
     const mongoUsers = await getMongoUsers();
+    const validUserIds = mongoUsers.map((u) => String(u._id));
     const mongoQuery =
       status === 'resolved'
-        ? { isResolved: true }
+        ? { isResolved: true, userId: { $in: validUserIds } }
         : status === 'all'
-        ? {}
-        : { isResolved: false };
+          ? { userId: { $in: validUserIds } }
+          : { isResolved: false, userId: { $in: validUserIds } };
 
-    const mongoIncidents = (await EmergencyLog.find(mongoQuery).sort({ createdAt: -1 }))
-      .map(mapEmergencyDoc)
-      .map((item) => buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers), mongoUsers));
-
+    const rawLogs = (await EmergencyLog.find(mongoQuery).sort({ createdAt: -1 })).map(mapEmergencyDoc);
     const rescueQuery =
       status === 'resolved'
         ? { status: 'RESOLVED' }
         : status === 'all'
-        ? {}
-        : { status: 'ACTIVE' };
-    const rescueIncidents = (await RescueIncident.find(rescueQuery).sort({ createdAt: -1 }).lean())
-      .map((item) => {
-        const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
-        return buildDispatchIncidentFromRescue(item, user, mongoUsers);
-      });
+          ? {}
+          : { status: 'ACTIVE' };
+    const rawRescues = await RescueIncident.find(rescueQuery).sort({ createdAt: -1 }).lean();
+
+    const { medMap, signalMap } = await buildMedicalAndSignalMaps([
+      ...rawLogs.map((l) => l.userId),
+      ...rawRescues.map((r) => r.victimId),
+    ]);
+
+    const mongoIncidents = rawLogs.map((item) =>
+      buildDispatchIncidentFromEmergency(this.attachEmergencyUser(item, mongoUsers), mongoUsers, medMap, signalMap),
+    );
+
+    const rescueIncidents = rawRescues.map((item) => {
+      const user = mongoUsers.find((entry) => entry._id === item.victimId) || null;
+      return buildDispatchIncidentFromRescue(item, user, mongoUsers, medMap, signalMap);
+    });
 
     const combined = mongoIncidents.concat(rescueIncidents).sort((a, b) =>
       String(b.receivedAt).localeCompare(String(a.receivedAt)),
@@ -927,7 +1145,7 @@ class AdminPortalService {
       if (emergencyRow) {
         return await resolveEmergency(id, notes);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // 3. RescueIncident
     try {
@@ -935,7 +1153,7 @@ class AdminPortalService {
       if (rescueIncident) {
         return await emergencyService.resolveIncidentFromAdmin(id, notes);
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // 4. Fallback for any other valid ID
     hitlIncidentStates.set(String(id), {
@@ -971,8 +1189,8 @@ class AdminPortalService {
             item.level === 'LEVEL_3_SOS'
               ? 'sos'
               : item.level === 'WARNING'
-              ? 'warning'
-              : 'info',
+                ? 'warning'
+                : 'info',
           hash: `0x${Buffer.from(item.id).toString('hex').slice(0, 16)}`,
           category: item.source === 'ADMIN' ? 'Dispatch' : 'System',
           metadata: item.metadata || {},
@@ -1031,29 +1249,29 @@ class AdminPortalService {
       combined.length > 0
         ? combined
         : [
-            {
-              id: 'log-hitl-001',
-              ts: new Date(Date.now() - 25 * 1000).toISOString(),
-              actor: 'Đoàn Minh Quân (Trưởng ca)',
-              action: 'HITL_INSTANT_DISPATCH',
-              target: 'INC-HITL-001',
-              tone: 'sos',
-              hash: '0x9fa1b4382c7e01d2',
-              category: 'Dispatch',
-              metadata: { supervisorId: 'SUP-0137', tier: 2 },
-            },
-            {
-              id: 'log-hitl-002',
-              ts: new Date(Date.now() - 55 * 1000).toISOString(),
-              actor: 'Đoàn Minh Quân (Trưởng ca)',
-              action: 'HITL_PAUSE_COUNTDOWN',
-              target: 'INC-HITL-002',
-              tone: 'info',
-              hash: '0x7e83d21c409b55f1',
-              category: 'Dispatch',
-              metadata: { supervisorId: 'SUP-0137', tier: 2 },
-            },
-          ];
+          {
+            id: 'log-hitl-001',
+            ts: new Date(Date.now() - 25 * 1000).toISOString(),
+            actor: 'Đoàn Minh Quân (Trưởng ca)',
+            action: 'HITL_INSTANT_DISPATCH',
+            target: 'INC-HITL-001',
+            tone: 'sos',
+            hash: '0x9fa1b4382c7e01d2',
+            category: 'Dispatch',
+            metadata: { supervisorId: 'SUP-0137', tier: 2 },
+          },
+          {
+            id: 'log-hitl-002',
+            ts: new Date(Date.now() - 55 * 1000).toISOString(),
+            actor: 'Đoàn Minh Quân (Trưởng ca)',
+            action: 'HITL_PAUSE_COUNTDOWN',
+            target: 'INC-HITL-002',
+            tone: 'info',
+            hash: '0x7e83d21c409b55f1',
+            category: 'Dispatch',
+            metadata: { supervisorId: 'SUP-0137', tier: 2 },
+          },
+        ];
 
     return result
       .filter((item) =>
@@ -1102,28 +1320,30 @@ class AdminPortalService {
           document.status === 'PENDING'
             ? 'pending'
             : document.status === 'REJECTED'
-            ? 'rejected'
-            : 'approved',
+              ? 'rejected'
+              : 'approved',
         region: sensitive.approxAddress || 'Unknown',
         match,
         phone: user?.phoneNumber || '',
-        frontImageUrl:
-          document.frontImageUrl ||
+        frontImageUrl: resolveUploadOrFallback(document.frontImageUrl, () =>
           buildIdentityCardFace({
             name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
             idNumber: identityNumber,
             side: 'Mặt trước',
             address: identityAddress,
           }),
-        backImageUrl:
-          document.backImageUrl ||
+        ),
+        backImageUrl: resolveUploadOrFallback(document.backImageUrl, () =>
           buildIdentityCardFace({
             name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
             idNumber: identityNumber,
             side: 'Mặt sau',
             address: identityAddress,
           }),
-        selfieImageUrl: portrait,
+        ),
+        selfieImageUrl: resolveUploadOrFallback(portrait, () =>
+          buildHeroPortrait(user ? fullName(user) : 'Hiệp sĩ'),
+        ),
         identityNumber,
         identityAddress,
         documentLabel: document.credentialName || 'Căn cước công dân & Bằng cấp chuyên môn',
@@ -1140,28 +1360,30 @@ class AdminPortalService {
         issuingAuthority: document.issuingAuthority || document.issuingOrganization || 'Bộ Y tế & Trung tâm Cấp cứu 115',
         workingUnit: document.workingUnit || 'Đơn vị Cứu hộ Khẩn cấp',
         yearsOfExperience: document.yearsOfExperience || 3,
-        credentialImageUrl:
-          document.credentialImageUrl ||
-          document.certificateImageUrl ||
-          buildCredentialBadgeCard({
-            name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
-            category: document.professionCategory || 'MEDICAL_NURSE',
-            credentialName: document.credentialName || 'Chứng chỉ Chuyên môn',
-            credentialNumber: document.credentialNumber || document.certificateNumber || 'CERT-0001',
-            issuingAuthority: document.issuingAuthority || 'Bộ Y tế',
-            workingUnit: document.workingUnit || 'SafeSolo Rescue Unit',
-          }),
-        certificateImageUrl:
-          document.credentialImageUrl ||
-          document.certificateImageUrl ||
-          buildCredentialBadgeCard({
-            name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
-            category: document.professionCategory || 'MEDICAL_NURSE',
-            credentialName: document.credentialName || 'Chứng chỉ Chuyên môn',
-            credentialNumber: document.credentialNumber || document.certificateNumber || 'CERT-0001',
-            issuingAuthority: document.issuingAuthority || 'Bộ Y tế',
-            workingUnit: document.workingUnit || 'SafeSolo Rescue Unit',
-          }),
+        credentialImageUrl: resolveUploadOrFallback(
+          document.credentialImageUrl || document.certificateImageUrl,
+          () =>
+            buildCredentialBadgeCard({
+              name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
+              category: document.professionCategory || 'MEDICAL_NURSE',
+              credentialName: document.credentialName || 'Chứng chỉ Chuyên môn',
+              credentialNumber: document.credentialNumber || document.certificateNumber || 'CERT-0001',
+              issuingAuthority: document.issuingAuthority || 'Bộ Y tế',
+              workingUnit: document.workingUnit || 'SafeSolo Rescue Unit',
+            }),
+        ),
+        certificateImageUrl: resolveUploadOrFallback(
+          document.credentialImageUrl || document.certificateImageUrl,
+          () =>
+            buildCredentialBadgeCard({
+              name: user ? fullName(user) : 'Hiệp sĩ SafeSolo',
+              category: document.professionCategory || 'MEDICAL_NURSE',
+              credentialName: document.credentialName || 'Chứng chỉ Chuyên môn',
+              credentialNumber: document.credentialNumber || document.certificateNumber || 'CERT-0001',
+              issuingAuthority: document.issuingAuthority || 'Bộ Y tế',
+              workingUnit: document.workingUnit || 'SafeSolo Rescue Unit',
+            }),
+        ),
         certificateNumber: document.credentialNumber || document.certificateNumber || null,
         issuingOrganization: document.issuingAuthority || document.issuingOrganization || 'RED_CROSS_VN',
         certificateType: document.credentialName || 'FIRST_AID_STANDARD',
@@ -1329,14 +1551,14 @@ class AdminPortalService {
       const logs = provider ? countByProvider(provider) : [];
       const success = logs.length
         ? Number(
-            (
-              (logs.filter((item) => item.success).length / logs.length) *
-              100
-            ).toFixed(1),
-          )
+          (
+            (logs.filter((item) => item.success).length / logs.length) *
+            100
+          ).toFixed(1),
+        )
         : forcedHealthy == null
-        ? 100
-        : forcedHealthy;
+          ? 100
+          : forcedHealthy;
 
       return {
         name,
@@ -1487,7 +1709,7 @@ class AdminPortalService {
         testLogId,
         channels: results,
       },
-    }).catch(() => {});
+    }).catch(() => { });
 
     return {
       success: true,
@@ -1584,25 +1806,25 @@ class AdminPortalService {
       let distanceMeters = null;
 
       if (sim && sim.active) {
-         if (!sim.currentLat) { sim.currentLat = currentLat; sim.currentLng = currentLng; }
-         const distLat = sim.targetLat - sim.currentLat;
-         const distLng = sim.targetLng - sim.currentLng;
-         distanceMeters = Math.round(Math.hypot(distLat, distLng) * 111000);
+        if (!sim.currentLat) { sim.currentLat = currentLat; sim.currentLng = currentLng; }
+        const distLat = sim.targetLat - sim.currentLat;
+        const distLng = sim.targetLng - sim.currentLng;
+        distanceMeters = Math.round(Math.hypot(distLat, distLng) * 111000);
 
-         if (distanceMeters < 35 || sim.arrived) {
-             currentLat = sim.targetLat + 0.0001;
-             currentLng = sim.targetLng + 0.0001;
-             sim.arrived = true;
-             isSimulating = true;
-             distanceMeters = 5;
-         } else {
-             sim.currentLat += distLat * 0.35;
-             sim.currentLng += distLng * 0.35;
-             currentLat = sim.currentLat;
-             currentLng = sim.currentLng;
-             isSimulating = true;
-             distanceMeters = Math.round(Math.hypot(sim.targetLat - currentLat, sim.targetLng - currentLng) * 111000);
-         }
+        if (distanceMeters < 35 || sim.arrived) {
+          currentLat = sim.targetLat + 0.0001;
+          currentLng = sim.targetLng + 0.0001;
+          sim.arrived = true;
+          isSimulating = true;
+          distanceMeters = 5;
+        } else {
+          sim.currentLat += distLat * 0.35;
+          sim.currentLng += distLng * 0.35;
+          currentLat = sim.currentLat;
+          currentLng = sim.currentLng;
+          isSimulating = true;
+          distanceMeters = Math.round(Math.hypot(sim.targetLat - currentLat, sim.targetLng - currentLng) * 111000);
+        }
       }
 
       return {
@@ -2071,6 +2293,7 @@ class AdminPortalService {
       const isCritical = p === 'P1_CRITICAL';
       return {
         incidentId: inc.id,
+        userId: inc.userId || null,
         victimName: inc.name,
         victimPhone: inc.phoneNumber,
         age: inc.age || 28,
@@ -2086,11 +2309,20 @@ class AdminPortalService {
           spo2: inc.vitals?.spo2 || (isCritical ? 91 : 98),
           hrvRmssd: inc.vitals?.hrvRmssd || (isCritical ? 18 : 42),
           strokeRisk: inc.vitals?.strokeRisk || (isCritical ? 'NGUY CƠ CAO (Rung nhĩ AFib)' : 'Bình thường'),
-          fallDetected: Boolean(isCritical),
+          fallDetected: Boolean(inc.vitals?.fallDetected || isCritical),
+          isOffWrist: Boolean(inc.vitals?.isOffWrist),
+          svmG: inc.vitals?.svmG ?? 1.0,
+          steps: inc.vitals?.steps,
           battery: inc.vitals?.battery || 82,
           device: inc.vitals?.device || 'Samsung Galaxy Watch 5 (WearOS)',
-          status: isCritical ? 'CẢNH BÁO NGUY HIỂM' : 'ĐANG THEO DÕI',
-          syncTime: 'Trực tiếp qua 4G eSIM',
+          watchPaired: Boolean(inc.vitals?.watchPaired),
+          watchDeviceId: inc.vitals?.watchDeviceId || null,
+          status: inc.vitals?.isOffWrist
+            ? 'CẢNH BÁO THÁO ĐỒNG HỒ'
+            : isCritical
+              ? 'CẢNH BÁO NGUY HIỂM'
+              : 'ĐANG THEO DÕI',
+          syncTime: inc.vitals?.syncTime || 'Trực tiếp qua 4G eSIM',
         },
         iceProfile: {
           bloodGroup: inc.blood || 'O+',
@@ -2182,7 +2414,29 @@ class AdminPortalService {
           sbarSummary,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
+
+    // Sync bi-directional dispatch confirmation straight to Victim's Galaxy Watch 5
+    let watchNotification = 'NO_WATCH_LINKED';
+    try {
+      const watchRoutes = require('../routes/watchRoutes');
+      if (typeof watchRoutes.enqueueWatchCommand === 'function' && (incident?.userId || incident?.id)) {
+        const cmdRes = await watchRoutes.enqueueWatchCommand({
+          userId: incident?.userId || undefined,
+          action: 'TOC_DISPATCH_ACK',
+          payload: {
+            dispatchId,
+            ambulanceUnit,
+            targetSop,
+            incidentId: incident?.id,
+            incidentName: incident?.name,
+          },
+          issuedBy: 'Web Admin TOC (Dispatch STAT)',
+          sender: 'toc',
+        });
+        watchNotification = `ENQUEUED:${cmdRes.deviceId}`;
+      }
+    } catch (_) { }
 
     return {
       dispatchId,
@@ -2191,6 +2445,7 @@ class AdminPortalService {
       victimName: incident.name,
       ambulanceUnit,
       telegramStatus,
+      watchNotification,
       sbarSummary,
     };
   }
@@ -2221,7 +2476,7 @@ class AdminPortalService {
           telegramStatus,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       userId: String(user._id),
@@ -2261,7 +2516,7 @@ class AdminPortalService {
           telegramStatus,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       userId: String(user._id),
@@ -2284,7 +2539,7 @@ class AdminPortalService {
         address = hazard.address;
         cat = hazard.category;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     let telegramStatus = 'SENT';
     try {
@@ -2317,7 +2572,7 @@ class AdminPortalService {
           telegramStatus,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       hazardId,
@@ -2446,7 +2701,7 @@ class AdminPortalService {
           hash: `0x${crypto.createHash('sha256').update(settlementId + partnerName + amount).digest('hex').slice(0, 16)}`,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       success: true,
@@ -2497,7 +2752,7 @@ class AdminPortalService {
           timestamp,
         },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       success: true,
@@ -2624,7 +2879,7 @@ class AdminPortalService {
                 ].join('\n'),
               });
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       } catch (err) {
         console.warn('disburseHeroBounty mongo update notice:', err.message);
@@ -2659,7 +2914,7 @@ class AdminPortalService {
             $or: [{ isKycVerified: true }, { role: 'hero' }, { isHero: true }],
           });
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     const urgencyTitle =
@@ -2689,7 +2944,7 @@ class AdminPortalService {
         await telegramBotService.sendMessage({ chatId: tgChat, text });
         telegramSent = true;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       await SystemLog.create({
@@ -2697,7 +2952,7 @@ class AdminPortalService {
         description: `Gửi thông điệp điều động tới Hiệp sĩ [${targetUser?.fullName || heroId}]: ${message.slice(0, 80)}`,
         metadata: { heroId: String(targetUser?._id || heroId), message, urgency, telegramSent },
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       success: true,
@@ -2908,7 +3163,7 @@ class AdminPortalService {
         issuedBy: 'Ban Điều Phối Cứu Hộ SafeSolo',
         broadcastCount: geofence.broadcastCount,
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       success: true,
@@ -3018,7 +3273,7 @@ class AdminPortalService {
         isAdminBroadcast: true,
         severity: alert.severity === 'CRITICAL' ? 'P1_CRITICAL' : 'P2_URGENT',
       });
-    } catch (_) {}
+    } catch (_) { }
 
     return alert.toObject ? alert.toObject() : alert;
   }
@@ -3238,7 +3493,7 @@ class AdminPortalService {
         });
         await rescueIncident.save();
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return {
       success: true,

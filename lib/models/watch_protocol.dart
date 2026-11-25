@@ -8,6 +8,7 @@ import 'dart:convert';
 enum WatchSender {
   watch,
   phone,
+  toc,
 }
 
 enum WatchPacketType {
@@ -40,6 +41,12 @@ class WatchAction {
   static const String timerSync = 'TIMER_SYNC';
   static const String pinConfigSync = 'PIN_CONFIG_SYNC';
   static const String medicalProfileSync = 'MEDICAL_PROFILE_SYNC';
+
+  // Commands & ACKs with Web Admin TOC
+  static const String tocDispatchAck = 'TOC_DISPATCH_ACK';
+  static const String watchCommandAck = 'WATCH_COMMAND_ACK';
+  static const String routeDeviationCheck = 'ROUTE_DEVIATION_CHECK';
+  static const String journeyCheckSafe = 'JOURNEY_CHECK_SAFE';
 
   // Commands from Watch
   static const String findPhonePing = 'FIND_PHONE_PING';
@@ -97,7 +104,9 @@ class WatchPacket {
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
           : DateTime.now(),
-      sender: (json['sender'] == 'phone') ? WatchSender.phone : WatchSender.watch,
+      sender: json['sender'] == 'phone'
+          ? WatchSender.phone
+          : (json['sender'] == 'toc' ? WatchSender.toc : WatchSender.watch),
       type: WatchPacketType.values.firstWhere(
         (t) => t.name == json['type'],
         orElse: () => WatchPacketType.telemetry,

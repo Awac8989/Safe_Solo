@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useAdminAuth } from "@/context/AdminAuthContext";
+import { canAccessPath } from "@/lib/rbac";
 import {
   Sidebar,
   SidebarContent,
@@ -86,7 +87,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Tác chiến khẩn cấp</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {operationItems.map((item) => (
+              {operationItems
+                .filter((item) => canAccessPath(adminUser?.role, item.url))
+                .map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={path === item.url}>
                     <Link to={item.url} className="flex items-center gap-2">
@@ -105,7 +108,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Lực lượng & Doanh nghiệp</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {fleetAndB2bItems.map((item) => (
+              {fleetAndB2bItems
+                .filter((item) => canAccessPath(adminUser?.role, item.url))
+                .map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={path === item.url}>
                     <Link to={item.url} className="flex items-center gap-2">
@@ -124,7 +129,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Hệ thống & Báo cáo</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {systemItems.map((item) => (
+              {systemItems
+                .filter((item) => canAccessPath(adminUser?.role, item.url))
+                .map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={path === item.url}>
                     <Link to={item.url} className="flex items-center gap-2">

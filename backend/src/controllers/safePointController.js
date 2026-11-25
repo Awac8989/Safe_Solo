@@ -71,6 +71,17 @@ class SafePointController {
     }
   }
 
+  async testIotDevice(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { action = 'PING_SENSOR', actorName = 'Điều phối viên TOC' } = req.body || {};
+      const result = await safePointService.testIotCabinetDevice(id, action, actorName);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async resolveTamper(req, res, next) {
     try {
       const { id } = req.params;

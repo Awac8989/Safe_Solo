@@ -172,6 +172,13 @@ class RadarController {
       );
       res.status(200).json({ success: true, data: result });
     } catch (error) {
+      if (error.statusCode === 404 || error.statusCode === 403) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.message,
+          shouldStopTelemetry: true,
+        });
+      }
       next(error);
     }
   }

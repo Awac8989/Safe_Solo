@@ -1,8 +1,15 @@
 const jwt = require('jsonwebtoken');
 const chatService = require('../services/chatService');
 
+const VALID_SOCKET_API_KEYS = new Set([
+  process.env.PUBLIC_API_KEY || 'default-public-api-key-123',
+  'android-app-key-abc',
+  'ios-app-key-xyz',
+]);
+const SOCKET_JWT_SECRET = process.env.JWT_SECRET || 'safesolo-dev-secret';
+
 function initializeChatSocket(io) {
-  // JWT authentication middleware for sockets
+  // JWT / App-Key authentication middleware for sockets
   io.use(async (socket, next) => {
     try {
       // Cho phép kết nối chuyên biệt cho smartwatch đồng bộ qua SafeSolo Watch Protocol
@@ -12,14 +19,31 @@ function initializeChatSocket(io) {
         return next();
       }
 
-      const token = socket.handshake.auth.token || socket.handshake.query.token;
+      const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+      const apiKey = socket.handshake.auth?.apiKey || socket.handshake.query?.apiKey;
+
+      // Cho phép kênh WebRTC / Audio PTT hiện trường & Bác sĩ 115 TOC qua JWT hoặc API Key hợp lệ
+      if (authType === 'webrtc_dispatch' || authType === 'webrtc_field') {
+        if (token) {
+          const decoded = jwt.verify(token, SOCKET_JWT_SECRET);
+          socket.userId = decoded.id;
+          socket.userEmail = decoded.email;
+          socket.isWebRtcPeer = true;
+          return next();
+        }
+        if (apiKey && VALID_SOCKET_API_KEYS.has(apiKey)) {
+          socket.isWebRtcPeer = true;
+          return next();
+        }
+        return next(new Error('WebRTC authentication required'));
+      }
 
       if (!token) {
         return next(new Error('Authentication token required'));
       }
 
       // Verify JWT token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, SOCKET_JWT_SECRET);
       socket.userId = decoded.id;
       socket.userEmail = decoded.email;
 

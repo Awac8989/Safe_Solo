@@ -559,15 +559,20 @@ class _GhostBreadcrumbsSheetState extends State<GhostBreadcrumbsSheet>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'NHẬT KÝ VẾT TÍCH TRINH SÁT (BREADCRUMB TIMELINE):',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.6,
-                color: Color(0xFFCBD5E1),
+            const Expanded(
+              child: Text(
+                'NHẬT KÝ VẾT TÍCH TRINH SÁT (BREADCRUMB TIMELINE):',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.6,
+                  color: Color(0xFFCBD5E1),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${waypoints.length} Điểm',
               style: const TextStyle(
@@ -682,16 +687,20 @@ class _GhostBreadcrumbsSheetState extends State<GhostBreadcrumbsSheet>
             children: [
               const Icon(Icons.shield_rounded, color: Color(0xFF38EF7D), size: 18),
               const SizedBox(width: 8),
-              const Text(
-                'KÉT SẮT NGỤY TRANG (DECOY DUMMY VAULT)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF38EF7D),
-                  letterSpacing: 0.6,
+              const Expanded(
+                child: Text(
+                  'KÉT SẮT NGỤY TRANG (DECOY DUMMY VAULT)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF38EF7D),
+                    letterSpacing: 0.6,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.close, size: 16, color: Colors.white70),
                 onPressed: () => ghost.toggleDecoyVault(false),
